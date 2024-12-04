@@ -168,18 +168,42 @@ class ExecuteContainerCommand extends Component
             return;
         }
         try {
+            // Validate container name format
+            if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $this->selected_container)) {
+                throw new \InvalidArgumentException('Invalid container name format');
+            }
+
+            // Verify container exists in our allowed list
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
                 throw new \RuntimeException('Container not found.');
             }
-            $server = data_get($this->container, 'server');
+
+            // Verify server ownership and status
+            $server = data_get($container, 'server');
+            if (! $server || ! $server instanceof Server) {
+                throw new \RuntimeException('Invalid server configuration.');
+            }
 
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
+
+            // Additional ownership verification based on resource type
+            $resourceServer = match ($this->type) {
+                'application' => $this->resource->destination->server,
+                'database' => $this->resource->destination->server,
+                'service' => $this->resource->server,
+                default => throw new \RuntimeException('Invalid resource type.')
+            };
+
+            if ($server->id !== $resourceServer->id && ! $this->resource->additional_servers->contains('id', $server->id)) {
+                throw new \RuntimeException('Server ownership verification failed.');
+            }
+
             $this->dispatch(
                 'send-terminal-command',
-                isset($container),
+                true,
                 data_get($container, 'container.Names'),
                 data_get($container, 'server.uuid')
             );
