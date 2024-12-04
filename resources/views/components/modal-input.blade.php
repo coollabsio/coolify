@@ -7,6 +7,7 @@
     'action' => 'delete',
     'content' => null,
     'closeOutside' => true,
+    'minWidth' => '36rem',
 ])
 <div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     class="relative w-auto h-auto" wire:ignore>
@@ -40,7 +41,7 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded drop-shadow min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
+                class="relative w-full py-6 border rounded drop-shadow min-w-full lg:min-w-[{{ $minWidth }}] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen=false"

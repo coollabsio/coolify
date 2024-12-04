@@ -11,6 +11,7 @@ use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -48,7 +49,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait, SoftDeletes;
+    use HasFactory, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 

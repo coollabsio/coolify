@@ -2170,6 +2170,21 @@
         "logo": "svgs/plane.svg",
         "minversion": "0.0.0"
     },
+    "plex": {
+        "documentation": "https://docs.linuxserver.io/images/docker-plex/?utm_source=coolify.io",
+        "slogan": "Plex organizes video, music and photos from personal media libraries and streams them to smart TVs, streaming boxes and mobile devices.",
+        "compose": "c2VydmljZXM6CiAgcGxleDoKICAgIGltYWdlOiAnbHNjci5pby9saW51eHNlcnZlci9wbGV4OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9QTEVYXzMyNDAwCiAgICAgIC0gX0FQUF9VUkw9JFNFUlZJQ0VfRlFETl9QTEVYCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUFtZXJpY2EvVG9yb250b30nCiAgICAgIC0gJ1BMRVhfQ0xBSU09JHtQTEVYX0NMQUlNfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3BsZXgtY29uZmlnOi9jb25maWcnCiAgICAgIC0gJ3BsZXgtdHY6L3R2JwogICAgICAtICdwbGV4LW1vdmllczovbW92aWVzJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjMyNDAwL2lkZW50aXR5JwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "media",
+            "server",
+            "movies",
+            "tv",
+            "music"
+        ],
+        "logo": "svgs/plex.svg",
+        "minversion": "0.0.0",
+        "port": "32400"
+    },
     "plunk": {
         "documentation": "https://docs.useplunk.com/getting-started/introduction?utm_source=coolify.io",
         "slogan": "Plunk, The Open-Source Email Platform for AWS",

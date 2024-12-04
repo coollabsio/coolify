@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Process\InvokedProcess;
@@ -104,7 +105,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     private static $parserVersion = '4';
 
