@@ -90,8 +90,28 @@ function metrics_dir(): string
     return base_configuration_dir().'/metrics';
 }
 
+function sanitize_string(string $input): string
+{
+    // Remove any HTML/PHP tags
+    $sanitized = strip_tags($input);
+
+    // Convert special characters to HTML entities
+    $sanitized = htmlspecialchars($sanitized, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    // Remove any control characters
+    $sanitized = preg_replace('/[\x00-\x1F\x7F]/u', '', $sanitized);
+
+    // Trim whitespace
+    $sanitized = trim($sanitized);
+
+    return $sanitized;
+}
+
 function generate_readme_file(string $name, string $updated_at): string
 {
+    $name = sanitize_string($name);
+    $updated_at = sanitize_string($updated_at);
+
     return "Resource name: $name\nLatest Deployment Date: $updated_at";
 }
 
@@ -944,6 +964,15 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'REALBASE64':
         case 'REALBASE64_32':
             $generatedValue = base64_encode(Str::random(32));
+            break;
+        case 'HEX_32':
+            $generatedValue = bin2hex(Str::random(32));
+            break;
+        case 'HEX_64':
+            $generatedValue = bin2hex(Str::random(64));
+            break;
+        case 'HEX_128':
+            $generatedValue = bin2hex(Str::random(128));
             break;
         case 'USER':
             $generatedValue = Str::random(16);

@@ -27,7 +27,7 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                 $versions = $response->json();
 
                 $latest_version = data_get($versions, 'coolify.v4.version');
-                $current_version = config('version');
+                $current_version = config('constants.coolify.version');
 
                 if (version_compare($latest_version, $current_version, '>')) {
                     // New version available

@@ -7,7 +7,6 @@ use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
-use App\Notifications\Container\ContainerRestarted;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -15,6 +14,8 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class GetContainersStatus
 {
     use AsAction;
+
+    public string $jobQueue = 'high';
 
     public $applications;
 
@@ -178,7 +179,7 @@ class GetContainersStatus
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
-                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                    // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for database", $this->server));
                                 }
                             }
                         } else {

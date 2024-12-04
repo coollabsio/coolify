@@ -192,7 +192,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
-    $labels->push('coolify.version='.config('version'));
+    $labels->push('coolify.version='.config('constants.coolify.version'));
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.$name);
@@ -227,13 +227,17 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
 
-            if (str($MINIO_BROWSER_REDIRECT_URL->value)->isEmpty()) {
-                $MINIO_BROWSER_REDIRECT_URL?->update([
+            if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
+                return collect([]);
+            }
+
+            if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
+                $MINIO_BROWSER_REDIRECT_URL->update([
                     'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
-            if (str($MINIO_SERVER_URL->value)->isEmpty()) {
-                $MINIO_SERVER_URL?->update([
+            if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
+                $MINIO_SERVER_URL->update([
                     'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
@@ -246,13 +250,17 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
             $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
 
-            if (str($LOGTO_ENDPOINT?->value)->isEmpty()) {
-                $LOGTO_ENDPOINT?->update([
+            if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
+                return collect([]);
+            }
+
+            if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
+                $LOGTO_ENDPOINT->update([
                     'value' => generateFqdn($server, 'logto-'.$uuid),
                 ]);
             }
-            if (str($LOGTO_ADMIN_ENDPOINT?->value)->isEmpty()) {
-                $LOGTO_ADMIN_ENDPOINT?->update([
+            if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
+                $LOGTO_ADMIN_ENDPOINT->update([
                     'value' => generateFqdn($server, 'logto-admin-'.$uuid),
                 ]);
             }
@@ -280,6 +288,10 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
         $port = $url->getPort();
+        $handle = "handle_path";
+        if ( ! $is_stripprefix_enabled){
+            $handle = "handle";
+        }
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
         }
@@ -290,12 +302,13 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_{$loop}.header=-Server");
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
+
         if ($port) {
-            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams $port}}");
         } else {
-            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams}}");
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
-        $labels->push("caddy_{$loop}.handle_path={$path}*");
+        $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }

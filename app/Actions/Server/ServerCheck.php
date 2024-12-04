@@ -51,7 +51,6 @@ class ServerCheck
 
                     $containerReplicates = null;
                     $this->isSentinel = true;
-
                 } else {
                     ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
                     // ServerStorageCheckJob::dispatch($this->server);
@@ -130,10 +129,10 @@ class ServerCheck
         if ($foundLogDrainContainer) {
             $status = data_get($foundLogDrainContainer, 'State.Status');
             if ($status !== 'running') {
-                StartLogDrain::dispatch($this->server)->onQueue('high');
+                StartLogDrain::dispatch($this->server);
             }
         } else {
-            StartLogDrain::dispatch($this->server)->onQueue('high');
+            StartLogDrain::dispatch($this->server);
         }
     }
 
@@ -148,7 +147,6 @@ class ServerCheck
                 } else {
                     $labels = Arr::undot(data_get($container, 'Config.Labels'));
                 }
-
             }
             $managed = data_get($labels, 'coolify.managed');
             if (! $managed) {
@@ -259,7 +257,7 @@ class ServerCheck
                         })->first();
                         if (! $foundTcpProxy) {
                             StartDatabaseProxy::run($database);
-                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for database", $this->server));
                         }
                     }
                 }

@@ -29,9 +29,9 @@ class UpdateCoolify
         if (! $this->server) {
             return;
         }
-        CleanupDocker::dispatch($this->server)->onQueue('high');
+        CleanupDocker::dispatch($this->server);
         $this->latestVersion = get_latest_version_of_coolify();
-        $this->currentVersion = config('version');
+        $this->currentVersion = config('constants.coolify.version');
         if (! $manual_update) {
             if (! $settings->is_auto_update_enabled) {
                 return;

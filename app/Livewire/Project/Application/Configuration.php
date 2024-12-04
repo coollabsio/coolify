@@ -16,24 +16,28 @@ class Configuration extends Component
 
     public function mount()
     {
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (! $project) {
-            return redirect()->route('dashboard');
+        $this->application = Application::query()
+            ->whereHas('environment.project', function ($query) {
+                $query->where('team_id', currentTeam()->id)
+                    ->where('uuid', request()->route('project_uuid'));
+            })
+            ->whereHas('environment', function ($query) {
+                $query->where('name', request()->route('environment_name'));
+            })
+            ->where('uuid', request()->route('application_uuid'))
+            ->with(['destination' => function ($query) {
+                $query->select('id', 'server_id');
+            }])
+            ->firstOrFail();
+
+        if ($this->application->destination && $this->application->destination->server_id) {
+            $this->servers = Server::ownedByCurrentTeam()
+                ->select('id', 'name')
+                ->where('id', '!=', $this->application->destination->server_id)
+                ->get();
+        } else {
+            $this->servers = collect();
         }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (! $environment) {
-            return redirect()->route('dashboard');
-        }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (! $application) {
-            return redirect()->route('dashboard');
-        }
-        $this->application = $application;
-        $mainServer = $this->application->destination->server;
-        $servers = Server::ownedByCurrentTeam()->get();
-        $this->servers = $servers->filter(function ($server) use ($mainServer) {
-            return $server->id != $mainServer->id;
-        });
     }
 
     public function render()
