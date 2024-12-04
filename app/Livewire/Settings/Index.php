@@ -53,7 +53,7 @@ class Index extends Component
     #[Validate('string')]
     public string $auto_update_frequency;
 
-    #[Validate('string')]
+    #[Validate('string|required')]
     public string $update_check_frequency;
 
     #[Validate('required|string|timezone')]
@@ -109,6 +109,13 @@ class Index extends Component
 
     public function instantSave($isSave = true)
     {
+        $this->validate();
+        if ($this->settings->is_auto_update_enabled === true) {
+            $this->validate([
+                'auto_update_frequency' => ['required', 'string'],
+            ]);
+        }
+
         $this->settings->fqdn = $this->fqdn;
         $this->settings->resale_license = $this->resale_license;
         $this->settings->public_port_min = $this->public_port_min;

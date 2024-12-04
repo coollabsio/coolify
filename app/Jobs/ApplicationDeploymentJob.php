@@ -463,7 +463,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
-                $services = collect($composeFile['services']);
+                $services = collect(data_get($composeFile, 'services', []));
                 $services = $services->map(function ($service, $name) {
                     $service['env_file'] = [$this->env_filename];
 
@@ -2400,7 +2400,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            //$this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
     }
 

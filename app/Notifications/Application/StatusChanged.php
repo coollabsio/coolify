@@ -3,18 +3,12 @@
 namespace App\Notifications\Application;
 
 use App\Models\Application;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class StatusChanged extends Notification implements ShouldQueue
+class StatusChanged extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public string $resource_name;
 
     public string $project_uuid;

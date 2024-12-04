@@ -20,7 +20,10 @@ class ServicesGenerate extends Command
 
     public function handle(): int
     {
-        $serviceTemplatesJson = collect(glob(base_path('templates/compose/*.yaml')))
+        $serviceTemplatesJson = collect(array_merge(
+            glob(base_path('templates/compose/*.yaml')),
+            glob(base_path('templates/compose/*.yml'))
+        ))
             ->mapWithKeys(function ($file): array {
                 $file = basename($file);
                 $parsed = $this->processFile($file);
@@ -68,7 +71,7 @@ class ServicesGenerate extends Command
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
             'tags' => $tags,
-            'logo' => $data->get('logo', 'svgs/coolify.png'),
+            'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
         ];
 
