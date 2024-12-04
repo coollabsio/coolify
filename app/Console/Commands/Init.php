@@ -200,7 +200,7 @@ class Init extends Command
 
     private function restore_coolify_db_backup()
     {
-        if (version_compare('4.0.0-beta.179', config('version'), '<=')) {
+        if (version_compare('4.0.0-beta.179', config('constants.coolify.version'), '<=')) {
             try {
                 $database = StandalonePostgresql::withTrashed()->find(0);
                 if ($database && $database->trashed()) {
@@ -228,7 +228,7 @@ class Init extends Command
     private function send_alive_signal()
     {
         $id = config('app.id');
-        $version = config('version');
+        $version = config('constants.coolify.version');
         $settings = instanceSettings();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
@@ -264,7 +264,7 @@ class Init extends Command
 
     private function replace_slash_in_environment_name()
     {
-        if (version_compare('4.0.0-beta.298', config('version'), '<=')) {
+        if (version_compare('4.0.0-beta.298', config('constants.coolify.version'), '<=')) {
             $environments = Environment::all();
             foreach ($environments as $environment) {
                 if (str_contains($environment->name, '/')) {

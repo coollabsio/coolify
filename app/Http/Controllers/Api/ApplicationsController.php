@@ -1591,16 +1591,32 @@ class ApplicationsController extends Controller
         }
         $domains = $request->domains;
         if ($request->has('domains') && $server->isProxyShouldRun()) {
-            $errors = [];
+            $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-            $application->fqdn = $fqdn;
-            if (! $application->settings->is_container_label_readonly_enabled) {
-                $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-                $application->custom_labels = base64_encode($customLabels);
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                $domain = trim($domain);
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false || !preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
+                    $errors[] = 'Invalid domain: '.$domain;
+                }
+                return $domain;
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
             }
-            $request->offsetUnset('domains');
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'One of the domain is already used.',
+                    ],
+                ], 422);
+            }
         }
 
         $dockerComposeDomainsJson = collect();
@@ -2790,6 +2806,33 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
                     $errors[] = 'Invalid domain: '.$domain;
+                }
+
+                return str($domain)->trim()->lower();
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'One of the domain is already used.',
+                    ],
+                ], 422);
+            }
+        }
+    }
+}
+
+            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+                    $errors[] = 'Invalid domain: ' . $domain;
                 }
 
                 return str($domain)->trim()->lower();

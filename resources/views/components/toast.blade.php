@@ -11,16 +11,20 @@
         toast(this.title, { description: this.description, type: this.type, position: this.position, html: html })
     }
 }" x-init="window.toast = function(message, options = {}) {
-    let description = '';
-    let type = 'default';
-    let position = 'top-center';
-    let html = '';
-    if (typeof options.description != 'undefined') description = options.description;
-    if (typeof options.type != 'undefined') type = options.type;
-    if (typeof options.position != 'undefined') position = options.position;
-    if (typeof options.html != 'undefined') html = options.html;
+    try {
+        let description = '';
+        let type = 'default';
+        let position = 'top-center';
+        let html = '';
+        if (typeof options.description != 'undefined') description = options.description;
+        if (typeof options.type != 'undefined') type = options.type;
+        if (typeof options.position != 'undefined') position = options.position;
+        if (typeof options.html != 'undefined') html = options.html;
 
-    window.dispatchEvent(new CustomEvent('toast-show', { detail: { type: type, message: message, description: description, position: position, html: html } }));
+        window.dispatchEvent(new CustomEvent('toast-show', { detail: { type: type, message: message, description: description, position: position, html: html } }));
+    } catch (error) {
+        console.error('Error showing toast:', error);
+    }
 }" class="relative space-y-5">
     <template x-teleport="body">
         <ul x-data="{
