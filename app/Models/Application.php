@@ -110,10 +110,6 @@ class Application extends BaseModel
 
     private static $parserVersion = '4';
 
-    protected $fillable = [
-        'docker_use_custom_registry',
-    ];
-
     protected $casts = [
         'docker_use_custom_registry' => 'boolean',
         'selectedRegistries' => 'array',
