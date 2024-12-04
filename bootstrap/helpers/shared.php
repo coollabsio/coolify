@@ -90,8 +90,11 @@ function metrics_dir(): string
     return base_configuration_dir().'/metrics';
 }
 
-function sanitize_string(string $input): string
+function sanitize_string(?string $input = null): ?string
 {
+    if (is_null($input)) {
+        return null;
+    }
     // Remove any HTML/PHP tags
     $sanitized = strip_tags($input);
 
