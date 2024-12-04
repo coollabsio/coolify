@@ -60,7 +60,7 @@ class DockerImage extends Component
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
             $name = 'docker-image-' . new Cuid2;
-            error_log($name);
+
             $application = Application::create([
                 'name' => $name,
                 'repository_project_id' => 0,
