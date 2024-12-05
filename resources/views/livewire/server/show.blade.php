@@ -88,7 +88,7 @@
                     <div class="w-full" x-data="{
                         open: false,
                         search: '{{ $serverTimezone ?: '' }}',
-                        timezones: @js($timezones),
+                        timezones: @js($this->timezones),
                         placeholder: '{{ $serverTimezone ? 'Search timezone...' : 'Select Server Timezone' }}',
                         init() {
                             this.$watch('search', value => {

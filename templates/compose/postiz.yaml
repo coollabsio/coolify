@@ -13,9 +13,8 @@ services:
       - FRONTEND_URL=${SERVICE_FQDN_POSTIZ}
       - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ}/api
       - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRESQL}:${SERVICE_PASSWORD_POSTGRESQL}@postgres:5432/${POSTGRESQL_DATABASE:-postiz-db}
-      # Changed Redis URL to use default username
-      - REDIS_URL=redis://${SERVICE_USER_REDIS}:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRESQL}@postgres:5432/${POSTGRESQL_DATABASE:-postiz-db}
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
       - BACKEND_INTERNAL_URL=http://localhost:3000
       
       # Cloudflare R2 Settings
@@ -36,6 +35,7 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER}
       
       # Social Media API Settings
       - X_API_KEY=${SERVICE_X_API}
@@ -75,7 +75,7 @@ services:
       # Misc Settings
       - NEXT_PUBLIC_DISCORD_SUPPORT=${NEXT_PUBLIC_DISCORD_SUPPORT}
       - NEXT_PUBLIC_POLOTNO=${NEXT_PUBLIC_POLOTNO}
-      - IS_GENERAL=${IS_GENERAL:-true}
+      - IS_GENERAL=true
       - NX_ADD_PLUGINS=${NX_ADD_PLUGINS:-false}
       
       # Payment Settings
@@ -106,13 +106,11 @@ services:
     volumes:
       - postiz_postgresql_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_DB=${POSTGRESQL_DATABASE:-postiz-db}
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U ${SERVICE_USER_POSTGRESQL} -d ${POSTGRESQL_DATABASE:-postiz-db}
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-postiz-db}"]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -121,7 +119,6 @@ services:
     image: redis:7.2
     environment:
       - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
-      - REDIS_USER=${SERVICE_USER_REDIS}
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - postiz_redis_data:/data

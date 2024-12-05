@@ -73,8 +73,8 @@ class Email extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $resendApiKey = null;
 
-    #[Validate(['required', 'email'])]
-    public string $testEmailAddress = '';
+    #[Validate(['nullable', 'email'])]
+    public ?string $testEmailAddress = null;
 
     public function mount()
     {

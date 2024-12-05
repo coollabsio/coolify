@@ -132,7 +132,7 @@ class Kernel extends ConsoleKernel
         }
 
         foreach ($servers as $server) {
-            $serverTimezone = $server->settings->server_timezone;
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
 
             // Sentinel check
             $lastSentinelUpdate = $server->sentinel_updated_at;
@@ -141,8 +141,12 @@ class Kernel extends ConsoleKernel
                 if (validate_timezone($serverTimezone) === false) {
                     $serverTimezone = config('app.timezone');
                 }
-                $this->scheduleInstance->job(new ServerCheckJob($server))->timezone($serverTimezone)->everyMinute()->onOneServer();
-                // $this->scheduleInstance->job(new \App\Jobs\ServerCheckNewJob($server))->everyMinute()->onOneServer();
+                if (isCloud()) {
+                    $this->scheduleInstance->job(new ServerCheckJob($server))->timezone($serverTimezone)->everyFiveMinutes()->onOneServer();
+                } else {
+                    $this->scheduleInstance->job(new ServerCheckJob($server))->timezone($serverTimezone)->everyMinute()->onOneServer();
+                }
+                // $this->scheduleInstance->job(new \App\Jobs\ServerCheckNewJob($server))->everyFiveMinutes()->onOneServer();
 
                 // Check storage usage every 10 minutes if Sentinel does not activated
                 $this->scheduleInstance->job(new ServerStorageCheckJob($server))->everyTenMinutes()->onOneServer();

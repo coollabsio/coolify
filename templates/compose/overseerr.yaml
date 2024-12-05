@@ -1,0 +1,30 @@
+# documentation: https://docs.overseerr.dev/getting-started/installation#docker
+# slogan: Overseerr is a request management and media discovery tool built to work with your existing Plex ecosystem.
+# tags: media,request,plex,sonarr,radarr
+# logo: svgs/overseerr.svg
+# port: 5055
+
+services:
+  overseerr:
+    image: sctx/overseerr:latest
+    environment:
+      - SERVICE_FQDN_OVERSEERR_5055
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - overseerr-config:/app/config
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--tries",
+          "1",
+          "--no-verbose",
+          "--spider",
+          "http://localhost:5055/api/v1/status",
+        ]
+      interval: 2s
+      timeout: 10s
+      retries: 15

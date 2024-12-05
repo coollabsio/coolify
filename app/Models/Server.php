@@ -11,6 +11,7 @@ use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -48,7 +49,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use SchemalessAttributesTrait, SoftDeletes;
+    use HasFactory, SchemalessAttributesTrait, SoftDeletes;
 
     public static $batch_counter = 0;
 
@@ -610,7 +611,8 @@ $schema://$host {
             }
             $memory = json_decode($memory, true);
             $parsedCollection = collect($memory)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['usedPercent']];
+                $usedPercent = $metric['usedPercent'] ?? 0.0;
+                return [(int) $metric['time'], (float) $usedPercent];
             });
 
             return $parsedCollection->toArray();
@@ -1039,7 +1041,7 @@ $schema://$host {
         $this->unreachable_notification_sent = false;
         $this->save();
         $this->refresh();
-        $this->team->notify(new Reachable($this));
+        // $this->team->notify(new Reachable($this));
     }
 
     public function sendUnreachableNotification()
@@ -1047,7 +1049,7 @@ $schema://$host {
         $this->unreachable_notification_sent = true;
         $this->save();
         $this->refresh();
-        $this->team->notify(new Unreachable($this));
+        // $this->team->notify(new Unreachable($this));
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)
