@@ -71,6 +71,7 @@ class EmailChannel
                 'password' => data_get($notifiable, 'smtp_password'),
                 'timeout' => data_get($notifiable, 'smtp_timeout'),
                 'local_domain' => null,
+                'auto_tls' => data_get($notifiable, 'smtp_encryption') === 'none' ? '0' : '',
             ]);
         }
     }
