@@ -2,15 +2,16 @@
 
 namespace App\Actions\Docker;
 
-use Illuminate\Database\Eloquent\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class GetServerDockerImageDetails
 {
     use AsAction;
 
-    public static function run()
+    public static function run($server, $imageId)
     {
+        $result = instant_remote_process(["docker inspect --format 'json' --type=image {$imageId}"], $server);
 
+        return json_decode($result, true);
     }
 }

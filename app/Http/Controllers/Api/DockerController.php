@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Docker\GetServerDockerImageDetails;
 use App\Actions\Docker\ListServerDockerImages;
 use App\Http\Controllers\Controller;
 use App\Models\Server;
@@ -26,6 +27,24 @@ class DockerController extends Controller
             return response()->json(['error' => 'server is not reachable.'], 403);
         }
 
-        return response()->json(ListServerDockerImages::run($server));
+        return ListServerDockerImages::run($server);
+    }
+
+    public function get_server_dcoker_image_details($server_uuid, $id)
+    {
+        $query = Server::query();
+
+        $server  = $query->where('uuid', $server_uuid)->first();
+        if (!$server) {
+            return response()->json(['error' => 'server not found'], 404);
+        }
+
+        $isReachable = (bool) $server->settings->is_reachable;
+        // If the server is reachable, send the reachable notification if it was sent before
+        if ($isReachable !== true) {
+            return response()->json(['error' => 'server is not reachable.'], 403);
+        }
+
+        return response()->json(GetServerDockerImageDetails::run($server, $id));
     }
 }
