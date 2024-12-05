@@ -611,7 +611,8 @@ $schema://$host {
             }
             $memory = json_decode($memory, true);
             $parsedCollection = collect($memory)->map(function ($metric) {
-                return [(int) $metric['time'], (float) $metric['usedPercent']];
+                $usedPercent = $metric['usedPercent'] ?? 0.0;
+                return [(int) $metric['time'], (float) $usedPercent];
             });
 
             return $parsedCollection->toArray();
