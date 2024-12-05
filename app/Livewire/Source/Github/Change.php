@@ -158,6 +158,10 @@ class Change extends Component
 
     public function getGithubAppNameUpdatePath()
     {
+        if (str($this->github_app->organization)->isNotEmpty()) {
+            return "{$this->github_app->html_url}/organizations/{$this->github_app->organization}/settings/apps/{$this->github_app->name}";
+        }
+
         return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
     }
 
@@ -184,7 +188,7 @@ class Change extends Component
     public function updateGithubAppName()
     {
         try {
-            $privateKey = PrivateKey::find($this->github_app->private_key_id);
+            $privateKey = PrivateKey::ownedByCurrentTeam()->find($this->github_app->private_key_id);
 
             if (! $privateKey) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
