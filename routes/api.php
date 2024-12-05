@@ -131,7 +131,8 @@ Route::group([
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
 
     Route::get('/docker/{server_uuid}/images', [DockerController::class, 'list_server_docker_images']);
-    Route::get('/docker/{server_uuid}/image/{id}', [DockerController::class, 'get_server_dcoker_image_details']);
+    Route::get('/docker/{server_uuid}/image/{id}', [DockerController::class, 'get_server_docker_image_details']);
+    Route::delete('/docker/{server_uuid}/images/delete/dangling', [DockerController::class, 'delete_all_dangling_server_docker_images']);
 });
 
 
