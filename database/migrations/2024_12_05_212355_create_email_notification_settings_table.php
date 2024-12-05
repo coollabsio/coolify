@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
 
-            // SMTP Configuration
             $table->boolean('smtp_enabled')->default(false);
             $table->string('smtp_from_address')->nullable();
             $table->string('smtp_from_name')->nullable();
@@ -29,19 +28,17 @@ return new class extends Migration
 
             $table->boolean('use_instance_email_settings')->default(false);
 
-            // Resend Configuration
             $table->boolean('resend_enabled')->default(false);
             $table->encryptedText('resend_api_key')->nullable();
 
-            // Notification Settings
-            $table->boolean('deployment_success_email_notification')->default(false);
-            $table->boolean('deployment_failure_email_notification')->default(true);
-            $table->boolean('backup_success_email_notification')->default(false);
-            $table->boolean('backup_failure_email_notification')->default(true);
-            $table->boolean('scheduled_task_success_email_notification')->default(false);
-            $table->boolean('scheduled_task_failure_email_notification')->default(true);
-            $table->boolean('status_change_email_notification')->default(false);
-            $table->boolean('server_disk_usage_email_notification')->default(true);
+            $table->boolean('deployment_success_email_notifications')->default(false);
+            $table->boolean('deployment_failure_email_notifications')->default(true);
+            $table->boolean('backup_success_email_notifications')->default(false);
+            $table->boolean('backup_failure_email_notifications')->default(true);
+            $table->boolean('scheduled_task_success_email_notifications')->default(false);
+            $table->boolean('scheduled_task_failure_email_notifications')->default(true);
+            $table->boolean('status_change_email_notifications')->default(false);
+            $table->boolean('server_disk_usage_email_notifications')->default(true);
 
             $table->unique(['team_id']);
         });

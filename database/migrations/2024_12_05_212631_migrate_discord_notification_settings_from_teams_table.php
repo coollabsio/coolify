@@ -20,14 +20,14 @@ return new class extends Migration
                     'discord_enabled' => $team->discord_enabled ?? false,
                     'discord_webhook_url' => $team->discord_webhook_url,
 
-                    'deployment_success_discord_notification' => $team->discord_notifications_deployments ?? false,
-                    'deployment_failure_discord_notification' => $team->discord_notifications_deployments ?? true,
-                    'backup_success_discord_notification' => $team->discord_notifications_database_backups ?? false,
-                    'backup_failure_discord_notification' => $team->discord_notifications_database_backups ?? true,
-                    'scheduled_task_success_discord_notification' => $team->discord_notifications_scheduled_tasks ?? false,
-                    'scheduled_task_failure_discord_notification' => $team->discord_notifications_scheduled_tasks ?? true,
-                    'status_change_discord_notification' => $team->discord_notifications_status_changes ?? false,
-                    'server_disk_usage_discord_notification' => $team->discord_notifications_server_disk_usage ?? true,
+                    'deployment_success_discord_notifications' => $team->discord_notifications_deployments ?? false,
+                    'deployment_failure_discord_notifications' => $team->discord_notifications_deployments ?? true,
+                    'backup_success_discord_notifications' => $team->discord_notifications_database_backups ?? false,
+                    'backup_failure_discord_notifications' => $team->discord_notifications_database_backups ?? true,
+                    'scheduled_task_success_discord_notifications' => $team->discord_notifications_scheduled_tasks ?? false,
+                    'scheduled_task_failure_discord_notifications' => $team->discord_notifications_scheduled_tasks ?? true,
+                    'status_change_discord_notifications' => $team->discord_notifications_status_changes ?? false,
+                    'server_disk_usage_discord_notifications' => $team->discord_notifications_server_disk_usage ?? true,
                 ]
             );
         }
@@ -68,12 +68,11 @@ return new class extends Migration
                 $team->update([
                     'discord_enabled' => $settings->discord_enabled,
                     'discord_webhook_url' => $settings->discord_webhook_url,
-                    'discord_notifications_test' => true,
-                    'discord_notifications_deployments' => $settings->deployment_success_discord_notification,
-                    'discord_notifications_status_changes' => $settings->status_change_discord_notification,
-                    'discord_notifications_database_backups' => $settings->backup_success_discord_notification,
-                    'discord_notifications_scheduled_tasks' => $settings->scheduled_task_success_discord_notification,
-                    'discord_notifications_server_disk_usage' => $settings->server_disk_usage_discord_notification,
+                    'discord_notifications_deployments' => $settings->deployment_success_discord_notifications || $settings->deployment_failure_discord_notifications,
+                    'discord_notifications_status_changes' => $settings->status_change_discord_notifications,
+                    'discord_notifications_database_backups' => $settings->backup_success_discord_notifications || $settings->backup_failure_discord_notifications,
+                    'discord_notifications_scheduled_tasks' => $settings->scheduled_task_success_discord_notifications || $settings->scheduled_task_failure_discord_notifications,
+                    'discord_notifications_server_disk_usage' => $settings->server_disk_usage_discord_notifications,
                 ]);
             }
         }

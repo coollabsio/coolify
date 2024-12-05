@@ -18,15 +18,14 @@ return new class extends Migration
             $table->boolean('discord_enabled')->default(false);
             $table->string('discord_webhook_url')->nullable();
 
-            // Notification Settings
-            $table->boolean('deployment_success_discord_notification')->default(false);
-            $table->boolean('deployment_failure_discord_notification')->default(true);
-            $table->boolean('backup_success_discord_notification')->default(false);
-            $table->boolean('backup_failure_discord_notification')->default(true);
-            $table->boolean('scheduled_task_success_discord_notification')->default(false);
-            $table->boolean('scheduled_task_failure_discord_notification')->default(true);
-            $table->boolean('status_change_discord_notification')->default(false);
-            $table->boolean('server_disk_usage_discord_notification')->default(true);
+            $table->boolean('deployment_success_discord_notifications')->default(false);
+            $table->boolean('deployment_failure_discord_notifications')->default(true);
+            $table->boolean('backup_success_discord_notifications')->default(false);
+            $table->boolean('backup_failure_discord_notifications')->default(true);
+            $table->boolean('scheduled_task_success_discord_notifications')->default(false);
+            $table->boolean('scheduled_task_failure_discord_notifications')->default(true);
+            $table->boolean('status_change_discord_notifications')->default(false);
+            $table->boolean('server_disk_usage_discord_notifications')->default(true);
 
             $table->unique(['team_id']);
         });

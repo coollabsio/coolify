@@ -30,14 +30,14 @@ return new class extends Migration
                     'resend_enabled' => $team->resend_enabled ?? false,
                     'resend_api_key' => $team->resend_api_key,
 
-                    'deployment_success_email_notification' => $team->smtp_notifications_deployments ?? false,
-                    'deployment_failure_email_notification' => $team->smtp_notifications_deployments ?? true,
-                    'backup_success_email_notification' => $team->smtp_notifications_database_backups ?? false,
-                    'backup_failure_email_notification' => $team->smtp_notifications_database_backups ?? true,
-                    'scheduled_task_success_email_notification' => $team->smtp_notifications_scheduled_tasks ?? false,
-                    'scheduled_task_failure_email_notification' => $team->smtp_notifications_scheduled_tasks ?? true,
-                    'status_change_email_notification' => $team->smtp_notifications_status_changes ?? false,
-                    'server_disk_usage_email_notification' => true,
+                    'deployment_success_email_notifications' => $team->smtp_notifications_deployments ?? false,
+                    'deployment_failure_email_notifications' => $team->smtp_notifications_deployments ?? true,
+                    'backup_success_email_notifications' => $team->smtp_notifications_database_backups ?? false,
+                    'backup_failure_email_notifications' => $team->smtp_notifications_database_backups ?? true,
+                    'scheduled_task_success_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? false,
+                    'scheduled_task_failure_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? true,
+                    'status_change_email_notifications' => $team->smtp_notifications_status_changes ?? false,
+                    'server_disk_usage_email_notifications' => true,
                 ]
             );
         }
@@ -104,10 +104,11 @@ return new class extends Migration
                     'use_instance_email_settings' => $settings->use_instance_email_settings,
                     'resend_enabled' => $settings->resend_enabled,
                     'resend_api_key' => $settings->resend_api_key,
-                    'smtp_notifications_deployments' => $settings->deployment_success_email_notification,
-                    'smtp_notifications_database_backups' => $settings->backup_success_email_notification,
-                    'smtp_notifications_scheduled_tasks' => $settings->scheduled_task_success_email_notification,
-                    'smtp_notifications_status_changes' => $settings->status_change_email_notification,
+                    'smtp_notifications_deployments' => $settings->deployment_success_email_notifications || $settings->deployment_failure_email_notifications,
+                    'smtp_notifications_database_backups' => $settings->backup_success_email_notifications || $settings->backup_failure_email_notifications,
+                    'smtp_notifications_scheduled_tasks' => $settings->scheduled_task_success_email_notifications || $settings->scheduled_task_failure_email_notifications,
+                    'smtp_notifications_status_changes' => $settings->status_change_email_notifications,
+                    'smtp_notifications_server_disk_usage' => $settings->server_disk_usage_email_notifications,
                 ]);
             }
         }
