@@ -29,7 +29,7 @@ return new class extends Migration
             $table->boolean('use_instance_email_settings')->default(false);
 
             $table->boolean('resend_enabled')->default(false);
-            $table->encryptedText('resend_api_key')->nullable();
+            $table->text('resend_api_key')->nullable();
 
             $table->boolean('deployment_success_email_notifications')->default(false);
             $table->boolean('deployment_failure_email_notifications')->default(true);
