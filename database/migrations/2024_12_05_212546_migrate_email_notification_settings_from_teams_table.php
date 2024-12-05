@@ -57,10 +57,12 @@ return new class extends Migration
                 'use_instance_email_settings',
                 'resend_enabled',
                 'resend_api_key',
+                'smtp_notifications_test',
                 'smtp_notifications_deployments',
                 'smtp_notifications_database_backups',
                 'smtp_notifications_scheduled_tasks',
                 'smtp_notifications_status_changes',
+                'smtp_notifications_server_disk_usage',
             ]);
         });
     }
