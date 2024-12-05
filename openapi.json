@@ -1,5 +1,5 @@
 {
-    "openapi": "3.0.0",
+    "openapi": "3.1.0",
     "info": {
         "title": "Coolify",
         "version": "0.1"
@@ -3011,13 +3011,17 @@
                                         "type": "string",
                                         "description": "Mongo initdb root password"
                                     },
-                                    "mongo_initdb_init_database": {
+                                    "mongo_initdb_database": {
                                         "type": "string",
                                         "description": "Mongo initdb init database"
                                     },
                                     "mysql_root_password": {
                                         "type": "string",
                                         "description": "MySQL root password"
+                                    },
+                                    "mysql_password": {
+                                        "type": "string",
+                                        "description": "MySQL password"
                                     },
                                     "mysql_user": {
                                         "type": "string",
@@ -3841,6 +3845,10 @@
                                     "mysql_root_password": {
                                         "type": "string",
                                         "description": "MySQL root password"
+                                    },
+                                    "mysql_password": {
+                                        "type": "string",
+                                        "description": "MySQL password"
                                     },
                                     "mysql_user": {
                                         "type": "string",
@@ -5391,6 +5399,17 @@
                 "summary": "Update",
                 "description": "Update Server.",
                 "operationId": "update-server-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "description": "Server updated.",
                     "required": true,
@@ -5451,10 +5470,7 @@
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#\/components\/schemas\/Server"
-                                    }
+                                    "$ref": "#\/components\/schemas\/Server"
                                 }
                             }
                         }
@@ -7441,13 +7457,8 @@
                         "type": "string",
                         "description": "The swarm cluster configuration."
                     },
-                    "delete_unused_volumes": {
-                        "type": "boolean",
-                        "description": "The flag to indicate if the unused volumes should be deleted."
-                    },
-                    "delete_unused_networks": {
-                        "type": "boolean",
-                        "description": "The flag to indicate if the unused networks should be deleted."
+                    "settings": {
+                        "$ref": "#\/components\/schemas\/ServerSetting"
                     }
                 },
                 "type": "object"
@@ -7556,6 +7567,14 @@
                     },
                     "updated_at": {
                         "type": "string"
+                    },
+                    "delete_unused_volumes": {
+                        "type": "boolean",
+                        "description": "The flag to indicate if the unused volumes should be deleted."
+                    },
+                    "delete_unused_networks": {
+                        "type": "boolean",
+                        "description": "The flag to indicate if the unused networks should be deleted."
                     }
                 },
                 "type": "object"

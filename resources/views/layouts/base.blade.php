@@ -34,11 +34,13 @@
     </style>
     @if (config('app.name') == 'Coolify Cloud')
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
+        <script src="https://js.sentry-cdn.com/0f8593910512b5cdd48c6da78d4093be.min.js" crossorigin="anonymous"></script>
     @endif
     @auth
         <script type="text/javascript" src="{{ URL::asset('js/echo.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
+
     @endauth
 </head>
 @section('body')
@@ -94,6 +96,20 @@
                 enableStats: false,
                 enableLogging: true,
                 enabledTransports: ['ws', 'wss'],
+                disableStats: true,
+                // Add auto reconnection settings
+                enabledTransports: ['ws', 'wss'],
+                disabledTransports: ['sockjs', 'xhr_streaming', 'xhr_polling'],
+                // Attempt to reconnect on connection lost
+                autoReconnect: true,
+                // Wait 1 second before first reconnect attempt
+                reconnectionDelay: 1000,
+                // Maximum delay between reconnection attempts
+                maxReconnectionDelay: 1000,
+                // Multiply delay by this number for each reconnection attempt
+                reconnectionDelayGrowth: 1,
+                // Maximum number of reconnection attempts
+                maxAttempts: 15
             });
             @endauth
             let checkHealthInterval = null;

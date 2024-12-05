@@ -16,6 +16,8 @@ class StartDatabase
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
     {
         $server = $database->destination->server;
@@ -49,7 +51,7 @@ class StartDatabase
                 break;
         }
         if ($database->is_public && $database->public_port) {
-            StartDatabaseProxy::dispatch($database)->onQueue('high');
+            StartDatabaseProxy::dispatch($database);
         }
 
         return $activity;

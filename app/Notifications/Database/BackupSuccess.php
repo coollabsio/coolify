@@ -3,26 +3,20 @@
 namespace App\Notifications\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class BackupSuccess extends Notification implements ShouldQueue
+class BackupSuccess extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $backoff = 10;
-
-    public $tries = 3;
-
     public string $name;
 
     public string $frequency;
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
     {
+        $this->onQueue('high');
+
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
     }

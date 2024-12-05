@@ -18,6 +18,8 @@ class StopDatabaseProxy
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|ServiceDatabase|StandaloneDragonfly|StandaloneClickhouse $database)
     {
         $server = data_get($database, 'destination.server');

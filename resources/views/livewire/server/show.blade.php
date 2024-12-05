@@ -88,7 +88,7 @@
                     <div class="w-full" x-data="{
                         open: false,
                         search: '{{ $serverTimezone ?: '' }}',
-                        timezones: @js($timezones),
+                        timezones: @js($this->timezones),
                         placeholder: '{{ $serverTimezone ? 'Search timezone...' : 'Select Server Timezone' }}',
                         init() {
                             this.$watch('search', value => {
@@ -219,12 +219,12 @@
                                 <div class="flex flex-wrap gap-2 sm:flex-nowrap">
                                     <x-forms.input id="sentinelMetricsRefreshRateSeconds"
                                         label="Metrics rate (seconds)" required
-                                        helper="The interval for gathering metrics. Lower means more disk space will be used." />
+                                        helper="Interval used for gathering metrics. Lower values result in more disk space usage." />
                                     <x-forms.input id="sentinelMetricsHistoryDays" label="Metrics history (days)"
-                                        required helper="How many days should the metrics data should be reserved." />
+                                        required helper="Number of days to retain metrics data for." />
                                     <x-forms.input id="sentinelPushIntervalSeconds" label="Push interval (seconds)"
                                         required
-                                        helper="How many seconds should the metrics data should be pushed to the collector." />
+                                        helper="Interval at which metrics data is sent to the collector." />
                                 </div>
                             </div>
                         @endif

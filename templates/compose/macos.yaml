@@ -1,0 +1,25 @@
+# ignore: true
+# documentation: https://github.com/dockur/macos
+# slogan: Run macOS in a containerized environment.
+# tags: macos, virtualization, container, os
+# logo: svgs/macos.svg
+# port: 8006
+
+services:
+  macos:
+    image: dockurr/macos
+    volumes:
+      - macos-storage:/storage
+    environment:
+      - SERVICE_FQDN_MACOS_8006
+      - VERSION=15
+    devices:
+      - /dev/kvm:/dev/kvm
+    cap_add:
+      - NET_ADMIN
+    stop_grace_period: 2m
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8006"]
+      interval: 2s
+      timeout: 10s
+      retries: 10

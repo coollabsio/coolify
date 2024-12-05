@@ -30,7 +30,7 @@ class CheckProxy
         if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
             return false;
         }
-        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection(false);
+        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
         if (! $uptime) {
             throw new \Exception($error);
         }

@@ -36,7 +36,11 @@ class Heading extends Component
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
+        $this->parameters = [
+            'project_uuid' => $this->application->project()->uuid,
+            'environment_name' => $this->application->environment->name,
+            'application_uuid' => $this->application->uuid,
+        ];
         $lastDeployment = $this->application->get_last_successful_deployment();
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
@@ -45,13 +49,11 @@ class Heading extends Component
     public function check_status($showNotification = false)
     {
         if ($this->application->destination->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->application->destination->server)->onQueue('high');
+            GetContainersStatus::dispatch($this->application->destination->server);
         }
         if ($showNotification) {
             $this->dispatch('success', 'Success', 'Application status updated.');
         }
-        // Removed because it caused flickering
-        // $this->dispatch('configurationChanged');
     }
 
     public function force_deploy_without_cache()

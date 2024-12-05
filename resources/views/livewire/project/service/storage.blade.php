@@ -15,7 +15,7 @@
                     volume
                     name, example: <span class='text-helper'>-pr-1</span>" />
             @if ($resource?->build_pack !== 'dockercompose')
-                <x-modal-input :closeOutside="false" buttonTitle="+ Add" title="New Persistent Storage">
+                <x-modal-input :closeOutside="false" buttonTitle="+ Add" title="New Persistent Storage" minWidth="64rem">
                     <livewire:project.shared.storages.add :resource="$resource" />
                 </x-modal-input>
             @endif

@@ -11,16 +11,22 @@
 
         let checkNumber = 1;
         let checkPusherInterval = null;
+        let checkReconnectInterval = null;
+
         if (!this.popups.realtime) {
             checkPusherInterval = setInterval(() => {
-                if (window.Echo && window.Echo.connector.pusher.connection.state !== 'connected') {
-                    checkNumber++;
-                    if (checkNumber > 5) {
-                        this.popups.realtime = true;
-                        console.error(
-                            'Coolify could not connect to its real-time service. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/knowledge-base/cloudflare/tunnels) or get help on Discord (https://coollabs.io/discord).)'
-                        );
-                        clearInterval(checkPusherInterval);
+                if (window.Echo) {
+                    if (window.Echo.connector.pusher.connection.state === 'connected') {
+                        this.popups.realtime = false;
+                    } else {
+                        checkNumber++;
+                        if (checkNumber > 5) {
+                            this.popups.realtime = true;
+                            console.error(
+                                'Coolify could not connect to its real-time service. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/knowledge-base/cloudflare/tunnels) or get help on Discord (https://coollabs.io/discord).)'
+                            );
+                        }
+
                     }
                 }
             }, 2000);
