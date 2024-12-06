@@ -14,9 +14,9 @@ class SlackChannel
     {
         $message = $notification->toSlack();
         $webhookUrl = $notifiable->routeNotificationForSlack();
-        if (!$webhookUrl) {
+        if (! $webhookUrl) {
             return;
         }
-        dispatch(new SendMessageToSlackJob($message, $webhookUrl))->onQueue('high');
+        SendMessageToSlackJob::dispatch($message, $webhookUrl);
     }
 }

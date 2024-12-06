@@ -51,7 +51,7 @@ class Test extends Notification implements ShouldQueue
             color: DiscordMessage::successColor(),
         );
 
-        $message->addField(name: 'Dashboard', value: '[Link](' . base_url() . ')', inline: true);
+        $message->addField(name: 'Dashboard', value: '[Link]('.base_url().')', inline: true);
 
         return $message;
     }

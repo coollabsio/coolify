@@ -18,6 +18,7 @@ class SendMessageToSlackJob implements ShouldQueue
         private SlackMessage $message,
         private string $webhookUrl
     ) {
+        $this->onQueue('high');
     }
 
     public function handle(): void
@@ -28,7 +29,7 @@ class SendMessageToSlackJob implements ShouldQueue
                     'type' => 'section',
                     'text' => [
                         'type' => 'plain_text',
-                        'text' => "Coolify Notification",
+                        'text' => 'Coolify Notification',
                     ],
                 ],
             ],
@@ -47,12 +48,12 @@ class SendMessageToSlackJob implements ShouldQueue
                             'type' => 'section',
                             'text' => [
                                 'type' => 'mrkdwn',
-                                'text' => $this->message->description
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                                'text' => $this->message->description,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ]);
     }
 }
