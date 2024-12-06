@@ -13,6 +13,8 @@
                     helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" />
             @endif
+            <x-forms.checkbox helper="Disable Docker build cache on every deployment." instantSave id="disableBuildCache"
+                label="Disable Build Cache" />
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="isForceHttpsEnabled" label="Force Https" />

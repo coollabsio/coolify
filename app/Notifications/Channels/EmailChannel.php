@@ -66,11 +66,12 @@ class EmailChannel
                 'transport' => 'smtp',
                 'host' => data_get($notifiable, 'smtp_host'),
                 'port' => data_get($notifiable, 'smtp_port'),
-                'encryption' => data_get($notifiable, 'smtp_encryption'),
+                'encryption' => data_get($notifiable, 'smtp_encryption') === 'none' ? null : data_get($notifiable, 'smtp_encryption'),
                 'username' => data_get($notifiable, 'smtp_username'),
                 'password' => data_get($notifiable, 'smtp_password'),
                 'timeout' => data_get($notifiable, 'smtp_timeout'),
                 'local_domain' => null,
+                'auto_tls' => data_get($notifiable, 'smtp_encryption') === 'none' ? '0' : '',
             ]);
         }
     }
