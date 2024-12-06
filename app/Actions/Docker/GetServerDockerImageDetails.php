@@ -22,6 +22,6 @@ class GetServerDockerImageDetails
 
         $imageDetails[0]['ContainerCount'] = $containerCount;
 
-        return $imageDetails;
+        return $imageDetails[0];
     }
 }
