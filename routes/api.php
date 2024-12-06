@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\ServersController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\Api\GithubController;
 use App\Http\Middleware\ApiAllowed;
 use App\Http\Middleware\IgnoreReadOnlyApiToken;
 use App\Http\Middleware\OnlyRootApiToken;
@@ -118,13 +119,16 @@ Route::group([
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid']);
     // Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
-
+    Route::patch('/services/{uuid}/fqdn', [ServicesController::class, 'update_service_fqdn_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs']);
     Route::post('/services/{uuid}/envs', [ServicesController::class, 'create_env'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/services/{uuid}/envs/bulk', [ServicesController::class, 'create_bulk_envs'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::patch('/services/{uuid}/envs', [ServicesController::class, 'update_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::delete('/services/{uuid}/envs/{env_uuid}', [ServicesController::class, 'delete_env_by_uuid'])->middleware([IgnoreReadOnlyApiToken::class]);
-
+    Route::post('/github-apps', [GithubController::class, 'createGitHubApp'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::get('/github-apps/{github_app_id}/repositories', [GithubController::class, 'loadRepositories'])->middleware([IgnoreReadOnlyApiToken::class]);
+    Route::get('/github-apps/{github_app_id}/repositories/{owner}/{repo}/branches', [GithubController::class, 'loadBranches'])->middleware([IgnoreReadOnlyApiToken::class]);
+    
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
