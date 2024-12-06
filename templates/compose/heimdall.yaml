@@ -1,6 +1,7 @@
 # documentation: https://github.com/linuxserver/Heimdall
 # slogan: Heimdall is a dashboard for managing and organizing your server applications.
 # tags: dashboard, server, applications, interface
+# logo: svgs/heimdall.svg
 
 services:
   heimdall:
