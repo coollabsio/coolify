@@ -5,7 +5,6 @@
 # port: 3000
 
 x-common-env: &common-env
-  PORT: 3030
   REMIX_APP_PORT: 3000
   NODE_ENV: production
   RUNTIME_PLATFORM: docker-compose
@@ -118,7 +117,7 @@ services:
     environment:
       <<: *common-env
       PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3030
+      PLATFORM_WS_PORT: 3000
       SECURE_CONNECTION: "false"
       PLATFORM_SECRET: $PROVIDER_SECRET
   coordinator:
@@ -133,7 +132,7 @@ services:
     environment:
       <<: *common-env
       PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3030
+      PLATFORM_WS_PORT: 3000
       SECURE_CONNECTION: "false"
       PLATFORM_SECRET: $COORDINATOR_SECRET
     healthcheck:
