@@ -1,46 +1,42 @@
 <?php
 
-use App\Models\Team;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        $teams = Team::all();
+        $teams = DB::table('teams')->get();
 
         foreach ($teams as $team) {
+            DB::table('telegram_notification_settings')->insert([
+                'team_id' => $team->id,
+                'telegram_enabled' => $team->telegram_enabled ?? false,
+                'telegram_token' => $team->telegram_token,
+                'telegram_chat_id' => $team->telegram_chat_id,
 
-            $team->telegramNotificationSettings()->updateOrCreate(
-                ['team_id' => $team->id],
-                [
-                    'telegram_enabled' => $team->telegram_enabled ?? false,
-                    'telegram_token' => $team->telegram_token,
-                    'telegram_chat_id' => $team->telegram_chat_id,
+                'deployment_success_telegram_notifications' => $team->telegram_notifications_deployments ?? false,
+                'deployment_failure_telegram_notifications' => $team->telegram_notifications_deployments ?? false,
+                'backup_success_telegram_notifications' => $team->telegram_notifications_database_backups ?? false,
+                'backup_failure_telegram_notifications' => $team->telegram_notifications_database_backups ?? false,
+                'scheduled_task_success_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? false,
+                'scheduled_task_failure_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? false,
+                'status_change_telegram_notifications' => $team->telegram_notifications_status_changes ?? false,
+                'server_disk_usage_telegram_notifications' => $team->telegram_notifications_server_disk_usage ?? true,
 
-                    'deployment_success_telegram_notifications' => $team->telegram_notifications_deployments ?? false,
-                    'deployment_failure_telegram_notifications' => $team->telegram_notifications_deployments ?? true,
-                    'backup_success_telegram_notifications' => $team->telegram_notifications_database_backups ?? false,
-                    'backup_failure_telegram_notifications' => $team->telegram_notifications_database_backups ?? true,
-                    'scheduled_task_success_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? false,
-                    'scheduled_task_failure_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? true,
-                    'status_change_telegram_notifications' => $team->telegram_notifications_status_changes ?? false,
-                    'server_disk_usage_telegram_notifications' => $team->telegram_notifications_server_disk_usage ?? true,
-
-                    'telegram_notifications_deployment_success_topic_id' => $team->telegram_notifications_deployments_message_thread_id,
-                    'telegram_notifications_deployment_failure_topic_id' => $team->telegram_notifications_deployments_message_thread_id,
-                    'telegram_notifications_backup_success_topic_id' => $team->telegram_notifications_database_backups_message_thread_id,
-                    'telegram_notifications_backup_failure_topic_id' => $team->telegram_notifications_database_backups_message_thread_id,
-                    'telegram_notifications_scheduled_task_success_topic_id' => $team->telegram_notifications_scheduled_tasks_thread_id,
-                    'telegram_notifications_scheduled_task_failure_topic_id' => $team->telegram_notifications_scheduled_tasks_thread_id,
-                    'telegram_notifications_status_change_topic_id' => $team->telegram_notifications_status_changes_message_thread_id,
-                ]
-            );
+                'telegram_notifications_deployment_success_topic_id' => $team->telegram_notifications_deployments_message_thread_id,
+                'telegram_notifications_deployment_failure_topic_id' => $team->telegram_notifications_deployments_message_thread_id,
+                'telegram_notifications_backup_success_topic_id' => $team->telegram_notifications_database_backups_message_thread_id,
+                'telegram_notifications_backup_failure_topic_id' => $team->telegram_notifications_database_backups_message_thread_id,
+                'telegram_notifications_scheduled_task_success_topic_id' => $team->telegram_notifications_scheduled_tasks_thread_id,
+                'telegram_notifications_scheduled_task_failure_topic_id' => $team->telegram_notifications_scheduled_tasks_thread_id,
+                'telegram_notifications_status_change_topic_id' => $team->telegram_notifications_status_changes_message_thread_id,
+            ]);
         }
 
-        // Drop the old columns
         Schema::table('teams', function (Blueprint $table) {
             $table->dropColumn([
                 'telegram_enabled',
@@ -63,7 +59,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Add back the old columns
         Schema::table('teams', function (Blueprint $table) {
             $table->boolean('telegram_enabled')->default(false);
             $table->text('telegram_token')->nullable();
@@ -81,25 +76,24 @@ return new class extends Migration
             $table->text('telegram_notifications_scheduled_tasks_thread_id')->nullable();
         });
 
-        // Migrate data back from the new table to the old columns
-        $teams = Team::with('telegramNotificationSettings')->get();
-        foreach ($teams as $team) {
-            if ($settings = $team->telegramNotificationSettings) {
-                $team->update([
-                    'telegram_enabled' => $settings->telegram_enabled,
-                    'telegram_token' => $settings->telegram_token,
-                    'telegram_chat_id' => $settings->telegram_chat_id,
-                    'telegram_notifications_deployments' => $settings->deployment_success_telegram_notifications || $settings->deployment_failure_telegram_notifications,
-                    'telegram_notifications_status_changes' => $settings->status_change_telegram_notifications,
-                    'telegram_notifications_database_backups' => $settings->backup_success_telegram_notifications || $settings->backup_failure_telegram_notifications,
-                    'telegram_notifications_scheduled_tasks' => $settings->scheduled_task_success_telegram_notifications || $settings->scheduled_task_failure_telegram_notifications,
-                    'telegram_notifications_server_disk_usage' => $settings->server_disk_usage_telegram_notifications,
-                    'telegram_notifications_deployments_message_thread_id' => $settings->telegram_notifications_deployment_success_topic_id,
-                    'telegram_notifications_status_changes_message_thread_id' => $settings->telegram_notifications_status_change_topic_id,
-                    'telegram_notifications_database_backups_message_thread_id' => $settings->telegram_notifications_backup_success_topic_id,
-                    'telegram_notifications_scheduled_tasks_thread_id' => $settings->telegram_notifications_scheduled_task_success_topic_id,
+        $settings = DB::table('telegram_notification_settings')->get();
+        foreach ($settings as $setting) {
+            DB::table('teams')
+                ->where('id', $setting->team_id)
+                ->update([
+                    'telegram_enabled' => $setting->telegram_enabled,
+                    'telegram_token' => $setting->telegram_token,
+                    'telegram_chat_id' => $setting->telegram_chat_id,
+                    'telegram_notifications_deployments' => $setting->deployment_success_telegram_notifications || $setting->deployment_failure_telegram_notifications,
+                    'telegram_notifications_status_changes' => $setting->status_change_telegram_notifications,
+                    'telegram_notifications_database_backups' => $setting->backup_success_telegram_notifications || $setting->backup_failure_telegram_notifications,
+                    'telegram_notifications_scheduled_tasks' => $setting->scheduled_task_success_telegram_notifications || $setting->scheduled_task_failure_telegram_notifications,
+                    'telegram_notifications_server_disk_usage' => $setting->server_disk_usage_telegram_notifications,
+                    'telegram_notifications_deployments_message_thread_id' => $setting->telegram_notifications_deployment_success_topic_id,
+                    'telegram_notifications_status_changes_message_thread_id' => $setting->telegram_notifications_status_change_topic_id,
+                    'telegram_notifications_database_backups_message_thread_id' => $setting->telegram_notifications_backup_success_topic_id,
+                    'telegram_notifications_scheduled_tasks_thread_id' => $setting->telegram_notifications_scheduled_task_success_topic_id,
                 ]);
-            }
         }
     }
 };
