@@ -16,6 +16,7 @@ class Proxy extends Component
     public $proxy_settings = null;
 
     public bool $redirect_enabled = true;
+
     public ?string $redirect_url = null;
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
@@ -40,7 +41,7 @@ class Proxy extends Component
     {
         $this->server->proxy = null;
         $this->server->save();
-        $this->dispatch('proxyChanged');
+        $this->dispatch('reloadWindow');
     }
 
     public function selectProxy($proxy_type)
@@ -48,7 +49,7 @@ class Proxy extends Component
         try {
             $this->server->changeProxy($proxy_type, async: false);
             $this->selectedProxy = $this->server->proxy->type;
-            $this->dispatch('proxyStatusUpdated');
+            $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
