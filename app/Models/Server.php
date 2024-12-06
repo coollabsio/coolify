@@ -242,6 +242,9 @@ class Server extends BaseModel
                                 ],
                                 'service' => 'noop',
                                 'rule' => 'PathPrefix(`/`)',
+                                'tls' => [
+                                    'certResolver' => 'letsencrypt',
+                                ],
                                 'priority' => -1000,
                             ],
                         ],
