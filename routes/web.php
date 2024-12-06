@@ -33,6 +33,8 @@ use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Project\Show as ProjectShow;
+use App\Livewire\Images\Registry\Index as RegistryIndex;
+use App\Livewire\Images\Images\Index as ImagesIndex;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
@@ -229,6 +231,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
+    Route::get('/images/images', ImagesIndex::class)->name('images.images.index');
+    Route::get('/images/registries', RegistryIndex::class)->name('images.registries.index');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -313,7 +317,6 @@ Route::middleware(['auth'])->group(function () {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');
-
 });
 
 Route::any('/{any}', function () {
