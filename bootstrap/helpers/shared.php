@@ -394,14 +394,20 @@ function translate_cron_expression($expression_to_validate): string
 
     return $expression_to_validate;
 }
+
 function validate_cron_expression($expression_to_validate): bool
 {
     if (empty($expression_to_validate)) {
         return false;
     }
+
     $isValid = false;
-    $expression = new CronExpression($expression_to_validate);
-    $isValid = $expression->isValid();
+    try {
+        $expression = new CronExpression($expression_to_validate);
+        $isValid = $expression->isValid();
+    } catch (\Exception $e) {
+        return false;
+    }
 
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
         $isValid = true;
