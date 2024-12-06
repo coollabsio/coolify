@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
+use App\Notifications\Dto\SlackMessage;
 
 class StatusChanged extends CustomEmailNotification
 {
@@ -29,7 +30,7 @@ class StatusChanged extends CustomEmailNotification
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
+        $this->resource_url = base_url() . "/project/{$this->project_uuid}/" . urlencode($this->environment_name) . "/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
@@ -55,7 +56,7 @@ class StatusChanged extends CustomEmailNotification
     {
         return new DiscordMessage(
             title: ':cross_mark: Application stopped',
-            description: '[Open Application in Coolify]('.$this->resource_url.')',
+            description: '[Open Application in Coolify](' . $this->resource_url . ')',
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
@@ -63,7 +64,7 @@ class StatusChanged extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        $message = 'Coolify: '.$this->resource_name.' has been stopped.';
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.';
 
         return [
             'message' => $message,
@@ -74,5 +75,21 @@ class StatusChanged extends CustomEmailNotification
                 ],
             ],
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = "Application stopped";
+        $description = "{$this->resource_name} has been stopped";
+
+        $description .= "\n\n**Project:** " . data_get($this->resource, 'environment.project.name');
+        $description .= "\n**Environment:** {$this->environment_name}";
+        $description .= "\n**Application URL:** {$this->resource_url}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

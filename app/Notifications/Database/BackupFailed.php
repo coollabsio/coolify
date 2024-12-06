@@ -6,6 +6,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
+use App\Notifications\Dto\SlackMessage;
 
 class BackupFailed extends CustomEmailNotification
 {
@@ -61,5 +62,20 @@ class BackupFailed extends CustomEmailNotification
         return [
             'message' => $message,
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = "Database backup failed";
+        $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
+
+        $description .= "\n\n**Frequency:** {$this->frequency}";
+        $description .= "\n\n**Error Output:**\n{$this->output}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }
