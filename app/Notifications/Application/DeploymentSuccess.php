@@ -112,6 +112,23 @@ class DeploymentSuccess extends CustomEmailNotification
         return $message;
     }
 
+
+    public function toNtfy(): array
+    {
+        if ($this->preview) {
+            $message = 'Coolify: New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
+        } else {
+            $message = 'Coolify: New version successfully deployed of '.$this->application_name.'';
+        }
+
+        return [
+            'title' => 'Coolify: New version deployed',
+            'message' => $message,
+            'buttons' => 'view, Open Application, '.$this->fqdn.';view, Deployment logs, '.$this->deployment_url.';',
+            'emoji' => 'checkmark',
+        ];
+    }
+
     public function toTelegram(): array
     {
         if ($this->preview) {

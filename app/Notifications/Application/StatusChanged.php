@@ -29,7 +29,7 @@ class StatusChanged extends CustomEmailNotification
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
+        $this->resource_url = base_url() . "/project/{$this->project_uuid}/" . urlencode($this->environment_name) . "/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
@@ -51,7 +51,7 @@ class StatusChanged extends CustomEmailNotification
         return $mail;
     }
 
-    public function toDiscord(): DiscordMessage
+ 	public function toDiscord(): DiscordMessage
     {
         return new DiscordMessage(
             title: ':cross_mark: Application stopped',
@@ -61,9 +61,22 @@ class StatusChanged extends CustomEmailNotification
         );
     }
 
+	public function toNtfy(): array
+    {
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.';
+
+        return [
+            'title' => 'Coolify: Application Status Changed',
+            'message' => $message,
+            'buttons' => 'view, Go to your dashboard, ' . base_url() . ';',
+            'emoji' => 'stop_sign',
+        ];
+    }
+
+
     public function toTelegram(): array
     {
-        $message = 'Coolify: '.$this->resource_name.' has been stopped.';
+        $message = 'Coolify: ' . $this->resource_name . ' has been stopped.';
 
         return [
             'message' => $message,

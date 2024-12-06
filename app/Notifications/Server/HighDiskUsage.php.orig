@@ -5,9 +5,12 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+<<<<<<< HEAD
 use App\Notifications\Channels\NtfyChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+=======
+>>>>>>> next
 use Illuminate\Notifications\Messages\MailMessage;
 
 class HighDiskUsage extends CustomEmailNotification

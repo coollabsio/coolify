@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\NtfyChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
@@ -23,6 +24,7 @@ class ForceEnabled extends CustomEmailNotification
         $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+        $isNtfyEnabled = data_get($notifiable, 'ntfy_enabled');
 
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
@@ -32,6 +34,10 @@ class ForceEnabled extends CustomEmailNotification
         }
         if ($isTelegramEnabled) {
             $channels[] = TelegramChannel::class;
+        }
+
+        if ($isNtfyEnabled) {
+            $channels[] = NtfyChannel::class;
         }
 
         return $channels;
@@ -55,6 +61,14 @@ class ForceEnabled extends CustomEmailNotification
             description: "Server '{$this->server->name}' enabled again!",
             color: DiscordMessage::successColor(),
         );
+    }
+
+    public function toNtfy(): array
+    {
+        return [
+            'title' => "Coolify: Server ({$this->server->name}) enabled again!",
+            'message' => "Coolify: Server ({$this->server->name}) enabled again!",
+        ];
     }
 
     public function toTelegram(): array

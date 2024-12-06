@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
+use App\Notifications\Channels\SendsNtfy;
 use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -70,7 +71,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsNtfy
 {
     use Notifiable;
 
@@ -124,6 +125,16 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return [
             'token' => data_get($this, 'telegram_token', null),
             'chat_id' => data_get($this, 'telegram_chat_id', null),
+        ];
+    }
+
+    public function routeNotificationForNtfy()
+    {
+        return [
+            'url' => data_get($this, 'ntfy_url', null),
+            'username' => data_get($this, 'ntfy_username', null),
+            'password' => data_get($this, 'ntfy_password', null),
+            'topic' => data_get($this, 'ntfy_topic', null),
         ];
     }
 
@@ -279,7 +290,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         if (isCloud()) {
             return true;
         }
-        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
+        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->ntfy_enabled || $this->use_instance_email_settings) {
             return true;
         }
 

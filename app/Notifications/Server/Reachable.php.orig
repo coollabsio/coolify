@@ -6,8 +6,11 @@ use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
+<<<<<<< HEAD
 use App\Notifications\Channels\NtfyChannel;
+=======
 use App\Notifications\CustomEmailNotification;
+>>>>>>> next
 use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 

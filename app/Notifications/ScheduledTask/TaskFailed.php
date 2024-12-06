@@ -54,6 +54,16 @@ class TaskFailed extends CustomEmailNotification
         return $message;
     }
 
+    public function toNtfy(): array
+    {
+        return [
+            'title' => 'Coolify: Scheduled task failed',
+            'message' => "Coolify: Scheduled task ({$this->task->name}) failed with output: {$this->output}",
+            'buttons' => 'view, Open task in Coolify, '.$this->url.';',
+            'emoji' => 'warning',
+        ];
+    }
+
     public function toTelegram(): array
     {
         $message = "Coolify: Scheduled task ({$this->task->name}) failed with output: {$this->output}";

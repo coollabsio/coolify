@@ -18,7 +18,10 @@ class GeneralNotification extends Notification implements ShouldQueue
 
     public function __construct(public string $message)
     {
+<<<<<<< HEAD
+=======
         $this->onQueue('high');
+>>>>>>> next
     }
 
     public function via(object $notifiable): array
