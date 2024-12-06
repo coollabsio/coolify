@@ -37,7 +37,7 @@ class Email extends Component
     #[Validate(['nullable', 'numeric'])]
     public ?int $smtpPort = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['nullable', 'string', 'in:tls,ssl,none'])]
     public ?string $smtpEncryption = null;
 
     #[Validate(['nullable', 'string'])]
@@ -73,8 +73,8 @@ class Email extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $resendApiKey = null;
 
-    #[Validate(['required', 'email'])]
-    public string $testEmailAddress = '';
+    #[Validate(['nullable', 'email'])]
+    public ?string $testEmailAddress = null;
 
     public function mount()
     {

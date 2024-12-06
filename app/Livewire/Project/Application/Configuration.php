@@ -21,19 +21,16 @@ class Configuration extends Component
             ->select('id', 'uuid', 'team_id')
             ->where('uuid', request()->route('project_uuid'))
             ->firstOrFail();
-
         $environment = $project->environments()
             ->select('id', 'name', 'project_id')
             ->where('name', request()->route('environment_name'))
             ->firstOrFail();
-
         $application = $environment->applications()
             ->with(['destination'])
             ->where('uuid', request()->route('application_uuid'))
             ->firstOrFail();
 
         $this->application = $application;
-
         if ($application->destination && $application->destination->server) {
             $mainServer = $application->destination->server;
             $this->servers = Server::ownedByCurrentTeam()
