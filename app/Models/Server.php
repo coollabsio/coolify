@@ -201,7 +201,11 @@ class Server extends BaseModel
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
         $redirect_url = $this->proxy->redirect_url;
-
+        if (isDev()) {
+            if ($proxy_type === ProxyTypes::CADDY->value) {
+                $dynamic_conf_path = '/data/coolify/proxy/caddy/dynamic';
+            }
+        }
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_503.yaml";
         } elseif ($proxy_type === ProxyTypes::CADDY->value) {
@@ -214,18 +218,18 @@ class Server extends BaseModel
             "rm -f $dynamic_conf_path/default_redirect_404.caddy",
         ], $this);
 
-        if (! $redirect_enabled) {
+        if ($redirect_enabled === false) {
             instant_remote_process(["rm -f $default_redirect_file"], $this);
         } else {
             if ($proxy_type === ProxyTypes::CADDY->value) {
-                if (empty($redirect_url)) {
+                if (filled($redirect_url)) {
+                    $conf = ":80, :443 {
+   redir $redirect_url
+}";
+                } else {
                     $conf = ':80, :443 {
     respond 503
 }';
-                } else {
-                    $conf = ":80, :443 {
-    redir $redirect_url
-}";
                 }
             } elseif ($proxy_type === ProxyTypes::TRAEFIK->value) {
                 $dynamic_conf = [
