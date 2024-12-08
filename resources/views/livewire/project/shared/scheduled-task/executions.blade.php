@@ -1,4 +1,18 @@
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-4"
+    x-data="{
+        init() {
+            let interval;
+            $wire.$watch('isPollingActive', value => {
+                if (value) {
+                    interval = setInterval(() => {
+                        $wire.polling();
+                    }, 1000);
+                } else {
+                    if (interval) clearInterval(interval);
+                }
+            });
+        }
+    }">
     @forelse($executions as $execution)
         <a wire:click="selectTask({{ data_get($execution, 'id') }})" @class([
             'flex flex-col border-l-2 transition-colors p-4 cursor-pointer',
@@ -23,9 +37,23 @@
         </a>
         @if (data_get($execution, 'id') == $selectedKey)
             <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded">
-                @if (data_get($execution, 'message'))
+                @if (data_get($execution, 'status') === 'running')
+                    <div class="flex items-center gap-2 mb-2">
+                        <span>Task is running...</span>
+                        <x-loading class="w-4 h-4" />
+                    </div>
+                @endif
+                @if ($this->logLines->isNotEmpty())
                     <div>
-                        <pre class="whitespace-pre-wrap">{{ data_get($execution, 'message') }}</pre>
+                        <pre class="whitespace-pre-wrap">@foreach($this->logLines as $line){{ $line }}
+@endforeach</pre>
+                        @if ($this->hasMoreLogs())
+                            <div class="flex justify-center mt-4">
+                                <button wire:click="loadMoreLogs" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                                    Load More Logs
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 @else
                     <div>No output was recorded for this execution.</div>
