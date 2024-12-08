@@ -19,7 +19,7 @@ class SettingsEmail extends Component
     #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
     public ?int $smtpPort = null;
 
-    #[Validate(['nullable', 'string'])]
+    #[Validate(['nullable', 'string', 'in:tls,ssl,none'])]
     public ?string $smtpEncryption = null;
 
     #[Validate(['nullable', 'string'])]

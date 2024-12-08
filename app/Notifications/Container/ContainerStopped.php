@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use Illuminate\Notifications\Messages\MailMessage;
+use App\Notifications\Dto\SlackMessage;
 
 class ContainerStopped extends CustomEmailNotification
 {
@@ -41,7 +42,7 @@ class ContainerStopped extends CustomEmailNotification
         );
 
         if ($this->url) {
-            $message->addField('Resource', '[Link]('.$this->url.')');
+            $message->addField('Resource', '[Link](' . $this->url . ')');
         }
 
         return $message;
@@ -65,5 +66,21 @@ class ContainerStopped extends CustomEmailNotification
         }
 
         return $payload;
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = "Resource stopped";
+        $description = "A resource ({$this->name}) has been stopped unexpectedly on {$this->server->name}";
+
+        if ($this->url) {
+            $description .= "\n**Resource URL:** {$this->url}";
+        }
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

@@ -288,9 +288,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
         $port = $url->getPort();
-        $handle = "handle_path";
-        if ( ! $is_stripprefix_enabled){
-            $handle = "handle";
+        $handle = 'handle_path';
+        if (! $is_stripprefix_enabled) {
+            $handle = 'handle';
         }
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
@@ -301,7 +301,6 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_{$loop}={$schema}://{$host}");
         $labels->push("caddy_{$loop}.header=-Server");
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
-
 
         if ($port) {
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams $port}}");

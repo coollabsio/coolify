@@ -13,6 +13,7 @@ use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
+use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Profile\Index as ProfileIndex;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
@@ -132,6 +133,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/email', NotificationEmail::class)->name('notifications.email');
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
+        Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
     });
 
     Route::prefix('storages')->group(function () {
@@ -285,7 +287,7 @@ Route::middleware(['auth'])->group(function () {
                 'privateKey' => $privateKeyLocation,
                 'root' => '/',
             ]);
-            if (! $disk->exists($filename)) {
+            if (!$disk->exists($filename)) {
                 return response()->json(['message' => 'Backup not found.'], 404);
             }
 
@@ -297,7 +299,7 @@ Route::middleware(['auth'])->group(function () {
                 if ($stream === false || is_null($stream)) {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
-                while (! feof($stream)) {
+                while (!feof($stream)) {
                     echo fread($stream, 2048);
                     flush();
                 }
@@ -305,7 +307,7 @@ Route::middleware(['auth'])->group(function () {
                 fclose($stream);
             }, 200, [
                 'Content-Type' => 'application/octet-stream',
-                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
+                'Content-Disposition' => 'attachment; filename="' . basename($filename) . '"',
             ]);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);

@@ -35,6 +35,7 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER}
       
       # Social Media API Settings
       - X_API_KEY=${SERVICE_X_API}
