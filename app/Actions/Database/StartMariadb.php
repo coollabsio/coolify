@@ -43,11 +43,7 @@ class StartMariadb
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'labels' => [
-                        'coolify.managed' => 'true',
-                        'coolify.type' => 'database',
-                        'coolify.databaseId' => $this->database->id,
-                    ],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
                         'test' => ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized'],
                         'interval' => '5s',
