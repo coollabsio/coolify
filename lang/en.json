@@ -34,5 +34,13 @@
     "resource.delete_connected_networks": "Permanently delete all non-predefined networks associated with this resource.",
     "resource.delete_configurations": "Permanently delete all configuration files from the server.",
     "database.delete_backups_locally": "All backups will be permanently deleted from local storage.",
-    "warning.sslipdomain": "Your configuration is saved, but sslip domain with https is <span class='dark:text-red-500 text-red-500 font-bold'>NOT</span> recommended, because Let's Encrypt servers with this public domain are rate limited (SSL certificate validation will fail). <br><br>Use your own domain instead."
+    "warning.sslipdomain": "Your configuration is saved, but sslip domain with https is <span class='dark:text-red-500 text-red-500 font-bold'>NOT</span> recommended, because Let's Encrypt servers with this public domain are rate limited (SSL certificate validation will fail). <br><br>Use your own domain instead.",
+    "server.os_not_supported": "Server OS type is not supported. Please install Docker manually before continuing: <a target=\"_blank\" class=\"text-black underline dark:text-white\" href=\"https://docs.docker.com/engine/install/#server\">documentation</a>.",
+    "server.key_not_valid": "This key is not valid for this server.",
+    "server.not_reachable": "Server is not reachable. Please validate your configuration and connection.<br>Check this <a target=\"_blank\" class=\"text-black underline dark:text-white\" href=\"https://coolify.io/docs/knowledge-base/server/openssh\">documentation</a> for further help.",
+    "server.docker_not_installed": "Server is not usable. Docker Engine is not installed.",
+    "server.docker_not_running": "Server is not usable. Docker Engine is not running.",
+    "server.docker_compose_not_installed": "Server is not usable. Docker Compose is not installed.",
+    "server.docker_engine_not_installed": "Docker Engine is not installed. Please install Docker manually before continuing: <a target=\"_blank\" class=\"text-black underline dark:text-white\" href=\"https://docs.docker.com/engine/install/#server\">documentation</a>.",
+    "server.swarm_not_initiated": "Docker Swarm is not initiated. Please join the server to a swarm before continuing."
 }
