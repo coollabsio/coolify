@@ -21,6 +21,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         \SocialiteProviders\Manager\SocialiteWasCalled::class => [
             \SocialiteProviders\Azure\AzureExtendSocialite::class.'@handle',
+            \SocialiteProviders\Authentik\AuthentikExtendSocialite::class.'@handle',
         ],
         ProxyStarted::class => [
             ProxyStartedNotification::class,
