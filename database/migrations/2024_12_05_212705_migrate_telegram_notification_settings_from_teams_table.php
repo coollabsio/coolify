@@ -19,11 +19,11 @@ return new class extends Migration
                 'telegram_chat_id' => $team->telegram_chat_id,
 
                 'deployment_success_telegram_notifications' => $team->telegram_notifications_deployments ?? false,
-                'deployment_failure_telegram_notifications' => $team->telegram_notifications_deployments ?? false,
+                'deployment_failure_telegram_notifications' => $team->telegram_notifications_deployments ?? true,
                 'backup_success_telegram_notifications' => $team->telegram_notifications_database_backups ?? false,
-                'backup_failure_telegram_notifications' => $team->telegram_notifications_database_backups ?? false,
+                'backup_failure_telegram_notifications' => $team->telegram_notifications_database_backups ?? true,
                 'scheduled_task_success_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? false,
-                'scheduled_task_failure_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? false,
+                'scheduled_task_failure_telegram_notifications' => $team->telegram_notifications_scheduled_tasks ?? true,
                 'status_change_telegram_notifications' => $team->telegram_notifications_status_changes ?? false,
                 'server_disk_usage_telegram_notifications' => $team->telegram_notifications_server_disk_usage ?? true,
 

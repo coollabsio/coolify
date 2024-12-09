@@ -33,12 +33,15 @@ return new class extends Migration
 
             $table->boolean('deployment_success_email_notifications')->default(false);
             $table->boolean('deployment_failure_email_notifications')->default(true);
+            $table->boolean('status_change_email_notifications')->default(false);
             $table->boolean('backup_success_email_notifications')->default(false);
             $table->boolean('backup_failure_email_notifications')->default(true);
             $table->boolean('scheduled_task_success_email_notifications')->default(false);
             $table->boolean('scheduled_task_failure_email_notifications')->default(true);
-            $table->boolean('status_change_email_notifications')->default(false);
+            $table->boolean('docker_cleanup_email_notifications')->default(false);
             $table->boolean('server_disk_usage_email_notifications')->default(true);
+            $table->boolean('server_reachable_email_notifications')->default(false);
+            $table->boolean('server_unreachable_email_notifications')->default(true);
 
             $table->unique(['team_id']);
         });

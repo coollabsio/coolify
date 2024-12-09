@@ -20,12 +20,15 @@ return new class extends Migration
 
             $table->boolean('deployment_success_slack_notifications')->default(false);
             $table->boolean('deployment_failure_slack_notifications')->default(true);
+            $table->boolean('status_change_slack_notifications')->default(false);
             $table->boolean('backup_success_slack_notifications')->default(false);
             $table->boolean('backup_failure_slack_notifications')->default(true);
             $table->boolean('scheduled_task_success_slack_notifications')->default(false);
             $table->boolean('scheduled_task_failure_slack_notifications')->default(true);
-            $table->boolean('status_change_slack_notifications')->default(false);
+            $table->boolean('docker_cleanup_slack_notifications')->default(false);
             $table->boolean('server_disk_usage_slack_notifications')->default(true);
+            $table->boolean('server_reachable_slack_notifications')->default(false);
+            $table->boolean('server_unreachable_slack_notifications')->default(true);
 
             $table->unique(['team_id']);
         });

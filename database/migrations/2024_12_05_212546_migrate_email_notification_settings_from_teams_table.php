@@ -28,13 +28,13 @@ return new class extends Migration
                 'resend_enabled' => $team->resend_enabled ?? false,
                 'resend_api_key' => $team->resend_api_key,
                 'deployment_success_email_notifications' => $team->smtp_notifications_deployments ?? false,
-                'deployment_failure_email_notifications' => $team->smtp_notifications_deployments ?? false,
+                'deployment_failure_email_notifications' => $team->smtp_notifications_deployments ?? true,
                 'backup_success_email_notifications' => $team->smtp_notifications_database_backups ?? false,
-                'backup_failure_email_notifications' => $team->smtp_notifications_database_backups ?? false,
+                'backup_failure_email_notifications' => $team->smtp_notifications_database_backups ?? true,
                 'scheduled_task_success_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? false,
-                'scheduled_task_failure_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? false,
+                'scheduled_task_failure_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? true,
                 'status_change_email_notifications' => $team->smtp_notifications_status_changes ?? false,
-                'server_disk_usage_email_notifications' => true,
+                'server_disk_usage_email_notifications' => $team->smtp_notifications_server_disk_usage ?? true,
             ]);
         }
 
