@@ -26,7 +26,7 @@ Route::group([
     Route::get('/disable', [OtherController::class, 'disable_api']);
 });
 Route::group([
-    'middleware' => ['auth:sanctum', ApiAllowed::class],
+    'middleware' => ['auth:sanctum', ApiAllowed::class, 'api.sensitive'],
     'prefix' => 'v1',
 ], function () {
     Route::get('/version', [OtherController::class, 'version'])->middleware(['api.ability:read']);

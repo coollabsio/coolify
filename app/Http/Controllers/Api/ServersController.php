@@ -19,25 +19,22 @@ class ServersController extends Controller
 {
     private function removeSensitiveDataFromSettings($settings)
     {
-        $token = auth()->user()->currentAccessToken();
-        if ($token->can('read:sensitive')) {
-            return serializeApiResponse($settings);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $settings = $settings->makeHidden([
+                'sentinel_token',
+            ]);
         }
-        $settings = $settings->makeHidden([
-            'sentinel_token',
-        ]);
 
         return serializeApiResponse($settings);
     }
 
     private function removeSensitiveData($server)
     {
-        $token = auth()->user()->currentAccessToken();
         $server->makeHidden([
             'id',
         ]);
-        if ($token->can('read:sensitive')) {
-            return serializeApiResponse($server);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            // Do nothing
         }
 
         return serializeApiResponse($server);
