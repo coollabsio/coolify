@@ -26,14 +26,20 @@ class ApiTokens extends Component
         $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
     }
 
-    public function updated()
+    public function updatedPermissions($permissionToUpdate)
     {
-        if (count($this->permissions) == 0) {
-            $this->permissions = ['read'];
-        }
-        if (in_array('read:sensitive', $this->permissions) && !in_array('read', $this->permissions)) {
+        if ($permissionToUpdate == 'write') {
+            $this->permissions = ['write', 'deploy', 'read', 'read:sensitive'];
+        } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions)) {
             $this->permissions[] = 'read';
+        } elseif ($permissionToUpdate == 'deploy') {
+            $this->permissions = ['deploy'];
+        } else {
+            if (count($this->permissions) == 0) {
+                $this->permissions = ['read'];
+            }
         }
+        sort($this->permissions);
     }
 
     public function addNewToken()
