@@ -126,69 +126,83 @@ class SettingsEmail extends Component
         }
     }
 
-    public function submitSmtp(): void
+    public function submitSmtp()
     {
-        $this->validate([
-            'smtpEnabled' => 'boolean',
-            'smtpFromAddress' => 'required|email',
-            'smtpFromName' => 'required|string',
-            'smtpHost' => 'required|string',
-            'smtpPort' => 'required|numeric',
-            'smtpEncryption' => 'required|string|in:tls,ssl,none',
-            'smtpUsername' => 'nullable|string',
-            'smtpPassword' => 'nullable|string',
-            'smtpTimeout' => 'nullable|numeric',
-        ], [
-            'smtpFromAddress.required' => 'From Address is required.',
-            'smtpFromAddress.email' => 'Please enter a valid email address.',
-            'smtpFromName.required' => 'From Name is required.',
-            'smtpHost.required' => 'SMTP Host is required.',
-            'smtpPort.required' => 'SMTP Port is required.',
-            'smtpPort.numeric' => 'SMTP Port must be a number.',
-            'smtpEncryption.required' => 'Encryption type is required.',
-        ]);
+        try {
+            $this->validate([
+                'smtpEnabled' => 'boolean',
+                'smtpFromAddress' => 'required|email',
+                'smtpFromName' => 'required|string',
+                'smtpHost' => 'required|string',
+                'smtpPort' => 'required|numeric',
+                'smtpEncryption' => 'required|string|in:tls,ssl,none',
+                'smtpUsername' => 'nullable|string',
+                'smtpPassword' => 'nullable|string',
+                'smtpTimeout' => 'nullable|numeric',
+            ], [
+                'smtpFromAddress.required' => 'From Address is required.',
+                'smtpFromAddress.email' => 'Please enter a valid email address.',
+                'smtpFromName.required' => 'From Name is required.',
+                'smtpHost.required' => 'SMTP Host is required.',
+                'smtpPort.required' => 'SMTP Port is required.',
+                'smtpPort.numeric' => 'SMTP Port must be a number.',
+                'smtpEncryption.required' => 'Encryption type is required.',
+            ]);
 
-        $this->resendEnabled = false;
+            $this->resendEnabled = false;
+            $this->settings->resend_enabled = false;
 
-        $this->settings->smtp_enabled = $this->smtpEnabled;
-        $this->settings->smtp_host = $this->smtpHost;
-        $this->settings->smtp_port = $this->smtpPort;
-        $this->settings->smtp_encryption = $this->smtpEncryption;
-        $this->settings->smtp_username = $this->smtpUsername;
-        $this->settings->smtp_password = $this->smtpPassword;
-        $this->settings->smtp_timeout = $this->smtpTimeout;
-        $this->settings->smtp_from_address = $this->smtpFromAddress;
-        $this->settings->smtp_from_name = $this->smtpFromName;
-        $this->settings->resend_enabled = false;
-        $this->settings->save();
+            $this->settings->smtp_enabled = $this->smtpEnabled;
+            $this->settings->smtp_host = $this->smtpHost;
+            $this->settings->smtp_port = $this->smtpPort;
+            $this->settings->smtp_encryption = $this->smtpEncryption;
+            $this->settings->smtp_username = $this->smtpUsername;
+            $this->settings->smtp_password = $this->smtpPassword;
+            $this->settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
 
-        $this->dispatch('success', 'SMTP settings updated.');
+            $this->settings->save();
+
+            $this->dispatch('success', 'SMTP settings updated.');
+        } catch (\Throwable $e) {
+            $this->smtpEnabled = false;
+
+            return handleError($e);
+        }
     }
 
-    public function submitResend(): void
+    public function submitResend()
     {
-        $this->validate([
-            'resendEnabled' => 'boolean',
-            'resendApiKey' => 'required|string',
-            'smtpFromAddress' => 'required|email',
-            'smtpFromName' => 'required|string',
-        ], [
-            'resendApiKey.required' => 'Resend API Key is required.',
-            'smtpFromAddress.required' => 'From Address is required.',
-            'smtpFromAddress.email' => 'Please enter a valid email address.',
-            'smtpFromName.required' => 'From Name is required.',
-        ]);
+        try {
+            $this->validate([
+                'resendEnabled' => 'boolean',
+                'resendApiKey' => 'required|string',
+                'smtpFromAddress' => 'required|email',
+                'smtpFromName' => 'required|string',
+            ], [
+                'resendApiKey.required' => 'Resend API Key is required.',
+                'smtpFromAddress.required' => 'From Address is required.',
+                'smtpFromAddress.email' => 'Please enter a valid email address.',
+                'smtpFromName.required' => 'From Name is required.',
+            ]);
 
-        $this->smtpEnabled = false;
+            $this->smtpEnabled = false;
+            $this->settings->smtp_enabled = false;
 
-        $this->settings->resend_enabled = $this->resendEnabled;
-        $this->settings->resend_api_key = $this->resendApiKey;
-        $this->settings->smtp_from_address = $this->smtpFromAddress;
-        $this->settings->smtp_from_name = $this->smtpFromName;
-        $this->settings->smtp_enabled = false;
-        $this->settings->save();
+            $this->settings->resend_enabled = $this->resendEnabled;
+            $this->settings->resend_api_key = $this->resendApiKey;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
 
-        $this->dispatch('success', 'Resend settings updated.');
+            $this->settings->save();
+
+            $this->dispatch('success', 'Resend settings updated.');
+        } catch (\Throwable $e) {
+            $this->resendEnabled = false;
+
+            return handleError($e, $this);
+        }
     }
 
     public function sendTestEmail()
