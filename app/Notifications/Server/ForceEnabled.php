@@ -5,11 +5,11 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Dto\SlackMessage;
+use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class ForceEnabled extends CustomEmailNotification
@@ -69,7 +69,6 @@ class ForceEnabled extends CustomEmailNotification
         ];
     }
 
-
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
@@ -78,5 +77,4 @@ class ForceEnabled extends CustomEmailNotification
             color: SlackMessage::successColor()
         );
     }
-
 }

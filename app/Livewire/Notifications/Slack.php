@@ -82,6 +82,7 @@ class Slack extends Component
             $this->saveModel();
         } catch (\Throwable $e) {
             $this->slackEnabled = false;
+
             return handleError($e, $this);
         }
     }

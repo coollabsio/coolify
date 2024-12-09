@@ -5,8 +5,8 @@ namespace App\Notifications\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Notifications\Messages\MailMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class BackupSuccess extends CustomEmailNotification
 {
@@ -64,7 +64,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        $title = "Database backup successful";
+        $title = 'Database backup successful';
         $description = "Database backup for {$this->name} (db:{$this->database_name}) was successful.";
 
         $description .= "\n\n**Frequency:** {$this->frequency}";

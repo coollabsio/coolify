@@ -3,8 +3,8 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\SlackChannel;
+use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;

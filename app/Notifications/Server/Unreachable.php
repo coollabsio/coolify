@@ -5,11 +5,11 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Dto\SlackMessage;
+use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class Unreachable extends CustomEmailNotification
@@ -20,7 +20,7 @@ class Unreachable extends CustomEmailNotification
     {
         $this->onQueue('high');
         $this->isRateLimited = isEmailRateLimited(
-            limiterKey: 'server-unreachable:' . $this->server->id,
+            limiterKey: 'server-unreachable:'.$this->server->id,
         );
     }
 
@@ -83,12 +83,11 @@ class Unreachable extends CustomEmailNotification
         ];
     }
 
-
     public function toSlack(): SlackMessage
     {
         $description = "Your server '{$this->server->name}' is unreachable.\n";
         $description .= "All automations & integrations are turned off!\n\n";
-        $description .= "*IMPORTANT:* We automatically try to revive your server and turn on all automations & integrations.";
+        $description .= '*IMPORTANT:* We automatically try to revive your server and turn on all automations & integrations.';
 
         return new SlackMessage(
             title: 'Server unreachable',

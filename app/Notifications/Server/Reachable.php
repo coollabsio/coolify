@@ -5,11 +5,11 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Dto\SlackMessage;
+use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class Reachable extends CustomEmailNotification
@@ -20,7 +20,7 @@ class Reachable extends CustomEmailNotification
     {
         $this->onQueue('high');
         $this->isRateLimited = isEmailRateLimited(
-            limiterKey: 'server-reachable:' . $this->server->id,
+            limiterKey: 'server-reachable:'.$this->server->id,
         );
     }
 
@@ -78,13 +78,10 @@ class Reachable extends CustomEmailNotification
         ];
     }
 
-
-
-
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
-            title: "Server revived",
+            title: 'Server revived',
             description: "Server '{$this->server->name}' revived.\nAll automations & integrations are turned on again!",
             color: SlackMessage::successColor()
         );

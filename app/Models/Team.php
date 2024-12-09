@@ -167,7 +167,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack
             return 9999999;
         }
         $team = Team::find(currentTeam()->id);
-        if (!$team) {
+        if (! $team) {
             return 0;
         }
 
