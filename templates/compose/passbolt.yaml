@@ -1,0 +1,58 @@
+# documentation: https://help.passbolt.com/hosting/install/ce/docker?utm_source=coolify.io
+# slogan: Open source password manager for teams.
+# tags: "password manager", "security", "open source", "team"
+# logo: svgs/passbolt.svg
+# port: 80
+
+services:
+  passbolt:
+    image: 'passbolt/passbolt:latest-ce'
+    environment:
+      - SERVICE_FQDN_PASSBOLT_80
+      - 'APP_FULL_BASE_URL=${APP_FULL_BASE_URL}'
+      -
+        DATASOURCES_DEFAULT_HOST: passbolt-db
+      -
+        DATASOURCES_DEFAULT_USERNAME: '${SERVICE_USER_MYSQL}'
+      -
+        DATASOURCES_DEFAULT_PASSWORD: '${SERVICE_PASSWORD_MYSQL}'
+      -
+        DATASOURCES_DEFAULT_DATABASE: '${MYSQL_DATABASE:-passbolt}'
+      - 'TZ=${TZ:-Europe/Paris}'
+    volumes:
+      - 'passbolt-gpg:/etc/passbolt/gpg'
+      - 'passbolt-jwt:/etc/passbolt/jwt'
+    depends_on:
+      passbolt-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:80'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    command:
+      - /usr/bin/wait-for.sh
+      - '-t'
+      - '0'
+      - 'passbolt-db:3306'
+      - '--'
+      - /docker-entrypoint.sh
+
+  passbolt-db:
+    image: mariadb:10.11
+    volumes:
+      - passbolt-mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-passbolt}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${SERVICE_PASSWORD_ROOT}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
