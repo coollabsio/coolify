@@ -25,8 +25,11 @@ class Executions extends Component
     public ?string $serverTimezone = null;
 
     public $currentPage = 1;
+
     public $logsPerPage = 100;
+
     public $selectedExecution = null;
+
     public $isPollingActive = false;
 
     public function getListeners()
@@ -74,12 +77,13 @@ class Executions extends Component
             $this->selectedExecution = null;
             $this->currentPage = 1;
             $this->isPollingActive = false;
+
             return;
         }
         $this->selectedKey = $key;
         $this->selectedExecution = $this->task->executions()->find($key);
         $this->currentPage = 1;
-        
+
         // Start polling if task is running
         if ($this->selectedExecution && $this->selectedExecution->status === 'running') {
             $this->isPollingActive = true;
@@ -103,24 +107,33 @@ class Executions extends Component
 
     public function getLogLinesProperty()
     {
-        if (!$this->selectedExecution) {
+        if (! $this->selectedExecution) {
             return collect();
         }
 
-        if (!$this->selectedExecution->message) {
+        if (! $this->selectedExecution->message) {
             return collect(['Waiting for task output...']);
         }
 
         $lines = collect(explode("\n", $this->selectedExecution->message));
+
         return $lines->take($this->currentPage * $this->logsPerPage);
+    }
+
+    public function downloadLogs()
+    {
+        return response()->streamDownload(function () {
+            echo $this->selectedExecution->message;
+        }, 'task-execution-'.$this->selectedExecution->id.'.log');
     }
 
     public function hasMoreLogs()
     {
-        if (!$this->selectedExecution || !$this->selectedExecution->message) {
+        if (! $this->selectedExecution || ! $this->selectedExecution->message) {
             return false;
         }
         $lines = collect(explode("\n", $this->selectedExecution->message));
+
         return $lines->count() > ($this->currentPage * $this->logsPerPage);
     }
 

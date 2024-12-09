@@ -1,18 +1,17 @@
-<div class="flex flex-col gap-4"
-    x-data="{
-        init() {
-            let interval;
-            $wire.$watch('isPollingActive', value => {
-                if (value) {
-                    interval = setInterval(() => {
-                        $wire.polling();
-                    }, 1000);
-                } else {
-                    if (interval) clearInterval(interval);
-                }
-            });
-        }
-    }">
+<div class="flex flex-col gap-4" x-data="{
+    init() {
+        let interval;
+        $wire.$watch('isPollingActive', value => {
+            if (value) {
+                interval = setInterval(() => {
+                    $wire.polling();
+                }, 1000);
+            } else {
+                if (interval) clearInterval(interval);
+            }
+        });
+    }
+}">
     @forelse($executions as $execution)
         <a wire:click="selectTask({{ data_get($execution, 'id') }})" @class([
             'flex flex-col border-l-2 transition-colors p-4 cursor-pointer',
@@ -45,15 +44,21 @@
                 @endif
                 @if ($this->logLines->isNotEmpty())
                     <div>
-                        <pre class="whitespace-pre-wrap">@foreach($this->logLines as $line){{ $line }}
-@endforeach</pre>
-                        @if ($this->hasMoreLogs())
-                            <div class="flex justify-center mt-4">
-                                <button wire:click="loadMoreLogs" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                                    Load More Logs
-                                </button>
-                            </div>
-                        @endif
+                        <pre class="whitespace-pre-wrap">
+@foreach ($this->logLines as $line)
+{{ $line }}
+@endforeach
+</pre>
+                        <div class="flex gap-2">
+                            @if ($this->hasMoreLogs())
+                                <x-forms.button wire:click.prevent="loadMoreLogs" isHighlighted>
+                                    Load More
+                                </x-forms.button>
+                            @endif
+                            <x-forms.button wire:click.prevent="downloadLogs" isHighlighted>
+                                Download
+                            </x-forms.button>
+                        </div>
                     </div>
                 @else
                     <div>No output was recorded for this execution.</div>
