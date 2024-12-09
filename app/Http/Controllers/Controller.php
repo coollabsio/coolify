@@ -44,7 +44,6 @@ class Controller extends BaseController
         $request->fulfill();
         $name = request()->user()?->name;
 
-        // send_internal_notification("User {$name} verified their email address.");
         return redirect(RouteServiceProvider::HOME);
     }
 
