@@ -24,7 +24,7 @@ class StartMariadb
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
-            "echo 'Starting {$database->name}.'",
+            "echo 'Starting database.'",
             "mkdir -p $this->configuration_dir",
         ];
 

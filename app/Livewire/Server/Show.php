@@ -5,7 +5,7 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
-use Livewire\Attributes\Locked;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -79,9 +79,6 @@ class Show extends Component
     #[Validate(['required'])]
     public string $serverTimezone;
 
-    #[Locked]
-    public array $timezones;
-
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -96,11 +93,19 @@ class Show extends Component
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    #[Computed]
+    public function timezones(): array
+    {
+        return collect(timezone_identifiers_list())
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     public function syncData(bool $toModel = false)

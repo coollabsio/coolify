@@ -16,24 +16,26 @@ class Configuration extends Component
 
     public function mount()
     {
-        $this->application = Application::query()
-            ->whereHas('environment.project', function ($query) {
-                $query->where('team_id', currentTeam()->id)
-                    ->where('uuid', request()->route('project_uuid'));
-            })
-            ->whereHas('environment', function ($query) {
-                $query->where('name', request()->route('environment_name'));
-            })
+        $project = currentTeam()
+            ->projects()
+            ->select('id', 'uuid', 'team_id')
+            ->where('uuid', request()->route('project_uuid'))
+            ->firstOrFail();
+        $environment = $project->environments()
+            ->select('id', 'name', 'project_id')
+            ->where('name', request()->route('environment_name'))
+            ->firstOrFail();
+        $application = $environment->applications()
+            ->with(['destination'])
             ->where('uuid', request()->route('application_uuid'))
-            ->with(['destination' => function ($query) {
-                $query->select('id', 'server_id');
-            }])
             ->firstOrFail();
 
-        if ($this->application->destination && $this->application->destination->server_id) {
+        $this->application = $application;
+        if ($application->destination && $application->destination->server) {
+            $mainServer = $application->destination->server;
             $this->servers = Server::ownedByCurrentTeam()
                 ->select('id', 'name')
-                ->where('id', '!=', $this->application->destination->server_id)
+                ->where('id', '!=', $mainServer->id)
                 ->get();
         } else {
             $this->servers = collect();

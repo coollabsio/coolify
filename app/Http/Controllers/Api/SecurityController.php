@@ -11,13 +11,11 @@ class SecurityController extends Controller
 {
     private function removeSensitiveData($team)
     {
-        $token = auth()->user()->currentAccessToken();
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($team);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $team->makeHidden([
+                'private_key',
+            ]);
         }
-        $team->makeHidden([
-            'private_key',
-        ]);
 
         return serializeApiResponse($team);
     }

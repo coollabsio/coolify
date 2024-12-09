@@ -27,6 +27,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use Carbon\CarbonImmutable;
@@ -90,8 +91,11 @@ function metrics_dir(): string
     return base_configuration_dir().'/metrics';
 }
 
-function sanitize_string(string $input): string
+function sanitize_string(?string $input = null): ?string
 {
+    if (is_null($input)) {
+        return null;
+    }
     // Remove any HTML/PHP tags
     $sanitized = strip_tags($input);
 
@@ -472,11 +476,13 @@ function setNotificationChannels($notifiable, $event)
 {
     $channels = [];
     $isEmailEnabled = isEmailEnabled($notifiable);
+    $isSlackEnabled = data_get($notifiable, 'slack_enabled');
     $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
     $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
     $isSubscribedToEmailEvent = data_get($notifiable, "smtp_notifications_$event");
     $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
     $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
+    $isSubscribedToSlackEvent = data_get($notifiable, "slack_notifications_$event");
 
     if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
         $channels[] = DiscordChannel::class;
@@ -486,6 +492,9 @@ function setNotificationChannels($notifiable, $event)
     }
     if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
         $channels[] = TelegramChannel::class;
+    }
+    if ($isSlackEnabled && $isSubscribedToSlackEvent) {
+        $channels[] = SlackChannel::class;
     }
 
     return $channels;

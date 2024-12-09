@@ -9,7 +9,7 @@ class Show extends Component
 {
     public Project $project;
 
-    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
+    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey',  'environmentVariableDeleted' => '$refresh'];
 
     public function saveKey($data)
     {
