@@ -96,8 +96,7 @@ RUN mkdir -p /usr/local/bin && \
     chmod +x /usr/local/bin/cloudflared
 
 # Configure PHP
-RUN echo 'upload_max_filesize=256M' > /usr/local/etc/php/conf.d/upload-limits.ini && \
-    echo 'post_max_size=256M' >> /usr/local/etc/php/conf.d/upload-limits.ini
+COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=1
 
 # Copy application files from previous stages
@@ -115,7 +114,10 @@ COPY --chown=www-data:www-data public ./public
 COPY --chown=www-data:www-data routes ./routes
 COPY --chown=www-data:www-data storage ./storage
 COPY --chown=www-data:www-data templates ./templates
+COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
+
+RUN composer dump-autoload
 
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
