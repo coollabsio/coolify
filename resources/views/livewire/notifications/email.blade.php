@@ -14,7 +14,7 @@
                     Copy from Instance Settings
                 </x-forms.button>
                 @endif
-                @if (isEmailEnabled($team) && auth()->user()->isAdminFromSession())
+                @if ($team->isNotificationEnabled('email') && auth()->user()->isAdminFromSession())
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                     <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
                         <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress" label="Recipients" required />
@@ -93,7 +93,7 @@
             </form>
         </div>
         @endif
-        @if (isEmailEnabled($team) || $useInstanceEmailSettings)
+        @if ($team->isNotificationEnabled('email') || $useInstanceEmailSettings)
         <h2 class="mt-8 mb-4">Notification Settings</h2>
         <p class="mb-4">
             Select events for which you would like to receive email notifications.
