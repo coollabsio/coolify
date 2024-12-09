@@ -26,6 +26,9 @@ class Advanced extends Component
     public bool $isAutoDeployEnabled = true;
 
     #[Validate(['boolean'])]
+    public bool $disableBuildCache = false;
+
+    #[Validate(['boolean'])]
     public bool $isLogDrainEnabled = false;
 
     #[Validate(['boolean'])]
@@ -95,6 +98,7 @@ class Advanced extends Component
             $this->application->settings->is_stripprefix_enabled = $this->isStripprefixEnabled;
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
             $this->application->settings->connect_to_docker_network = $this->isConnectToDockerNetworkEnabled;
+            $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->save();
         } else {
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
@@ -116,6 +120,7 @@ class Advanced extends Component
             $this->customInternalName = $this->application->settings->custom_internal_name;
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
+            $this->disableBuildCache = $this->application->settings->disable_build_cache;
         }
     }
 

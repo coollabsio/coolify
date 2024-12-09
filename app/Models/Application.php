@@ -1321,17 +1321,43 @@ class Application extends BaseModel
         if (! $gitRemoteStatus['is_accessible']) {
             throw new \RuntimeException("Failed to read Git source:\n\n{$gitRemoteStatus['error']}");
         }
+        $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
+        $gitVersion = str($getGitVersion)->explode(' ')->last();
 
-        $commands = collect([
-            "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid}",
-            "cd /tmp/{$uuid}",
-            $cloneCommand,
-            'git sparse-checkout init --cone',
-            "git sparse-checkout set {$fileList->implode(' ')}",
-            'git read-tree -mu HEAD',
-            "cat .$workdir$composeFile",
-        ]);
+        if (version_compare($gitVersion, '2.35.1', '<')) {
+            $fileList = $fileList->map(function ($file) {
+                $parts = explode('/', trim($file, '.'));
+                $paths = collect();
+                $currentPath = '';
+                foreach ($parts as $part) {
+                    $currentPath .= ($currentPath ? '/' : '').$part;
+                    $paths->push($currentPath);
+                }
+
+                return $paths;
+            })->flatten()->unique()->values();
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+                'git sparse-checkout init --cone',
+                "git sparse-checkout set {$fileList->implode(' ')}",
+                'git read-tree -mu HEAD',
+                "cat .$workdir$composeFile",
+            ]);
+        } else {
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+                'git sparse-checkout init --cone',
+                "git sparse-checkout set {$fileList->implode(' ')}",
+                'git read-tree -mu HEAD',
+                "cat .$workdir$composeFile",
+            ]);
+        }
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
         } catch (\Exception $e) {

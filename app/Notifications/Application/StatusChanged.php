@@ -5,6 +5,7 @@ namespace App\Notifications\Application;
 use App\Models\Application;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class StatusChanged extends CustomEmailNotification
@@ -74,5 +75,21 @@ class StatusChanged extends CustomEmailNotification
                 ],
             ],
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Application stopped';
+        $description = "{$this->resource_name} has been stopped";
+
+        $description .= "\n\n**Project:** ".data_get($this->resource, 'environment.project.name');
+        $description .= "\n**Environment:** {$this->environment_name}";
+        $description .= "\n**Application URL:** {$this->resource_url}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

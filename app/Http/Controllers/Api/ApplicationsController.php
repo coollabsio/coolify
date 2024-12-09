@@ -25,26 +25,24 @@ class ApplicationsController extends Controller
 {
     private function removeSensitiveData($application)
     {
-        $token = auth()->user()->currentAccessToken();
         $application->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($application);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $application->makeHidden([
+                'custom_labels',
+                'dockerfile',
+                'docker_compose',
+                'docker_compose_raw',
+                'manual_webhook_secret_bitbucket',
+                'manual_webhook_secret_gitea',
+                'manual_webhook_secret_github',
+                'manual_webhook_secret_gitlab',
+                'private_key_id',
+                'value',
+                'real_value',
+            ]);
         }
-        $application->makeHidden([
-            'custom_labels',
-            'dockerfile',
-            'docker_compose',
-            'docker_compose_raw',
-            'manual_webhook_secret_bitbucket',
-            'manual_webhook_secret_gitea',
-            'manual_webhook_secret_github',
-            'manual_webhook_secret_gitlab',
-            'private_key_id',
-            'value',
-            'real_value',
-        ]);
 
         return serializeApiResponse($application);
     }
@@ -70,7 +68,8 @@ class ApplicationsController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/Application')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -180,8 +179,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -284,8 +285,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -388,8 +391,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -476,8 +481,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -561,8 +568,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -612,8 +621,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -1268,7 +1279,8 @@ class ApplicationsController extends Controller
                             ref: '#/components/schemas/Application'
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1340,7 +1352,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1466,8 +1479,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -1482,7 +1497,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1598,9 +1614,10 @@ class ApplicationsController extends Controller
             $errors = [];
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 $domain = trim($domain);
-                if (filter_var($domain, FILTER_VALIDATE_URL) === false || !preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false || ! preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
                     $errors[] = 'Invalid domain: '.$domain;
                 }
+
                 return $domain;
             });
             if (count($errors) > 0) {
@@ -1706,7 +1723,8 @@ class ApplicationsController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1812,7 +1830,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2000,7 +2019,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2181,7 +2201,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2330,7 +2351,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2422,9 +2444,11 @@ class ApplicationsController extends Controller
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Deployment request queued.', 'description' => 'Message.'],
                                 'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2510,7 +2534,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2584,7 +2609,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
 
             new OA\Response(
                 response: 401,
@@ -2806,33 +2832,6 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
                     $errors[] = 'Invalid domain: '.$domain;
-                }
-
-                return str($domain)->trim()->lower();
-            });
-            if (count($errors) > 0) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'domains' => 'One of the domain is already used.',
-                    ],
-                ], 422);
-            }
-        }
-    }
-}
-
-            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-            $errors = [];
-            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                    $errors[] = 'Invalid domain: ' . $domain;
                 }
 
                 return str($domain)->trim()->lower();

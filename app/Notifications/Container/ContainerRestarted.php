@@ -5,6 +5,7 @@ namespace App\Notifications\Container;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class ContainerRestarted extends CustomEmailNotification
@@ -65,5 +66,21 @@ class ContainerRestarted extends CustomEmailNotification
         }
 
         return $payload;
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Resource restarted';
+        $description = "A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
+
+        if ($this->url) {
+            $description .= "\n**Resource URL:** {$this->url}";
+        }
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::warningColor()
+        );
     }
 }
