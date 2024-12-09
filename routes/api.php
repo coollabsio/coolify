@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\DockerController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
@@ -128,7 +129,13 @@ Route::group([
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware([IgnoreReadOnlyApiToken::class]);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware([IgnoreReadOnlyApiToken::class]);
+
+    Route::get('/docker/{server_uuid}/images', [DockerController::class, 'list_server_docker_images']);
+    Route::get('/docker/{server_uuid}/image/{id}', [DockerController::class, 'get_server_docker_image_details']);
+    Route::delete('/docker/{server_uuid}/images/delete/dangling', [DockerController::class, 'delete_all_dangling_server_docker_images']);
 });
+
+
 
 Route::group([
     'prefix' => 'v1',
