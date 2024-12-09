@@ -70,7 +70,7 @@ class Rollback extends Component
                     ];
                 })->toArray();
             }
-            $showToast && $this->dispatch('success', 'ListServerDockerImages loaded.');
+            $showToast && $this->dispatch('success', 'Images loaded.');
 
             return [];
         } catch (\Throwable $e) {
