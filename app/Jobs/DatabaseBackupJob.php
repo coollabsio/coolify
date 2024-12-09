@@ -60,12 +60,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct($backup)
     {
+        $this->onQueue('high');
         $this->backup = $backup;
     }
 
     public function handle(): void
     {
         try {
+            $databasesToBackup = null;
+
             $this->team = Team::find($this->backup->team_id);
             if (! $this->team) {
                 $this->backup->delete();
@@ -197,8 +200,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databaseType = $this->database->type();
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
-
-            if (is_null($databasesToBackup)) {
+            if (blank($databasesToBackup)) {
                 if (str($databaseType)->contains('postgres')) {
                     $databasesToBackup = [$this->database->postgres_db];
                 } elseif (str($databaseType)->contains('mongodb')) {
@@ -304,7 +306,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
-                    $this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
+                    //$this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $this->backup_output,
@@ -319,12 +321,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'filename' => null,
                         ]);
                     }
-                    send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
                     $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output, $database));
                 }
             }
         } catch (\Throwable $e) {
-            send_internal_notification('DatabaseBackupJob failed with: '.$e->getMessage());
             throw $e;
         } finally {
             if ($this->team) {
@@ -524,7 +524,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function getFullImageName(): string
     {
         $settings = instanceSettings();
-        $helperImage = config('coolify.helper_image');
+        $helperImage = config('constants.coolify.helper_image');
         $latestVersion = $settings->helper_version;
 
         return "{$helperImage}:{$latestVersion}";

@@ -3,19 +3,17 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class HighDiskUsage extends Notification implements ShouldQueue
+class HighDiskUsage extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
-    public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold) {}
+    public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
@@ -57,5 +55,23 @@ class HighDiskUsage extends Notification implements ShouldQueue
         return [
             'message' => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->server_disk_usage_notification_threshold}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.",
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $description = "Server '{$this->server->name}' high disk usage detected!\n";
+        $description .= "Disk usage: {$this->disk_usage}%\n";
+        $description .= "Threshold: {$this->server_disk_usage_notification_threshold}%\n\n";
+        $description .= "Please cleanup your disk to prevent data-loss.\n";
+        $description .= "Tips for cleanup: https://coolify.io/docs/knowledge-base/server/automated-cleanup\n";
+        $description .= "Change settings:\n";
+        $description .= '- Threshold: '.base_url().'/server/'.$this->server->uuid."#advanced\n";
+        $description .= '- Notifications: '.base_url().'/notifications/discord';
+
+        return new SlackMessage(
+            title: 'High disk usage detected',
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

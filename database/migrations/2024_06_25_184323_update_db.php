@@ -5,6 +5,7 @@ use App\Models\Server;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Visus\Cuid2\Cuid2;
 
@@ -52,7 +53,7 @@ return new class extends Migration
 
             DB::table('server_settings')->update(['metrics_history_days' => 7]);
         } catch (\Exception $e) {
-            loggy($e);
+            Log::error('Error updating db: '.$e->getMessage());
         }
     }
 

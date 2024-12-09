@@ -4,35 +4,35 @@ namespace App\Livewire\Notifications;
 
 use App\Models\Team;
 use App\Notifications\Test;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Discord extends Component
 {
     public Team $team;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordEnabled = false;
 
-    #[Rule(['url', 'nullable'])]
+    #[Validate(['url', 'nullable'])]
     public ?string $discordWebhookUrl = null;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsTest = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsDeployments = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsStatusChanges = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsDatabaseBackups = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsScheduledTasks = false;
 
-    #[Rule(['boolean'])]
+    #[Validate(['boolean'])]
     public bool $discordNotificationsServerDiskUsage = false;
 
     public function mount()
@@ -41,7 +41,7 @@ class Discord extends Component
             $this->team = auth()->user()->currentTeam();
             $this->syncData();
         } catch (\Throwable $e) {
-            handleError($e, $this);
+            return handleError($e, $this);
         }
     }
 
@@ -57,11 +57,8 @@ class Discord extends Component
             $this->team->discord_notifications_database_backups = $this->discordNotificationsDatabaseBackups;
             $this->team->discord_notifications_scheduled_tasks = $this->discordNotificationsScheduledTasks;
             $this->team->discord_notifications_server_disk_usage = $this->discordNotificationsServerDiskUsage;
-            try {
-                $this->saveModel();
-            } catch (\Throwable $e) {
-                return handleError($e, $this);
-            }
+            $this->team->save();
+            refreshSession();
         } else {
             $this->discordEnabled = $this->team->discord_enabled;
             $this->discordWebhookUrl = $this->team->discord_webhook_url;
@@ -71,6 +68,22 @@ class Discord extends Component
             $this->discordNotificationsDatabaseBackups = $this->team->discord_notifications_database_backups;
             $this->discordNotificationsScheduledTasks = $this->team->discord_notifications_scheduled_tasks;
             $this->discordNotificationsServerDiskUsage = $this->team->discord_notifications_server_disk_usage;
+        }
+    }
+
+    public function instantSaveDiscordEnabled()
+    {
+        try {
+            $this->validate([
+                'discordWebhookUrl' => 'required',
+            ], [
+                'discordWebhookUrl.required' => 'Discord Webhook URL is required.',
+            ]);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->discordEnabled = false;
+
+            return handleError($e, $this);
         }
     }
 
@@ -96,7 +109,7 @@ class Discord extends Component
 
     public function saveModel()
     {
-        $this->team->save();
+        $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');
     }

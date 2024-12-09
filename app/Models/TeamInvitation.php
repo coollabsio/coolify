@@ -28,8 +28,8 @@ class TeamInvitation extends Model
     public function isValid()
     {
         $createdAt = $this->created_at;
-        $diff = $createdAt->diffInMinutes(now());
-        if ($diff <= config('constants.invitation.link.expiration')) {
+        $diff = $createdAt->diffInDays(now());
+        if ($diff <= config('constants.invitation.link.expiration_days')) {
             return true;
         } else {
             $this->delete();

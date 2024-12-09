@@ -22,6 +22,7 @@ services:
       - MONGO_URI=mongodb://mongo:27017/heyform
       - REDIS_HOST=keydb
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_KEYDB}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000 || exit 1"]
       interval: 5s

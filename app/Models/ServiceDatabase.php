@@ -24,6 +24,16 @@ class ServiceDatabase extends BaseModel
         });
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
     public function restart()
     {
         $container_id = $this->name.'-'.$this->service->uuid;

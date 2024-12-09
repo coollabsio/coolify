@@ -35,10 +35,15 @@
         @endif
         <h4>Token Permissions</h4>
         <div class="w-64">
-            <x-forms.checkbox label="read" wire:model.live="permissions" domValue="read" :checked="in_array('read', $permissions)"></x-forms.checkbox>
-            <x-forms.checkbox label="read:sensitive" wire:model.live="permissions" domValue="read:sensitive" helper="Responses will include secrets, logs, passwords, and compose file contents" :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
-            <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write" helper="Root access, be careful!" :checked="in_array('write', $permissions)"></x-forms.checkbox>
-            <x-forms.checkbox label="deploy" wire:model.live="permissions" domValue="deploy" helper="Can trigger deploy webhooks" :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="read" wire:model.live="permissions" value="read"
+                :checked="in_array('read', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="read:sensitive" wire:model.live="permissions" value="read:sensitive"
+                helper="Responses will include secrets, logs, passwords, and compose file contents"
+                :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="write" wire:model.live="permissions" value="write"
+                helper="Root access, be careful!" :checked="in_array('write', $permissions)"></x-forms.checkbox>
+            <x-forms.checkbox label="deploy" wire:model.live="permissions" value="deploy"
+                helper="Can trigger deploy webhooks" :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
         </div>
     </form>
     @if (session()->has('token'))

@@ -31,7 +31,7 @@ class NavbarDeleteTeam extends Component
         $currentTeam->delete();
 
         $currentTeam->members->each(function ($user) use ($currentTeam) {
-            if ($user->id === auth()->user()->id) {
+            if ($user->id === Auth::id()) {
                 return;
             }
             $user->teams()->detach($currentTeam);

@@ -66,11 +66,15 @@ class Index extends Component
 
     public bool $serverReachable = true;
 
+    public ?string $minDockerVersion = null;
+
     public function mount()
     {
         if (auth()->user()?->isMember() && auth()->user()->currentTeam()->show_boarding === true) {
             return redirect()->route('dashboard');
         }
+
+        $this->minDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
         if (isDev()) {
@@ -168,13 +172,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function getProxyType()
     {
-        // Set Default Proxy Type
         $this->selectProxy(ProxyTypes::TRAEFIK->value);
-        // $proxyTypeSet = $this->createdServer->proxy->type;
-        // if (!$proxyTypeSet) {
-        //     $this->currentState = 'select-proxy';
-        //     return;
-        // }
         $this->getProjects();
     }
 
@@ -185,7 +183,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
             return;
         }
-        $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
+        $this->createdPrivateKey = PrivateKey::where('team_id', currentTeam()->id)->where('id', $this->selectedExistingPrivateKey)->first();
         $this->privateKey = $this->createdPrivateKey->private_key;
         $this->currentState = 'create-server';
     }

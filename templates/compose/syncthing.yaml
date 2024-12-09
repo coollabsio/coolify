@@ -6,17 +6,22 @@
 
 services:
   syncthing:
-    image: 'lscr.io/linuxserver/syncthing:latest'
+    image: lscr.io/linuxserver/syncthing:latest
     environment:
       - SERVICE_FQDN_SYNCTHING_8384
       - PUID=1000
       - PGID=1000
-      - TZ=Etc/UTC
+      - TZ=${TZ:-Etc/UTC}
     volumes:
-      - 'syncthing-config:/config'
-      - 'syncthing-data1:/data1'
-      - 'syncthing-data2:/data2'
+      - syncthing_config:/config
+      - syncthing_data1:/data1
+      - syncthing_data2:/data2
     ports:
-      - '22000:22000/tcp'
-      - '22000:22000/udp'
-      - '21027:21027/udp'
+      - 22000:22000/tcp
+      - 22000:22000/udp
+      - 21027:21027/udp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8384/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

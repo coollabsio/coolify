@@ -140,6 +140,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $buildTarget = null;
 
+    private bool $disableBuildCache = false;
+
     private Collection $saved_outputs;
 
     private ?string $full_healthcheck_url = null;
@@ -166,6 +168,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(int $application_deployment_queue_id)
     {
+        $this->onQueue('high');
+
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
@@ -176,7 +180,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
         $this->rollback = $this->application_deployment_queue->rollback;
+        $this->disableBuildCache = $this->application->settings->disable_build_cache;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
+        if ($this->disableBuildCache) {
+            $this->force_rebuild = true;
+        }
         $this->restart_only = $this->application_deployment_queue->restart_only;
         $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
@@ -223,6 +231,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         }
+    }
+
+    public function tags(): array
+    {
+        return ['server:'.gethostname()];
     }
 
     public function handle(): void
@@ -344,8 +357,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function post_deployment()
     {
         if ($this->server->isProxyShouldRun()) {
-            GetContainersStatus::dispatch($this->server)->onQueue('high');
-            // dispatch(new ContainerStatusJob($this->server));
+            GetContainersStatus::dispatch($this->server);
         }
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {
@@ -457,7 +469,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
             if (! is_null($this->env_filename)) {
-                $services = collect($composeFile['services']);
+                $services = collect(data_get($composeFile, 'services', []));
                 $services = $services->map(function ($service, $name) {
                     $service['env_file'] = [$this->env_filename];
 
@@ -1318,7 +1330,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function prepare_builder_image()
     {
         $settings = instanceSettings();
-        $helperImage = config('coolify.helper_image');
+        $helperImage = config('constants.coolify.helper_image');
         $helperImage = "{$helperImage}:{$settings->helper_version}";
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
@@ -1836,7 +1848,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if ($this->pull_request_id === 0) {
-            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+            $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                 if (! $this->application->settings->custom_internal_name) {
                     $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
@@ -1970,6 +1982,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->build_args = $this->build_args->implode(' ');
 
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        if ($this->disableBuildCache) {
+            $this->application_deployment_queue->addLogEntry('Docker build cache is disabled. It will not be used during the build process.');
+        }
         if ($this->application->build_pack === 'static') {
             $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
         } else {
@@ -1990,22 +2005,11 @@ COPY . .
 RUN rm -f /usr/share/nginx/html/nginx.conf
 RUN rm -f /usr/share/nginx/html/Dockerfile
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
-                $nginx_config = base64_encode('server {
-                listen       80;
-                listen  [::]:80;
-                server_name  localhost;
-
-                location / {
-                    root   /usr/share/nginx/html;
-                    index  index.html;
-                    try_files $uri $uri.html $uri/index.html $uri/ /index.html =404;
+                if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
+                    $nginx_config = base64_encode($this->application->custom_nginx_configuration);
+                } else {
+                    $nginx_config = base64_encode(defaultNginxConfiguration());
                 }
-
-                error_page   500 502 503 504  /50x.html;
-                location = /50x.html {
-                    root   /usr/share/nginx/html;
-                }
-            }');
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
@@ -2068,23 +2072,11 @@ WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
 COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
-
-                $nginx_config = base64_encode('server {
-                listen       80;
-                listen  [::]:80;
-                server_name  localhost;
-
-                location / {
-                    root   /usr/share/nginx/html;
-                    index  index.html;
-                    try_files $uri $uri.html $uri/index.html $uri/ /index.html =404;
+                if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
+                    $nginx_config = base64_encode($this->application->custom_nginx_configuration);
+                } else {
+                    $nginx_config = base64_encode(defaultNginxConfiguration());
                 }
-
-                error_page   500 502 503 504  /50x.html;
-                location = /50x.html {
-                    root   /usr/share/nginx/html;
-                }
-            }');
             }
             $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
             $base64_build_command = base64_encode($build_command);
@@ -2417,7 +2409,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            //$this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
     }
 

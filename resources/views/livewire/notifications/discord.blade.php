@@ -17,7 +17,7 @@
             @endif
         </div>
         <div class="w-32">
-            <x-forms.checkbox instantSave id="discordEnabled" label="Enabled" />
+            <x-forms.checkbox instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
         </div>
         <x-forms.input type="password"
             helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required

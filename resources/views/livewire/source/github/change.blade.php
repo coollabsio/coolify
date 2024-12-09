@@ -58,7 +58,18 @@
             @else
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.name" label="App Name" disabled />
+                        <div class="flex items-end gap-2 w-full">
+                            <x-forms.input id="github_app.name" label="App Name" disabled />
+                            <x-forms.button wire:click.prevent="updateGithubAppName" class="bg-coollabs">
+                                Sync Name
+                            </x-forms.button>
+                            <a href="{{ $this->getGithubAppNameUpdatePath() }}">
+                                <x-forms.button>
+                                    Rename
+                                    <x-external-link />
+                                </x-forms.button>
+                            </a>
+                        </div>
                         <x-forms.input id="github_app.organization" label="Organization" disabled
                             placeholder="If empty, personal user will be used" />
                     </div>
@@ -254,7 +265,7 @@
                 const name = @js($name);
                 const isDev = @js(config('app.env')) ===
                     'local';
-                const devWebhook = @js(config('coolify.dev_webhook'));
+                const devWebhook = @js(config('constants.webhooks.dev_webhook'));
                 if (isDev && devWebhook) {
                     baseUrl = devWebhook;
                 }

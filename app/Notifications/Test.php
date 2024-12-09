@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -15,7 +16,10 @@ class Test extends Notification implements ShouldQueue
 
     public $tries = 5;
 
-    public function __construct(public ?string $emails = null) {}
+    public function __construct(public ?string $emails = null)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
@@ -63,5 +67,13 @@ class Test extends Notification implements ShouldQueue
                 ],
             ],
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        return new SlackMessage(
+            title: 'Test Slack Notification',
+            description: 'This is a test Slack notification from Coolify.'
+        );
     }
 }

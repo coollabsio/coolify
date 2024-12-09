@@ -5,88 +5,87 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
     public Server $server;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $name;
 
-    #[Rule(['nullable'])]
-    public ?string $description;
+    #[Validate(['nullable'])]
+    public ?string $description = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $ip;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $user;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $port;
 
-    #[Rule(['nullable'])]
+    #[Validate(['nullable'])]
     public ?string $validationLogs = null;
 
-    #[Rule(['nullable', 'url'])]
-    public ?string $wildcardDomain;
+    #[Validate(['nullable', 'url'])]
+    public ?string $wildcardDomain = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isReachable;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isUsable;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSwarmManager;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSwarmWorker;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isBuildServer;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isMetricsEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $sentinelToken;
 
-    #[Rule(['nullable'])]
-    public ?string $sentinelUpdatedAt;
+    #[Validate(['nullable'])]
+    public ?string $sentinelUpdatedAt = null;
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsRefreshRateSeconds;
 
-    #[Rule(['required', 'integer', 'min:1'])]
+    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsHistoryDays;
 
-    #[Rule(['required', 'integer', 'min:10'])]
+    #[Validate(['required', 'integer', 'min:10'])]
     public int $sentinelPushIntervalSeconds;
 
-    #[Rule(['nullable', 'url'])]
-    public ?string $sentinelCustomUrl;
+    #[Validate(['nullable', 'url'])]
+    public ?string $sentinelCustomUrl = null;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSentinelEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public bool $isSentinelDebugEnabled;
 
-    #[Rule(['required'])]
+    #[Validate(['required'])]
     public string $serverTimezone;
-
-    public array $timezones;
 
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => '$refresh',
-            'refreshServerShow' => '$refresh',
+            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
+            'refreshServerShow' => 'refresh',
         ];
     }
 
@@ -94,17 +93,34 @@ class Show extends Component
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-            $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
+    #[Computed]
+    public function timezones(): array
+    {
+        return collect(timezone_identifiers_list())
+            ->sort()
+            ->values()
+            ->toArray();
+    }
+
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
             $this->validate();
+
+            if (Server::where('team_id', currentTeam()->id)
+                ->where('ip', $this->ip)
+                ->where('id', '!=', $this->server->id)
+                ->exists()) {
+                $this->ip = $this->server->ip;
+                throw new \Exception('This IP/Domain is already in use by another server in your team.');
+            }
+
             $this->server->name = $this->name;
             $this->server->description = $this->description;
             $this->server->ip = $this->ip;
@@ -114,6 +130,7 @@ class Show extends Component
             $this->server->save();
 
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;
+            $this->server->settings->wildcard_domain = $this->wildcardDomain;
             $this->server->settings->is_swarm_worker = $this->isSwarmWorker;
             $this->server->settings->is_build_server = $this->isBuildServer;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
@@ -124,7 +141,14 @@ class Show extends Component
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
-            $this->server->settings->server_timezone = $this->serverTimezone;
+
+            if (! validate_timezone($this->serverTimezone)) {
+                $this->serverTimezone = config('app.timezone');
+                throw new \Exception('Invalid timezone.');
+            } else {
+                $this->server->settings->server_timezone = $this->serverTimezone;
+            }
+
             $this->server->settings->save();
         } else {
             $this->name = $this->server->name;
@@ -132,6 +156,7 @@ class Show extends Component
             $this->ip = $this->server->ip;
             $this->user = $this->server->user;
             $this->port = $this->server->port;
+
             $this->wildcardDomain = $this->server->settings->wildcard_domain;
             $this->isReachable = $this->server->settings->is_reachable;
             $this->isUsable = $this->server->settings->is_usable;
@@ -149,6 +174,12 @@ class Show extends Component
             $this->sentinelUpdatedAt = $this->server->settings->updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
         }
+    }
+
+    public function refresh()
+    {
+        $this->syncData();
+        $this->dispatch('$refresh');
     }
 
     public function validateServer($install = true)

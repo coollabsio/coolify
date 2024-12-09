@@ -9,6 +9,8 @@ class StartLogDrain
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(Server $server)
     {
         if ($server->settings->is_logdrain_newrelic_enabled) {
@@ -169,7 +171,7 @@ Files:
 ');
             $license_key = $server->settings->logdrain_newrelic_license_key;
             $base_uri = $server->settings->logdrain_newrelic_base_uri;
-            $base_path = config('coolify.base_config_path');
+            $base_path = config('constants.coolify.base_config_path');
 
             $config_path = $base_path.'/log-drains';
             $fluent_bit_config = $config_path.'/fluent-bit.conf';

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsSlack;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
@@ -70,7 +71,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack
 {
     use Notifiable;
 
@@ -127,6 +128,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
         ];
     }
 
+    public function routeNotificationForSlack()
+    {
+        return data_get($this, 'slack_webhook_url', null);
+    }
+
     public function getRecepients($notification)
     {
         $recipients = data_get($notification, 'emails', null);
@@ -165,14 +171,14 @@ class Team extends Model implements SendsDiscord, SendsEmail
             return 0;
         }
 
-        return data_get($team, 'limits.serverLimit', 0);
+        return data_get($team, 'limits', 0);
     }
 
     public function limits(): Attribute
     {
         return Attribute::make(
             get: function () {
-                if (config('coolify.self_hosted') || $this->id === 0) {
+                if (config('constants.coolify.self_hosted') || $this->id === 0) {
                     $subscription = 'self-hosted';
                 } else {
                     $subscription = data_get($this, 'subscription');
@@ -187,9 +193,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
                 } else {
                     $serverLimit = config('constants.limits.server')[strtolower($subscription)];
                 }
-                $sharedEmailEnabled = config('constants.limits.email')[strtolower($subscription)];
 
-                return ['serverLimit' => $serverLimit, 'sharedEmailEnabled' => $sharedEmailEnabled];
+                return $serverLimit ?? 2;
             }
 
         );
@@ -258,22 +263,19 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return $this->hasMany(S3Storage::class)->where('is_usable', true);
     }
 
-    public function trialEnded()
+    public function subscriptionEnded()
     {
+        $this->subscription->update([
+            'stripe_subscription_id' => null,
+            'stripe_plan_id' => null,
+            'stripe_cancel_at_period_end' => false,
+            'stripe_invoice_paid' => false,
+            'stripe_trial_already_ended' => false,
+        ]);
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => false,
                 'is_reachable' => false,
-            ]);
-        }
-    }
-
-    public function trialEndedButSubscribed()
-    {
-        foreach ($this->servers as $server) {
-            $server->settings()->update([
-                'is_usable' => true,
-                'is_reachable' => true,
             ]);
         }
     }

@@ -7,8 +7,13 @@
             }
             window.location.reload();
         },
+        setZoom(zoom) {
+            localStorage.setItem('zoom', zoom);
+            window.location.reload();
+        },
         init() {
             this.full = localStorage.getItem('pageWidth');
+            this.zoom = localStorage.getItem('zoom');
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 const userSettings = localStorage.getItem('theme');
                 if (userSettings !== 'system') {
@@ -21,6 +26,7 @@
                 }
             });
             this.queryTheme();
+            this.checkZoom();
         },
         setTheme(type) {
             this.theme = type;
@@ -43,6 +49,30 @@
             } else if (!darkModePreference) {
                 this.theme = 'system';
                 document.documentElement.classList.remove('dark');
+            }
+        },
+        checkZoom() {
+            if (this.zoom === null) {
+                this.setZoom(100);
+            }
+            if (this.zoom === '90') {
+                const style = document.createElement('style');
+                style.textContent = `
+                    html {
+                        font-size: 93.75%;
+                    }
+
+                    :root {
+                        --vh: 1vh;
+                    }
+
+                    @media (min-width: 1024px) {
+                        html {
+                            font-size: 87.5%;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
             }
         }
 }">
@@ -69,7 +99,7 @@
                     </div>
                 </x-slot:title>
                 <div class="flex flex-col gap-1">
-                    <div class="mb-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
+                    <div class="font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
                     <button @click="setTheme('dark')" class="px-1 dropdown-item-no-padding">Dark</button>
                     <button @click="setTheme('light')" class="px-1 dropdown-item-no-padding">Light</button>
                     <button @click="setTheme('system')" class="px-1 dropdown-item-no-padding">System</button>
@@ -78,6 +108,9 @@
                         x-show="full === 'full'">Center</button>
                     <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
                         x-show="full === 'center'">Full</button>
+                    <div class="my-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Zoom</div>
+                    <button @click="setZoom(100)" class="px-1 dropdown-item-no-padding">100%</button>
+                    <button @click="setZoom(90)" class="px-1 dropdown-item-no-padding">90%</button>
                 </div>
             </x-dropdown>
         </div>
@@ -148,7 +181,7 @@
                     <li>
                         <a title="Destinations"
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('destination.index') }}" wire:navigate>
+                            href="{{ route('destination.index') }}">
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
@@ -163,8 +196,8 @@
                             class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('storage.index') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2">
+                                <g fill="none" stroke="currentColor" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2">
                                     <path d="M4 6a8 3 0 1 0 16 0A8 3 0 1 0 4 6" />
                                     <path d="M4 6v6a8 3 0 0 0 16 0V6" />
                                     <path d="M4 12v6a8 3 0 0 0 16 0v-6" />
@@ -215,7 +248,7 @@
                     <li>
                         <a title="Tags"
                             class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('tags.index') }}">
+                            href="{{ route('tags.show') }}">
                             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2">

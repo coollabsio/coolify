@@ -3,20 +3,23 @@
 namespace App\Livewire\Server;
 
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class CloudflareTunnels extends Component
 {
     public Server $server;
 
-    #[Rule(['required', 'boolean'])]
+    #[Validate(['required', 'boolean'])]
     public bool $isCloudflareTunnelsEnabled;
 
     public function mount(string $server_uuid)
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
+            if ($this->server->isLocalhost()) {
+                return redirect()->route('server.show', ['server_uuid' => $server_uuid]);
+            }
             $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
         } catch (\Throwable $e) {
             return handleError($e, $this);

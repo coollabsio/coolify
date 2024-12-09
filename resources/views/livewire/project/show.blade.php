@@ -12,7 +12,7 @@
                 </x-forms.button>
             </form>
         </x-modal-input>
-        <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
+        <livewire:project.delete-project :disabled="!$project->isEmpty()" :project_id="$project->id" />
     </div>
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
     <div class="grid gap-2 lg:grid-cols-2">

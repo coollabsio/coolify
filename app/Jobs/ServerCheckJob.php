@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
@@ -25,7 +26,17 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public $containers;
 
-    public function __construct(public Server $server) {}
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+    }
+
+    public function __construct(public Server $server)
+    {
+        if (isDev()) {
+            $this->handle();
+        }
+    }
 
     public function handle()
     {

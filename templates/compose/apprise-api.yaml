@@ -1,0 +1,21 @@
+# documentation: https://docs.linuxserver.io/images/docker-apprise-api/
+# slogan: Push Notifications API
+# tags: api, apprise
+# logo: svgs/apprise.png
+# port: 8000
+
+services:
+  apprise-api:
+    image: linuxserver/apprise-api:latest
+    environment:
+      - SERVICE_FQDN_APPRISE_8000
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    volumes:
+      - '/apprise-api/config:/config'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

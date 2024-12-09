@@ -3,26 +3,20 @@
 namespace App\Notifications\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class BackupFailed extends Notification implements ShouldQueue
+class BackupFailed extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $backoff = 10;
-
-    public $tries = 2;
-
     public string $name;
 
     public string $frequency;
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
     {
+        $this->onQueue('high');
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
     }
@@ -68,5 +62,20 @@ class BackupFailed extends Notification implements ShouldQueue
         return [
             'message' => $message,
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Database backup failed';
+        $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
+
+        $description .= "\n\n**Frequency:** {$this->frequency}";
+        $description .= "\n\n**Error Output:**\n{$this->output}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

@@ -3,19 +3,17 @@
 namespace App\Notifications\Container;
 
 use App\Models\Server;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ContainerRestarted extends Notification implements ShouldQueue
+class ContainerRestarted extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
-    public function __construct(public string $name, public Server $server, public ?string $url = null) {}
+    public function __construct(public string $name, public Server $server, public ?string $url = null)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
@@ -68,5 +66,21 @@ class ContainerRestarted extends Notification implements ShouldQueue
         }
 
         return $payload;
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Resource restarted';
+        $description = "A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
+
+        if ($this->url) {
+            $description .= "\n**Resource URL:** {$this->url}";
+        }
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::warningColor()
+        );
     }
 }

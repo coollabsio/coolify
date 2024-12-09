@@ -4,7 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Jobs\DockerCleanupJob;
 use App\Models\Server;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
@@ -13,28 +13,28 @@ class Advanced extends Component
 
     public array $parameters = [];
 
-    #[Rule(['integer', 'min:1'])]
+    #[Validate(['integer', 'min:1'])]
     public int $concurrentBuilds = 1;
 
-    #[Rule(['integer', 'min:1'])]
+    #[Validate(['integer', 'min:1'])]
     public int $dynamicTimeout = 1;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $forceDockerCleanup = false;
 
-    #[Rule('string')]
+    #[Validate(['string', 'required'])]
     public string $dockerCleanupFrequency = '*/10 * * * *';
 
-    #[Rule(['integer', 'min:1', 'max:99'])]
+    #[Validate(['integer', 'min:1', 'max:99'])]
     public int $dockerCleanupThreshold = 10;
 
-    #[Rule(['integer', 'min:1', 'max:99'])]
+    #[Validate(['integer', 'min:1', 'max:99'])]
     public int $serverDiskUsageNotificationThreshold = 50;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $deleteUnusedVolumes = false;
 
-    #[Rule('boolean')]
+    #[Validate('boolean')]
     public bool $deleteUnusedNetworks = false;
 
     public function mount(string $server_uuid)
@@ -78,7 +78,6 @@ class Advanced extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
-            // $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

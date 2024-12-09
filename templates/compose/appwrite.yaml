@@ -3,19 +3,10 @@
 # tags: backend-as-a-service, platform
 # logo: svgs/appwrite.svg
 
-
-x-logging: &x-logging
-  logging:
-    driver: 'json-file'
-    options:
-      max-file: '5'
-      max-size: '10m'
-
 services:
   appwrite:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     container_name: appwrite
-    <<: *x-logging
     volumes:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-cache:/storage/cache:rw
@@ -36,14 +27,17 @@ services:
       - _APP_CONSOLE_HOSTNAMES=${_APP_CONSOLE_HOSTNAMES:-localhost,appwrite.io,*.appwrite.io}
       - _APP_SYSTEM_EMAIL_NAME=${_APP_SYSTEM_EMAIL_NAME:-Appwrite}
       - _APP_SYSTEM_EMAIL_ADDRESS=${_APP_SYSTEM_EMAIL_ADDRESS:-team@appwrite.io}
-      - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${_APP_SYSTEM_SECURITY_EMAIL_ADDRESS:-certs@appwrite.io}
+      - _APP_SYSTEM_TEAM_EMAIL=${_APP_SYSTEM_TEAM_EMAIL:-team@appwrite.io}
+      - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-certs@appwrite.io}
       - _APP_SYSTEM_RESPONSE_FORMAT=${_APP_SYSTEM_RESPONSE_FORMAT}
       - _APP_OPTIONS_ABUSE=${_APP_OPTIONS_ABUSE:-enabled}
+      - _APP_OPTIONS_ROUTER_PROTECTION=${_APP_OPTIONS_ROUTER_PROTECTION:-disabled}
       - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
-      - _APP_DOMAIN=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_FUNCTIONS=$SERVICE_FQDN_APPWRITE
+      - _APP_OPTIONS_FUNCTIONS_FORCE_HTTPS=${_APP_OPTIONS_FUNCTIONS_FORCE_HTTPS:-disabled}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_FUNCTIONS=$SERVICE_URL_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -53,7 +47,6 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_DB_ROOT_PASS=$SERVICE_PASSWORD_MARIADBROOT
       - _APP_SMTP_HOST=${_APP_SMTP_HOST}
       - _APP_SMTP_PORT=${_APP_SMTP_PORT}
       - _APP_SMTP_SECURE=${_APP_SMTP_SECURE}
@@ -94,7 +87,6 @@ services:
       - _APP_FUNCTIONS_RUNTIMES=${_APP_FUNCTIONS_RUNTIMES:-node-20.0,php-8.2,python-3.11,ruby-3.2}
       - _APP_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_HOST=${_APP_EXECUTOR_HOST:-http://appwrite-executor/v1}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_MAINTENANCE_INTERVAL=${_APP_MAINTENANCE_INTERVAL:-86400}
       - _APP_MAINTENANCE_DELAY=${_APP_MAINTENANCE_DELAY}
@@ -119,10 +111,16 @@ services:
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET=${_APP_MIGRATIONS_FIREBASE_CLIENT_SECRET}
       - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
 
+  appwrite-console:
+    image: appwrite/console:5.0.12
+    container_name: appwrite-console
+    environment:
+      - SERVICE_FQDN_APPWRITE=/console
+
   appwrite-realtime:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: realtime
-    <<: *x-logging
+    container_name: appwrite-realtime
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
@@ -131,7 +129,7 @@ services:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPTIONS_ABUSE=${_APP_OPTIONS_ABUSE:-enabled}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -142,13 +140,11 @@ services:
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-audits:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-audits
-    <<: *x-logging
     container_name: appwrite-worker-audits
     depends_on:
       - appwrite-redis
@@ -156,7 +152,7 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -166,13 +162,11 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-webhooks:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-webhooks
-    <<: *x-logging
     container_name: appwrite-worker-webhooks
     depends_on:
       - appwrite-redis
@@ -180,19 +174,23 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
-      - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${_APP_SYSTEM_SECURITY_EMAIL_ADDRESS:-certs@appwrite.io}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-certs@appwrite.io}
+      - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${_APP_SYSTEM_SECURITY_EMAIL_ADDRESS}
+      - _APP_DB_HOST=${_APP_DB_HOST:-appwrite-mariadb}
+      - _APP_DB_PORT=${_APP_DB_PORT:-3306}
+      - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
+      - _APP_DB_USER=$SERVICE_USER_MARIADB
+      - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
       - _APP_REDIS_PASS=${_APP_REDIS_PASS}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-deletes:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-deletes
-    <<: *x-logging
     container_name: appwrite-worker-deletes
     depends_on:
       - appwrite-redis
@@ -206,7 +204,7 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -237,15 +235,16 @@ services:
       - _APP_STORAGE_WASABI_SECRET=${_APP_STORAGE_WASABI_SECRET}
       - _APP_STORAGE_WASABI_REGION=${_APP_STORAGE_WASABI_REGION:-eu-central-1}
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_HOST=${_APP_EXECUTOR_HOST:-http://appwrite-executor/v1}
+      - _APP_MAINTENANCE_RETENTION_ABUSE=${_APP_MAINTENANCE_RETENTION_ABUSE:-86400}
+      - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
+      - _APP_MAINTENANCE_RETENTION_EXECUTION=${_APP_MAINTENANCE_RETENTION_EXECUTION:-1209600}
 
   appwrite-worker-databases:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-databases
-    <<: *x-logging
     container_name: appwrite-worker-databases
     depends_on:
       - appwrite-redis
@@ -253,7 +252,7 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -263,13 +262,11 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-builds:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-builds
-    <<: *x-logging
     container_name: appwrite-worker-builds
     depends_on:
       - appwrite-redis
@@ -280,7 +277,7 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_EXECUTOR_HOST=${_APP_EXECUTOR_HOST:-http://appwrite-executor/v1}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
@@ -292,7 +289,6 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_VCS_GITHUB_APP_NAME=${_APP_VCS_GITHUB_APP_NAME}
       - _APP_VCS_GITHUB_PRIVATE_KEY=${_APP_VCS_GITHUB_PRIVATE_KEY}
@@ -301,8 +297,10 @@ services:
       - _APP_FUNCTIONS_BUILD_TIMEOUT=${_APP_FUNCTIONS_BUILD_TIMEOUT:-900}
       - _APP_FUNCTIONS_CPUS=${_APP_FUNCTIONS_CPUS:-0}
       - _APP_FUNCTIONS_MEMORY=${_APP_FUNCTIONS_MEMORY:-0}
+      - _APP_FUNCTIONS_SIZE_LIMIT=${_APP_FUNCTIONS_SIZE_LIMIT:-30000000}
       - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
-      - _APP_DOMAIN=$SERVICE_FQDN_APPWRITE
+      - _APP_OPTIONS_FUNCTIONS_FORCE_HTTPS=${_APP_OPTIONS_FUNCTIONS_FORCE_HTTPS:-disabled}
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
       - _APP_STORAGE_DEVICE=${_APP_STORAGE_DEVICE:-local}
       - _APP_STORAGE_S3_ACCESS_KEY=${_APP_STORAGE_S3_ACCESS_KEY:-local}
       - _APP_STORAGE_S3_SECRET=${_APP_STORAGE_S3_SECRET}
@@ -326,9 +324,8 @@ services:
       - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
 
   appwrite-worker-certificates:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-certificates
-    <<: *x-logging
     container_name: appwrite-worker-certificates
     depends_on:
       - appwrite-redis
@@ -339,11 +336,12 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
-      - _APP_DOMAIN=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_FUNCTIONS=$SERVICE_FQDN_APPWRITE
-      - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${_APP_SYSTEM_SECURITY_EMAIL_ADDRESS:-certs@appwrite.io}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_FUNCTIONS=$SERVICE_URL_APPWRITE
+      - _APP_EMAIL_CERTIFICATES=${_APP_EMAIL_CERTIFICATES:-enabled}
+      - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-certs@appwrite.io}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -353,13 +351,11 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
 
   appwrite-worker-functions:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-functions
-    <<: *x-logging
     container_name: appwrite-worker-functions
     depends_on:
       - appwrite-redis
@@ -368,7 +364,9 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
+      - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -387,23 +385,25 @@ services:
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_DOCKER_HUB_USERNAME=${_APP_DOCKER_HUB_USERNAME}
       - _APP_DOCKER_HUB_PASSWORD=${_APP_DOCKER_HUB_PASSWORD}
-      - _APP_DOCKER_HUB_EMAIL=${_APP_DOCKER_HUB_EMAIL}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
 
   appwrite-worker-mails:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-mails
-    <<: *x-logging
     container_name: appwrite-worker-mails
     depends_on:
       - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_SYSTEM_EMAIL_NAME=${_APP_SYSTEM_EMAIL_NAME:-Appwrite}
       - _APP_SYSTEM_EMAIL_ADDRESS=${_APP_SYSTEM_EMAIL_ADDRESS:-team@appwrite.io}
+      - _APP_DB_HOST=${_APP_DB_HOST:-appwrite-mariadb}
+      - _APP_DB_PORT=${_APP_DB_PORT:-3306}
+      - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
+      - _APP_DB_USER=$SERVICE_USER_MARIADB
+      - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -413,20 +413,21 @@ services:
       - _APP_SMTP_SECURE=${_APP_SMTP_SECURE}
       - _APP_SMTP_USERNAME=${_APP_SMTP_USERNAME}
       - _APP_SMTP_PASSWORD=${_APP_SMTP_PASSWORD}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
 
   appwrite-worker-messaging:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-messaging
-    <<: *x-logging
     container_name: appwrite-worker-messaging
+    volumes:
+      - appwrite-uploads:/storage/uploads:rw
     depends_on:
       - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -436,25 +437,44 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_SMS_FROM=${_APP_SMS_FROM}
       - _APP_SMS_PROVIDER=${_APP_SMS_PROVIDER}
+      - _APP_STORAGE_DEVICE=${_APP_STORAGE_DEVICE:-local}
+      - _APP_STORAGE_S3_ACCESS_KEY=${_APP_STORAGE_S3_ACCESS_KEY}
+      - _APP_STORAGE_S3_SECRET=${_APP_STORAGE_S3_SECRET}
+      - _APP_STORAGE_S3_REGION=${_APP_STORAGE_S3_REGION:-us-east-1}
+      - _APP_STORAGE_S3_BUCKET=${_APP_STORAGE_S3_BUCKET}
+      - _APP_STORAGE_DO_SPACES_ACCESS_KEY=${_APP_STORAGE_DO_SPACES_ACCESS_KEY}
+      - _APP_STORAGE_DO_SPACES_SECRET=${_APP_STORAGE_DO_SPACES_SECRET}
+      - _APP_STORAGE_DO_SPACES_REGION=${_APP_STORAGE_DO_SPACES_REGION:-us-east-1}
+      - _APP_STORAGE_DO_SPACES_BUCKET=${_APP_STORAGE_DO_SPACES_BUCKET}
+      - _APP_STORAGE_BACKBLAZE_ACCESS_KEY=${_APP_STORAGE_BACKBLAZE_ACCESS_KEY}
+      - _APP_STORAGE_BACKBLAZE_SECRET=${_APP_STORAGE_BACKBLAZE_SECRET}
+      - _APP_STORAGE_BACKBLAZE_REGION=${_APP_STORAGE_BACKBLAZE_REGION:-us-west-004}
+      - _APP_STORAGE_BACKBLAZE_BUCKET=${_APP_STORAGE_BACKBLAZE_BUCKET}
+      - _APP_STORAGE_LINODE_ACCESS_KEY=${_APP_STORAGE_LINODE_ACCESS_KEY}
+      - _APP_STORAGE_LINODE_SECRET=${_APP_STORAGE_LINODE_SECRET}
+      - _APP_STORAGE_LINODE_REGION=${_APP_STORAGE_LINODE_REGION:-eu-central-1}
+      - _APP_STORAGE_LINODE_BUCKET=${_APP_STORAGE_LINODE_BUCKET}
+      - _APP_STORAGE_WASABI_ACCESS_KEY=${_APP_STORAGE_WASABI_ACCESS_KEY}
+      - _APP_STORAGE_WASABI_SECRET=${_APP_STORAGE_WASABI_SECRET}
+      - _APP_STORAGE_WASABI_REGION=${_APP_STORAGE_WASABI_REGION:-eu-central-1}
+      - _APP_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
 
   appwrite-worker-migrations:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-migrations
-    <<: *x-logging
     container_name: appwrite-worker-migrations
     depends_on:
       - appwrite-mariadb
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
-      - _APP_DOMAIN=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_FQDN_APPWRITE
-      - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=${_APP_SYSTEM_SECURITY_EMAIL_ADDRESS:-certs@appwrite.io}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-certs@appwrite.io}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -464,25 +484,23 @@ services:
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_ID=${_APP_MIGRATIONS_FIREBASE_CLIENT_ID}
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET=${_APP_MIGRATIONS_FIREBASE_CLIENT_SECRET}
 
-  appwrite-maintenance:
-    image: appwrite/appwrite:1.6
+  appwrite-task-maintenance:
+    image: appwrite/appwrite:1.6.0
     entrypoint: maintenance
-    <<: *x-logging
-    container_name: appwrite-maintenance
+    container_name: appwrite-task-maintenance
     depends_on:
       - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_DOMAIN=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_TARGET=$SERVICE_FQDN_APPWRITE
-      - _APP_DOMAIN_FUNCTIONS=$SERVICE_FQDN_APPWRITE
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_DOMAIN=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_TARGET=$SERVICE_URL_APPWRITE
+      - _APP_DOMAIN_FUNCTIONS=$SERVICE_URL_APPWRITE
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -501,10 +519,9 @@ services:
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
 
   appwrite-worker-usage:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-usage
     container_name: appwrite-worker-usage
-    <<: *x-logging
     restart: unless-stopped
     depends_on:
       - appwrite-redis
@@ -512,7 +529,7 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_DB_HOST=${_APP_DB_HOST:-appwrite-mariadb}
       - _APP_DB_PORT=${_APP_DB_PORT:-3306}
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
@@ -523,14 +540,12 @@ services:
       - _APP_REDIS_USER=${_APP_REDIS_USER}
       - _APP_REDIS_PASS=${_APP_REDIS_PASS}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_USAGE_AGGREGATION_INTERVAL=${_APP_USAGE_AGGREGATION_INTERVAL:-30}
 
   appwrite-worker-usage-dump:
-    image: appwrite/appwrite:1.6
+    image: appwrite/appwrite:1.6.0
     entrypoint: worker-usage-dump
-    <<: *x-logging
     container_name: appwrite-worker-usage-dump
     depends_on:
       - appwrite-redis
@@ -538,7 +553,7 @@ services:
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_DB_HOST=${_APP_DB_HOST:-appwrite-mariadb}
       - _APP_DB_PORT=${_APP_DB_PORT:-3306}
       - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
@@ -549,23 +564,20 @@ services:
       - _APP_REDIS_USER=${_APP_REDIS_USER}
       - _APP_REDIS_PASS=${_APP_REDIS_PASS}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
-      - _APP_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - _APP_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - _APP_USAGE_AGGREGATION_INTERVAL=${_APP_USAGE_AGGREGATION_INTERVAL:-30}
 
-  appwrite-scheduler-functions:
-    image: appwrite/appwrite:1.6
+  appwrite-task-scheduler-functions:
+    image: appwrite/appwrite:1.6.0
     entrypoint: schedule-functions
-    container_name: appwrite-scheduler-functions
-    <<: *x-logging
-    restart: unless-stopped
+    container_name: appwrite-task-scheduler-functions
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -576,19 +588,38 @@ services:
       - _APP_DB_USER=$SERVICE_USER_MARIADB
       - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
 
-  appwrite-scheduler-messages:
-    image: appwrite/appwrite:1.6
-    entrypoint: schedule-messages
-    container_name: appwrite-scheduler-messages
-    <<: *x-logging
-    restart: unless-stopped
+  appwrite-task-scheduler-executions:
+    image: appwrite/appwrite:1.6.0
+    entrypoint: schedule-executions
+    container_name: appwrite-task-scheduler-executions
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
     environment:
       - _APP_ENV=${_APP_ENV:-production}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
-      - _APP_OPENSSL_KEY_V1=${_APP_OPENSSL_KEY_V1}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
+      - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
+      - _APP_REDIS_USER=${_APP_REDIS_USER}
+      - _APP_REDIS_PASS=${_APP_REDIS_PASS}
+      - _APP_DB_HOST=${_APP_DB_HOST:-appwrite-mariadb}
+      - _APP_DB_PORT=${_APP_DB_PORT:-3306}
+      - _APP_DB_SCHEMA=${_APP_DB_SCHEMA:-appwrite}
+      - _APP_DB_USER=$SERVICE_USER_MARIADB
+      - _APP_DB_PASS=$SERVICE_PASSWORD_MARIADB
+
+  appwrite-task-scheduler-messages:
+    image: appwrite/appwrite:1.6.0
+    entrypoint: schedule-messages
+    container_name: appwrite-task-scheduler-messages
+    depends_on:
+      - appwrite-mariadb
+      - appwrite-redis
+    environment:
+      - _APP_ENV=${_APP_ENV:-production}
+      - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
+      - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -603,13 +634,15 @@ services:
     image: appwrite/assistant:0.4.0
     container_name: appwrite-assistant
     environment:
-      - _APP_ASSISTANT_OPENAI_API_KEY
+      - _APP_ASSISTANT_OPENAI_API_KEY=${_APP_ASSISTANT_OPENAI_API_KEY}
+
   openruntimes-executor:
     container_name: openruntimes-executor
     hostname: appwrite-executor
-    <<: *x-logging
     stop_signal: SIGINT
-    image: openruntimes/executor:0.4.9
+    image: openruntimes/executor:0.6.11
+    networks:
+      - runtimes
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - appwrite-builds:/storage/builds:rw
@@ -618,13 +651,12 @@ services:
     environment:
       - OPR_EXECUTOR_INACTIVE_TRESHOLD=${_APP_FUNCTIONS_INACTIVE_THRESHOLD}
       - OPR_EXECUTOR_MAINTENANCE_INTERVAL=${_APP_FUNCTIONS_MAINTENANCE_INTERVAL}
-      - OPR_EXECUTOR_NETWORK=${_APP_FUNCTIONS_RUNTIMES_NETWORK}
+      - OPR_EXECUTOR_NETWORK=${_APP_FUNCTIONS_RUNTIMES_NETWORK:-runtimes}
       - OPR_EXECUTOR_DOCKER_HUB_USERNAME=${_APP_DOCKER_HUB_USERNAME}
       - OPR_EXECUTOR_DOCKER_HUB_PASSWORD=${_APP_DOCKER_HUB_PASSWORD}
       - OPR_EXECUTOR_ENV=${_APP_ENV:-production}
       - OPR_EXECUTOR_RUNTIMES=${_APP_FUNCTIONS_RUNTIMES}
       - OPR_EXECUTOR_SECRET=$SERVICE_PASSWORD_64_APPWRITE
-      - OPR_EXECUTOR_LOGGING_PROVIDER=${_APP_LOGGING_PROVIDER}
       - OPR_EXECUTOR_LOGGING_CONFIG=${_APP_LOGGING_CONFIG}
       - OPR_EXECUTOR_STORAGE_DEVICE=${_APP_STORAGE_DEVICE:-local}
       - OPR_EXECUTOR_STORAGE_S3_ACCESS_KEY=${_APP_STORAGE_S3_ACCESS_KEY:-local}
@@ -651,7 +683,6 @@ services:
   appwrite-mariadb:
     image: mariadb:10.11
     container_name: appwrite-mariadb
-    <<: *x-logging
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
     environment:
@@ -659,11 +690,12 @@ services:
       - MYSQL_DATABASE=${_APP_DB_SCHEMA:-appwrite}
       - MYSQL_USER=$SERVICE_USER_MARIADB
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - MARIADB_AUTO_UPGRADE=1
     command: 'mysqld --innodb-flush-method=fsync'
+
   appwrite-redis:
     image: redis:7.2.4-alpine
     container_name: appwrite-redis
-    <<: *x-logging
     command: >
       redis-server
       --maxmemory            512mb
@@ -671,6 +703,10 @@ services:
       --maxmemory-samples    5
     volumes:
       - appwrite-redis:/data:rw
+networks:
+  runtimes:
+    name: runtimes
+
 volumes:
   appwrite-mariadb:
   appwrite-redis:

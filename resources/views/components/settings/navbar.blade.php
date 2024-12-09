@@ -7,12 +7,6 @@
                 href="{{ route('settings.index') }}">
                 <button>Configuration</button>
             </a>
-            @if (isCloud())
-                <a class="{{ request()->routeIs('settings.license') ? 'dark:text-white' : '' }}"
-                    href="{{ route('settings.license') }}">
-                    <button>Resale License</button>
-                </a>
-            @endif
             <a class="{{ request()->routeIs('settings.backup') ? 'dark:text-white' : '' }}"
                 href="{{ route('settings.backup') }}">
                 <button>Backup</button>

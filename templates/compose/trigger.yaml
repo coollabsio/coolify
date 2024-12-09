@@ -5,7 +5,6 @@
 # port: 3000
 
 x-common-env: &common-env
-  PORT: 3030
   REMIX_APP_PORT: 3000
   NODE_ENV: production
   RUNTIME_PLATFORM: docker-compose
@@ -20,9 +19,9 @@ x-common-env: &common-env
   ENCRYPTION_KEY: $SERVICE_PASSWORD_64_ENCRYPTION
   PROVIDER_SECRET: $SERVICE_PASSWORD_64_PROVIDER
   COORDINATOR_SECRET: $SERVICE_PASSWORD_64_COORDINATOR
-  DATABASE_HOST: postgresql
-  DATABASE_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
-  DIRECT_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
+  DATABASE_HOST: postgresql:5432
+  DATABASE_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB?sslmode=disable
+  DIRECT_URL: postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB?sslmode=disable
   REDIS_HOST: redis
   REDIS_PORT: 6379
   REDIS_TLS_DISABLED: true
@@ -118,7 +117,7 @@ services:
     environment:
       <<: *common-env
       PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3030
+      PLATFORM_WS_PORT: 3000
       SECURE_CONNECTION: "false"
       PLATFORM_SECRET: $PROVIDER_SECRET
   coordinator:
@@ -133,7 +132,7 @@ services:
     environment:
       <<: *common-env
       PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3030
+      PLATFORM_WS_PORT: 3000
       SECURE_CONNECTION: "false"
       PLATFORM_SECRET: $COORDINATOR_SECRET
     healthcheck:

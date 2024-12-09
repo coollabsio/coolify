@@ -5,17 +5,17 @@ namespace App\Livewire;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Http;
-use Livewire\Attributes\Rule;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Help extends Component
 {
     use WithRateLimiting;
 
-    #[Rule(['required', 'min:10', 'max:1000'])]
+    #[Validate(['required', 'min:10', 'max:1000'])]
     public string $description;
 
-    #[Rule(['required', 'min:3'])]
+    #[Validate(['required', 'min:3'])]
     public string $subject;
 
     public function submit()
