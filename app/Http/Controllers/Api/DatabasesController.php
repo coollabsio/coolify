@@ -19,25 +19,22 @@ class DatabasesController extends Controller
 {
     private function removeSensitiveData($database)
     {
-        $token = auth()->user()->currentAccessToken();
         $database->makeHidden([
             'id',
             'laravel_through_key',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($database);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $database->makeHidden([
+                'internal_db_url',
+                'external_db_url',
+                'postgres_password',
+                'dragonfly_password',
+                'redis_password',
+                'mongo_initdb_root_password',
+                'keydb_password',
+                'clickhouse_admin_password',
+            ]);
         }
-
-        $database->makeHidden([
-            'internal_db_url',
-            'external_db_url',
-            'postgres_password',
-            'dragonfly_password',
-            'redis_password',
-            'mongo_initdb_root_password',
-            'keydb_password',
-            'clickhouse_admin_password',
-        ]);
 
         return serializeApiResponse($database);
     }

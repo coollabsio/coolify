@@ -8,8 +8,7 @@ class SlackMessage
         public string $title,
         public string $description,
         public string $color = '#0099ff'
-    ) {
-    }
+    ) {}
 
     public static function infoColor(): string
     {
