@@ -9,7 +9,7 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-                @if ($this->isEmailEnabled() && auth()->user()->isAdminFromSession())
+                @if (is_transactional_emails_enabled() && auth()->user()->isAdminFromSession())
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                     <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
                         <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress" label="Recipients" required />

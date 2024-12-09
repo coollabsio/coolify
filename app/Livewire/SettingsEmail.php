@@ -201,7 +201,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->resendEnabled = false;
 
-            return handleError($e, $this);
+            return handleError($e);
         }
     }
 
@@ -229,12 +229,7 @@ class SettingsEmail extends Component
                 throw new \Exception('Too many messages sent!');
             }
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            return handleError($e);
         }
-    }
-
-    public function isEmailEnabled(): bool
-    {
-        return $this->settings->smtp_enabled || $this->settings->resend_enabled;
     }
 }
