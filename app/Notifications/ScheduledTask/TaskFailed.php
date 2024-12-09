@@ -5,8 +5,8 @@ namespace App\Notifications\ScheduledTask;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Notifications\Messages\MailMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class TaskFailed extends CustomEmailNotification
 {
@@ -24,7 +24,7 @@ class TaskFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'scheduled_tasks');
+        return $notifiable->getEnabledChannels('scheduled_task_failure');
     }
 
     public function toMail(): MailMessage
@@ -49,7 +49,7 @@ class TaskFailed extends CustomEmailNotification
         );
 
         if ($this->url) {
-            $message->addField('Scheduled task', '[Link](' . $this->url . ')');
+            $message->addField('Scheduled task', '[Link]('.$this->url.')');
         }
 
         return $message;
@@ -72,7 +72,7 @@ class TaskFailed extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        $title = "Scheduled task failed";
+        $title = 'Scheduled task failed';
         $description = "Scheduled task ({$this->task->name}) failed.";
 
         if ($this->output) {

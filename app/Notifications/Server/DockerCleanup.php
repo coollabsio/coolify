@@ -3,11 +3,10 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class DockerCleanup extends CustomEmailNotification
 {
@@ -18,38 +17,20 @@ class DockerCleanup extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        // $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-        $isSlackEnabled = data_get($notifiable, 'slack_enabled');
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        // if ($isEmailEnabled) {
-        //     $channels[] = EmailChannel::class;
-        // }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-        if ($isSlackEnabled) {
-            $channels[] = SlackChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('docker_cleanup');
     }
 
-    // public function toMail(): MailMessage
-    // {
-    //     $mail = new MailMessage();
-    //     $mail->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
-    //     $mail->view('emails.high-disk-usage', [
-    //         'name' => $this->server->name,
-    //         'disk_usage' => $this->disk_usage,
-    //         'threshold' => $this->docker_cleanup_threshold,
-    //     ]);
-    //     return $mail;
-    // }
+    public function toMail(): MailMessage
+    {
+        $mail = new MailMessage;
+        $mail->subject("Coolify: Server ({$this->server->name}) docker cleanup job done!");
+        $mail->view('emails.docker-cleanup', [
+            'name' => $this->server->name,
+            'message' => $this->message,
+        ]);
+
+        return $mail;
+    }
 
     public function toDiscord(): DiscordMessage
     {

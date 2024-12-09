@@ -5,8 +5,8 @@ namespace App\Notifications\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Notifications\Messages\MailMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class BackupFailed extends CustomEmailNotification
 {
@@ -23,13 +23,13 @@ class BackupFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'database_backups');
+        return $notifiable->getEnabledChannels('backup_failure');
     }
 
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
+        $mail->subject("Coolify: [ACTION REQUIRED] Database Backup FAILED for {$this->database->name}");
         $mail->view('emails.backup-failed', [
             'name' => $this->name,
             'database_name' => $this->database_name,
@@ -66,7 +66,7 @@ class BackupFailed extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        $title = "Database backup failed";
+        $title = 'Database backup failed';
         $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
 
         $description .= "\n\n**Frequency:** {$this->frequency}";

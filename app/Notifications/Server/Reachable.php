@@ -3,13 +3,9 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
-use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Dto\SlackMessage;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class Reachable extends CustomEmailNotification
@@ -20,7 +16,7 @@ class Reachable extends CustomEmailNotification
     {
         $this->onQueue('high');
         $this->isRateLimited = isEmailRateLimited(
-            limiterKey: 'server-reachable:' . $this->server->id,
+            limiterKey: 'server-reachable:'.$this->server->id,
         );
     }
 
@@ -30,25 +26,7 @@ class Reachable extends CustomEmailNotification
             return [];
         }
 
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-        $isSlackEnabled = data_get($notifiable, 'slack_enabled');
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isEmailEnabled) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-        if ($isSlackEnabled) {
-            $channels[] = SlackChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('server_reachable');
     }
 
     public function toMail(): MailMessage
@@ -78,13 +56,10 @@ class Reachable extends CustomEmailNotification
         ];
     }
 
-
-
-
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
-            title: "Server revived",
+            title: 'Server revived',
             description: "Server '{$this->server->name}' revived.\nAll automations & integrations are turned on again!",
             color: SlackMessage::successColor()
         );
