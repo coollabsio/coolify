@@ -42,7 +42,6 @@ class Controller extends BaseController
     public function email_verify(EmailVerificationRequest $request)
     {
         $request->fulfill();
-        $name = request()->user()?->name;
 
         return redirect(RouteServiceProvider::HOME);
     }
