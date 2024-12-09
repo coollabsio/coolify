@@ -200,23 +200,6 @@ class Emails extends Command
                 //     $this->mail = (new InvitationLink($user))->toMail();
                 //     $this->sendEmail();
                 //     break;
-            case 'waitlist-invitation-link':
-                $this->mail = new MailMessage;
-                $this->mail->view('emails.waitlist-invitation', [
-                    'loginLink' => 'https://coolify.io',
-                ]);
-                $this->mail->subject('Congratulations! You are invited to join Coolify Cloud.');
-                $this->sendEmail();
-                break;
-            case 'waitlist-confirmation':
-                $found = Waitlist::where('email', $this->email)->first();
-                if ($found) {
-                    SendConfirmationForWaitlistJob::dispatch($this->email, $found->uuid);
-                } else {
-                    throw new Exception('Waitlist not found');
-                }
-
-                break;
             case 'realusers-before-trial':
                 $this->mail = new MailMessage;
                 $this->mail->view('emails.before-trial-conversion');
