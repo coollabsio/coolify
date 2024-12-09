@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-4" x-data="{
+<div class="flex flex-col gap-2" x-data="{
     init() {
         let interval;
         $wire.$watch('isPollingActive', value => {
@@ -23,6 +23,7 @@
             'border-red-500' => data_get($execution, 'status') === 'failed',
             'border-yellow-500' => data_get($execution, 'status') === 'running',
         ])>
+
             @if (data_get($execution, 'status') === 'running')
                 <div class="absolute top-2 right-2">
                     <x-loading />
@@ -34,6 +35,11 @@
                 Started At: {{ $this->formatDateInServerTimezone(data_get($execution, 'created_at', now())) }}
             </div>
         </a>
+        @if (strlen($execution->message) > 0)
+            <x-forms.button wire:click.prevent="downloadLogs({{ data_get($execution, 'id') }})">
+                Download Logs
+            </x-forms.button>
+        @endif
         @if (data_get($execution, 'id') == $selectedKey)
             <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded">
                 @if (data_get($execution, 'status') === 'running')
@@ -55,9 +61,7 @@
                                     Load More
                                 </x-forms.button>
                             @endif
-                            <x-forms.button wire:click.prevent="downloadLogs" isHighlighted>
-                                Download
-                            </x-forms.button>
+
                         </div>
                     </div>
                 @else

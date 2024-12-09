@@ -120,11 +120,16 @@ class Executions extends Component
         return $lines->take($this->currentPage * $this->logsPerPage);
     }
 
-    public function downloadLogs()
+    public function downloadLogs(int $executionId)
     {
-        return response()->streamDownload(function () {
-            echo $this->selectedExecution->message;
-        }, 'task-execution-'.$this->selectedExecution->id.'.log');
+        $execution = $this->executions->firstWhere('id', $executionId);
+        if (! $execution) {
+            return;
+        }
+
+        return response()->streamDownload(function () use ($execution) {
+            echo $execution->message;
+        }, 'task-execution-'.$execution->id.'.log');
     }
 
     public function hasMoreLogs()
