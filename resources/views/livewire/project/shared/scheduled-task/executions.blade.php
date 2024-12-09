@@ -1,4 +1,17 @@
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-4" x-data="{
+    init() {
+        let interval;
+        $wire.$watch('isPollingActive', value => {
+            if (value) {
+                interval = setInterval(() => {
+                    $wire.polling();
+                }, 1000);
+            } else {
+                if (interval) clearInterval(interval);
+            }
+        });
+    }
+}">
     @forelse($executions as $execution)
         <a wire:click="selectTask({{ data_get($execution, 'id') }})" @class([
             'flex flex-col border-l-2 transition-colors p-4 cursor-pointer',
@@ -23,9 +36,29 @@
         </a>
         @if (data_get($execution, 'id') == $selectedKey)
             <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded">
-                @if (data_get($execution, 'message'))
+                @if (data_get($execution, 'status') === 'running')
+                    <div class="flex items-center gap-2 mb-2">
+                        <span>Task is running...</span>
+                        <x-loading class="w-4 h-4" />
+                    </div>
+                @endif
+                @if ($this->logLines->isNotEmpty())
                     <div>
-                        <pre class="whitespace-pre-wrap">{{ data_get($execution, 'message') }}</pre>
+                        <pre class="whitespace-pre-wrap">
+@foreach ($this->logLines as $line)
+{{ $line }}
+@endforeach
+</pre>
+                        <div class="flex gap-2">
+                            @if ($this->hasMoreLogs())
+                                <x-forms.button wire:click.prevent="loadMoreLogs" isHighlighted>
+                                    Load More
+                                </x-forms.button>
+                            @endif
+                            <x-forms.button wire:click.prevent="downloadLogs" isHighlighted>
+                                Download
+                            </x-forms.button>
+                        </div>
                     </div>
                 @else
                     <div>No output was recorded for this execution.</div>
