@@ -1,0 +1,74 @@
+# documentation: https://docs.gitea.com
+# slogan: Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
+# tags: version control, collaboration, code, hosting, lightweight
+# logo: svgs/gitea.svg
+
+services:
+  gitea:
+    image: 'gitea/gitea:latest'
+    environment:
+      - SERVICE_FQDN_GITEA_3000
+      - USER_UID=1000
+      - USER_GID=1000
+      # Domain configuration
+      - GITEA__server__ROOT_URL=${GITEA_SERVER_ROOT_URL}
+      - GITEA__server__DOMAIN=${GITEA_SERVER_DOMAIN}
+      # Basic Security
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=${GITEA_SERVICE_REQUIRE_SIGNIN_VIEW:true}
+      - GITEA__service__REGISTER_MANUAL_CONFIRM=${GITEA_SERVICE_REGISTER_MANUAL_CONFIRM:true}
+      - GITEA__service__REGISTER_EMAIL_CONFIRM=${GITEA_SERVICE_REGISTER_EMAIL_CONFIRM:false}
+      - GITEA__service__ENABLE_NOTIFY_MAIL=${GITEA_SERVICE_ENABLE_NOTIFY_MAIL:true}
+      - GITEA__service__DEFAULT_ALLOW_CREATE_ORGANIZATION=${GITEA_SERVICE_DEFAULT_ALLOW_CREATE_ORGANIZATION:false}
+      - GITEA__service__DEFAULT_USER_IS_RESTRICTED=${GITEA_SERVICE_DEFAULT_USER_IS_RESTRICTED:true}
+      - GITEA__service__DEFAULT_USER_VISIBILITY=${GITEA_SERVICE_DEFAULT_USER_VISIBILITY:private}
+      
+      # Additional Security
+      - GITEA__security__INSTALL_LOCK=true # Lock the installation to prevent unauthorized access
+      - GITEA__security__MIN_PASSWORD_LENGTH=12 # Minimum password length
+      - GITEA__security__PASSWORD_COMPLEXITY=off # Disable password complexity checks
+      - GITEA__security__PASSWORD_CHECK_PWN=true # Check if the password has been leaked
+      - GITEA__security__DISABLE_GIT_HOOKS=true # Disable Git hooks to prevent code execution
+      - GITEA__security__ONLY_ALLOW_PUSH_IF_GITEA_ENVIRONMENT_SET=true
+      
+      # Brute Force Protection
+      - GITEA__security__LOGIN_REMEMBER_DAYS=7
+      - GITEA__security__MAX_FAILED_LOGIN_ATTEMPTS=5
+      - GITEA__security__BLOCK_LOGIN_FAILURES_THRESHOLD=true # Block login attempts after reaching the threshold
+      - GITEA__security__BLOCK_LOGIN_FAILURES_DURATION=15m # Block login attempts for 15 minutes after reaching the threshold
+      
+      # Session Security
+      - GITEA__session__PROVIDER=file # Use file-based session provider 
+      - GITEA__session__SAME_SITE=strict # Set SameSite attribute to strict to prevent cross-site request forgery
+      - GITEA__session__COOKIE_SECURE=true # Ensure cookies are only sent over HTTPS
+      
+      # API Protection
+      - GITEA__api__ENABLE_SWAGGER=false # Disable Swagger API documentation to prevent leaking information
+      - GITEA__api__MAX_RESPONSE_ITEMS=50 # Limit the number of items returned in API responses
+      
+      # Other Restrictions
+      - GITEA__repository__DEFAULT_PRIVATE=true # Default repository visibility to private  
+      - GITEA__repository__DEFAULT_BRANCH=main # Default branch for new repositories
+      - GITEA__repository__DISABLE_HTTP_GIT=false
+      - GITEA__repository__USE_COMPAT_SSH_URI=true # Use compatible SSH URI format
+      
+      # Attack Protection
+      - GITEA__other__SHOW_FOOTER_VERSION=false # Hide version information in footer
+      - GITEA__other__SHOW_FOOTER_TEMPLATE_LOAD_TIME=false # Hide template load time in footer
+      
+    ports:
+      - '22222:22'
+    volumes:
+      - 'gitea-data:/data'
+      - 'gitea-timezone:/etc/timezone:ro'
+      - 'gitea-localtime:/etc/localtime:ro'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:3000'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    security_opt:
+      - no-new-privileges:true
