@@ -125,7 +125,6 @@ class ScheduledTaskJob implements ShouldQueue
                 ]);
             }
             $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
-            // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
         } finally {
             ScheduledTaskDone::dispatch($this->team->id);
