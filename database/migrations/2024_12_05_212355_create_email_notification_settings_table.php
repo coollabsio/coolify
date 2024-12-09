@@ -26,10 +26,10 @@ return new class extends Migration
             $table->text('smtp_password')->nullable();
             $table->integer('smtp_timeout')->nullable();
 
-            $table->boolean('use_instance_email_settings')->default(false);
-
             $table->boolean('resend_enabled')->default(false);
             $table->text('resend_api_key')->nullable();
+
+            $table->boolean('use_instance_email_settings')->default(false);
 
             $table->boolean('deployment_success_email_notifications')->default(false);
             $table->boolean('deployment_failure_email_notifications')->default(true);
