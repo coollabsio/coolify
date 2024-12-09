@@ -17,7 +17,8 @@
             @if (isEmailEnabled($team) && auth()->user()->isAdminFromSession() && isTestEmailEnabled($team))
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                     <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
-                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress" label="Recipients" required />
+                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress"
+                            label="Recipients" required />
                         <x-forms.button type="submit" @click="modalOpen=false">
                             Send Email
                         </x-forms.button>
@@ -62,8 +63,11 @@
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
                             <x-forms.input required id="smtpPort" placeholder="587" label="Port" />
-                            <x-forms.input id="smtpEncryption" helper="If SMTP uses SSL, set it to 'tls'."
-                                placeholder="tls" label="Encryption" />
+                            <x-forms.select id="smtpEncryption" label="Encryption">
+                                <option value="tls">TLS</option>
+                                <option value="ssl">SSL</option>
+                                <option value="none">None</option>
+                            </x-forms.select>
                         </div>
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input id="smtpUsername" label="SMTP Username" />

@@ -18,18 +18,15 @@ class ServicesController extends Controller
 {
     private function removeSensitiveData($service)
     {
-        $token = auth()->user()->currentAccessToken();
         $service->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($service);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $service->makeHidden([
+                'docker_compose_raw',
+                'docker_compose',
+            ]);
         }
-
-        $service->makeHidden([
-            'docker_compose_raw',
-            'docker_compose',
-        ]);
 
         return serializeApiResponse($service);
     }

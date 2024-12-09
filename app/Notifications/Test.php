@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -66,5 +67,13 @@ class Test extends Notification implements ShouldQueue
                 ],
             ],
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        return new SlackMessage(
+            title: 'Test Slack Notification',
+            description: 'This is a test Slack notification from Coolify.'
+        );
     }
 }

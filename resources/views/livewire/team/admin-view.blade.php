@@ -10,7 +10,8 @@
     <h3 class="pt-4">Users</h3>
     <div class="flex flex-col gap-2 ">
         @forelse ($users as $user)
-            <div class="flex items-center justify-center gap-2 bg-white box-without-bg dark:bg-coolgray-100">
+            <div wire:key="user-{{ $user->id }}"
+                class="flex items-center justify-center gap-2 bg-white box-without-bg dark:bg-coolgray-100">
                 <div>{{ $user->name }}</div>
                 <div>{{ $user->email }}</div>
                 <div class="flex-1"></div>

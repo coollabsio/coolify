@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class DeploymentSuccess extends CustomEmailNotification
@@ -142,5 +143,32 @@ class DeploymentSuccess extends CustomEmailNotification
                 ...$buttons,
             ],
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
+            $description = "New version successfully deployed for {$this->application_name}";
+            if ($this->preview->fqdn) {
+                $description .= "\nPreview URL: {$this->preview->fqdn}";
+            }
+        } else {
+            $title = 'New version successfully deployed';
+            $description = "New version successfully deployed for {$this->application_name}";
+            if ($this->fqdn) {
+                $description .= "\nApplication URL: {$this->fqdn}";
+            }
+        }
+
+        $description .= "\n\n**Project:** ".data_get($this->application, 'environment.project.name');
+        $description .= "\n**Environment:** {$this->environment_name}";
+        $description .= "\n**Deployment Logs:** {$this->deployment_url}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::successColor()
+        );
     }
 }

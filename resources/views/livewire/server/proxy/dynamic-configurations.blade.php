@@ -29,7 +29,8 @@
                                 @if (str_replace('|', '.', $fileName) === 'coolify.yaml' ||
                                         str_replace('|', '.', $fileName) === 'Caddyfile' ||
                                         str_replace('|', '.', $fileName) === 'coolify.caddy' ||
-                                        str_replace('|', '.', $fileName) === 'default_redirect_404.caddy')
+                                        str_replace('|', '.', $fileName) === 'default_redirect_503.yaml' ||
+                                        str_replace('|', '.', $fileName) === 'default_redirect_503.caddy')
                                     <div>
                                         <h3 class="dark:text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
                                     </div>
