@@ -7,7 +7,6 @@ use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
-use Log;
 
 class TransactionalEmailChannel
 {
@@ -15,8 +14,6 @@ class TransactionalEmailChannel
     {
         $settings = instanceSettings();
         if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
-            Log::info('SMTP/Resend not enabled');
-
             return;
         }
         $email = $notifiable->email;

@@ -16,7 +16,6 @@ class InstanceSettings extends Model implements SendsEmail
     protected $guarded = [];
 
     protected $casts = [
-        'resale_license' => 'encrypted',
         'smtp_password' => 'encrypted',
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
@@ -81,7 +80,7 @@ class InstanceSettings extends Model implements SendsEmail
         return InstanceSettings::findOrFail(0);
     }
 
-    public function getRecepients($notification)
+    public function getRecipients($notification)
     {
         $recipients = data_get($notification, 'emails', null);
         if (is_null($recipients) || $recipients === '') {

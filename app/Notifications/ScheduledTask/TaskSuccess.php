@@ -24,13 +24,13 @@ class TaskFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return $notifiable->getEnabledChannels('scheduled_task_failure');
+        return $notifiable->getEnabledChannels('scheduled_task_success');
     }
 
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Scheduled task ({$this->task->name}) failed.");
+        $mail->subject("Coolify: Scheduled task ({$this->task->name}) succeeded.");
         $mail->view('emails.scheduled-task-failed', [
             'task' => $this->task,
             'url' => $this->url,
@@ -43,9 +43,9 @@ class TaskFailed extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: ':cross_mark: Scheduled task failed',
-            description: "Scheduled task ({$this->task->name}) failed.",
-            color: DiscordMessage::errorColor(),
+            title: ':check_mark: Scheduled task succeeded',
+            description: "Scheduled task ({$this->task->name}) succeeded.",
+            color: DiscordMessage::successColor(),
         );
 
         if ($this->url) {
@@ -57,7 +57,7 @@ class TaskFailed extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Scheduled task ({$this->task->name}) failed with output: {$this->output}";
+        $message = "Coolify: Scheduled task ({$this->task->name}) succeeded.";
         if ($this->url) {
             $buttons[] = [
                 'text' => 'Open task in Coolify',
@@ -72,12 +72,8 @@ class TaskFailed extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        $title = 'Scheduled task failed';
-        $description = "Scheduled task ({$this->task->name}) failed.";
-
-        if ($this->output) {
-            $description .= "\n\n**Error Output:**\n{$this->output}";
-        }
+        $title = 'Scheduled task succeeded';
+        $description = "Scheduled task ({$this->task->name}) succeeded.";
 
         if ($this->url) {
             $description .= "\n\n**Task URL:** {$this->url}";
@@ -86,7 +82,7 @@ class TaskFailed extends CustomEmailNotification
         return new SlackMessage(
             title: $title,
             description: $description,
-            color: SlackMessage::errorColor()
+            color: SlackMessage::successColor()
         );
     }
 }

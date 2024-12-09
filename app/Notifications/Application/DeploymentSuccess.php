@@ -45,13 +45,7 @@ class DeploymentSuccess extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        $channels = setNotificationChannels($notifiable, 'deployments');
-        if (isCloud()) {
-            // TODO: Make batch notifications work with email
-            $channels = array_diff($channels, [\App\Notifications\Channels\EmailChannel::class]);
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('deployment_success');
     }
 
     public function toMail(): MailMessage

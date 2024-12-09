@@ -59,7 +59,7 @@ class S3Storage extends BaseModel
             $this->is_usable = true;
         } catch (\Throwable $e) {
             $this->is_usable = false;
-            if ($this->unusable_email_sent === false && is_transactional_emails_active()) {
+            if ($this->unusable_email_sent === false && is_transactional_emails_enabled()) {
                 $mail = new MailMessage;
                 $mail->subject('Coolify: S3 Storage Connection Error');
                 $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);

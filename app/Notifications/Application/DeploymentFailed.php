@@ -45,7 +45,7 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'deployments');
+        return $notifiable->getEnabledChannels('deployment_failure');
     }
 
     public function toMail(): MailMessage

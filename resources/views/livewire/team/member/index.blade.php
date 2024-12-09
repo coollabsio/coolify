@@ -33,7 +33,7 @@
     </div>
     @if (auth()->user()->isAdminFromSession())
         <div class="py-4">
-            @if (is_transactional_emails_active())
+            @if (is_transactional_emails_enabled())
                 <h2 class="pb-4">Invite New Member</h2>
             @else
                 <h2>Invite New Member</h2>

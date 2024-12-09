@@ -77,11 +77,6 @@ return [
         ],
     ],
 
-    'waitlist' => [
-        'enabled' => env('WAITLIST', false),
-        'expiration' => 10,
-    ],
-
     'sentry' => [
         'sentry_dsn' => env('SENTRY_DSN'),
     ],

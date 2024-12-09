@@ -1,43 +1,65 @@
 <div>
     <x-slot:title>
         Notifications | Coolify
-        </x-slot>
-        <x-notification.navbar />
-        <form wire:submit='submit' class="flex flex-col gap-4">
-            <div class="flex items-center gap-2">
-                <h2>Slack</h2>
-                <x-forms.button type="submit">
-                    Save
+    </x-slot>
+    <x-notification.navbar />
+    <form wire:submit='submit' class="flex flex-col gap-4">
+        <div class="flex items-center gap-2">
+            <h2>Slack</h2>
+            <x-forms.button type="submit">
+                Save
+            </x-forms.button>
+            @if ($slackEnabled)
+                <x-forms.button class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
+                    wire:click="sendTestNotification">
+                    Send Test Notification
                 </x-forms.button>
-                @if ($slackEnabled)
-                    <x-forms.button class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
-                        wire:click="sendTestNotification">
-                        Send Test Notifications
-                    </x-forms.button>
-                @endif
+            @endif
+        </div>
+        <div class="w-32">
+            <x-forms.checkbox instantSave="instantSaveSlackEnabled" id="slackEnabled" label="Enabled" />
+        </div>
+        <x-forms.input type="password"
+            helper="Generate a webhook in Slack.<br>Example: https://hooks.slack.com/services/...." required
+            id="slackWebhookUrl" label="Webhook" />
+    </form>
+    @if ($slackEnabled)
+        <h2 class="mt-8 mb-4">Notification Settings</h2>
+        <p class="mb-4">
+            Select events for which you would like to receive Slack notifications.
+        </p>
+        <div class="flex flex-col gap-4 max-w-2xl">
+            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+                <h3 class="font-medium mb-3">Deployments</h3>
+                <div class="flex flex-col gap-1.5 pl-1">
+                    <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessSlackNotifications" label="Deployment Success" />
+                    <x-forms.checkbox instantSave="saveModel" id="deploymentFailureSlackNotifications" label="Deployment Failure" />
+                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container." id="statusChangeSlackNotifications" label="Container Status Changes" />
+                </div>
             </div>
-            <div class="w-32">
-                <x-forms.checkbox instantSave="instantSaveSlackEnabled" id="slackEnabled" label="Enabled" />
+            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+                <h3 class="font-medium mb-3">Backups</h3>
+                <div class="flex flex-col gap-1.5 pl-1">
+                    <x-forms.checkbox instantSave="saveModel" id="backupSuccessSlackNotifications" label="Backup Success" />
+                    <x-forms.checkbox instantSave="saveModel" id="backupFailureSlackNotifications" label="Backup Failure" />
+                </div>
             </div>
-            <x-forms.input type="password"
-                helper="Generate a webhook in Slack.<br>Example: https://hooks.slack.com/services/...." required
-                id="slackWebhookUrl" label="Webhook" />
-        </form>
-        @if ($slackEnabled)
-            <h2 class="mt-4">Subscribe to events</h2>
-            <div class="w-64">
-                @if (isDev())
-                    <x-forms.checkbox instantSave="saveModel" id="slackNotificationsTest" label="Test" />
-                @endif
-                <x-forms.checkbox instantSave="saveModel" id="slackNotificationsStatusChanges"
-                    label="Container Status Changes" />
-                <x-forms.checkbox instantSave="saveModel" id="slackNotificationsDeployments"
-                    label="Application Deployments" />
-                <x-forms.checkbox instantSave="saveModel" id="slackNotificationsDatabaseBackups" label="Backup Status" />
-                <x-forms.checkbox instantSave="saveModel" id="slackNotificationsScheduledTasks"
-                    label="Scheduled Tasks Status" />
-                <x-forms.checkbox instantSave="saveModel" id="slackNotificationsServerDiskUsage"
-                    label="Server Disk Usage" />
+            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+                <h3 class="font-medium mb-3">Scheduled Tasks</h3>
+                <div class="flex flex-col gap-1.5 pl-1">
+                    <x-forms.checkbox instantSave="saveModel" id="scheduledTaskSuccessSlackNotifications" label="Scheduled Task Success" />
+                    <x-forms.checkbox instantSave="saveModel" id="scheduledTaskFailureSlackNotifications" label="Scheduled Task Failure" />
+                </div>
             </div>
-        @endif
+            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+                <h3 class="font-medium mb-3">Server</h3>
+                <div class="flex flex-col gap-1.5 pl-1">
+                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup is run on a server." id="dockerCleanupSlackNotifications" label="Docker Cleanup" />
+                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when server disk usage is high." id="serverDiskUsageSlackNotifications" label="Server Disk Usage" />
+                    <x-forms.checkbox instantSave="saveModel" id="serverReachableSlackNotifications" label="Server Reachable" />
+                    <x-forms.checkbox instantSave="saveModel" id="serverUnreachableSlackNotifications" label="Server Unreachable" />
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

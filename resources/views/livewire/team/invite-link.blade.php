@@ -11,7 +11,7 @@
     </div>
     <div class="flex gap-2">
         <x-forms.button type="submit">Generate Invitation Link</x-forms.button>
-        @if (is_transactional_emails_active())
+        @if (is_transactional_emails_enabled())
             <x-forms.button wire:click.prevent='viaEmail'>Send Invitation via Email</x-forms.button>
         @endif
     </div>

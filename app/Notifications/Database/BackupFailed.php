@@ -23,13 +23,13 @@ class BackupFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'database_backups');
+        return $notifiable->getEnabledChannels('backup_failure');
     }
 
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
+        $mail->subject("Coolify: [ACTION REQUIRED] Database Backup FAILED for {$this->database->name}");
         $mail->view('emails.backup-failed', [
             'name' => $this->name,
             'database_name' => $this->database_name,

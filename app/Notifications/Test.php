@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
@@ -23,13 +24,13 @@ class Test extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'test');
+        return $notifiable->getEnabledChannels('test');
     }
 
     public function middleware(object $notifiable, string $channel)
     {
         return match ($channel) {
-            \App\Notifications\Channels\EmailChannel::class => [new RateLimited('email')],
+            EmailChannel::class => [new RateLimited('email')],
             default => [],
         };
     }
