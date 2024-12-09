@@ -7,7 +7,7 @@ use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Livewire\Attributes\Locked;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -16,9 +16,6 @@ class Index extends Component
     public InstanceSettings $settings;
 
     protected Server $server;
-
-    #[Locked]
-    public $timezones;
 
     #[Validate('boolean')]
     public bool $is_auto_update_enabled;
@@ -101,10 +98,18 @@ class Index extends Component
             $this->is_api_enabled = $this->settings->is_api_enabled;
             $this->auto_update_frequency = $this->settings->auto_update_frequency;
             $this->update_check_frequency = $this->settings->update_check_frequency;
-            $this->timezones = collect(timezone_identifiers_list())->sort()->values()->toArray();
             $this->instance_timezone = $this->settings->instance_timezone;
             $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         }
+    }
+
+    #[Computed]
+    public function timezones(): array
+    {
+        return collect(timezone_identifiers_list())
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     public function instantSave($isSave = true)

@@ -19,7 +19,7 @@
         },
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
-
+    
             if (this.alwaysScroll) {
                 this.intervalId = setInterval(() => {
                     const screen = document.getElementById('screen');
@@ -58,30 +58,34 @@
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                 class="flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
                 :class="fullscreen ? '' : 'min-h-14 max-h-[40rem] border border-dotted rounded'">
-                <div :class="fullscreen ? 'fixed' : 'absolute'" class="top-4 right-6">
+                <div :class="fullscreen ? 'fixed' : 'absolute'" class="top-2 right-3">
                     <div class="flex justify-end gap-4 fixed -translate-x-full">
                         <button title="Toggle timestamps" x-on:click="showTimestamps = !showTimestamps">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                stroke="currentColor" stroke-width="2">
+                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                             </svg>
                         </button>
                         <button title="Go Top" x-show="fullscreen" x-on:click="goTop">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2" d="M12 5v14m4-10l-4-4M8 9l4-4" />
                             </svg>
                         </button>
                         <button title="Follow Logs" x-show="fullscreen" :class="alwaysScroll ? 'dark:text-warning' : ''"
                             x-on:click="toggleScroll">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                             </svg>
                         </button>
                         <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none">
                                     <path
                                         d="M24 0v24H0V0h24ZM12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035c-.01-.004-.019-.001-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427c-.002-.01-.009-.017-.017-.018Zm.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093c.012.004.023 0 .029-.008l.004-.014l-.034-.614c-.003-.012-.01-.02-.02-.022Zm-.715.002a.023.023 0 0 0-.027.006l-.006.014l-.034.614c0 .012.007.02.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01l-.184-.092Z" />
@@ -91,7 +95,8 @@
                             </svg>
                         </button>
                         <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen">
-                            <svg class="icon" viewBox="0 0 24 24"xmlns="http://www.w3.org/2000/svg">
+                            <svg class="w-5 h-5 opacity-30 hover:opacity-100"
+                                viewBox="0 0 24 24"xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2"
                                     d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />

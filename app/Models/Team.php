@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsSlack;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
@@ -70,7 +71,7 @@ use OpenApi\Attributes as OA;
         ),
     ]
 )]
-class Team extends Model implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack
 {
     use Notifiable;
 
@@ -127,11 +128,9 @@ class Team extends Model implements SendsDiscord, SendsEmail
         ];
     }
 
-    public function name(): Attribute
+    public function routeNotificationForSlack()
     {
-        return new Attribute(
-            get: fn () => sanitize_string($this->getRawOriginal('name')),
-        );
+        return data_get($this, 'slack_webhook_url', null);
     }
 
     public function getRecepients($notification)
