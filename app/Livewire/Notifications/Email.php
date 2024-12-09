@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
 use Illuminate\Support\Facades\RateLimiter;
@@ -12,6 +13,8 @@ use Livewire\Component;
 class Email extends Component
 {
     public Team $team;
+
+    public EmailNotificationSettings $settings;
 
     #[Locked]
     public string $emails;
@@ -96,6 +99,7 @@ class Email extends Component
         try {
             $this->team = auth()->user()->currentTeam();
             $this->emails = auth()->user()->email;
+            $this->settings = $this->team->emailNotificationSettings;
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -106,67 +110,64 @@ class Email extends Component
     {
         if ($toModel) {
             $this->validate();
-            $settings = $this->team->emailNotificationSettings;
-            $settings->smtp_enabled = $this->smtpEnabled;
-            $settings->smtp_from_address = $this->smtpFromAddress;
-            $settings->smtp_from_name = $this->smtpFromName;
-            $settings->smtp_recipients = $this->smtpRecipients;
-            $settings->smtp_host = $this->smtpHost;
-            $settings->smtp_port = $this->smtpPort;
-            $settings->smtp_encryption = $this->smtpEncryption;
-            $settings->smtp_username = $this->smtpUsername;
-            $settings->smtp_password = $this->smtpPassword;
-            $settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_enabled = $this->smtpEnabled;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->smtp_recipients = $this->smtpRecipients;
+            $this->settings->smtp_host = $this->smtpHost;
+            $this->settings->smtp_port = $this->smtpPort;
+            $this->settings->smtp_encryption = $this->smtpEncryption;
+            $this->settings->smtp_username = $this->smtpUsername;
+            $this->settings->smtp_password = $this->smtpPassword;
+            $this->settings->smtp_timeout = $this->smtpTimeout;
 
-            $settings->resend_enabled = $this->resendEnabled;
-            $settings->resend_api_key = $this->resendApiKey;
+            $this->settings->resend_enabled = $this->resendEnabled;
+            $this->settings->resend_api_key = $this->resendApiKey;
 
-            $settings->use_instance_email_settings = $this->useInstanceEmailSettings;
+            $this->settings->use_instance_email_settings = $this->useInstanceEmailSettings;
 
-            $settings->deployment_success_email_notifications = $this->deploymentSuccessEmailNotifications;
-            $settings->deployment_failure_email_notifications = $this->deploymentFailureEmailNotifications;
-            $settings->status_change_email_notifications = $this->statusChangeEmailNotifications;
-            $settings->backup_success_email_notifications = $this->backupSuccessEmailNotifications;
-            $settings->backup_failure_email_notifications = $this->backupFailureEmailNotifications;
-            $settings->scheduled_task_success_email_notifications = $this->scheduledTaskSuccessEmailNotifications;
-            $settings->scheduled_task_failure_email_notifications = $this->scheduledTaskFailureEmailNotifications;
-            $settings->docker_cleanup_email_notifications = $this->dockerCleanupEmailNotifications;
-            $settings->server_disk_usage_email_notifications = $this->serverDiskUsageEmailNotifications;
-            $settings->server_reachable_email_notifications = $this->serverReachableEmailNotifications;
-            $settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
+            $this->settings->deployment_success_email_notifications = $this->deploymentSuccessEmailNotifications;
+            $this->settings->deployment_failure_email_notifications = $this->deploymentFailureEmailNotifications;
+            $this->settings->status_change_email_notifications = $this->statusChangeEmailNotifications;
+            $this->settings->backup_success_email_notifications = $this->backupSuccessEmailNotifications;
+            $this->settings->backup_failure_email_notifications = $this->backupFailureEmailNotifications;
+            $this->settings->scheduled_task_success_email_notifications = $this->scheduledTaskSuccessEmailNotifications;
+            $this->settings->scheduled_task_failure_email_notifications = $this->scheduledTaskFailureEmailNotifications;
+            $this->settings->docker_cleanup_email_notifications = $this->dockerCleanupEmailNotifications;
+            $this->settings->server_disk_usage_email_notifications = $this->serverDiskUsageEmailNotifications;
+            $this->settings->server_reachable_email_notifications = $this->serverReachableEmailNotifications;
+            $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
 
-            $settings->save();
+            $this->settings->save();
             refreshSession();
         } else {
-            $settings = $this->team->emailNotificationSettings;
+            $this->smtpEnabled = $this->settings->smtp_enabled;
+            $this->smtpFromAddress = $this->settings->smtp_from_address;
+            $this->smtpFromName = $this->settings->smtp_from_name;
+            $this->smtpRecipients = $this->settings->smtp_recipients;
+            $this->smtpHost = $this->settings->smtp_host;
+            $this->smtpPort = $this->settings->smtp_port;
+            $this->smtpEncryption = $this->settings->smtp_encryption;
+            $this->smtpUsername = $this->settings->smtp_username;
+            $this->smtpPassword = $this->settings->smtp_password;
+            $this->smtpTimeout = $this->settings->smtp_timeout;
 
-            $this->smtpEnabled = $settings->smtp_enabled;
-            $this->smtpFromAddress = $settings->smtp_from_address;
-            $this->smtpFromName = $settings->smtp_from_name;
-            $this->smtpRecipients = $settings->smtp_recipients;
-            $this->smtpHost = $settings->smtp_host;
-            $this->smtpPort = $settings->smtp_port;
-            $this->smtpEncryption = $settings->smtp_encryption;
-            $this->smtpUsername = $settings->smtp_username;
-            $this->smtpPassword = $settings->smtp_password;
-            $this->smtpTimeout = $settings->smtp_timeout;
+            $this->resendEnabled = $this->settings->resend_enabled;
+            $this->resendApiKey = $this->settings->resend_api_key;
 
-            $this->resendEnabled = $settings->resend_enabled;
-            $this->resendApiKey = $settings->resend_api_key;
+            $this->useInstanceEmailSettings = $this->settings->use_instance_email_settings;
 
-            $this->useInstanceEmailSettings = $settings->use_instance_email_settings;
-
-            $this->deploymentSuccessEmailNotifications = $settings->deployment_success_email_notifications;
-            $this->deploymentFailureEmailNotifications = $settings->deployment_failure_email_notifications;
-            $this->statusChangeEmailNotifications = $settings->status_change_email_notifications;
-            $this->backupSuccessEmailNotifications = $settings->backup_success_email_notifications;
-            $this->backupFailureEmailNotifications = $settings->backup_failure_email_notifications;
-            $this->scheduledTaskSuccessEmailNotifications = $settings->scheduled_task_success_email_notifications;
-            $this->scheduledTaskFailureEmailNotifications = $settings->scheduled_task_failure_email_notifications;
-            $this->dockerCleanupEmailNotifications = $settings->docker_cleanup_email_notifications;
-            $this->serverDiskUsageEmailNotifications = $settings->server_disk_usage_email_notifications;
-            $this->serverReachableEmailNotifications = $settings->server_reachable_email_notifications;
-            $this->serverUnreachableEmailNotifications = $settings->server_unreachable_email_notifications;
+            $this->deploymentSuccessEmailNotifications = $this->settings->deployment_success_email_notifications;
+            $this->deploymentFailureEmailNotifications = $this->settings->deployment_failure_email_notifications;
+            $this->statusChangeEmailNotifications = $this->settings->status_change_email_notifications;
+            $this->backupSuccessEmailNotifications = $this->settings->backup_success_email_notifications;
+            $this->backupFailureEmailNotifications = $this->settings->backup_failure_email_notifications;
+            $this->scheduledTaskSuccessEmailNotifications = $this->settings->scheduled_task_success_email_notifications;
+            $this->scheduledTaskFailureEmailNotifications = $this->settings->scheduled_task_failure_email_notifications;
+            $this->dockerCleanupEmailNotifications = $this->settings->docker_cleanup_email_notifications;
+            $this->serverDiskUsageEmailNotifications = $this->settings->server_disk_usage_email_notifications;
+            $this->serverReachableEmailNotifications = $this->settings->server_reachable_email_notifications;
+            $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
         }
     }
 
@@ -238,24 +239,22 @@ class Email extends Component
                 'smtpEncryption.required' => 'Encryption type is required.',
             ]);
 
-            $settings = $this->team->emailNotificationSettings;
-
-            $settings->resend_enabled = false;
-            $settings->use_instance_email_settings = false;
+            $this->settings->resend_enabled = false;
+            $this->settings->use_instance_email_settings = false;
             $this->resendEnabled = false;
             $this->useInstanceEmailSettings = false;
 
-            $settings->smtp_enabled = $this->smtpEnabled;
-            $settings->smtp_from_address = $this->smtpFromAddress;
-            $settings->smtp_from_name = $this->smtpFromName;
-            $settings->smtp_host = $this->smtpHost;
-            $settings->smtp_port = $this->smtpPort;
-            $settings->smtp_encryption = $this->smtpEncryption;
-            $settings->smtp_username = $this->smtpUsername;
-            $settings->smtp_password = $this->smtpPassword;
-            $settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_enabled = $this->smtpEnabled;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->smtp_host = $this->smtpHost;
+            $this->settings->smtp_port = $this->smtpPort;
+            $this->settings->smtp_encryption = $this->smtpEncryption;
+            $this->settings->smtp_username = $this->smtpUsername;
+            $this->settings->smtp_password = $this->smtpPassword;
+            $this->settings->smtp_timeout = $this->smtpTimeout;
 
-            $settings->save();
+            $this->settings->save();
             refreshSession();
             $this->dispatch('success', 'SMTP settings updated.');
         } catch (\Throwable $e) {
@@ -280,19 +279,18 @@ class Email extends Component
                 'smtpFromAddress.email' => 'Please enter a valid email address.',
                 'smtpFromName.required' => 'From Name is required.',
             ]);
-            $settings = $this->team->emailNotificationSettings;
 
-            $settings->smtp_enabled = false;
-            $settings->use_instance_email_settings = false;
+            $this->settings->smtp_enabled = false;
+            $this->settings->use_instance_email_settings = false;
             $this->smtpEnabled = false;
             $this->useInstanceEmailSettings = false;
 
-            $settings->resend_enabled = $this->resendEnabled;
-            $settings->resend_api_key = $this->resendApiKey;
-            $settings->smtp_from_address = $this->smtpFromAddress;
-            $settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->resend_enabled = $this->resendEnabled;
+            $this->settings->resend_api_key = $this->resendApiKey;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
 
-            $settings->save();
+            $this->settings->save();
             refreshSession();
             $this->dispatch('success', 'Resend settings updated.');
         } catch (\Throwable $e) {
