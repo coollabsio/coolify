@@ -18,7 +18,6 @@ class CleanupUnreachableServers extends Command
         if ($servers->count() > 0) {
             foreach ($servers as $server) {
                 echo "Cleanup unreachable server ($server->id) with name $server->name";
-                // send_internal_notification("Server $server->name is unreachable for 7 days. Cleaning up...");
                 $server->update([
                     'ip' => '1.2.3.4',
                 ]);
