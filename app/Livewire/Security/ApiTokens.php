@@ -23,13 +23,18 @@ class ApiTokens extends Component
     public function mount()
     {
         $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
+        $this->getTokens();
+    }
+
+    private function getTokens()
+    {
         $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
     }
 
     public function updatedPermissions($permissionToUpdate)
     {
-        if ($permissionToUpdate == 'write') {
-            $this->permissions = ['write', 'deploy', 'read', 'read:sensitive'];
+        if ($permissionToUpdate == 'root') {
+            $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions)) {
             $this->permissions[] = 'read';
         } elseif ($permissionToUpdate == 'deploy') {
@@ -49,7 +54,7 @@ class ApiTokens extends Component
                 'description' => 'required|min:3|max:255',
             ]);
             $token = auth()->user()->createToken($this->description, array_values($this->permissions));
-            $this->tokens = auth()->user()->tokens;
+            $this->getTokens();
             session()->flash('token', $token->plainTextToken);
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -58,8 +63,12 @@ class ApiTokens extends Component
 
     public function revoke(int $id)
     {
-        $token = auth()->user()->tokens()->where('id', $id)->first();
-        $token->delete();
-        $this->tokens = auth()->user()->tokens;
+        try {
+            $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
+            $token->delete();
+            $this->getTokens();
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 }

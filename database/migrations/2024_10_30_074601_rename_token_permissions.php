@@ -15,7 +15,7 @@ return new class extends Migration
             foreach ($tokens as $token) {
                 $abilities = collect();
                 if (in_array('*', $token->abilities)) {
-                    $abilities->push('write', 'deploy', 'read', 'read:sensitive');
+                    $abilities->push('root');
                 }
                 if (in_array('read-only', $token->abilities)) {
                     $abilities->push('read');

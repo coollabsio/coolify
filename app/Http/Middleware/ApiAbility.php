@@ -9,6 +9,10 @@ class ApiAbility extends CheckForAnyAbility
     public function handle($request, $next, ...$abilities)
     {
         try {
+            if ($request->user()->tokenCan('root')) {
+                return $next($request);
+            }
+
             return parent::handle($request, $next, ...$abilities);
         } catch (\Illuminate\Auth\AuthenticationException $e) {
             return response()->json([

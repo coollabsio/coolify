@@ -33,9 +33,11 @@
 
         <h4>Token Permissions</h4>
         <div class="w-64">
-            <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write"
-                helper="Root access, be careful!" :checked="in_array('write', $permissions)"></x-forms.checkbox>
-            @if (!in_array('write', $permissions))
+            <x-forms.checkbox label="root" wire:model.live="permissions" domValue="root"
+                helper="Root access, be careful!" :checked="in_array('root', $permissions)"></x-forms.checkbox>
+            @if (!in_array('root', $permissions))
+                <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write"
+                    helper="Write access to all resources" :checked="in_array('write', $permissions)"></x-forms.checkbox>
                 <x-forms.checkbox label="deploy" wire:model.live="permissions" domValue="deploy"
                     helper="Can trigger deploy webhooks" :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
                 <x-forms.checkbox label="read" domValue="read" wire:model.live="permissions" domValue="read"
@@ -45,7 +47,7 @@
                     :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
             @endif
         </div>
-        @if (in_array('write', $permissions))
+        @if (in_array('root', $permissions))
             <div class="font-bold text-warning">Root access, be careful!</div>
         @endif
     </form>
@@ -58,7 +60,8 @@
     <h3 class="py-4">Issued Tokens</h3>
     <div class="grid gap-2 lg:grid-cols-1">
         @forelse ($tokens as $token)
-            <div class="flex flex-col gap-1 p-2 border dark:border-coolgray-200 hover:no-underline">
+            <div wire:key="token-{{ $token->id }}"
+                class="flex flex-col gap-1 p-2 border dark:border-coolgray-200 hover:no-underline">
                 <div>Description: {{ $token->name }}</div>
                 <div>Last used: {{ $token->last_used_at ? $token->last_used_at->diffForHumans() : 'Never' }}</div>
                 <div class="flex gap-1">
