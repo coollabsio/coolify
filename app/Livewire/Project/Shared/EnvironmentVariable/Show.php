@@ -88,6 +88,9 @@ class Show extends Component
     public function lock()
     {
         $this->env->is_shown_once = true;
+        if ($this->isSharedVariable) {
+            unset($this->env->is_required);
+        }
         $this->serialize();
         $this->env->save();
         $this->checkEnvs();
