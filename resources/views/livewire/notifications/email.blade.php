@@ -9,11 +9,6 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-                @if (isInstanceAdmin() && !$useInstanceEmailSettings)
-                <x-forms.button wire:click='copyFromInstanceSettings'>
-                    Copy from Instance Settings
-                </x-forms.button>
-                @endif
                 @if ($team->isNotificationEnabled('email') && auth()->user()->isAdminFromSession())
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                     <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
@@ -24,10 +19,15 @@
                     </form>
                 </x-modal-input>
                 @endif
+                @if (isInstanceAdmin() && !$useInstanceEmailSettings)
+                <x-forms.button wire:click='copyFromInstanceSettings'>
+                    Copy from Instance Settings
+                </x-forms.button>
+                @endif
             </div>
             @if (!isCloud())
             <div class="w-96">
-                <x-forms.checkbox instantSave="instantSaveInstance" id="useInstanceEmailSettings" label="Use system wide (transactional) email settings" />
+                <x-forms.checkbox instantSave="instantSave()" id="useInstanceEmailSettings" label="Use system wide (transactional) email settings" />
             </div>
             @endif
             @if (!$useInstanceEmailSettings)
@@ -39,7 +39,7 @@
         </form>
         @if (isCloud())
         <div class="w-64 py-4">
-            <x-forms.checkbox instantSave="instantSaveInstance" id="useInstanceEmailSettings" label="Use Hosted Email Service" />
+            <x-forms.checkbox instantSave="instantSave()" id="useInstanceEmailSettings" label="Use Hosted Email Service" />
         </div>
         @endif
         @if (!$useInstanceEmailSettings)
@@ -52,7 +52,7 @@
                     </x-forms.button>
                 </div>
                 <div class="w-32">
-                    <x-forms.checkbox instantSave="instantSaveSmtpEnabled" id="smtpEnabled" label="Enabled" />
+                    <x-forms.checkbox wire:model="smtpEnabled" instantSave="instantSave('SMTP')" id="smtpEnabled" label="Enabled" />
                 </div>
                 <div class="flex flex-col">
                     <div class="flex flex-col gap-4">
@@ -81,7 +81,7 @@
                     </x-forms.button>
                 </div>
                 <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSaveResend' id="resendEnabled" label="Enabled" />
+                    <x-forms.checkbox wire:model="resendEnabled" instantSave="instantSave('Resend')" id="resendEnabled" label="Enabled" />
                 </div>
                 <div class="flex flex-col">
                     <div class="flex flex-col gap-4">
