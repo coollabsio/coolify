@@ -16,7 +16,7 @@ class Show extends Component
 
     public array $parameters;
 
-    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey'];
+    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey', 'environmentVariableDeleted' => '$refresh'];
 
     public function saveKey($data)
     {

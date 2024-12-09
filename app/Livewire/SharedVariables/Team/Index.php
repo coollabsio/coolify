@@ -9,7 +9,7 @@ class Index extends Component
 {
     public Team $team;
 
-    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
+    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey',  'environmentVariableDeleted' => '$refresh'];
 
     public function saveKey($data)
     {
