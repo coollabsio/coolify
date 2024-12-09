@@ -25,21 +25,31 @@
             <div class="flex gap-1 font-bold dark:text-white">
                 @if ($permissions)
                     @foreach ($permissions as $permission)
-                        @if ($permission === '*')
-                            <div>Root access, be careful!</div>
-                        @else
-                            <div>{{ $permission }}</div>
-                        @endif
+                        <div>{{ $permission }}</div>
                     @endforeach
                 @endif
             </div>
         </div>
+
         <h4>Token Permissions</h4>
         <div class="w-64">
-            <x-forms.checkbox label="Root Access" wire:model.live="rootAccess"></x-forms.checkbox>
-            <x-forms.checkbox label="Read-only" wire:model.live="readOnly"></x-forms.checkbox>
-            <x-forms.checkbox label="View Sensitive Data" wire:model.live="viewSensitiveData"></x-forms.checkbox>
+            <x-forms.checkbox label="root" wire:model.live="permissions" domValue="root"
+                helper="Root access, be careful!" :checked="in_array('root', $permissions)"></x-forms.checkbox>
+            @if (!in_array('root', $permissions))
+                <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write"
+                    helper="Write access to all resources" :checked="in_array('write', $permissions)"></x-forms.checkbox>
+                <x-forms.checkbox label="deploy" wire:model.live="permissions" domValue="deploy"
+                    helper="Can trigger deploy webhooks" :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
+                <x-forms.checkbox label="read" domValue="read" wire:model.live="permissions" domValue="read"
+                    :checked="in_array('read', $permissions)"></x-forms.checkbox>
+                <x-forms.checkbox label="read:sensitive" wire:model.live="permissions" domValue="read:sensitive"
+                    helper="Responses will include secrets, logs, passwords, and compose file contents"
+                    :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
+            @endif
         </div>
+        @if (in_array('root', $permissions))
+            <div class="font-bold text-warning">Root access, be careful!</div>
+        @endif
     </form>
     @if (session()->has('token'))
         <div class="py-4 font-bold dark:text-warning">Please copy this token now. For your security, it won't be shown
@@ -50,12 +60,13 @@
     <h3 class="py-4">Issued Tokens</h3>
     <div class="grid gap-2 lg:grid-cols-1">
         @forelse ($tokens as $token)
-            <div class="flex flex-col gap-1 p-2 border dark:border-coolgray-200 hover:no-underline">
+            <div wire:key="token-{{ $token->id }}"
+                class="flex flex-col gap-1 p-2 border dark:border-coolgray-200 hover:no-underline">
                 <div>Description: {{ $token->name }}</div>
                 <div>Last used: {{ $token->last_used_at ? $token->last_used_at->diffForHumans() : 'Never' }}</div>
                 <div class="flex gap-1">
                     @if ($token->abilities)
-                        Abilities:
+                        Permissions:
                         @foreach ($token->abilities as $ability)
                             <div class="font-bold dark:text-white">{{ $ability }}</div>
                         @endforeach
