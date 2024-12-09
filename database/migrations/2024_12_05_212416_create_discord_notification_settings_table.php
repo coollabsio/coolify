@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
 
             $table->boolean('discord_enabled')->default(false);
-            $table->string('discord_webhook_url')->nullable();
+            $table->text('discord_webhook_url')->nullable();
 
             $table->boolean('deployment_success_discord_notifications')->default(false);
             $table->boolean('deployment_failure_discord_notifications')->default(true);

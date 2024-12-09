@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
 
             $table->boolean('slack_enabled')->default(false);
-            $table->string('slack_webhook_url')->nullable();
+            $table->text('slack_webhook_url')->nullable();
 
             $table->boolean('deployment_success_slack_notifications')->default(false);
             $table->boolean('deployment_failure_slack_notifications')->default(true);
