@@ -10,6 +10,13 @@ use Illuminate\Database\Eloquent\Model;
 
 trait HasNotificationSettings
 {
+    protected $alwaysSendEvents = [
+        'server_force_enabled',
+        'server_force_disabled',
+        'general',
+        'test',
+    ];
+
     /**
      * Get settings model for specific channel
      */
@@ -35,16 +42,30 @@ trait HasNotificationSettings
     }
 
     /**
+     * Check if a specific notification type is enabled for a channel
+     */
+    public function isNotificationTypeEnabled(string $channel, string $event): bool
+    {
+        $settings = $this->getNotificationSettings($channel);
+
+        if (! $settings || ! $this->isNotificationEnabled($channel)) {
+            return false;
+        }
+
+        if (in_array($event, $this->alwaysSendEvents)) {
+            return true;
+        }
+
+        $settingKey = "{$event}_{$channel}_notifications";
+
+        return (bool) $settings->$settingKey;
+    }
+
+    /**
      * Get all enabled notification channels for an event
      */
     public function getEnabledChannels(string $event): array
     {
-        $alwaysSendEvents = [
-            'server_force_enabled',
-            'server_force_disabled',
-            'general',
-        ];
-
         $channels = [];
 
         $channelMap = [
@@ -55,14 +76,8 @@ trait HasNotificationSettings
         ];
 
         foreach ($channelMap as $channel => $channelClass) {
-            if (in_array($event, $alwaysSendEvents)) {
-                if ($this->isNotificationEnabled($channel)) {
-                    $channels[] = $channelClass;
-                }
-            } else {
-                if ($this->isNotificationEnabled($channel) && $this->isNotificationTypeEnabled($channel, $event)) {
-                    $channels[] = $channelClass;
-                }
+            if ($this->isNotificationEnabled($channel) && $this->isNotificationTypeEnabled($channel, $event)) {
+                $channels[] = $channelClass;
             }
         }
 
