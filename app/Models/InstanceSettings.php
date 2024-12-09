@@ -16,7 +16,6 @@ class InstanceSettings extends Model implements SendsEmail
     protected $guarded = [];
 
     protected $casts = [
-        'resale_license' => 'encrypted',
         'smtp_password' => 'encrypted',
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
