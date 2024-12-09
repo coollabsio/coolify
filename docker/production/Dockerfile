@@ -6,7 +6,7 @@ ARG MINIO_VERSION=RELEASE.2024-11-05T11-29-45Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2024.11.0
 # https://www.postgresql.org/support/versioning/ - Upgraded to 16 if the we have a manual upgrade guide?
-ARG POSTGRES_VERSION=16
+ARG POSTGRES_VERSION=15
 
 # Add user/group
 ARG USER_ID=9999
@@ -118,8 +118,9 @@ COPY --chown=www-data:www-data templates ./templates
 COPY --chown=www-data:www-data artisan artisan
 
 # Configure Nginx and S6 overlay
-COPY docker/prod/nginx.conf /etc/nginx/conf.d/custom.conf
-COPY --chmod=755 docker/prod/etc/s6-overlay/ /etc/s6-overlay/
+COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
+COPY docker/production/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
+COPY --chmod=755 docker/production/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN mkdir -p /etc/nginx/conf.d && \
     chown -R www-data:www-data /etc/nginx && \

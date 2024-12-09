@@ -2,15 +2,14 @@ services:
   coolify:
     build:
       context: .
-      dockerfile: ./docker/dev/Dockerfile
+      dockerfile: ./docker/development/Dockerfile
+      args:
+        - USER_ID=${USERID:-1000}
+        - GROUP_ID=${GROUPID:-1000}
     ports:
       - "${APP_PORT:-8000}:80"
     environment:
-      PUID: "${USERID:-1000}"
-      PGID: "${GROUPID:-1000}"
-      SSL_MODE: "off"
-      AUTORUN_LARAVEL_STORAGE_LINK: "false"
-      AUTORUN_LARAVEL_MIGRATION: "false"
+      AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST}"
       PUSHER_PORT: "${PUSHER_PORT}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
