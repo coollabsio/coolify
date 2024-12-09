@@ -81,7 +81,7 @@ class InstanceSettings extends Model implements SendsEmail
         return InstanceSettings::findOrFail(0);
     }
 
-    public function getRecepients($notification)
+    public function getRecipients($notification)
     {
         $recipients = data_get($notification, 'emails', null);
         if (is_null($recipients) || $recipients === '') {
