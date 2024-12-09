@@ -3,13 +3,9 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
-use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Dto\SlackMessage;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class ForceDisabled extends CustomEmailNotification
@@ -21,25 +17,7 @@ class ForceDisabled extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-        $isSlackEnabled = data_get($notifiable, 'slack_enabled');
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isEmailEnabled) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-        if ($isSlackEnabled) {
-            $channels[] = SlackChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('server_force_disabled');
     }
 
     public function toMail(): MailMessage
@@ -73,13 +51,12 @@ class ForceDisabled extends CustomEmailNotification
         ];
     }
 
-
     public function toSlack(): SlackMessage
     {
-        $title = "Server disabled";
+        $title = 'Server disabled';
         $description = "Server ({$this->server->name}) disabled because it is not paid!\n";
         $description .= "All automations and integrations are stopped.\n\n";
-        $description .= "Please update your subscription to enable the server again: https://app.coolify.io/subscriptions";
+        $description .= 'Please update your subscription to enable the server again: https://app.coolify.io/subscriptions';
 
         return new SlackMessage(
             title: $title,
