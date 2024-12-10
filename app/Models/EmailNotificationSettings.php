@@ -40,6 +40,7 @@ class EmailNotificationSettings extends Model
     protected $casts = [
         'smtp_enabled' => 'boolean',
         'smtp_from_address' => 'encrypted',
+        'smtp_from_name' => 'encrypted',
         'smtp_recipients' => 'encrypted',
         'smtp_host' => 'encrypted',
         'smtp_port' => 'integer',
