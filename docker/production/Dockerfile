@@ -38,9 +38,9 @@ FROM node:20-alpine AS static-assets
 
 WORKDIR /app
 COPY package*.json vite.config.js tailwind.config.js postcss.config.cjs ./
-COPY public ./public
-COPY resources ./resources
-RUN npm ci && npm run build
+RUN npm ci
+COPY . .
+RUN npm run build
 
 # =================================================================
 # Stage 3: Get MinIO client
