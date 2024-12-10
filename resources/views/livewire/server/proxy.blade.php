@@ -27,6 +27,13 @@
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
                             id="server.settings.generate_exact_labels"
                             label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
+                        <x-forms.checkbox instantSave="instantSaveRedirect" id="redirect_enabled"
+                            label="Override default request handler"
+                            helper="Requests to unknown hosts or stopped services will recieve a 503 response or be redirected to the URL you set below (need to enable this first)." />
+                        @if ($redirect_enabled)
+                            <x-forms.input placeholder="https://app.coolify.io" id="redirect_url"
+                                label="Redirect to (optional)" />
+                        @endif
                     </div>
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
                         <h4>Traefik</h4>
@@ -40,8 +47,6 @@
                             configurations.
                         </div>
                     @endif
-                    <x-forms.input placeholder="https://app.coolify.io" id="redirect_url" label="Default Redirect 404"
-                        helper="All urls that has no service available will be redirected to this domain." />
                     <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
                         <x-loading text="Loading proxy configuration..." />
                     </div>
