@@ -42,7 +42,10 @@ class Slack extends Component
     public bool $scheduledTaskFailureSlackNotifications = true;
 
     #[Validate(['boolean'])]
-    public bool $dockerCleanupSlackNotifications = false;
+    public bool $dockerCleanupSuccessSlackNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $dockerCleanupFailureSlackNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $serverDiskUsageSlackNotifications = true;
@@ -78,7 +81,8 @@ class Slack extends Component
             $this->settings->backup_failure_slack_notifications = $this->backupFailureSlackNotifications;
             $this->settings->scheduled_task_success_slack_notifications = $this->scheduledTaskSuccessSlackNotifications;
             $this->settings->scheduled_task_failure_slack_notifications = $this->scheduledTaskFailureSlackNotifications;
-            $this->settings->docker_cleanup_slack_notifications = $this->dockerCleanupSlackNotifications;
+            $this->settings->docker_cleanup_success_slack_notifications = $this->dockerCleanupSuccessSlackNotifications;
+            $this->settings->docker_cleanup_failure_slack_notifications = $this->dockerCleanupFailureSlackNotifications;
             $this->settings->server_disk_usage_slack_notifications = $this->serverDiskUsageSlackNotifications;
             $this->settings->server_reachable_slack_notifications = $this->serverReachableSlackNotifications;
             $this->settings->server_unreachable_slack_notifications = $this->serverUnreachableSlackNotifications;
@@ -96,7 +100,8 @@ class Slack extends Component
             $this->backupFailureSlackNotifications = $this->settings->backup_failure_slack_notifications;
             $this->scheduledTaskSuccessSlackNotifications = $this->settings->scheduled_task_success_slack_notifications;
             $this->scheduledTaskFailureSlackNotifications = $this->settings->scheduled_task_failure_slack_notifications;
-            $this->dockerCleanupSlackNotifications = $this->settings->docker_cleanup_slack_notifications;
+            $this->dockerCleanupSuccessSlackNotifications = $this->settings->docker_cleanup_success_slack_notifications;
+            $this->dockerCleanupFailureSlackNotifications = $this->settings->docker_cleanup_failure_slack_notifications;
             $this->serverDiskUsageSlackNotifications = $this->settings->server_disk_usage_slack_notifications;
             $this->serverReachableSlackNotifications = $this->settings->server_reachable_slack_notifications;
             $this->serverUnreachableSlackNotifications = $this->settings->server_unreachable_slack_notifications;

@@ -80,7 +80,10 @@ class Email extends Component
     public bool $scheduledTaskFailureEmailNotifications = true;
 
     #[Validate(['boolean'])]
-    public bool $dockerCleanupEmailNotifications = false;
+    public bool $dockerCleanupSuccessEmailNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $dockerCleanupFailureEmailNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $serverDiskUsageEmailNotifications = true;
@@ -133,7 +136,8 @@ class Email extends Component
             $this->settings->backup_failure_email_notifications = $this->backupFailureEmailNotifications;
             $this->settings->scheduled_task_success_email_notifications = $this->scheduledTaskSuccessEmailNotifications;
             $this->settings->scheduled_task_failure_email_notifications = $this->scheduledTaskFailureEmailNotifications;
-            $this->settings->docker_cleanup_email_notifications = $this->dockerCleanupEmailNotifications;
+            $this->settings->docker_cleanup_success_email_notifications = $this->dockerCleanupSuccessEmailNotifications;
+            $this->settings->docker_cleanup_failure_email_notifications = $this->dockerCleanupFailureEmailNotifications;
             $this->settings->server_disk_usage_email_notifications = $this->serverDiskUsageEmailNotifications;
             $this->settings->server_reachable_email_notifications = $this->serverReachableEmailNotifications;
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
@@ -164,10 +168,12 @@ class Email extends Component
             $this->backupFailureEmailNotifications = $this->settings->backup_failure_email_notifications;
             $this->scheduledTaskSuccessEmailNotifications = $this->settings->scheduled_task_success_email_notifications;
             $this->scheduledTaskFailureEmailNotifications = $this->settings->scheduled_task_failure_email_notifications;
-            $this->dockerCleanupEmailNotifications = $this->settings->docker_cleanup_email_notifications;
+            $this->dockerCleanupSuccessEmailNotifications = $this->settings->docker_cleanup_success_email_notifications;
+            $this->dockerCleanupFailureEmailNotifications = $this->settings->docker_cleanup_failure_email_notifications;
             $this->serverDiskUsageEmailNotifications = $this->settings->server_disk_usage_email_notifications;
             $this->serverReachableEmailNotifications = $this->settings->server_reachable_email_notifications;
             $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
+
         }
     }
 

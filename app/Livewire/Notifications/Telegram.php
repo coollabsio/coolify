@@ -45,7 +45,10 @@ class Telegram extends Component
     public bool $scheduledTaskFailureTelegramNotifications = true;
 
     #[Validate(['boolean'])]
-    public bool $dockerCleanupTelegramNotifications = false;
+    public bool $dockerCleanupSuccessTelegramNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $dockerCleanupFailureTelegramNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $serverDiskUsageTelegramNotifications = true;
@@ -78,7 +81,10 @@ class Telegram extends Component
     public ?string $telegramNotificationsScheduledTaskFailureTopicId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsDockerCleanupTopicId = null;
+    public ?string $telegramNotificationsDockerCleanupSuccessTopicId = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $telegramNotificationsDockerCleanupFailureTopicId = null;
 
     #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsServerDiskUsageTopicId = null;
@@ -115,7 +121,8 @@ class Telegram extends Component
             $this->settings->backup_failure_telegram_notifications = $this->backupFailureTelegramNotifications;
             $this->settings->scheduled_task_success_telegram_notifications = $this->scheduledTaskSuccessTelegramNotifications;
             $this->settings->scheduled_task_failure_telegram_notifications = $this->scheduledTaskFailureTelegramNotifications;
-            $this->settings->docker_cleanup_telegram_notifications = $this->dockerCleanupTelegramNotifications;
+            $this->settings->docker_cleanup_success_telegram_notifications = $this->dockerCleanupSuccessTelegramNotifications;
+            $this->settings->docker_cleanup_failure_telegram_notifications = $this->dockerCleanupFailureTelegramNotifications;
             $this->settings->server_disk_usage_telegram_notifications = $this->serverDiskUsageTelegramNotifications;
             $this->settings->server_reachable_telegram_notifications = $this->serverReachableTelegramNotifications;
             $this->settings->server_unreachable_telegram_notifications = $this->serverUnreachableTelegramNotifications;
@@ -127,7 +134,8 @@ class Telegram extends Component
             $this->settings->telegram_notifications_backup_failure_topic_id = $this->telegramNotificationsBackupFailureTopicId;
             $this->settings->telegram_notifications_scheduled_task_success_topic_id = $this->telegramNotificationsScheduledTaskSuccessTopicId;
             $this->settings->telegram_notifications_scheduled_task_failure_topic_id = $this->telegramNotificationsScheduledTaskFailureTopicId;
-            $this->settings->telegram_notifications_docker_cleanup_topic_id = $this->telegramNotificationsDockerCleanupTopicId;
+            $this->settings->telegram_notifications_docker_cleanup_success_topic_id = $this->telegramNotificationsDockerCleanupSuccessTopicId;
+            $this->settings->telegram_notifications_docker_cleanup_failure_topic_id = $this->telegramNotificationsDockerCleanupFailureTopicId;
             $this->settings->telegram_notifications_server_disk_usage_topic_id = $this->telegramNotificationsServerDiskUsageTopicId;
             $this->settings->telegram_notifications_server_reachable_topic_id = $this->telegramNotificationsServerReachableTopicId;
             $this->settings->telegram_notifications_server_unreachable_topic_id = $this->telegramNotificationsServerUnreachableTopicId;
@@ -146,7 +154,8 @@ class Telegram extends Component
             $this->backupFailureTelegramNotifications = $this->settings->backup_failure_telegram_notifications;
             $this->scheduledTaskSuccessTelegramNotifications = $this->settings->scheduled_task_success_telegram_notifications;
             $this->scheduledTaskFailureTelegramNotifications = $this->settings->scheduled_task_failure_telegram_notifications;
-            $this->dockerCleanupTelegramNotifications = $this->settings->docker_cleanup_telegram_notifications;
+            $this->dockerCleanupSuccessTelegramNotifications = $this->settings->docker_cleanup_success_telegram_notifications;
+            $this->dockerCleanupFailureTelegramNotifications = $this->settings->docker_cleanup_failure_telegram_notifications;
             $this->serverDiskUsageTelegramNotifications = $this->settings->server_disk_usage_telegram_notifications;
             $this->serverReachableTelegramNotifications = $this->settings->server_reachable_telegram_notifications;
             $this->serverUnreachableTelegramNotifications = $this->settings->server_unreachable_telegram_notifications;
@@ -158,7 +167,8 @@ class Telegram extends Component
             $this->telegramNotificationsBackupFailureTopicId = $this->settings->telegram_notifications_backup_failure_topic_id;
             $this->telegramNotificationsScheduledTaskSuccessTopicId = $this->settings->telegram_notifications_scheduled_task_success_topic_id;
             $this->telegramNotificationsScheduledTaskFailureTopicId = $this->settings->telegram_notifications_scheduled_task_failure_topic_id;
-            $this->telegramNotificationsDockerCleanupTopicId = $this->settings->telegram_notifications_docker_cleanup_topic_id;
+            $this->telegramNotificationsDockerCleanupSuccessTopicId = $this->settings->telegram_notifications_docker_cleanup_success_topic_id;
+            $this->telegramNotificationsDockerCleanupFailureTopicId = $this->settings->telegram_notifications_docker_cleanup_failure_topic_id;
             $this->telegramNotificationsServerDiskUsageTopicId = $this->settings->telegram_notifications_server_disk_usage_topic_id;
             $this->telegramNotificationsServerReachableTopicId = $this->settings->telegram_notifications_server_reachable_topic_id;
             $this->telegramNotificationsServerUnreachableTopicId = $this->settings->telegram_notifications_server_unreachable_topic_id;

@@ -42,7 +42,10 @@ class Discord extends Component
     public bool $scheduledTaskFailureDiscordNotifications = true;
 
     #[Validate(['boolean'])]
-    public bool $dockerCleanupDiscordNotifications = false;
+    public bool $dockerCleanupSuccessDiscordNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $dockerCleanupFailureDiscordNotifications = true;
 
     #[Validate(['boolean'])]
     public bool $serverDiskUsageDiscordNotifications = true;
@@ -78,7 +81,8 @@ class Discord extends Component
             $this->settings->backup_failure_discord_notifications = $this->backupFailureDiscordNotifications;
             $this->settings->scheduled_task_success_discord_notifications = $this->scheduledTaskSuccessDiscordNotifications;
             $this->settings->scheduled_task_failure_discord_notifications = $this->scheduledTaskFailureDiscordNotifications;
-            $this->settings->docker_cleanup_discord_notifications = $this->dockerCleanupDiscordNotifications;
+            $this->settings->docker_cleanup_success_discord_notifications = $this->dockerCleanupSuccessDiscordNotifications;
+            $this->settings->docker_cleanup_failure_discord_notifications = $this->dockerCleanupFailureDiscordNotifications;
             $this->settings->server_disk_usage_discord_notifications = $this->serverDiskUsageDiscordNotifications;
             $this->settings->server_reachable_discord_notifications = $this->serverReachableDiscordNotifications;
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
@@ -96,7 +100,8 @@ class Discord extends Component
             $this->backupFailureDiscordNotifications = $this->settings->backup_failure_discord_notifications;
             $this->scheduledTaskSuccessDiscordNotifications = $this->settings->scheduled_task_success_discord_notifications;
             $this->scheduledTaskFailureDiscordNotifications = $this->settings->scheduled_task_failure_discord_notifications;
-            $this->dockerCleanupDiscordNotifications = $this->settings->docker_cleanup_discord_notifications;
+            $this->dockerCleanupSuccessDiscordNotifications = $this->settings->docker_cleanup_success_discord_notifications;
+            $this->dockerCleanupFailureDiscordNotifications = $this->settings->docker_cleanup_failure_discord_notifications;
             $this->serverDiskUsageDiscordNotifications = $this->settings->server_disk_usage_discord_notifications;
             $this->serverReachableDiscordNotifications = $this->settings->server_reachable_discord_notifications;
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
