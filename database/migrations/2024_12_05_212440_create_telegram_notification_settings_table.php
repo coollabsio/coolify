@@ -26,7 +26,8 @@ return new class extends Migration
             $table->boolean('backup_failure_telegram_notifications')->default(true);
             $table->boolean('scheduled_task_success_telegram_notifications')->default(false);
             $table->boolean('scheduled_task_failure_telegram_notifications')->default(true);
-            $table->boolean('docker_cleanup_telegram_notifications')->default(false);
+            $table->boolean('docker_cleanup_success_telegram_notifications')->default(false);
+            $table->boolean('docker_cleanup_failure_telegram_notifications')->default(true);
             $table->boolean('server_disk_usage_telegram_notifications')->default(true);
             $table->boolean('server_reachable_telegram_notifications')->default(false);
             $table->boolean('server_unreachable_telegram_notifications')->default(true);
@@ -38,7 +39,8 @@ return new class extends Migration
             $table->text('telegram_notifications_backup_failure_topic_id')->nullable();
             $table->text('telegram_notifications_scheduled_task_success_topic_id')->nullable();
             $table->text('telegram_notifications_scheduled_task_failure_topic_id')->nullable();
-            $table->text('telegram_notifications_docker_cleanup_topic_id')->nullable();
+            $table->text('telegram_notifications_docker_cleanup_success_topic_id')->nullable();
+            $table->text('telegram_notifications_docker_cleanup_failure_topic_id')->nullable();
             $table->text('telegram_notifications_server_disk_usage_topic_id')->nullable();
             $table->text('telegram_notifications_server_reachable_topic_id')->nullable();
             $table->text('telegram_notifications_server_unreachable_topic_id')->nullable();
