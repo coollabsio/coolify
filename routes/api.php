@@ -132,8 +132,7 @@ Route::group([
 
     Route::get('/docker/{server_uuid}/images', [DockerController::class, 'list_server_docker_images']);
     Route::get('/docker/{server_uuid}/image/{id}', [DockerController::class, 'get_server_docker_image_details']);
-    Route::delete('/docker/{server_uuid}/images/delete/dangling', [DockerController::class, 'delete_all_dangling_server_docker_images']);
-    Route::delete('/docker/{server_uuid}/images/delete/{id}', [DockerController::class, 'delete_server_docker_image']);
+    Route::delete('/docker/{server_uuid}/images/delete', [DockerController::class, 'delete_server_docker_images']);
     Route::patch('/docker/{server_uuid}/image/{id}/update', [DockerController::class, 'update_server_docker_image_tag']);
 });
 

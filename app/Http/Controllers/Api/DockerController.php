@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Docker\DeleteAllDanglingServerDockerImages;
-use App\Actions\Docker\DeleteServerDockerImage;
+use App\Actions\Docker\DeleteServerDockerImages;
 use App\Actions\Docker\GetServerDockerImageDetails;
 use App\Actions\Docker\ListServerDockerImages;
 use App\Actions\Docker\UpdateServerDockerImageTag;
@@ -13,7 +12,7 @@ use Illuminate\Http\Request;
 
 class DockerController extends Controller
 {
-    public function list_server_docker_images($server_uuid)
+    public function list_server_docker_images($server_uuid, Request $request,)
     {
 
         $query = Server::query();
@@ -29,7 +28,14 @@ class DockerController extends Controller
             return response()->json(['error' => 'server is not reachable.'], 403);
         }
 
-        return ListServerDockerImages::run($server);
+        $filter = $request->input('filter', 'all'); // Default to 'all' if no filter is provided
+
+        // Validate filter
+        if (!in_array($filter, ['all', 'unused', 'used', 'dangling'])) {
+            return response()->json(['error' => 'Invalid filter. Allowed values are: all, unused, used, dangling.'], 400);
+        }
+
+        return ListServerDockerImages::run($server, $filter);
     }
 
     public function get_server_docker_image_details($server_uuid, $id)
@@ -72,7 +78,7 @@ class DockerController extends Controller
         return response()->json(UpdateServerDockerImageTag::run($server, $id, $validatedData['tag']));
     }
 
-    public function delete_server_docker_image($server_uuid, $id)
+    public function delete_server_docker_images($server_uuid, Request $request)
     {
         $query = Server::query();
 
@@ -87,27 +93,12 @@ class DockerController extends Controller
             return response()->json(['error' => 'server is not reachable.'], 403);
         }
 
-        $message = DeleteServerDockerImage::run($server, $id);
+        $validatedData = $request->validate([
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['string', 'distinct'],
+        ]);
 
-        return response()->json(['message' => $message]);
-    }
-
-    public function delete_all_dangling_server_docker_images($server_uuid)
-    {
-        $query = Server::query();
-
-        $server  = $query->where('uuid', $server_uuid)->first();
-        if (!$server) {
-            return response()->json(['error' => 'server not found'], 404);
-        }
-
-        $isReachable = (bool) $server->settings->is_reachable;
-        // If the server is reachable, send the reachable notification if it was sent before
-        if ($isReachable !== true) {
-            return response()->json(['error' => 'server is not reachable.'], 403);
-        }
-
-        $message = DeleteAllDanglingServerDockerImages::run($server);
+        $message = DeleteServerDockerImages::run($server, $validatedData['ids']);
 
         return response()->json(['message' => $message]);
     }
