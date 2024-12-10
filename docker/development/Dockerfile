@@ -8,31 +8,8 @@ ARG CLOUDFLARED_VERSION=2024.11.0
 # https://www.postgresql.org/support/versioning/ - Upgraded to 16 if the we have a manual upgrade guide?
 ARG POSTGRES_VERSION=15
 
-# Add user/group
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-
 # =================================================================
-# Stage 1: Composer dependencies
-# =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
-
-USER root
-
-ARG USER_ID
-ARG GROUP_ID
-
-RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
-    docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
-
-WORKDIR /var/www/html
-COPY --chown=www-data:www-data composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
-
-USER www-data
-
-# =================================================================
-# Stage 2: Get MinIO client
+# Get MinIO client
 # =================================================================
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 
@@ -46,7 +23,6 @@ ARG GROUP_ID
 ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
-ARG CI=true
 
 WORKDIR /var/www/html
 
@@ -85,8 +61,7 @@ RUN mkdir -p /usr/local/bin && \
     chmod +x /usr/local/bin/cloudflared
 
 # Configure PHP
-RUN echo 'upload_max_filesize=256M' > /usr/local/etc/php/conf.d/upload-limits.ini && \
-    echo 'post_max_size=256M' >> /usr/local/etc/php/conf.d/upload-limits.ini
+COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=0
 
 # Configure Nginx and S6 overlay
