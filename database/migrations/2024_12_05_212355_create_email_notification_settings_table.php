@@ -16,10 +16,10 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
 
             $table->boolean('smtp_enabled')->default(false);
-            $table->string('smtp_from_address')->nullable();
-            $table->string('smtp_from_name')->nullable();
-            $table->string('smtp_recipients')->nullable();
-            $table->string('smtp_host')->nullable();
+            $table->text('smtp_from_address')->nullable();
+            $table->text('smtp_from_name')->nullable();
+            $table->text('smtp_recipients')->nullable();
+            $table->text('smtp_host')->nullable();
             $table->integer('smtp_port')->nullable();
             $table->string('smtp_encryption')->nullable();
             $table->text('smtp_username')->nullable();
