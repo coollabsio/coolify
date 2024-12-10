@@ -1,2 +1,13 @@
 #!/command/execlineb -P
-php /var/www/html/artisan migrate --force --isolated
+
+# Use with-contenv to ensure environment variables are available
+with-contenv
+cd /var/www/html
+foreground {
+    php
+    artisan
+    migrate
+    --force
+    --isolated
+}
+

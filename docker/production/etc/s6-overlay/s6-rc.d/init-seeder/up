@@ -1,2 +1,15 @@
 #!/command/execlineb -P
-php /var/www/html/artisan db:seed --class ProductionSeeder --force
+
+# Use with-contenv to ensure environment variables are available
+with-contenv
+cd /var/www/html
+foreground {
+    php
+    artisan
+    db:seed
+    --class
+    ProductionSeeder
+    --force
+}
+
+
