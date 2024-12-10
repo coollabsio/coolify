@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\Team;
 use App\Notifications\ScheduledTask\TaskFailed;
+use App\Notifications\ScheduledTask\TaskSuccess;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -110,6 +111,8 @@ class ScheduledTaskJob implements ShouldQueue
                         'status' => 'success',
                         'message' => $this->task_output,
                     ]);
+
+                    $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
 
                     return;
                 }

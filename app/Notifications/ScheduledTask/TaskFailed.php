@@ -16,9 +16,9 @@ class TaskFailed extends CustomEmailNotification
     {
         $this->onQueue('high');
         if ($task->application) {
-            $this->url = $task->application->failedTaskLink($task->uuid);
+            $this->url = $task->application->taskLink($task->uuid);
         } elseif ($task->service) {
-            $this->url = $task->service->failedTaskLink($task->uuid);
+            $this->url = $task->service->taskLink($task->uuid);
         }
     }
 

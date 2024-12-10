@@ -8,7 +8,7 @@ use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class TaskFailed extends CustomEmailNotification
+class TaskSuccess extends CustomEmailNotification
 {
     public ?string $url = null;
 
@@ -16,9 +16,9 @@ class TaskFailed extends CustomEmailNotification
     {
         $this->onQueue('high');
         if ($task->application) {
-            $this->url = $task->application->failedTaskLink($task->uuid);
+            $this->url = $task->application->taskLink($task->uuid);
         } elseif ($task->service) {
-            $this->url = $task->service->failedTaskLink($task->uuid);
+            $this->url = $task->service->taskLink($task->uuid);
         }
     }
 
@@ -31,7 +31,7 @@ class TaskFailed extends CustomEmailNotification
     {
         $mail = new MailMessage;
         $mail->subject("Coolify: Scheduled task ({$this->task->name}) succeeded.");
-        $mail->view('emails.scheduled-task-failed', [
+        $mail->view('emails.scheduled-task-success', [
             'task' => $this->task,
             'url' => $this->url,
             'output' => $this->output,
@@ -43,7 +43,7 @@ class TaskFailed extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         $message = new DiscordMessage(
-            title: ':check_mark: Scheduled task succeeded',
+            title: ':white_check_mark: Scheduled task succeeded',
             description: "Scheduled task ({$this->task->name}) succeeded.",
             color: DiscordMessage::successColor(),
         );
