@@ -8,7 +8,7 @@ use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class DockerCleanup extends CustomEmailNotification
+class DockerCleanupFailed extends CustomEmailNotification
 {
     public function __construct(public Server $server, public string $message)
     {
@@ -17,15 +17,15 @@ class DockerCleanup extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return $notifiable->getEnabledChannels('docker_cleanup');
+        return $notifiable->getEnabledChannels('docker_cleanup_failure');
     }
 
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: Server ({$this->server->name}) docker cleanup job done!");
-        $mail->view('emails.docker-cleanup', [
-            'name' => $this->server->name,
+        $mail->subject("Coolify: [ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}");
+        $mail->view('emails.docker-cleanup-failed', [
+            'serverName' => $this->server->name,
             'message' => $this->message,
         ]);
 
@@ -35,25 +35,25 @@ class DockerCleanup extends CustomEmailNotification
     public function toDiscord(): DiscordMessage
     {
         return new DiscordMessage(
-            title: ':white_check_mark: Server cleanup job done',
+            title: ':cross_mark: Coolify: [ACTION REQUIRED] Docker cleanup job failed on '.$this->server->name,
             description: $this->message,
-            color: DiscordMessage::successColor(),
+            color: DiscordMessage::errorColor(),
         );
     }
 
     public function toTelegram(): array
     {
         return [
-            'message' => "Coolify: Server '{$this->server->name}' cleanup job done!\n\n{$this->message}",
+            'message' => "Coolify: [ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}!\n\n{$this->message}",
         ];
     }
 
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
-            title: 'Server cleanup job done',
-            description: "Server '{$this->server->name}' cleanup job done!\n\n{$this->message}",
-            color: SlackMessage::successColor()
+            title: 'Coolify: [ACTION REQUIRED] Docker cleanup job failed',
+            description: "Docker cleanup job failed on '{$this->server->name}'!\n\n{$this->message}",
+            color: SlackMessage::errorColor()
         );
     }
 }
