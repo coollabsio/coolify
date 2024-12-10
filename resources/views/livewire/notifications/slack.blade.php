@@ -54,7 +54,8 @@
             <div class="border dark:border-coolgray-300 p-4 rounded-lg">
                 <h3 class="font-medium mb-3">Server</h3>
                 <div class="flex flex-col gap-1.5 pl-1">
-                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup is run on a server." id="dockerCleanupSlackNotifications" label="Docker Cleanup" />
+                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup is run on a server." id="dockerCleanupSuccessSlackNotifications" label="Docker Cleanup Success" />
+                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup fails on a server." id="dockerCleanupFailureSlackNotifications" label="Docker Cleanup Failure" />
                     <x-forms.checkbox instantSave="saveModel" helper="Send a notification when server disk usage is high." id="serverDiskUsageSlackNotifications" label="Server Disk Usage" />
                     <x-forms.checkbox instantSave="saveModel" id="serverReachableSlackNotifications" label="Server Reachable" />
                     <x-forms.checkbox instantSave="saveModel" id="serverUnreachableSlackNotifications" label="Server Unreachable" />

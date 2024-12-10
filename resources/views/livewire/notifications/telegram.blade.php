@@ -85,10 +85,16 @@
                 <div class="border dark:border-coolgray-300 p-4 rounded-lg">
                     <h3 class="text-lg font-medium mb-3">Server</h3>
                     <div class="flex flex-col gap-1.5 pl-1">
-                        <h4 class="font-medium mt-2">Docker Cleanup</h4>
+                        <h4 class="font-medium mt-2">Docker Cleanup Success</h4>
                         <div class="pl-1">
-                            <x-forms.checkbox instantSave="saveModel" id="dockerCleanupTelegramNotifications" label="Enabled" />
-                            <x-forms.input helper="Topic ID for Docker cleanup notifications" id="telegramNotificationsDockerCleanupTopicId" label="Docker Cleanup Topic ID" />
+                            <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup is run on a server." id="dockerCleanupSuccessTelegramNotifications" label="Enabled" />
+                            <x-forms.input helper="Topic ID for Docker cleanup success notifications" id="telegramNotificationsDockerCleanupSuccessTopicId" label="Docker Cleanup Success Topic ID" />
+                        </div>
+
+                        <h4 class="font-medium mt-3">Docker Cleanup Failure</h4>
+                        <div class="pl-1">
+                            <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup fails on a server." id="dockerCleanupFailureTelegramNotifications" label="Enabled" />
+                            <x-forms.input helper="Topic ID for Docker cleanup failure notifications" id="telegramNotificationsDockerCleanupFailureTopicId" label="Docker Cleanup Failure Topic ID" />
                         </div>
 
                         <h4 class="font-medium mt-3">Server Disk Usage</h4>
