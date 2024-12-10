@@ -104,7 +104,7 @@
                 <div class="flex flex-col gap-1.5 pl-1">
                     <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessEmailNotifications" label="Deployment Success" />
                     <x-forms.checkbox instantSave="saveModel" id="deploymentFailureEmailNotifications" label="Deployment Failure" />
-                    <x-forms.checkbox instantSave="saveModel" helper="Send an email when a container status changes. It will send and email for Stopped and Restarted events of a container." id="statusChangeEmailNotifications" label="Container Status Changes" />
+                    {{-- <x-forms.checkbox instantSave="saveModel" helper="Send an email when a container status changes. It will send and email for Stopped and Restarted events of a container." id="statusChangeEmailNotifications" label="Container Status Changes" /> --}}
                 </div>
             </div>
             <div class="border dark:border-coolgray-300 p-4 rounded-lg">
