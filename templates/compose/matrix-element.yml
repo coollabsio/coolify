@@ -2,7 +2,8 @@
 # slogan: An open network for secure, decentralised communication
 # tags: real-time-messaging,secure-communication,peer-to-peer
 # logo: svgs/matrix-element.svg
-# port: 80
+# port: 8008
+
 
 services:
   synapse:
@@ -12,32 +13,33 @@ services:
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no} 
       - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
     volumes:
-      - synapse_data:/data  
+      - synapse_data:/data
     entrypoint: >
       /bin/bash -c "
         if [ ! -f /data/homeserver.yaml ]; then
           echo 'Config file not found, generating...';
-          matrixdotorg/synapse:v1.84.1 generate;
+          synapse_generate;
         fi;
         echo 'Starting Synapse server...';
-        exec matrixdotorg/synapse start;
+        exec /start
       "
     depends_on:
-      - synapse_db  
-
+      - synapse_db 
+    ports:
+      - "8008:8008"  
     healthcheck:
       test:
         - CMD
         - curl
         - '-f'
-        - 'http://127.0.0.1:80/health' 
+        - 'http://127.0.0.1:8008/health' 
 
   element:
     image: "vectorim/element-web:latest"
     environment:
       - SERVICE_FQDN_ELEMENT=${SERVICE_FQDN_ELEMENT}
     volumes:
-      - element:/app  
+      - element:/app 
 
   synapse_db:
     image: "docker.io/postgres:14-alpine"
@@ -47,7 +49,7 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
-      - synapse_db_data:/var/lib/postgresql/data 
+      - synapse_db_data:/var/lib/postgresql/data  
 
   coturn:
     image: "instrumentisto/coturn:latest"
