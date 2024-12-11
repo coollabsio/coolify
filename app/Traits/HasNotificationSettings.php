@@ -6,6 +6,7 @@ use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\PushoverChannel;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasNotificationSettings
@@ -27,6 +28,7 @@ trait HasNotificationSettings
             'discord' => $this->discordNotificationSettings,
             'telegram' => $this->telegramNotificationSettings,
             'slack' => $this->slackNotificationSettings,
+            'pushover' => $this->pushoverNotificationSettings,
             default => null,
         };
     }
@@ -73,6 +75,7 @@ trait HasNotificationSettings
             'discord' => DiscordChannel::class,
             'telegram' => TelegramChannel::class,
             'slack' => SlackChannel::class,
+            'pushover' => PushoverChannel::class,
         ];
 
         if ($event === 'general') {

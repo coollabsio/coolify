@@ -6,7 +6,9 @@ use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,6 +35,7 @@ class Test extends Notification implements ShouldQueue
                 'discord' => [DiscordChannel::class],
                 'telegram' => [TelegramChannel::class],
                 'slack' => [SlackChannel::class],
+                'pushover' => [PushoverChannel::class],
                 default => [],
             };
         } else {
@@ -83,6 +86,20 @@ class Test extends Notification implements ShouldQueue
                 ],
             ],
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'Test Pushover Notification',
+            message: 'This is a test Pushover notification from Coolify.',
+            buttons: [
+                [
+                    'text' => 'Go to your dashboard',
+                    'url' => base_url(),
+                ],
+            ],
+        );
     }
 
     public function toSlack(): SlackMessage

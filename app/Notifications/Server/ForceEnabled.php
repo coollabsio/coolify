@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -45,6 +46,15 @@ class ForceEnabled extends CustomEmailNotification
         return [
             'message' => "Coolify: Server ({$this->server->name}) enabled again!",
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'Server enabled',
+            level: 'success',
+            message: "Server ({$this->server->name}) enabled again!",
+        );
     }
 
     public function toSlack(): SlackMessage
