@@ -12,29 +12,19 @@ class OauthSettingSeeder extends Seeder
      */
     public function run(): void
     {
-        OauthSetting::firstOrCreate([
-            'id' => 0,
-            'provider' => 'azure',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 1,
-            'provider' => 'bitbucket',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 2,
-            'provider' => 'github',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 3,
-            'provider' => 'gitlab',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 4,
-            'provider' => 'google',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 5,
-            'provider' => 'authentik',
-        ]);
+        $providers = [
+            'azure',
+            'bitbucket',
+            'github',
+            'gitlab',
+            'google',
+            'authentik',
+        ];
+
+        foreach ($providers as $provider) {
+            OauthSetting::updateOrCreate(
+                ['provider' => $provider]
+            );
+        }
     }
 }
