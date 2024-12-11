@@ -698,7 +698,7 @@
     "fileflows": {
         "documentation": "https://fileflows.com/docs/?utm_source=coolify.io",
         "slogan": "FileFlows can drastically reduce your files, up to 90%, saving you space and money. No need to buy more hard drives, just shrink your files and start saving.",
-        "compose": "c2VydmljZXM6CiAgcmFkYXJyOgogICAgaW1hZ2U6IHJldmVuei9maWxlZmxvd3MKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSUxFRkxPV1NfNTAwMAogICAgICAtIF9BUFBfVVJMPSRTRVJWSUNFX0ZRRE5fRklMRV9GTE9XUwogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAnZmlsZWZsb3dzLXRlbXA6L3RlbXAnCiAgICAgIC0gJ2ZpbGVmbG93cy1jb25maWdzOi9hcHAvRGF0YScKICAgICAgLSAnZmlsZWZsb3dzLWxvZ3M6L2FwcC9Mb2dzJwogICAgICAtICdmaWxlZmxvd3MtY29tbW9uOi9hcHAvY29tbW9uJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUwMDAvYXBpL3N5c3RlbS92ZXJzaW9uJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "compose": "c2VydmljZXM6CiAgcmFkYXJyOgogICAgaW1hZ2U6IHJldmVuei9maWxlZmxvd3MKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSUxFRkxPV1NfNTAwMAogICAgICAtIF9BUFBfVVJMPSRTRVJWSUNFX0ZRRE5fRklMRV9GTE9XUwogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAnZmlsZWZsb3dzX3RlbXA6L3RlbXAnCiAgICAgIC0gJ2ZpbGVmbG93c19jb25maWdzOi9hcHAvRGF0YScKICAgICAgLSAnZmlsZWZsb3dzX2xvZ3M6L2FwcC9Mb2dzJwogICAgICAtICdmaWxlZmxvd3NfY29tbW9uOi9hcHAvY29tbW9uJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUwMDAvYXBpL3N5c3RlbS92ZXJzaW9uJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
         "tags": [
             "media",
             "transcode",
@@ -1921,6 +1921,40 @@
         "logo": "svgs/nextcloud.svg",
         "minversion": "0.0.0",
         "port": "80"
+    },
+    "nexus-arm": {
+        "documentation": "https://help.sonatype.com/en/sonatype-nexus-repository.html?utm_source=coolify.io",
+        "slogan": "Open source Universal Repository Manager (ARM version, community edition), default credentials: admin/admin123",
+        "compose": "c2VydmljZXM6CiAgbmV4dXM6CiAgICBpbWFnZTogc29uYXR5cGVjb21tdW5pdHkvbmV4dXMzCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTkVYVVNfODA4MQogICAgICAtIE5FWFVTX1NFQ1VSSVRZX1JBTkRPTVBBU1NXT1JEPWZhbHNlCiAgICAgIC0gJ0lOU1RBTEw0Sl9BRERfVk1fUEFSQU1TPS1YbXMyNzAzbSAtWG14MjcwM20gLVhYOk1heERpcmVjdE1lbW9yeVNpemU9MjcwM20gLURqYXZhLnV0aWwucHJlZnMudXNlclJvb3Q9L25leHVzLWRhdGEvamF2YXByZWZzJwogICAgdm9sdW1lczoKICAgICAgLSAnbmV4dXNfZGF0YTovbmV4dXMtZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MDgxL3NlcnZpY2UvcmVzdC92MS9zdGF0dXMnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMKICAgICAgc3RhcnRfcGVyaW9kOiA2MHMK",
+        "tags": [
+            "repository",
+            "manager",
+            "open source",
+            "docker",
+            "docker",
+            "registry",
+            "container"
+        ],
+        "logo": "svgs/nexus.png",
+        "minversion": "0.0.0",
+        "port": "8081"
+    },
+    "nexus": {
+        "documentation": "https://help.sonatype.com/en/sonatype-nexus-repository.html?utm_source=coolify.io",
+        "slogan": "Open source Universal Repository Manager (x86_64 version, official), default credentials: admin/admin123",
+        "compose": "c2VydmljZXM6CiAgbmV4dXM6CiAgICBpbWFnZTogc29uYXR5cGUvbmV4dXMzCiAgICBwbGF0Zm9ybTogbGludXgvYW1kNjQKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ORVhVU184MDgxCiAgICAgIC0gJ05FWFVTX1NFQ1VSSVRZX1JBTkRPTVBBU1NXT1JEPSR7TkVYVVNfU0VDVVJJVFlfUkFORE9NUEFTU1dPUkQ6LWZhbHNlfScKICAgICAgLSAnSU5TVEFMTDRKX0FERF9WTV9QQVJBTVM9LVhtczI3MDNtIC1YbXgyNzAzbSAtWFg6TWF4RGlyZWN0TWVtb3J5U2l6ZT0yNzAzbSAtRGphdmEudXRpbC5wcmVmcy51c2VyUm9vdD0vbmV4dXMtZGF0YS9qYXZhcHJlZnMnCiAgICB2b2x1bWVzOgogICAgICAtICduZXh1c19kYXRhOi9uZXh1cy1kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwODEvc2VydmljZS9yZXN0L3YxL3N0YXR1cycKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMwogICAgICBzdGFydF9wZXJpb2Q6IDYwcwo=",
+        "tags": [
+            "repository",
+            "manager",
+            "open source",
+            "docker",
+            "docker",
+            "registry",
+            "container"
+        ],
+        "logo": "svgs/nexus.png",
+        "minversion": "0.0.0",
+        "port": "8081"
     },
     "nitropage-with-postgresql": {
         "documentation": "https://nitropage.com?utm_source=coolify.io",
