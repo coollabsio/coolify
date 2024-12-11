@@ -17,8 +17,8 @@ class PushoverMessage
     {
         return match ($this->level) {
             'info' => 'ℹ️',
-            'error' => '🚨',
-            'success' => '🟢',
+            'error' => '❌',
+            'success' => '✅ ',
             'warning' => '⚠️',
         };
     }
