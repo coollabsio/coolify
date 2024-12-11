@@ -42,15 +42,13 @@ class Controller extends BaseController
     public function email_verify(EmailVerificationRequest $request)
     {
         $request->fulfill();
-        $name = request()->user()?->name;
 
-        // send_internal_notification("User {$name} verified their email address.");
         return redirect(RouteServiceProvider::HOME);
     }
 
     public function forgot_password(Request $request)
     {
-        if (is_transactional_emails_active()) {
+        if (is_transactional_emails_enabled()) {
             $arrayOfRequest = $request->only(Fortify::email());
             $request->merge([
                 'email' => Str::lower($arrayOfRequest['email']),

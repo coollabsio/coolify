@@ -13,10 +13,12 @@ class SlackChannel
     public function send(SendsSlack $notifiable, Notification $notification): void
     {
         $message = $notification->toSlack();
-        $webhookUrl = $notifiable->routeNotificationForSlack();
-        if (! $webhookUrl) {
+        $slackSettings = $notifiable->slackNotificationSettings;
+
+        if (! $slackSettings || ! $slackSettings->isEnabled() || ! $slackSettings->slack_webhook_url) {
             return;
         }
-        SendMessageToSlackJob::dispatch($message, $webhookUrl);
+
+        SendMessageToSlackJob::dispatch($message, $slackSettings->slack_webhook_url);
     }
 }

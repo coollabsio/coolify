@@ -16,15 +16,15 @@ class TaskFailed extends CustomEmailNotification
     {
         $this->onQueue('high');
         if ($task->application) {
-            $this->url = $task->application->failedTaskLink($task->uuid);
+            $this->url = $task->application->taskLink($task->uuid);
         } elseif ($task->service) {
-            $this->url = $task->service->failedTaskLink($task->uuid);
+            $this->url = $task->service->taskLink($task->uuid);
         }
     }
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'scheduled_tasks');
+        return $notifiable->getEnabledChannels('scheduled_task_failure');
     }
 
     public function toMail(): MailMessage

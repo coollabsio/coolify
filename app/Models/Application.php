@@ -327,7 +327,7 @@ class Application extends BaseModel
         return null;
     }
 
-    public function failedTaskLink($task_uuid)
+    public function taskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.application.scheduled-tasks', [
