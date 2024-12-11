@@ -52,6 +52,7 @@ class ExecuteContainerCommand extends Component
                     $this->servers = $this->servers->push($server);
                 }
             }
+            $this->loadContainers();
         } elseif (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
             $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
@@ -62,12 +63,18 @@ class ExecuteContainerCommand extends Component
             if ($this->resource->destination->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->destination->server);
             }
+            $this->loadContainers();
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
+            $this->loadContainers();
+        } elseif (data_get($this->parameters, 'server_uuid')) {
+            $this->type = 'server';
+            $this->resource = Server::where('uuid', $this->parameters['server_uuid'])->firstOrFail();
+            $this->server = $this->resource;
         }
     }
 
@@ -125,10 +132,30 @@ class ExecuteContainerCommand extends Component
                     }
                 });
             }
-
         }
         if ($this->containers->count() > 0) {
             $this->container = $this->containers->first();
+        }
+        if ($this->containers->count() === 1) {
+            $this->selected_container = data_get($this->containers->first(), 'container.Names');
+        }
+    }
+
+    #[On('connectToServer')]
+    public function connectToServer()
+    {
+        try {
+            if ($this->server->isForceDisabled()) {
+                throw new \RuntimeException('Server is disabled.');
+            }
+            $this->dispatch(
+                'send-terminal-command',
+                false,
+                data_get($this->server, 'name'),
+                data_get($this->server, 'uuid')
+            );
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
@@ -141,22 +168,45 @@ class ExecuteContainerCommand extends Component
             return;
         }
         try {
+            // Validate container name format
+            if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $this->selected_container)) {
+                throw new \InvalidArgumentException('Invalid container name format');
+            }
+
+            // Verify container exists in our allowed list
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
                 throw new \RuntimeException('Container not found.');
             }
-            $server = data_get($this->container, 'server');
+
+            // Verify server ownership and status
+            $server = data_get($container, 'server');
+            if (! $server || ! $server instanceof Server) {
+                throw new \RuntimeException('Invalid server configuration.');
+            }
 
             if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
+
+            // Additional ownership verification based on resource type
+            $resourceServer = match ($this->type) {
+                'application' => $this->resource->destination->server,
+                'database' => $this->resource->destination->server,
+                'service' => $this->resource->server,
+                default => throw new \RuntimeException('Invalid resource type.')
+            };
+
+            if ($server->id !== $resourceServer->id && ! $this->resource->additional_servers->contains('id', $server->id)) {
+                throw new \RuntimeException('Server ownership verification failed.');
+            }
+
             $this->dispatch(
                 'send-terminal-command',
-                isset($container),
+                true,
                 data_get($container, 'container.Names'),
                 data_get($container, 'server.uuid')
             );
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

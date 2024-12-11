@@ -2,15 +2,14 @@ services:
   coolify:
     build:
       context: .
-      dockerfile: ./docker/dev/Dockerfile
+      dockerfile: ./docker/development/Dockerfile
+      args:
+        - USER_ID=${USERID:-1000}
+        - GROUP_ID=${GROUPID:-1000}
     ports:
       - "${APP_PORT:-8000}:80"
     environment:
-      PUID: "${USERID:-1000}"
-      PGID: "${GROUPID:-1000}"
-      SSL_MODE: "off"
-      AUTORUN_LARAVEL_STORAGE_LINK: "false"
-      AUTORUN_LARAVEL_MIGRATION: "false"
+      AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST}"
       PUSHER_PORT: "${PUSHER_PORT}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
@@ -60,7 +59,7 @@ services:
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: node:20
+    image: node:20-alpine
     pull_policy: always
     working_dir: /var/www/html
     environment:
@@ -74,8 +73,9 @@ services:
     networks:
       - coolify
   testing-host:
-    image: "ghcr.io/coollabsio/coolify-testing-host:latest"
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: ./docker/testing-host/Dockerfile
     init: true
     container_name: coolify-testing-host
     volumes:
@@ -88,7 +88,7 @@ services:
     networks:
       - coolify
   mailpit:
-    image: "axllent/mailpit:latest"
+    image: axllent/mailpit:latest
     pull_policy: always
     container_name: coolify-mail
     ports:

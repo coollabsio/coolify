@@ -22,9 +22,9 @@ class ProductionSeeder extends Seeder
     public function run(): void
     {
         if (isCloud()) {
-            echo "Running in cloud mode.\n";
+            echo "  Running in cloud mode.\n";
         } else {
-            echo "Running in self-hosted mode.\n";
+            echo "  Running in self-hosted mode.\n";
         }
 
         // Fix for 4.0.0-beta.37
@@ -100,7 +100,7 @@ class ProductionSeeder extends Seeder
             }
         }
 
-        if (! isCloud() && config('coolify.is_windows_docker_desktop') == false) {
+        if (! isCloud() && config('constants.coolify.is_windows_docker_desktop') == false) {
             $coolify_key_name = '@host.docker.internal';
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
@@ -126,9 +126,8 @@ class ProductionSeeder extends Seeder
                     echo "Your localhost connection won't work until then.";
                 }
             }
-
         }
-        if (config('coolify.is_windows_docker_desktop')) {
+        if (config('constants.coolify.is_windows_docker_desktop')) {
             PrivateKey::updateOrCreate(
                 [
                     'id' => 0,
@@ -186,6 +185,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         $this->call(OauthSettingSeeder::class);
         $this->call(PopulateSshKeysDirectorySeeder::class);
-
+        $this->call(SentinelSeeder::class);
     }
 }

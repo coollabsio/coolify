@@ -16,12 +16,10 @@ function collectProxyDockerNetworksByServer(Server $server)
         return collect();
     }
     $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
-    $networks = collect($networks)->map(function ($network) {
+
+    return collect($networks)->map(function ($network) {
         return collect(json_decode($network))->keys();
     })->flatten()->unique();
-
-    return $networks;
-
 }
 function collectDockerNetworksByServer(Server $server)
 {
@@ -175,13 +173,12 @@ function generate_default_proxy_configuration(Server $server)
                     ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',
-                        "{$proxy_path}:/traefik",
+
                     ],
                     'command' => [
                         '--ping=true',
                         '--ping.entrypoint=http',
                         '--api.dashboard=true',
-                        '--api.insecure=false',
                         '--entrypoints.http.address=:80',
                         '--entrypoints.https.address=:443',
                         '--entrypoints.http.http.encodequerysemicolons=true',
@@ -189,21 +186,26 @@ function generate_default_proxy_configuration(Server $server)
                         '--entrypoints.https.http.encodequerysemicolons=true',
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http3',
-                        '--providers.docker.exposedbydefault=false',
                         '--providers.file.directory=/traefik/dynamic/',
+                        '--providers.docker.exposedbydefault=false',
                         '--providers.file.watch=true',
                         '--certificatesresolvers.letsencrypt.acme.httpchallenge=true',
-                        '--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json',
                         '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http',
+                        '--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json',
                     ],
                     'labels' => $labels,
                 ],
             ],
         ];
         if (isDev()) {
-            // $config['services']['traefik']['command'][] = "--log.level=debug";
+            $config['services']['traefik']['command'][] = '--api.insecure=true';
+            $config['services']['traefik']['command'][] = '--log.level=debug';
             $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
+            $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
+        } else {
+            $config['services']['traefik']['command'][] = '--api.insecure=false';
+            $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
@@ -241,9 +243,11 @@ function generate_default_proxy_configuration(Server $server)
                     'ports' => [
                         '80:80',
                         '443:443',
+                        '443:443/udp',
                     ],
                     'labels' => [
                         'coolify.managed=true',
+                        'coolify.proxy=true',
                     ],
                     'volumes' => [
                         '/var/run/docker.sock:/var/run/docker.sock:ro',

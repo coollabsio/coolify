@@ -5,7 +5,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-        {{--
+            {{--
             <x-forms.button wire:click="downloadConfig">
                 Download Config
             <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
@@ -61,8 +61,16 @@
 
                 </div>
             @endif
+            @if ($application->settings->is_static || $application->build_pack === 'static')
+                <x-forms.textarea id="application.custom_nginx_configuration"
+                    placeholder="Empty means default configuration will be used." label="Custom Nginx Configuration"
+                    helper="You can add custom Nginx configuration here." />
+                <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
+                    Configuration</x-forms.button>
+            @endif
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
+
                     <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn" label="Domains"
                         helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
                     <x-forms.button wire:click="getWildcardDomain">Generate Domain
@@ -70,7 +78,7 @@
                 </div>
                 <div class="flex items-end gap-2">
                     <x-forms.select label="Direction" id="application.redirect" required
-                        helper="You must need to add www and non-www as an A DNS record.">
+                        helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
                         <option value="both">Allow www & non-www.</option>
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
@@ -154,7 +162,7 @@
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
                                 <a class="underline"
-                                    href="https://coolify.io/docs/resources/applications/index">Framework
+                                    href="https://coolify.io/docs/applications">Framework
                                     Specific Docs</a>
                             </div>
                         @endif
@@ -238,9 +246,9 @@
                             @if ($application->build_pack !== 'dockercompose')
                                 <div class="pt-2 w-96">
                                     <x-forms.checkbox
-                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         instantSave id="application.settings.is_build_server_enabled"
-                                        label="Use a Build Server? (experimental)" />
+                                        label="Use a Build Server?" />
                                 </div>
                             @endif
                             @if ($application->could_set_build_commands())
@@ -312,7 +320,7 @@
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
-                    buttonTitle="Reset Labels to Coolify Defaults" buttonFullWidth submitAction="resetDefaultLabels"
+                    buttonTitle="Reset Labels to Defaults" buttonFullWidth submitAction="resetDefaultLabels(true)"
                     :actions="[
                         'All your custom proxy labels will be lost.',
                         'Proxy labels (traefik, caddy, etc) will be reset to the coolify defaults.',

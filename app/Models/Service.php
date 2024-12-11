@@ -133,6 +133,11 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
     public function getContainersToStop(): array
     {
         $containersToStop = [];
@@ -297,7 +302,7 @@ class Service extends BaseModel
                                 'key' => 'CP_DISABLE_HTTPS',
                                 'value' => data_get($disable_https, 'value'),
                                 'rules' => 'required',
-                                'customHelper' => "If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS",
+                                'customHelper' => 'If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS',
                             ],
                         ]);
                     }
@@ -366,7 +371,6 @@ class Service extends BaseModel
                         ]);
                     }
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LANGFUSE')->first();
-                    ray('password', $password);
                     if ($password) {
                         $data = $data->merge([
                             'Admin Password' => [
@@ -997,8 +1001,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('mysql'):
                     $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS', 'MYSQL_USER'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD','SERVICE_PASSWORD_64_MYSQL'];
-                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT','SERVICE_PASSWORD_64_MYSQLROOT'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD', 'SERVICE_PASSWORD_64_MYSQL'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT', 'SERVICE_PASSWORD_64_MYSQLROOT'];
                     $dbNameVariables = ['MYSQL_DATABASE'];
                     $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
@@ -1096,7 +1100,6 @@ class Service extends BaseModel
                     }
                     $fields->put('MariaDB', $data->toArray());
                     break;
-
             }
         }
 
@@ -1108,7 +1111,6 @@ class Service extends BaseModel
         foreach ($fields as $field) {
             $key = data_get($field, 'key');
             $value = data_get($field, 'value');
-            ray($key, $value);
             $found = $this->environment_variables()->where('key', $key)->first();
             if ($found) {
                 $found->value = $value;
@@ -1138,7 +1140,7 @@ class Service extends BaseModel
         return null;
     }
 
-    public function failedTaskLink($task_uuid)
+    public function taskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.service.scheduled-tasks', [
@@ -1169,7 +1171,7 @@ class Service extends BaseModel
         $services = get_service_templates();
         $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
 
-        return data_get($service, 'documentation', config('constants.docs.base_url'));
+        return data_get($service, 'documentation', config('constants.urls.docs'));
     }
 
     public function applications()
@@ -1306,14 +1308,11 @@ class Service extends BaseModel
         } else {
             return collect([]);
         }
-
     }
 
     public function networks()
     {
-        $networks = getTopLevelNetworks($this);
-
-        return $networks;
+        return getTopLevelNetworks($this);
     }
 
     protected function isDeployable(): Attribute
@@ -1326,9 +1325,9 @@ class Service extends BaseModel
                         return false;
                     }
                 }
+
                 return true;
             }
         );
     }
-
 }

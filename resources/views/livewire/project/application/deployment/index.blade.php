@@ -32,7 +32,7 @@
         @forelse ($deployments as $deployment)
             <div @class([
                 'dark:bg-coolgray-100 p-2 border-l-2 transition-colors hover:no-underline box-without-bg-without-border bg-white flex-col cursor-pointer dark:hover:text-neutral-400 dark:hover:bg-coolgray-200',
-                'border-warning border-dashed ' =>
+                'border-white border-dashed ' =>
                     data_get($deployment, 'status') === 'in_progress' ||
                     data_get($deployment, 'status') === 'cancelled-by-user',
                 'border-error border-dashed ' =>

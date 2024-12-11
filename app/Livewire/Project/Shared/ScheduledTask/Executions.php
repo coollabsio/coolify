@@ -2,70 +2,153 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use App\Models\ScheduledTask;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Executions extends Component
 {
-    public $executions = [];
+    public ScheduledTask $task;
 
-    public $selectedKey;
+    #[Locked]
+    public int $taskId;
 
-    public $task;
+    #[Locked]
+    public Collection $executions;
+
+    #[Locked]
+    public ?int $selectedKey = null;
+
+    #[Locked]
+    public ?string $serverTimezone = null;
+
+    public $currentPage = 1;
+
+    public $logsPerPage = 100;
+
+    public $selectedExecution = null;
+
+    public $isPollingActive = false;
 
     public function getListeners()
     {
+        $teamId = Auth::user()->currentTeam()->id;
+
         return [
-            'selectTask',
+            "echo-private:team.{$teamId},ScheduledTaskDone" => 'refreshExecutions',
         ];
+    }
+
+    public function mount($taskId)
+    {
+        try {
+            $this->taskId = $taskId;
+            $this->task = ScheduledTask::findOrFail($taskId);
+            $this->executions = $this->task->executions()->take(20)->get();
+            $this->serverTimezone = data_get($this->task, 'application.destination.server.settings.server_timezone');
+            if (! $this->serverTimezone) {
+                $this->serverTimezone = data_get($this->task, 'service.destination.server.settings.server_timezone');
+            }
+            if (! $this->serverTimezone) {
+                $this->serverTimezone = 'UTC';
+            }
+        } catch (\Exception $e) {
+            return handleError($e);
+        }
+    }
+
+    public function refreshExecutions(): void
+    {
+        $this->executions = $this->task->executions()->take(20)->get();
+        if ($this->selectedKey) {
+            $this->selectedExecution = $this->task->executions()->find($this->selectedKey);
+            if ($this->selectedExecution && $this->selectedExecution->status !== 'running') {
+                $this->isPollingActive = false;
+            }
+        }
     }
 
     public function selectTask($key): void
     {
         if ($key == $this->selectedKey) {
             $this->selectedKey = null;
+            $this->selectedExecution = null;
+            $this->currentPage = 1;
+            $this->isPollingActive = false;
 
             return;
         }
         $this->selectedKey = $key;
+        $this->selectedExecution = $this->task->executions()->find($key);
+        $this->currentPage = 1;
+
+        // Start polling if task is running
+        if ($this->selectedExecution && $this->selectedExecution->status === 'running') {
+            $this->isPollingActive = true;
+        }
     }
 
-    public function server()
+    public function polling()
     {
-        if (! $this->task) {
-            return null;
-        }
-
-        if ($this->task->application) {
-            if ($this->task->application->destination && $this->task->application->destination->server) {
-                return $this->task->application->destination->server;
-            }
-        } elseif ($this->task->service) {
-            if ($this->task->service->destination && $this->task->service->destination->server) {
-                return $this->task->service->destination->server;
+        if ($this->selectedExecution && $this->isPollingActive) {
+            $this->selectedExecution->refresh();
+            if ($this->selectedExecution->status !== 'running') {
+                $this->isPollingActive = false;
             }
         }
-
-        return null;
     }
 
-    public function getServerTimezone()
+    public function loadMoreLogs()
     {
-        $server = $this->server();
-        if (! $server) {
-            return 'UTC';
-        }
-        $serverTimezone = $server->settings->server_timezone;
+        $this->currentPage++;
+    }
 
-        return $serverTimezone;
+    public function getLogLinesProperty()
+    {
+        if (! $this->selectedExecution) {
+            return collect();
+        }
+
+        if (! $this->selectedExecution->message) {
+            return collect(['Waiting for task output...']);
+        }
+
+        $lines = collect(explode("\n", $this->selectedExecution->message));
+
+        return $lines->take($this->currentPage * $this->logsPerPage);
+    }
+
+    public function downloadLogs(int $executionId)
+    {
+        $execution = $this->executions->firstWhere('id', $executionId);
+        if (! $execution) {
+            return;
+        }
+
+        return response()->streamDownload(function () use ($execution) {
+            echo $execution->message;
+        }, 'task-execution-'.$execution->id.'.log');
+    }
+
+    public function hasMoreLogs()
+    {
+        if (! $this->selectedExecution || ! $this->selectedExecution->message) {
+            return false;
+        }
+        $lines = collect(explode("\n", $this->selectedExecution->message));
+
+        return $lines->count() > ($this->currentPage * $this->logsPerPage);
     }
 
     public function formatDateInServerTimezone($date)
     {
-        $serverTimezone = $this->getServerTimezone();
+        $serverTimezone = $this->serverTimezone;
         $dateObj = new \DateTime($date);
         try {
             $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
 

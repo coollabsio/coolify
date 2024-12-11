@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Visus\Cuid2\Cuid2;
 
@@ -17,5 +18,19 @@ abstract class BaseModel extends Model
                 $model->uuid = (string) new Cuid2;
             }
         });
+    }
+
+    public function sanitizedName(): Attribute
+    {
+        return new Attribute(
+            get: fn () => sanitize_string($this->getRawOriginal('name')),
+        );
+    }
+
+    public function image(): Attribute
+    {
+        return new Attribute(
+            get: fn () => sanitize_string($this->getRawOriginal('image')),
+        );
     }
 }

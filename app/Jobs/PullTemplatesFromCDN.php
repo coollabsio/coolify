@@ -17,7 +17,10 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 10;
 
-    public function __construct() {}
+    public function __construct()
+    {
+        $this->onQueue('high');
+    }
 
     public function handle(): void
     {
@@ -25,7 +28,6 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
             if (isDev() || isCloud()) {
                 return;
             }
-            ray('PullTemplatesAndVersions service-templates');
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
             if ($response->successful()) {
                 $services = $response->json();
@@ -35,7 +37,6 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
             }
         } catch (\Throwable $e) {
             send_internal_notification('PullTemplatesAndVersions failed with: '.$e->getMessage());
-            ray($e->getMessage());
         }
     }
 }

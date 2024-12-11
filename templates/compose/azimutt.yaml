@@ -9,9 +9,9 @@ services:
   postgres:
     image: postgres:15
     environment:
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_DB=azimutt
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-azimutt}
     volumes:
       - azimutt-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -80,8 +80,8 @@ services:
       - PHX_SERVER=true
       - PHX_HOST=$SERVICE_URL_AZIMUTT
       - PORT=${PORT:-4000}
-      - DATABASE_URL=ecto://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres/azimutt
-      - SECRET_KEY_BASE=$SERVICE_BASE64_64_AZIMUTT
+      - DATABASE_URL=ecto://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres/${POSTGRES_DB:-azimutt}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_AZIMUTT}
       - FILE_STORAGE_ADAPTER=${FILE_STORAGE_ADAPTER:-s3}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-true}
       - SKIP_ONBOARDING_FUNNEL=${SKIP_ONBOARDING_FUNNEL:-true}

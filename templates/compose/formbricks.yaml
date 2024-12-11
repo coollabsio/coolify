@@ -12,10 +12,10 @@ services:
       - WEBAPP_URL=$SERVICE_FQDN_FORMBRICKS
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE:-formbricks}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - NEXTAUTH_SECRET=$SERVICE_BASE64_64_NEXTAUTH
+      - NEXTAUTH_SECRET=$SERVICE_BASE64_NEXTAUTH
       - NEXTAUTH_URL=$SERVICE_FQDN_FORMBRICKS
-      - ENCRYPTION_KEY=$SERVICE_BASE64_64_ENCRYPTION
-      - CRON_SECRET=$SERVICE_BASE64_64_CRON
+      - ENCRYPTION_KEY=$SERVICE_BASE64_ENCRYPTION
+      - CRON_SECRET=$SERVICE_BASE64_CRON
       - ENTERPRISE_LICENSE_KEY=${ENTERPRISE_LICENSE_KEY}
       - MAIL_FROM=${MAIL_FROM:-test@example.com}
       - SMTP_HOST=${SMTP_HOST:-test.example.com}
@@ -59,7 +59,7 @@ services:
       - REDIS_URL=${REDIS_URL}
       - REDIS_HTTP_URL=${REDIS_HTTP_URL}
       - DEFAULT_ORGANIZATION_ID=${DEFAULT_ORGANIZATION_ID}
-      - DEFAULT_ORGANIZATION_ROLE=${DEFAULT_ORGANIZATION_ROLE:-admin}
+      - DEFAULT_ORGANIZATION_ROLE=${DEFAULT_ORGANIZATION_ROLE:-owner}
     volumes:
       - formbricks-uploads:/apps/web/uploads/
     depends_on:
@@ -72,7 +72,7 @@ services:
       retries: 15
 
   postgresql:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     volumes:
       - formbricks-postgresql-data:/var/lib/postgresql/data
     environment:

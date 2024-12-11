@@ -16,6 +16,8 @@ class StartDatabase
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database)
     {
         $server = $database->destination->server;
@@ -23,28 +25,28 @@ class StartDatabase
             return 'Server is not functional';
         }
         switch ($database->getMorphClass()) {
-            case 'App\Models\StandalonePostgresql':
+            case \App\Models\StandalonePostgresql::class:
                 $activity = StartPostgresql::run($database);
                 break;
-            case 'App\Models\StandaloneRedis':
+            case \App\Models\StandaloneRedis::class:
                 $activity = StartRedis::run($database);
                 break;
-            case 'App\Models\StandaloneMongodb':
+            case \App\Models\StandaloneMongodb::class:
                 $activity = StartMongodb::run($database);
                 break;
-            case 'App\Models\StandaloneMysql':
+            case \App\Models\StandaloneMysql::class:
                 $activity = StartMysql::run($database);
                 break;
-            case 'App\Models\StandaloneMariadb':
+            case \App\Models\StandaloneMariadb::class:
                 $activity = StartMariadb::run($database);
                 break;
-            case 'App\Models\StandaloneKeydb':
+            case \App\Models\StandaloneKeydb::class:
                 $activity = StartKeydb::run($database);
                 break;
-            case 'App\Models\StandaloneDragonfly':
+            case \App\Models\StandaloneDragonfly::class:
                 $activity = StartDragonfly::run($database);
                 break;
-            case 'App\Models\StandaloneClickhouse':
+            case \App\Models\StandaloneClickhouse::class:
                 $activity = StartClickhouse::run($database);
                 break;
         }

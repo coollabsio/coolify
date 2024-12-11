@@ -25,26 +25,24 @@ class ApplicationsController extends Controller
 {
     private function removeSensitiveData($application)
     {
-        $token = auth()->user()->currentAccessToken();
         $application->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($application);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $application->makeHidden([
+                'custom_labels',
+                'dockerfile',
+                'docker_compose',
+                'docker_compose_raw',
+                'manual_webhook_secret_bitbucket',
+                'manual_webhook_secret_gitea',
+                'manual_webhook_secret_github',
+                'manual_webhook_secret_gitlab',
+                'private_key_id',
+                'value',
+                'real_value',
+            ]);
         }
-        $application->makeHidden([
-            'custom_labels',
-            'dockerfile',
-            'docker_compose',
-            'docker_compose_raw',
-            'manual_webhook_secret_bitbucket',
-            'manual_webhook_secret_gitea',
-            'manual_webhook_secret_github',
-            'manual_webhook_secret_gitlab',
-            'private_key_id',
-            'value',
-            'real_value',
-        ]);
 
         return serializeApiResponse($application);
     }
@@ -70,7 +68,8 @@ class ApplicationsController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/Application')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -180,8 +179,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -284,8 +285,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -388,8 +391,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -476,8 +481,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -561,8 +568,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -612,8 +621,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -636,7 +647,7 @@ class ApplicationsController extends Controller
 
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image'];
+        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -676,6 +687,27 @@ class ApplicationsController extends Controller
         $githubAppUuid = $request->github_app_uuid;
         $useBuildServer = $request->use_build_server;
         $isStatic = $request->is_static;
+        $customNginxConfiguration = $request->custom_nginx_configuration;
+
+        if (! is_null($customNginxConfiguration)) {
+            if (! isBase64Encoded($customNginxConfiguration)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customNginxConfiguration = base64_decode($customNginxConfiguration);
+            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+        }
 
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
@@ -1213,7 +1245,6 @@ class ApplicationsController extends Controller
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
-
     }
 
     #[OA\Get(
@@ -1248,7 +1279,8 @@ class ApplicationsController extends Controller
                             ref: '#/components/schemas/Application'
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1320,7 +1352,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1446,8 +1479,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -1462,7 +1497,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1501,7 +1537,7 @@ class ApplicationsController extends Controller
             ], 404);
         }
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server'];
+        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -1513,6 +1549,7 @@ class ApplicationsController extends Controller
             'docker_compose_domains' => 'array|nullable',
             'docker_compose_custom_start_command' => 'string|nullable',
             'docker_compose_custom_build_command' => 'string|nullable',
+            'custom_nginx_configuration' => 'string|nullable',
         ];
         $validationRules = array_merge($validationRules, sharedDataApplications());
         $validator = customApiValidator($request->all(), $validationRules);
@@ -1529,6 +1566,25 @@ class ApplicationsController extends Controller
                         ],
                     ], 422);
                 }
+            }
+        }
+        if ($request->has('custom_nginx_configuration')) {
+            if (! isBase64Encoded($request->custom_nginx_configuration)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customNginxConfiguration = base64_decode($request->custom_nginx_configuration);
+            if (mb_detect_encoding($customNginxConfiguration, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_nginx_configuration' => 'The custom_nginx_configuration should be base64 encoded.',
+                    ],
+                ], 422);
             }
         }
         $return = $this->validateDataApplications($request, $server);
@@ -1551,16 +1607,33 @@ class ApplicationsController extends Controller
         }
         $domains = $request->domains;
         if ($request->has('domains') && $server->isProxyShouldRun()) {
-            $errors = [];
+            $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-            $application->fqdn = $fqdn;
-            if (! $application->settings->is_container_label_readonly_enabled) {
-                $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-                $application->custom_labels = base64_encode($customLabels);
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                $domain = trim($domain);
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false || ! preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
+                    $errors[] = 'Invalid domain: '.$domain;
+                }
+
+                return $domain;
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
             }
-            $request->offsetUnset('domains');
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'One of the domain is already used.',
+                    ],
+                ], 422);
+            }
         }
 
         $dockerComposeDomainsJson = collect();
@@ -1579,11 +1652,16 @@ class ApplicationsController extends Controller
             $request->offsetUnset('docker_compose_domains');
         }
         $instantDeploy = $request->instant_deploy;
+        $isStatic = $request->is_static;
+        $useBuildServer = $request->use_build_server;
 
-        $use_build_server = $request->use_build_server;
+        if (isset($useBuildServer)) {
+            $application->settings->is_build_server_enabled = $useBuildServer;
+            $application->settings->save();
+        }
 
-        if (isset($use_build_server)) {
-            $application->settings->is_build_server_enabled = $use_build_server;
+        if (isset($isStatic)) {
+            $application->settings->is_static = $isStatic;
             $application->settings->save();
         }
 
@@ -1645,7 +1723,8 @@ class ApplicationsController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1687,9 +1766,8 @@ class ApplicationsController extends Controller
                 'standalone_postgresql_id',
                 'standalone_redis_id',
             ]);
-            $env = $this->removeSensitiveData($env);
 
-            return $env;
+            return $this->removeSensitiveData($env);
         });
 
         return response()->json($envs);
@@ -1752,7 +1830,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1864,18 +1943,15 @@ class ApplicationsController extends Controller
 
                 return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
             } else {
-
                 return response()->json([
                     'message' => 'Environment variable not found.',
                 ], 404);
-
             }
         }
 
         return response()->json([
             'message' => 'Something is not okay. Are you okay?',
         ], 500);
-
     }
 
     #[OA\Patch(
@@ -1943,7 +2019,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2124,7 +2201,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2220,14 +2298,12 @@ class ApplicationsController extends Controller
                 return response()->json([
                     'uuid' => $env->uuid,
                 ])->setStatusCode(201);
-
             }
         }
 
         return response()->json([
             'message' => 'Something went wrong.',
         ], 500);
-
     }
 
     #[OA\Delete(
@@ -2275,7 +2351,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2367,9 +2444,11 @@ class ApplicationsController extends Controller
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Deployment request queued.', 'description' => 'Message.'],
                                 'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2455,7 +2534,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2529,7 +2609,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
 
             new OA\Response(
                 response: 401,
@@ -2575,7 +2656,6 @@ class ApplicationsController extends Controller
                 'deployment_uuid' => $deployment_uuid->toString(),
             ],
         );
-
     }
 
     #[OA\Post(
@@ -2741,7 +2821,6 @@ class ApplicationsController extends Controller
                         'custom_labels' => 'The custom_labels should be base64 encoded.',
                     ],
                 ], 422);
-
             }
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {

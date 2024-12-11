@@ -12,9 +12,10 @@
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
     <div x-data="searchResources()">
         @if ($current_step === 'type')
-            <div class="sticky top-0 z-50 py-2">
-                <input autocomplete="off" x-ref="searchInput" class="input w-full" x-model="search"
-                    placeholder="Type / to search..." @keydown.window.slash.prevent="$refs.searchInput.focus()">
+            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky top-0 z-50 py-2">
+                <input autocomplete="off" x-ref="searchInput" class="input-sticky"
+                    :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
+                    @keydown.window.slash.prevent="$refs.searchInput.focus()">
             </div>
             <div x-show="loading">Loading...</div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
@@ -30,8 +31,7 @@
                                     <span x-html="application.description"></span>
                                 </x-slot>
                                 <x-slot:logo>
-                                    <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
+                                    <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
                                         :src="application.logo">
                                 </x-slot:logo>
                             </x-resource-view>
@@ -47,8 +47,7 @@
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description><span x-text="application.description"></span></x-slot>
                                 <x-slot:logo> <img
-                                        class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 "
+                                        class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10 "
                                         :src="application.logo"></x-slot>
                             </x-resource-view>
                         </div>
@@ -100,14 +99,18 @@
                                     </x-slot>
                                     <x-slot:logo>
                                         <template x-if="service.logo">
-                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
-                                                :src='service.logo'>
+                                            <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
+                                                :src='service.logo'
+                                                x-on:error.window="$event.target.src = service.logo_github_url"
+                                                onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
+                                                x-on:error="$event.target.src = '/svgs/coolify.png'"
+                                                :data-fallback='service.logo_github_url' />
                                         </template>
                                     </x-slot:logo>
                                     <x-slot:documentation>
                                         <template x-if="service.documentation">
                                             <div class="flex items-center px-2" title="Read the documentation.">
-                                                <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
+                                                <a class="p-2 rounded hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
                                                     onclick="event.stopPropagation()" :href="service.documentation"
                                                     target="_blank">
                                                     Docs
@@ -134,6 +137,7 @@
                     return {
                         search: '',
                         loading: false,
+                        isSticky: false,
                         services: [],
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
@@ -166,7 +170,8 @@
                             }
                             const filtered = Object.values(items).filter(item => {
                                 return (item.name?.toLowerCase().includes(searchLower) ||
-                                    item.description?.toLowerCase().includes(searchLower))
+                                    item.description?.toLowerCase().includes(searchLower) ||
+                                    item.slogan?.toLowerCase().includes(searchLower))
                             })
                             return isSort ? filtered.sort(sortFn) : filtered;
                         },
@@ -205,7 +210,7 @@
                     }
                 }
             </script>
-    @endif
+        @endif
     </div>
     @if ($current_step === 'servers')
         <h2>Select a server</h2>
@@ -270,7 +275,7 @@
             16 (default).</div>
         <div class="flex flex-col gap-4">
             <div class="flex flex-col gap-2">
-                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
                     wire:click="setPostgresqlType('postgres:16-alpine')">
                     <div class="flex flex-col">
                         <div class="box-title">PostgreSQL 16 (default)</div>

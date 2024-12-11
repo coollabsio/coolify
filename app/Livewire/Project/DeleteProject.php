@@ -27,11 +27,12 @@ class DeleteProject extends Component
             'project_id' => 'required|int',
         ]);
         $project = Project::findOrFail($this->project_id);
-        if ($project->applications->count() > 0) {
-            return $this->dispatch('error', 'Project has resources defined, please delete them first.');
-        }
-        $project->delete();
+        if ($project->isEmpty()) {
+            $project->delete();
 
-        return redirect()->route('project.index');
+            return redirect()->route('project.index');
+        }
+
+        return $this->dispatch('error', "<strong>Project {$project->name}</strong> has resources defined, please delete them first.");
     }
 }

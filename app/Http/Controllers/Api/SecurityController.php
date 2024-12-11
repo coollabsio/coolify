@@ -11,13 +11,11 @@ class SecurityController extends Controller
 {
     private function removeSensitiveData($team)
     {
-        $token = auth()->user()->currentAccessToken();
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($team);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $team->makeHidden([
+                'private_key',
+            ]);
         }
-        $team->makeHidden([
-            'private_key',
-        ]);
 
         return serializeApiResponse($team);
     }
@@ -81,15 +79,8 @@ class SecurityController extends Controller
             new OA\Response(
                 response: 200,
                 description: 'Get all private keys.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/PrivateKey')
-                        )
-                    ),
-                ]),
+                content: new OA\JsonContent(ref: '#/components/schemas/PrivateKey')
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',

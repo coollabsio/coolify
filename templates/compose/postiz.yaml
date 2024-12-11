@@ -1,59 +1,134 @@
-# ignore: true
-# documentation: https://docs.postiz.com/introduction
-# slogan:
-# tags:
-# logo:
-# port: 4200
+# documentation: https://docs.postiz.com
+# slogan: Open source social media scheduling tool.
+# tags: post everywhere, social media, planning
+# logo: svgs/postiz.svg
+# port: 5000
 
 services:
   postiz:
-    image: "ghcr.io/gitroomhq/postiz-app:latest"
+    image: ghcr.io/gitroomhq/postiz-app:latest
     environment:
-      - SERVICE_FQDN_POSTIZ_4200
+      - SERVICE_FQDN_POSTIZ_5000
       - MAIN_URL=${SERVICE_FQDN_POSTIZ}
       - FRONTEND_URL=${SERVICE_FQDN_POSTIZ}
-      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZAPI_3000}
-      - JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-postiz}?schema=public
-      - REDIS_URL=redis://redis:6379
-      - BACKEND_INTERNAL_URL=http://localhost:3000/
-      - IS_GENERAL=true
+      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ}/api
+      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
+      - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRESQL}@postgres:5432/${POSTGRESQL_DATABASE:-postiz-db}
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - BACKEND_INTERNAL_URL=http://localhost:3000
+      
+      # Cloudflare R2 Settings
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
       - CLOUDFLARE_ACCESS_KEY=${CLOUDFLARE_ACCESS_KEY}
       - CLOUDFLARE_SECRET_ACCESS_KEY=${CLOUDFLARE_SECRET_ACCESS_KEY}
       - CLOUDFLARE_BUCKETNAME=${CLOUDFLARE_BUCKETNAME}
       - CLOUDFLARE_BUCKET_URL=${CLOUDFLARE_BUCKET_URL}
       - CLOUDFLARE_REGION=${CLOUDFLARE_REGION}
+      
+      # Storage Settings
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
+      - UPLOAD_DIRECTORY=${UPLOAD_DIRECTORY:-/uploads}
+      - NEXT_PUBLIC_UPLOAD_DIRECTORY=${NEXT_PUBLIC_UPLOAD_DIRECTORY:-/uploads}
+      - NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY=${NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY}
+      
+      # Email Settings
       - RESEND_API_KEY=${RESEND_API_KEY}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER}
+      
+      # Social Media API Settings
+      - X_API_KEY=${SERVICE_X_API}
+      - X_API_SECRET=${SERVICE_X_SECRET}
+      - LINKEDIN_CLIENT_ID=${SERVICE_LINKEDIN_ID}
+      - LINKEDIN_CLIENT_SECRET=${SERVICE_LINKEDIN_SECRET}
+      - REDDIT_CLIENT_ID=${SERVICE_REDDIT_API}
+      - REDDIT_CLIENT_SECRET=${SERVICE_REDDIT_SECRET}
+      - GITHUB_CLIENT_ID=${SERVICE_GITHUB_ID}
+      - GITHUB_CLIENT_SECRET=${SERVICE_GITHUB_SECRET}
+      - THREADS_APP_ID=${SERVICE_THREADS_ID}
+      - THREADS_APP_SECRET=${SERVICE_THREADS_SECRET}
+      - FACEBOOK_APP_ID=${SERVICE_FACEBOOK_ID}
+      - FACEBOOK_APP_SECRET=${SERVICE_FACEBOOK_SECRET}
+      - YOUTUBE_CLIENT_ID=${SERVICE_YOUTUBE_ID}
+      - YOUTUBE_CLIENT_SECRET=${SERVICE_YOUTUBE_SECRET}
+      - TIKTOK_CLIENT_ID=${SERVICE_TIKTOK_ID}
+      - TIKTOK_CLIENT_SECRET=${SERVICE_TIKTOK_SECRET}
+      - PINTEREST_CLIENT_ID=${SERVICE_PINTEREST_ID}
+      - PINTEREST_CLIENT_SECRET=${SERVICE_PINTEREST_SECRET}
+      - DRIBBBLE_CLIENT_ID=${SERVICE_DRIBBLE_ID}
+      - DRIBBBLE_CLIENT_SECRET=${SERVICE_DRIBBLE_SECRET}
+      - DISCORD_CLIENT_ID=${SERVICE_DISCORD_ID}
+      - DISCORD_CLIENT_SECRET=${SERVICE_DISCORD_SECRET}
+      - DISCORD_BOT_TOKEN_ID=${SERVICE_DISCORD_TOKEN}
+      - SLACK_ID=${SERVICE_SLACK_ID}
+      - SLACK_SECRET=${SERVICE_SLACK_SECRET}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+      - MASTODON_CLIENT_ID=${SERVICE_MASTODON_ID}
+      - MASTODON_CLIENT_SECRET=${SERVICE_MASTODON_SECRET}
+      
+      # Integration APIs
+      - BEEHIIVE_API_KEY=${SERVICE_BEEHIIVE_KEY}
+      - BEEHIIVE_PUBLICATION_ID=${SERVICE_BEEHIIVE_PUBID}
+      - OPENAI_API_KEY=${SERVICE_OPENAI_KEY}
+      
+      # Misc Settings
+      - NEXT_PUBLIC_DISCORD_SUPPORT=${NEXT_PUBLIC_DISCORD_SUPPORT}
+      - NEXT_PUBLIC_POLOTNO=${NEXT_PUBLIC_POLOTNO}
+      - IS_GENERAL=true
+      - NX_ADD_PLUGINS=${NX_ADD_PLUGINS:-false}
+      
+      # Payment Settings
+      - FEE_AMOUNT=${FEE_AMOUNT:-0.05}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_SIGNING_KEY=${STRIPE_SIGNING_KEY}
+      - STRIPE_SIGNING_KEY_CONNECT=${STRIPE_SIGNING_KEY_CONNECT}
+
+    volumes:
+      - postiz_config:/config/
+      - postiz_uploads:/uploads/
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-    volumes:
-      - "postiz_config:/config"
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://127.0.0.1:5000/
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
   postgres:
-    image: "postgres:latest"
+    image: postgres:14.5
+    volumes:
+      - postiz_postgresql_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-postiz}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-    volumes:
-      - "pg-data:/var/lib/postgresql/data"
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-postiz-db}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-postiz-db}"]
       interval: 5s
       timeout: 20s
       retries: 10
+
   redis:
-    image: "redis:7.2"
+    image: redis:7.2
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
-      - "redis_data:/data"
+      - postiz_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - -a
+        - ${SERVICE_PASSWORD_REDIS}
+        - ping
       interval: 5s
-      timeout: 20s
-      retries: 10
+      timeout: 10s
+      retries: 20

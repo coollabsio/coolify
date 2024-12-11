@@ -5,7 +5,7 @@
 
 # About the Project
 
-Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc. 
+Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc.
 
 It helps you manage your servers, applications, and databases on your own hardware; you only need an SSH connection. You can manage VPS, Bare Metal, Raspberry PIs, and anything else.
 
@@ -22,6 +22,9 @@ curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
 You can find the installation script source [here](./scripts/install.sh).
 
+> [!NOTE]
+> Please refer to the [docs](https://coolify.io/docs/installation) for more information about the installation.
+
 # Support
 
 Contact us at [coolify.io/docs/contact](https://coolify.io/docs/contact).
@@ -37,21 +40,21 @@ Special thanks to our biggest sponsors!
 
 ### Special Sponsors
 
-![image](https://github.com/user-attachments/assets/c95a07df-7c5a-4e77-a35a-81f25fcbece1)
+![image](https://github.com/user-attachments/assets/726fb63e-c3b8-4260-b3ac-06780605ec5d)
 
 * [CCCareers](https://cccareers.org/) - A career development platform connecting coding bootcamp graduates with job opportunities in the tech industry.
 * [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering affordable dedicated servers, cloud services, and web hosting solutions.
 * [Logto](https://logto.io/?ref=coolify) - An open-source authentication and authorization solution for building secure login systems and managing user identities.
+* [Tolgee](https://tolgee.io/?ref=coolify) - Developer & translator friendly web-based localization platform.
 * [BC Direct](https://bc.direct/?ref=coolify.io) - A digital marketing agency specializing in e-commerce solutions and online business growth strategies.
 * [QuantCDN](https://www.quantcdn.io/?ref=coolify.io) - A content delivery network (CDN) optimizing website performance through global content distribution.
 * [Arcjet](https://arcjet.com/?ref=coolify.io) - A cloud-based platform providing real-time protection against API abuse and bot attacks.
 * [SupaGuide](https://supa.guide/?ref=coolify.io) - A comprehensive resource hub offering guides and tutorials for web development using Supabase.
+* [GoldenVM](https://billing.goldenvm.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
 * [Tigris](https://tigrisdata.com/?ref=coolify.io) - A fully managed serverless object storage service compatible with Amazon S3 API. Offers high performance, scalability, and built-in search capabilities for efficient data management.
-* [Fractal Networks](https://fractalnetworks.co/?ref=coolify.io) - A decentralized network infrastructure company focusing on secure and private communication solutions.
 * [Advin](https://coolify.ad.vin/?ref=coolify.io) - A digital advertising agency specializing in programmatic advertising and data-driven marketing strategies.
 * [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered search and discovery platform for enhancing information retrieval in large datasets.
 * [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-native platform for automating infrastructure provisioning and management across multiple cloud providers.
-* [Latitude](https://latitude.sh/?ref=coolify.io) - A cloud computing platform offering bare metal servers and cloud instances for developers and businesses.
 * [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in creating custom digital experiences and brand identities.
 * [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform connecting professionals with remote work opportunities across various industries.
 * [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - A web hosting provider offering affordable hosting solutions, domain registration, and website building tools.
@@ -60,6 +63,7 @@ Special thanks to our biggest sponsors!
 * [Juxtdigital](https://juxtdigital.dev/?ref=coolify.io) - A digital agency offering web development, design, and digital marketing services for businesses.
 * [Saasykit](https://saasykit.com/?ref=coolify.io) - A Laravel-based boilerplate providing essential components and features for building SaaS applications quickly.
 * [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
+* [LiquidWeb](https://liquidweb.com/?utm_source=coolify.io) - Fast web hosting provider.
 
 
 ## Github Sponsors ($40+)
@@ -87,7 +91,11 @@ Special thanks to our biggest sponsors!
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
 <a href="https://formbricks.com/?utm_source=coolify.io"><img src="https://github.com/formbricks.png" width="60px" alt="Formbricks" /></a>
-<a href="https://x.com/adithsuhas17?utm_source=coolify.io"><img src="https://github.com/adith-suhas-sv.png" width="60px" alt="Adith Suhas" /></a>
+<a href="https://startupfa.me?utm_source=coolify.io"><img src="https://github.com/startupfame.png" width="60px" alt="StartupFame" /></a>
+<a href="https://jonasjaeger.com?utm_source=coolify.io"><img src="https://github.com/toxin20.png" width="60px" alt="Jonas Jaeger" /></a>
+<a href="https://github.com/therealjp?utm_source=coolify.io"><img src="https://github.com/therealjp.png" width="60px" alt="JP" /></a>
+<a href="https://evercam.io/?utm_source=coolify.io"><img src="https://github.com/evercam.png" width="60px" alt="Evercam" /></a>
+<a href="https://web3.career/?utm_source=coolify.io"><img src="https://web3.career/favicon1.png" width="60px" alt="Web3 Career" /></a>
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>
@@ -121,7 +129,6 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 - Better support
 - Less maintenance for you
 
-
 # Recognitions
 
 <p>
@@ -137,6 +144,13 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 <a href="https://www.producthunt.com/posts/coolify?ref=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 
 <a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
+# Core Maintainers
+
+| Andras Bacsai | 🏔️ Peak |
+|------------|------------|
+| <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="peaklabs-dev" /> |
+| <a href="https://github.com/andrasbacsai"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/heyandras"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/heyandras.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> | <a href="https://github.com/peaklabs-dev"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/peaklabs_dev"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/peaklabs.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> |
 
 # Repo Activity
 

@@ -3,22 +3,21 @@
 namespace App\Notifications\Container;
 
 use App\Models\Server;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ContainerRestarted extends Notification implements ShouldQueue
+class ContainerRestarted extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
-    public function __construct(public string $name, public Server $server, public ?string $url = null) {}
+    public function __construct(public string $name, public Server $server, public ?string $url = null)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'status_changes');
+        return $notifiable->getEnabledChannels('status_change');
     }
 
     public function toMail(): MailMessage
@@ -34,9 +33,17 @@ class ContainerRestarted extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
+        $message = new DiscordMessage(
+            title: ':warning: Resource restarted',
+            description: "{$this->name} has been restarted automatically on {$this->server->name}.",
+            color: DiscordMessage::infoColor(),
+        );
+
+        if ($this->url) {
+            $message->addField('Resource', '[Link]('.$this->url.')');
+        }
 
         return $message;
     }
@@ -59,5 +66,21 @@ class ContainerRestarted extends Notification implements ShouldQueue
         }
 
         return $payload;
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Resource restarted';
+        $description = "A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
+
+        if ($this->url) {
+            $description .= "\n**Resource URL:** {$this->url}";
+        }
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::warningColor()
+        );
     }
 }

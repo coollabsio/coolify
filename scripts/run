@@ -20,8 +20,11 @@ function help {
     compgen -A function | cat -n
 }
 
+function logs {
+    docker exec -t coolify tail -f storage/logs/laravel.log
+}
 function test {
-    docker exec -t coolify php artisan test --testsuite=Feature
+    docker exec -t coolify php artisan test --testsuite=Feature -p
 }
 
 function sync:bunny {
@@ -29,23 +32,18 @@ function sync:bunny {
 }
 
 function db:reset {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
+    bash spin exec -u www-data coolify php artisan migrate:fresh --seed
 }
 function db:reset-prod {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    bash spin exec -u www-data coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
-
-function mfs {
-    db:reset
-}
-
 function coolify {
-    bash spin exec -u webuser coolify bash
+    bash spin exec -u www-data coolify sh
 }
 
 function coolify:root {
-    bash spin exec coolify bash
+    bash spin exec coolify sh
 }
 function coolify:proxy {
     docker exec -ti coolify-proxy sh
@@ -60,7 +58,7 @@ function vite {
 }
 
 function tinker {
-    bash spin exec -u webuser coolify php artisan tinker
+    bash spin exec -u www-data coolify php artisan tinker
 }
 
 function default {

@@ -3,8 +3,8 @@
         Proxy Dynamic Configuration | Coolify
     </x-slot>
     <x-server.navbar :server="$server" :parameters="$parameters" />
-    <div class="flex gap-2">
-        <x-server.sidebar :server="$server" :parameters="$parameters" />
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
+        <x-server.sidebar-proxy :server="$server" :parameters="$parameters" />
         <div class="w-full">
             @if ($server->isFunctional())
                 <div class="flex gap-2">
@@ -29,7 +29,8 @@
                                 @if (str_replace('|', '.', $fileName) === 'coolify.yaml' ||
                                         str_replace('|', '.', $fileName) === 'Caddyfile' ||
                                         str_replace('|', '.', $fileName) === 'coolify.caddy' ||
-                                        str_replace('|', '.', $fileName) === 'default_redirect_404.caddy')
+                                        str_replace('|', '.', $fileName) === 'default_redirect_503.yaml' ||
+                                        str_replace('|', '.', $fileName) === 'default_redirect_503.caddy')
                                     <div>
                                         <h3 class="dark:text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
                                     </div>

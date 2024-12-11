@@ -32,9 +32,8 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
 
             return null;
         });
-        $containers = $containers->filter();
 
-        return $containers;
+        return $containers->filter();
     }
 
     return $containers;
@@ -46,9 +45,8 @@ function getCurrentServiceContainerStatus(Server $server, int $id): Collection
     if (! $server->isSwarm()) {
         $containers = instant_remote_process(["docker ps -a --filter='label=coolify.serviceId={$id}' --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
-        $containers = $containers->filter();
 
-        return $containers;
+        return $containers->filter();
     }
 
     return $containers;
@@ -67,7 +65,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         return $outputLines
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return collect([]);
     }
 }
@@ -104,14 +102,15 @@ function format_docker_envs_to_json($rawOutput)
 
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable $e) {
+    } catch (\Throwable) {
         return collect([]);
     }
 }
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
     $majorDockerVersion = str($dockerVersion)->before('.')->value();
-    if ($majorDockerVersion <= 22) {
+    $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.')->value();
+    if ($majorDockerVersion < $requiredDockerVersion) {
         $dockerVersion = null;
     }
 
@@ -193,7 +192,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
-    $labels->push('coolify.version='.config('version'));
+    $labels->push('coolify.version='.config('constants.coolify.version'));
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.$name);
@@ -207,12 +206,12 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
 }
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
-    if ($resource->getMorphClass() === 'App\Models\ServiceApplication') {
+    if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'service.server');
         $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
-    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'destination.server');
         $environment_variables = data_get($resource, 'environment_variables');
@@ -227,16 +226,18 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         case $type?->contains('minio'):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
+
             if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
-                return $payload;
+                return collect([]);
             }
-            if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
-                $MINIO_BROWSER_REDIRECT_URL?->update([
+
+            if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
+                $MINIO_BROWSER_REDIRECT_URL->update([
                     'value' => generateFqdn($server, 'console-'.$uuid, true),
                 ]);
             }
-            if (is_null($MINIO_SERVER_URL?->value)) {
-                $MINIO_SERVER_URL?->update([
+            if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
+                $MINIO_SERVER_URL->update([
                     'value' => generateFqdn($server, 'minio-'.$uuid, true),
                 ]);
             }
@@ -248,16 +249,18 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         case $type?->contains('logto'):
             $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
             $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
+
             if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
-                return $payload;
+                return collect([]);
             }
-            if (is_null($LOGTO_ENDPOINT?->value)) {
-                $LOGTO_ENDPOINT?->update([
+
+            if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
+                $LOGTO_ENDPOINT->update([
                     'value' => generateFqdn($server, 'logto-'.$uuid),
                 ]);
             }
-            if (is_null($LOGTO_ADMIN_ENDPOINT?->value)) {
-                $LOGTO_ADMIN_ENDPOINT?->update([
+            if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
+                $LOGTO_ADMIN_ENDPOINT->update([
                     'value' => generateFqdn($server, 'logto-admin-'.$uuid),
                 ]);
             }
@@ -279,13 +282,16 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_ingress_network={$network}");
     }
     foreach ($domains as $loop => $domain) {
-        $loop = $loop;
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
         $port = $url->getPort();
+        $handle = 'handle_path';
+        if (! $is_stripprefix_enabled) {
+            $handle = 'handle';
+        }
         if (is_null($port) && ! is_null($onlyPort)) {
             $port = $onlyPort;
         }
@@ -297,11 +303,11 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
         if ($port) {
-            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams $port}}");
         } else {
-            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams}}");
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
-        $labels->push("caddy_{$loop}.handle_path={$path}*");
+        $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
@@ -335,10 +341,11 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if (preg_match('/coolify\.traefik\.middlewares=(.*)/', $item, $matches)) {
                 return explode(',', $matches[1]);
             }
+
             return null;
         })->flatten()
-        ->filter()
-        ->unique();
+            ->filter()
+            ->unique();
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -361,8 +368,11 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $https_label = "https-{$loop}-{$uuid}-{$service_name}";
             }
             if (str($image)->contains('ghost')) {
-                $labels->push("traefik.http.middlewares.redir-ghost.redirectregex.regex=^{$path}/(.*)");
-                $labels->push('traefik.http.middlewares.redir-ghost.redirectregex.replacement=/$1');
+                $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
+                $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.replacement=/$1");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.handler=rewrite");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.regexp=^{$path}/(.*)");
+                $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.replacement=/$1");
             }
 
             $to_www_name = "{$loop}-{$uuid}-to-www";
@@ -388,7 +398,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 if ($path !== '/') {
                     // Middleware handling
                     $middlewares = collect([]);
-                    if ($is_stripprefix_enabled && !str($image)->contains('ghost')) {
+                    if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
                         $middlewares->push("{$https_label}-stripprefix");
                     }
@@ -396,13 +406,13 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
                         $middlewares->push($to_non_www_name);
                     }
-                    if ($redirect_direction === 'www' && !str($host)->startsWith('www.')) {
+                    if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
@@ -417,9 +427,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $middlewares = collect([]);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
-                    }                   
+                    }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -468,7 +478,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -491,7 +501,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push('gzip');
                     }
                     if (str($image)->contains('ghost')) {
-                        $middlewares->push('redir-ghost');
+                        $middlewares->push("redir-ghost-{$uuid}");
                     }
                     if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_non_www);
@@ -510,7 +520,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             continue;
         }
     }
@@ -581,7 +591,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     redirect_direction: $application->redirect
                 ));
             }
-
         }
     } else {
         if (data_get($preview, 'fqdn')) {
@@ -633,7 +642,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_stripprefix_enabled: $application->isStripprefixEnabled()
             ));
         }
-
     }
 
     return $labels->all();
@@ -658,7 +666,7 @@ function isDatabaseImage(?string $image = null)
     return false;
 }
 
-function convert_docker_run_to_compose(?string $custom_docker_run_options = null)
+function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
@@ -683,9 +691,17 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--privileged' => 'privileged',
         '--ip' => 'ip',
         '--shm-size' => 'shm_size',
+        '--gpus' => 'gpus',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
+        if ($option === '--gpus') {
+            $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
+            preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
+            $value = $device_matches[1] ?? 'all';
+            $options[$option][] = $value;
+            $options[$option] = array_unique($options[$option]);
+        }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
             $options[$option][] = $value;
@@ -698,7 +714,6 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
     foreach ($options as $option => $value) {
-        // ray($option,$value);
         if (! data_get($mapping, $option)) {
             continue;
         }
@@ -727,6 +742,28 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
             if (! is_null($value) && is_array($value) && count($value) > 0) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
+        } elseif ($option === '--gpus') {
+            $payload = [
+                'driver' => 'nvidia',
+                'capabilities' => ['gpu'],
+            ];
+            if (! is_null($value) && is_array($value) && count($value) > 0) {
+                if (str($value[0]) != 'all') {
+                    if (str($value[0])->contains(',')) {
+                        $payload['device_ids'] = str($value[0])->explode(',')->toArray();
+                    } else {
+                        $payload['device_ids'] = [$value[0]];
+                    }
+                }
+            }
+            ray($payload);
+            $compose_options->put('deploy', [
+                'resources' => [
+                    'reservations' => [
+                        'devices' => [$payload],
+                    ],
+                ],
+            ]);
         } else {
             if ($list_options->contains($option)) {
                 if ($compose_options->has($mapping[$option])) {
@@ -748,7 +785,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     return $compose_options->toArray();
 }
 
-function generate_custom_docker_run_options_for_databases($docker_run_options, $docker_compose, $container_name, $network)
+function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $network)
 {
     $ipv4 = data_get($docker_run_options, 'ip.0');
     $ipv6 = data_get($docker_run_options, 'ip6.0');

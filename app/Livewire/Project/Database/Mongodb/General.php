@@ -55,7 +55,6 @@ class General extends Component
         $this->db_url = $this->database->internal_db_url;
         $this->db_url_public = $this->database->external_db_url;
         $this->server = data_get($this->database, 'destination.server');
-
     }
 
     public function instantSaveAdvanced()

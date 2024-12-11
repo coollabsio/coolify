@@ -23,7 +23,7 @@ class Create extends Component
 
     public function mount()
     {
-        $this->name = generate_random_name();
+        $this->name = substr(generate_random_name(), 0, 30);
     }
 
     public function createGitHubApp()

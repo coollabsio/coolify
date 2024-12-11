@@ -20,11 +20,16 @@ class TeamInvitation extends Model
         return $this->belongsTo(Team::class);
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return TeamInvitation::whereTeamId(currentTeam()->id);
+    }
+
     public function isValid()
     {
         $createdAt = $this->created_at;
-        $diff = $createdAt->diffInMinutes(now());
-        if ($diff <= config('constants.invitation.link.expiration')) {
+        $diff = $createdAt->diffInDays(now());
+        if ($diff <= config('constants.invitation.link.expiration_days')) {
             return true;
         } else {
             $this->delete();

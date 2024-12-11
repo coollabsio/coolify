@@ -4,6 +4,8 @@ namespace App\Livewire\Project;
 
 use App\Models\Application;
 use App\Models\Project;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class EnvironmentEdit extends Component
@@ -12,29 +14,45 @@ class EnvironmentEdit extends Component
 
     public Application $application;
 
+    #[Locked]
     public $environment;
 
-    public array $parameters;
+    #[Validate(['required', 'string', 'min:3', 'max:255'])]
+    public string $name;
 
-    protected $rules = [
-        'environment.name' => 'required|min:3|max:255',
-        'environment.description' => 'nullable|min:3|max:255',
-    ];
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $description = null;
 
-    public function mount()
+    public function mount(string $project_uuid, string $environment_name)
     {
-        $this->parameters = get_route_parameters();
-        $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->first();
-        $this->environment = $this->project->environments()->where('name', request()->route('environment_name'))->first();
+        try {
+            $this->project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
+            $this->environment = $this->project->environments()->where('name', $environment_name)->firstOrFail();
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->environment->update([
+                'name' => $this->name,
+                'description' => $this->description,
+            ]);
+        } else {
+            $this->name = $this->environment->name;
+            $this->description = $this->environment->description;
+        }
     }
 
     public function submit()
     {
-        $this->validate();
         try {
-            $this->environment->save();
-
-            return redirect()->route('project.environment.edit', ['project_uuid' => $this->project->uuid, 'environment_name' => $this->environment->name]);
+            $this->syncData(true);
+            $this->redirectRoute('project.environment.edit', ['environment_name' => $this->environment->name, 'project_uuid' => $this->project->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

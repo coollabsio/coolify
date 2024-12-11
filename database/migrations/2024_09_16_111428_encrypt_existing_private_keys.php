@@ -20,6 +20,5 @@ class EncryptExistingPrivateKeys extends Migration
             echo 'Encrypting private keys failed.';
             echo $e->getMessage();
         }
-
     }
 }

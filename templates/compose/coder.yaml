@@ -1,0 +1,46 @@
+# ignore: true
+# documentation: https://coder.com/docs
+# slogan: Coder is an open-source platform for creating and managing cloud development environments on your infrastructure, with the tools and IDEs your developers already love.
+# tags: coder,development,environment,self-hosted,postgres
+# logo: svgs/coder.svg
+# port: 7080
+
+services:
+  coder:
+    image: ghcr.io/coder/coder:latest
+    environment:
+      - SERVICE_FQDN_CODER_7080
+      - CODER_PG_CONNECTION_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@coder-database/${POSTGRES_DB:-coder-db}?sslmode=disable
+      - CODER_HTTP_ADDRESS=0.0.0.0:7080
+      - CODER_ACCESS_URL=${SERVICE_FQDN_CODER}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      coder-database:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://localhost:7080"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  coder-database:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: "${SERVICE_USER_POSTGRES}"
+      POSTGRES_PASSWORD: "${SERVICE_PASSWORD_POSTGRES}"
+      POSTGRES_DB: "${POSTGRES_DB:-coder-db}"
+    volumes:
+      - coder-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ${POSTGRES_USER:-username} -d ${POSTGRES_DB:-coder}"
+      interval: 5s
+      timeout: 5s
+      retries: 5

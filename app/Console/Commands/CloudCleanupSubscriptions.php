@@ -19,7 +19,6 @@ class CloudCleanupSubscriptions extends Command
 
                 return;
             }
-            ray()->clearAll();
             $this->info('Cleaning up subcriptions teams');
             $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
 
@@ -37,7 +36,7 @@ class CloudCleanupSubscriptions extends Command
                 }
                 // If the team has no subscription id and the invoice is paid, we need to reset the invoice paid status
                 if (! (data_get($team, 'subscription.stripe_subscription_id'))) {
-                    $this->info("Resetting invoice paid status for team {$team->id} {$team->name}");
+                    $this->info("Resetting invoice paid status for team {$team->id}");
 
                     $team->subscription->update([
                         'stripe_invoice_paid' => false,
@@ -62,9 +61,9 @@ class CloudCleanupSubscriptions extends Command
                     $this->info('Subscription id: '.data_get($team, 'subscription.stripe_subscription_id'));
                     $confirm = $this->confirm('Do you want to cancel the subscription?', true);
                     if (! $confirm) {
-                        $this->info("Skipping team {$team->id} {$team->name}");
+                        $this->info("Skipping team {$team->id}");
                     } else {
-                        $this->info("Cancelling subscription for team {$team->id} {$team->name}");
+                        $this->info("Cancelling subscription for team {$team->id}");
                         $team->subscription->update([
                             'stripe_invoice_paid' => false,
                             'stripe_trial_already_ended' => false,
@@ -74,7 +73,6 @@ class CloudCleanupSubscriptions extends Command
                     }
                 }
             }
-
         } catch (\Exception $e) {
             $this->error($e->getMessage());
 
@@ -96,6 +94,5 @@ class CloudCleanupSubscriptions extends Command
                 ]);
             }
         }
-
     }
 }

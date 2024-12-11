@@ -58,7 +58,7 @@ class Show extends Component
 
     public function mount()
     {
-        if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
+        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
         $this->modalId = new Cuid2;
@@ -80,7 +80,7 @@ class Show extends Component
     public function serialize()
     {
         data_forget($this->env, 'real_value');
-        if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
+        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             data_forget($this->env, 'is_build_time');
         }
     }
@@ -88,6 +88,9 @@ class Show extends Component
     public function lock()
     {
         $this->env->is_shown_once = true;
+        if ($this->isSharedVariable) {
+            unset($this->env->is_required);
+        }
         $this->serialize();
         $this->env->save();
         $this->checkEnvs();
@@ -112,14 +115,20 @@ class Show extends Component
                 $this->validate();
             }
 
-            if ($this->env->is_required && str($this->env->real_value)->isEmpty()) {
+            if (! $this->isSharedVariable && $this->env->is_required && str($this->env->real_value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
                 $this->env->value = $oldValue;
                 $this->dispatch('error', 'Required environment variable cannot be empty.');
 
                 return;
             }
+
             $this->serialize();
+
+            if ($this->isSharedVariable) {
+                unset($this->env->is_required);
+            }
+
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');

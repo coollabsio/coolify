@@ -3,40 +3,21 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class ForceEnabled extends Notification implements ShouldQueue
+class ForceEnabled extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
-    public function __construct(public Server $server) {}
+    public function __construct(public Server $server)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isEmailEnabled) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('server_force_enabled');
     }
 
     public function toMail(): MailMessage
@@ -50,11 +31,13 @@ class ForceEnabled extends Notification implements ShouldQueue
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server ({$this->server->name}) enabled again!";
-
-        return $message;
+        return new DiscordMessage(
+            title: ':white_check_mark: Server enabled',
+            description: "Server '{$this->server->name}' enabled again!",
+            color: DiscordMessage::successColor(),
+        );
     }
 
     public function toTelegram(): array
@@ -62,5 +45,14 @@ class ForceEnabled extends Notification implements ShouldQueue
         return [
             'message' => "Coolify: Server ({$this->server->name}) enabled again!",
         ];
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        return new SlackMessage(
+            title: 'Server enabled',
+            description: "Server '{$this->server->name}' enabled again!",
+            color: SlackMessage::successColor()
+        );
     }
 }
