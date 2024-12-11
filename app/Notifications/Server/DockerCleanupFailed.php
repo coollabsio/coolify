@@ -25,8 +25,8 @@ class DockerCleanupFailed extends CustomEmailNotification
         $mail = new MailMessage;
         $mail->subject("Coolify: [ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}");
         $mail->view('emails.docker-cleanup-failed', [
-            'serverName' => $this->server->name,
-            'message' => $this->message,
+            'name' => $this->server->name,
+            'text' => $this->message,
         ]);
 
         return $mail;

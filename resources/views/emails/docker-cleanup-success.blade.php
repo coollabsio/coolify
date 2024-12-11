@@ -1,8 +1,9 @@
 <x-emails.layout>
-Docker Cleanup on "{{ $serverName }}" succeeded with the following message:
+Docker Cleanup on {{ $name }} succeeded with the following message:
+
 
 <pre>
-"{{ $message }}"
+{{ $text }}
 </pre>
 
 </x-emails.layout>

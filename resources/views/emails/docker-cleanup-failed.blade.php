@@ -1,8 +1,8 @@
 <x-emails.layout>
-Docker Cleanup on {{ $serverName }} FAILED with the following error:
+Docker Cleanup on {{ $name }} FAILED with the following error:
 
 <pre>
-{{ $message }}
+{{ $text }}
 </pre>
 
 </x-emails.layout>

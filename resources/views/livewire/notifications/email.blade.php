@@ -142,14 +142,12 @@
         <div class="border dark:border-coolgray-300 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
-                <x-forms.checkbox instantSave="saveModel"
-                    helper="Send an email when Docker Cleanup is run on a server."
-                    id="dockerCleanupSuccessEmailNotifications" label="Docker Cleanup Success" />
-                <x-forms.checkbox instantSave="saveModel"
-                    helper="Send an email when Docker Cleanup fails on a server."
-                    id="dockerCleanupFailureEmailNotifications" label="Docker Cleanup Failure" />
-                <x-forms.checkbox instantSave="saveModel" helper="Send an email when server disk usage is high."
-                    id="serverDiskUsageEmailNotifications" label="Server Disk Usage" />
+                <x-forms.checkbox instantSave="saveModel" id="dockerCleanupSuccessEmailNotifications"
+                    label="Docker Cleanup Success" />
+                <x-forms.checkbox instantSave="saveModel" id="dockerCleanupFailureEmailNotifications"
+                    label="Docker Cleanup Failure" />
+                <x-forms.checkbox instantSave="saveModel" id="serverDiskUsageEmailNotifications"
+                    label="Server Disk Usage" />
                 <x-forms.checkbox instantSave="saveModel" id="serverReachableEmailNotifications"
                     label="Server Reachable" />
                 <x-forms.checkbox instantSave="saveModel" id="serverUnreachableEmailNotifications"
