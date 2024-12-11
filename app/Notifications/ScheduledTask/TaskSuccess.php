@@ -5,6 +5,7 @@ namespace App\Notifications\ScheduledTask;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -68,6 +69,25 @@ class TaskSuccess extends CustomEmailNotification
         return [
             'message' => $message,
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        $message = "Coolify: Scheduled task ({$this->task->name}) succeeded.";
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
+            ];
+        }
+
+        return new PushoverMessage(
+            title: 'Scheduled task succeeded',
+            level: 'success',
+            message: $message,
+            buttons: $buttons,
+        );
     }
 
     public function toSlack(): SlackMessage

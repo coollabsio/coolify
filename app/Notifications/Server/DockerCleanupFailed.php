@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -46,6 +47,15 @@ class DockerCleanupFailed extends CustomEmailNotification
         return [
             'message' => "Coolify: [ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}!\n\n{$this->message}",
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'Docker cleanup job failed',
+            level: 'error',
+            message: "[ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}!\n\n{$this->message}",
+        );
     }
 
     public function toSlack(): SlackMessage
