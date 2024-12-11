@@ -154,7 +154,7 @@ class Slack extends Component
     public function sendTestNotification()
     {
         try {
-            $this->team->notify(new Test);
+            $this->team->notify(new Test(channel: 'slack'));
             $this->dispatch('success', 'Test notification sent.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

@@ -106,6 +106,7 @@ class Email extends Component
             $this->emails = auth()->user()->email;
             $this->settings = $this->team->emailNotificationSettings;
             $this->syncData();
+            $this->testEmailAddress = auth()->user()->email;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -317,7 +318,7 @@ class Email extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress));
+                    $this->team?->notify(new Test($this->testEmailAddress, 'email'));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,

@@ -3,14 +3,19 @@
 namespace App\Livewire;
 
 use App\Models\InstanceSettings;
+use App\Models\Team;
 use App\Notifications\Test;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsEmail extends Component
 {
     public InstanceSettings $settings;
+
+    #[Locked]
+    public Team $team;
 
     #[Validate(['boolean'])]
     public bool $smtpEnabled = false;
@@ -58,6 +63,8 @@ class SettingsEmail extends Component
         }
         $this->settings = instanceSettings();
         $this->syncData();
+        $this->team = auth()->user()->currentTeam();
+        $this->testEmailAddress = auth()->user()->email;
     }
 
     public function syncData(bool $toModel = false)
@@ -219,7 +226,7 @@ class SettingsEmail extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress));
+                    $this->team?->notify(new Test($this->testEmailAddress, 'email'));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
