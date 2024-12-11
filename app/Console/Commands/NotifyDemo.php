@@ -59,9 +59,9 @@ class NotifyDemo extends Command
                 <div class="text-yellow-500"> Channels: </div>
                 <ul class="text-coolify">
                     <li>email</li>
-                    <li>slack</li>
                     <li>discord</li>
                     <li>telegram</li>
+                    <li>slack</li>
                     <li>pushover</li>
                 </ul>
             </div>
@@ -73,6 +73,6 @@ class NotifyDemo extends Command
         <div class="mr-1">
             In which manner you wish a <strong class="text-coolify">coolified</strong> notification?
         </div>
-        HTML, ['email', 'slack', 'discord', 'telegram', 'pushover']);
+        HTML, ['email', 'discord', 'telegram', 'slack', 'pushover']);
     }
 }
