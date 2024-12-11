@@ -39,7 +39,9 @@
                     label="Deployment Success" />
                 <x-forms.checkbox instantSave="saveModel" id="deploymentFailureDiscordNotifications"
                     label="Deployment Failure" />
-                {{-- <x-forms.checkbox instantSave="saveModel" helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container." id="statusChangeDiscordNotifications" label="Container Status Changes" /> --}}
+                <x-forms.checkbox instantSave="saveModel"
+                    helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container."
+                    id="statusChangeDiscordNotifications" label="Container Status Changes" />
             </div>
         </div>
         <div class="border dark:border-coolgray-300 p-4 rounded-lg">

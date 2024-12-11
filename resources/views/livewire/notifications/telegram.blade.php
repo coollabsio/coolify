@@ -55,11 +55,15 @@
                     <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
                         id="telegramNotificationsDeploymentFailureTopicId" />
                 </div>
-                {{-- <h4 class="font-medium mt-3">Container Status Changes</h4>
-                    <div class="pl-1">
-                        <x-forms.checkbox instantSave="saveModel" id="statusChangeTelegramNotifications" label="Enabled" helper="Send a notification when a container status changes. It will send a notification for Stopped and Restarted events of a container." />
-                        <x-forms.input helper="Topic ID for container status notifications" id="telegramNotificationsStatusChangeTopicId" label="Container Status Topic ID" />
-                    </div> --}}
+                <div class="pl-1 flex gap-2">
+                    <div class="w-96">
+                        <x-forms.checkbox instantSave="saveModel" id="statusChangeTelegramNotifications"
+                            label="Container Status Changes"
+                            helper="Send a notification when a container status changes. It will send a notification for Stopped and Restarted events of a container." />
+                    </div>
+                    <x-forms.input type="password" id="telegramNotificationsStatusChangeTopicId"
+                        placeholder="Custom Telegram Topic ID" />
+                </div>
             </div>
         </div>
         <div class="border dark:border-coolgray-300 p-4 rounded-lg">

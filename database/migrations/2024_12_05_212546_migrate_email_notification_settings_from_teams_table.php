@@ -18,13 +18,13 @@ return new class extends Migration
                     ['team_id' => $team->id],
                     [
                         'smtp_enabled' => $team->smtp_enabled ?? false,
-                        'smtp_from_address' => Crypt::encryptString($team->smtp_from_address),
-                        'smtp_from_name' => Crypt::encryptString($team->smtp_from_name),
-                        'smtp_recipients' => Crypt::encryptString($team->smtp_recipients),
-                        'smtp_host' => Crypt::encryptString($team->smtp_host),
+                        'smtp_from_address' => $team->smtp_from_address ? Crypt::encryptString($team->smtp_from_address) : null,
+                        'smtp_from_name' => $team->smtp_from_name ? Crypt::encryptString($team->smtp_from_name) : null,
+                        'smtp_recipients' => $team->smtp_recipients ? Crypt::encryptString($team->smtp_recipients) : null,
+                        'smtp_host' => $team->smtp_host ? Crypt::encryptString($team->smtp_host) : null,
                         'smtp_port' => $team->smtp_port,
                         'smtp_encryption' => $team->smtp_encryption,
-                        'smtp_username' => Crypt::encryptString($team->smtp_username),
+                        'smtp_username' => $team->smtp_username ? Crypt::encryptString($team->smtp_username) : null,
                         'smtp_password' => $team->smtp_password,
                         'smtp_timeout' => $team->smtp_timeout,
 
