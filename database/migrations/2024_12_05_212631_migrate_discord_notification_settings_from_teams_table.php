@@ -16,22 +16,26 @@ return new class extends Migration
         $teams = DB::table('teams')->get();
 
         foreach ($teams as $team) {
-            DB::table('discord_notification_settings')->updateOrInsert(
-                ['team_id' => $team->id],
-                [
-                    'discord_enabled' => $team->discord_enabled ?? false,
-                    'discord_webhook_url' => Crypt::encryptString($team->discord_webhook_url),
+            try {
+                DB::table('discord_notification_settings')->updateOrInsert(
+                    ['team_id' => $team->id],
+                    [
+                        'discord_enabled' => $team->discord_enabled ?? false,
+                        'discord_webhook_url' => $team->discord_webhook_url ? Crypt::encryptString($team->discord_webhook_url) : null,
 
-                    'deployment_success_discord_notifications' => $team->discord_notifications_deployments ?? false,
-                    'deployment_failure_discord_notifications' => $team->discord_notifications_deployments ?? true,
-                    'backup_success_discord_notifications' => $team->discord_notifications_database_backups ?? false,
-                    'backup_failure_discord_notifications' => $team->discord_notifications_database_backups ?? true,
-                    'scheduled_task_success_discord_notifications' => $team->discord_notifications_scheduled_tasks ?? false,
-                    'scheduled_task_failure_discord_notifications' => $team->discord_notifications_scheduled_tasks ?? true,
-                    'status_change_discord_notifications' => $team->discord_notifications_status_changes ?? false,
-                    'server_disk_usage_discord_notifications' => $team->discord_notifications_server_disk_usage ?? true,
-                ]
-            );
+                        'deployment_success_discord_notifications' => $team->discord_notifications_deployments ?? false,
+                        'deployment_failure_discord_notifications' => $team->discord_notifications_deployments ?? true,
+                        'backup_success_discord_notifications' => $team->discord_notifications_database_backups ?? false,
+                        'backup_failure_discord_notifications' => $team->discord_notifications_database_backups ?? true,
+                        'scheduled_task_success_discord_notifications' => $team->discord_notifications_scheduled_tasks ?? false,
+                        'scheduled_task_failure_discord_notifications' => $team->discord_notifications_scheduled_tasks ?? true,
+                        'status_change_discord_notifications' => $team->discord_notifications_status_changes ?? false,
+                        'server_disk_usage_discord_notifications' => $team->discord_notifications_server_disk_usage ?? true,
+                    ]
+                );
+            } catch (Exception $e) {
+                \Log::error('Error migrating discord notification settings from teams table: '.$e->getMessage());
+            }
         }
 
         Schema::table('teams', function (Blueprint $table) {
@@ -67,18 +71,22 @@ return new class extends Migration
 
         $settings = DB::table('discord_notification_settings')->get();
         foreach ($settings as $setting) {
-            DB::table('teams')
-                ->where('id', $setting->team_id)
-                ->update([
-                    'discord_enabled' => $setting->discord_enabled,
-                    'discord_webhook_url' => Crypt::decryptString($setting->discord_webhook_url),
+            try {
+                DB::table('teams')
+                    ->where('id', $setting->team_id)
+                    ->update([
+                        'discord_enabled' => $setting->discord_enabled,
+                        'discord_webhook_url' => Crypt::decryptString($setting->discord_webhook_url),
 
-                    'discord_notifications_deployments' => $setting->deployment_success_discord_notifications || $setting->deployment_failure_discord_notifications,
-                    'discord_notifications_status_changes' => $setting->status_change_discord_notifications,
-                    'discord_notifications_database_backups' => $setting->backup_success_discord_notifications || $setting->backup_failure_discord_notifications,
-                    'discord_notifications_scheduled_tasks' => $setting->scheduled_task_success_discord_notifications || $setting->scheduled_task_failure_discord_notifications,
-                    'discord_notifications_server_disk_usage' => $setting->server_disk_usage_discord_notifications,
-                ]);
+                        'discord_notifications_deployments' => $setting->deployment_success_discord_notifications || $setting->deployment_failure_discord_notifications,
+                        'discord_notifications_status_changes' => $setting->status_change_discord_notifications,
+                        'discord_notifications_database_backups' => $setting->backup_success_discord_notifications || $setting->backup_failure_discord_notifications,
+                        'discord_notifications_scheduled_tasks' => $setting->scheduled_task_success_discord_notifications || $setting->scheduled_task_failure_discord_notifications,
+                        'discord_notifications_server_disk_usage' => $setting->server_disk_usage_discord_notifications,
+                    ]);
+            } catch (Exception $e) {
+                \Log::error('Error migrating discord notification settings from teams table: '.$e->getMessage());
+            }
         }
     }
 };

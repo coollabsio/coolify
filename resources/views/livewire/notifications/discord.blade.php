@@ -14,6 +14,10 @@
                     wire:click="sendTestNotification">
                     Send Test Notification
                 </x-forms.button>
+            @else
+                <x-forms.button disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
+                    Send Test Notification
+                </x-forms.button>
             @endif
         </div>
         <div class="w-32">
@@ -23,44 +27,53 @@
             helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required
             id="discordWebhookUrl" label="Webhook" />
     </form>
-    @if ($discordEnabled)
-        <h2 class="mt-8 mb-4">Notification Settings</h2>
-        <p class="mb-4">
-            Select events for which you would like to receive Discord notifications.
-        </p>
-        <div class="flex flex-col gap-4 max-w-2xl">
-            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
-                <h3 class="font-medium mb-3">Deployments</h3>
-                <div class="flex flex-col gap-1.5 pl-1">
-                    <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessDiscordNotifications" label="Deployment Success" />
-                    <x-forms.checkbox instantSave="saveModel" id="deploymentFailureDiscordNotifications" label="Deployment Failure" />
-                    {{-- <x-forms.checkbox instantSave="saveModel" helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container." id="statusChangeDiscordNotifications" label="Container Status Changes" /> --}}
-                </div>
+    <h2 class="mt-4">Notification Settings</h2>
+    <p class="mb-4">
+        Select events for which you would like to receive Discord notifications.
+    </p>
+    <div class="flex flex-col gap-4 max-w-2xl">
+        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+            <h3 class="font-medium mb-3">Deployments</h3>
+            <div class="flex flex-col gap-1.5 pl-1">
+                <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessDiscordNotifications"
+                    label="Deployment Success" />
+                <x-forms.checkbox instantSave="saveModel" id="deploymentFailureDiscordNotifications"
+                    label="Deployment Failure" />
+                {{-- <x-forms.checkbox instantSave="saveModel" helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container." id="statusChangeDiscordNotifications" label="Container Status Changes" /> --}}
             </div>
-            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
-                <h3 class="font-medium mb-3">Backups</h3>
-                <div class="flex flex-col gap-1.5 pl-1">
-                    <x-forms.checkbox instantSave="saveModel" id="backupSuccessDiscordNotifications" label="Backup Success" />
-                    <x-forms.checkbox instantSave="saveModel" id="backupFailureDiscordNotifications" label="Backup Failure" />
-                </div>
+        </div>
+        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+            <h3 class="font-medium mb-3">Backups</h3>
+            <div class="flex flex-col gap-1.5 pl-1">
+                <x-forms.checkbox instantSave="saveModel" id="backupSuccessDiscordNotifications"
+                    label="Backup Success" />
+                <x-forms.checkbox instantSave="saveModel" id="backupFailureDiscordNotifications"
+                    label="Backup Failure" />
             </div>
-            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
-                <h3 class="font-medium mb-3">Scheduled Tasks</h3>
-                <div class="flex flex-col gap-1.5 pl-1">
-                    <x-forms.checkbox instantSave="saveModel" id="scheduledTaskSuccessDiscordNotifications" label="Scheduled Task Success" />
-                    <x-forms.checkbox instantSave="saveModel" id="scheduledTaskFailureDiscordNotifications" label="Scheduled Task Failure" />
-                </div>
+        </div>
+        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+            <h3 class="font-medium mb-3">Scheduled Tasks</h3>
+            <div class="flex flex-col gap-1.5 pl-1">
+                <x-forms.checkbox instantSave="saveModel" id="scheduledTaskSuccessDiscordNotifications"
+                    label="Scheduled Task Success" />
+                <x-forms.checkbox instantSave="saveModel" id="scheduledTaskFailureDiscordNotifications"
+                    label="Scheduled Task Failure" />
             </div>
-            <div class="border dark:border-coolgray-300 p-4 rounded-lg">
-                <h3 class="font-medium mb-3">Server</h3>
-                <div class="flex flex-col gap-1.5 pl-1">
-                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup is run on a server." id="dockerCleanupSuccessDiscordNotifications" label="Docker Cleanup Success" />
-                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when Docker Cleanup fails on a server." id="dockerCleanupFailureDiscordNotifications" label="Docker Cleanup Failure" />
-                    <x-forms.checkbox instantSave="saveModel" helper="Send a notification when server disk usage is high." id="serverDiskUsageDiscordNotifications" label="Server Disk Usage" />
-                    <x-forms.checkbox instantSave="saveModel" id="serverReachableDiscordNotifications" label="Server Reachable" />
-                    <x-forms.checkbox instantSave="saveModel" id="serverUnreachableDiscordNotifications" label="Server Unreachable" />
-                </div>
+        </div>
+        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+            <h3 class="font-medium mb-3">Server</h3>
+            <div class="flex flex-col gap-1.5 pl-1">
+                <x-forms.checkbox instantSave="saveModel" id="dockerCleanupSuccessDiscordNotifications"
+                    label="Docker Cleanup Success" />
+                <x-forms.checkbox instantSave="saveModel" id="dockerCleanupFailureDiscordNotifications"
+                    label="Docker Cleanup Failure" />
+                <x-forms.checkbox instantSave="saveModel" id="serverDiskUsageDiscordNotifications"
+                    label="Server Disk Usage" />
+                <x-forms.checkbox instantSave="saveModel" id="serverReachableDiscordNotifications"
+                    label="Server Reachable" />
+                <x-forms.checkbox instantSave="saveModel" id="serverUnreachableDiscordNotifications"
+                    label="Server Unreachable" />
             </div>
-        </div>    
-    @endif
+        </div>
+    </div>
 </div>

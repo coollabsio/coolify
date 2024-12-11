@@ -12,6 +12,8 @@ use Livewire\Component;
 
 class Email extends Component
 {
+    protected $listeners = ['refresh' => '$refresh'];
+
     public Team $team;
 
     public EmailNotificationSettings $settings;
@@ -141,9 +143,8 @@ class Email extends Component
             $this->settings->server_disk_usage_email_notifications = $this->serverDiskUsageEmailNotifications;
             $this->settings->server_reachable_email_notifications = $this->serverReachableEmailNotifications;
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
-
             $this->settings->save();
-            refreshSession();
+
         } else {
             $this->smtpEnabled = $this->settings->smtp_enabled;
             $this->smtpFromAddress = $this->settings->smtp_from_address;
@@ -173,7 +174,6 @@ class Email extends Component
             $this->serverDiskUsageEmailNotifications = $this->settings->server_disk_usage_email_notifications;
             $this->serverReachableEmailNotifications = $this->settings->server_reachable_email_notifications;
             $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
-
         }
     }
 
@@ -190,7 +190,6 @@ class Email extends Component
     public function saveModel()
     {
         $this->syncData(true);
-        refreshSession();
         $this->dispatch('success', 'Email notifications settings updated.');
     }
 
@@ -218,6 +217,8 @@ class Email extends Component
             }
 
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
@@ -261,7 +262,6 @@ class Email extends Component
             $this->settings->smtp_timeout = $this->smtpTimeout;
 
             $this->settings->save();
-            refreshSession();
             $this->dispatch('success', 'SMTP settings updated.');
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
@@ -297,7 +297,6 @@ class Email extends Component
             $this->settings->smtp_from_name = $this->smtpFromName;
 
             $this->settings->save();
-            refreshSession();
             $this->dispatch('success', 'Resend settings updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

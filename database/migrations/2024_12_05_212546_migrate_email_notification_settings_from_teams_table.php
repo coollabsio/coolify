@@ -13,35 +13,39 @@ return new class extends Migration
         $teams = DB::table('teams')->get();
 
         foreach ($teams as $team) {
-            DB::table('email_notification_settings')->updateOrInsert(
-                ['team_id' => $team->id],
-                [
-                    'smtp_enabled' => $team->smtp_enabled ?? false,
-                    'smtp_from_address' => Crypt::encryptString($team->smtp_from_address),
-                    'smtp_from_name' => Crypt::encryptString($team->smtp_from_name),
-                    'smtp_recipients' => Crypt::encryptString($team->smtp_recipients),
-                    'smtp_host' => Crypt::encryptString($team->smtp_host),
-                    'smtp_port' => $team->smtp_port,
-                    'smtp_encryption' => $team->smtp_encryption,
-                    'smtp_username' => Crypt::encryptString($team->smtp_username),
-                    'smtp_password' => $team->smtp_password,
-                    'smtp_timeout' => $team->smtp_timeout,
+            try {
+                DB::table('email_notification_settings')->updateOrInsert(
+                    ['team_id' => $team->id],
+                    [
+                        'smtp_enabled' => $team->smtp_enabled ?? false,
+                        'smtp_from_address' => Crypt::encryptString($team->smtp_from_address),
+                        'smtp_from_name' => Crypt::encryptString($team->smtp_from_name),
+                        'smtp_recipients' => Crypt::encryptString($team->smtp_recipients),
+                        'smtp_host' => Crypt::encryptString($team->smtp_host),
+                        'smtp_port' => $team->smtp_port,
+                        'smtp_encryption' => $team->smtp_encryption,
+                        'smtp_username' => Crypt::encryptString($team->smtp_username),
+                        'smtp_password' => $team->smtp_password,
+                        'smtp_timeout' => $team->smtp_timeout,
 
-                    'use_instance_email_settings' => $team->use_instance_email_settings ?? false,
+                        'use_instance_email_settings' => $team->use_instance_email_settings ?? false,
 
-                    'resend_enabled' => $team->resend_enabled ?? false,
-                    'resend_api_key' => $team->resend_api_key,
+                        'resend_enabled' => $team->resend_enabled ?? false,
+                        'resend_api_key' => $team->resend_api_key,
 
-                    'deployment_success_email_notifications' => $team->smtp_notifications_deployments ?? false,
-                    'deployment_failure_email_notifications' => $team->smtp_notifications_deployments ?? true,
-                    'backup_success_email_notifications' => $team->smtp_notifications_database_backups ?? false,
-                    'backup_failure_email_notifications' => $team->smtp_notifications_database_backups ?? true,
-                    'scheduled_task_success_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? false,
-                    'scheduled_task_failure_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? true,
-                    'status_change_email_notifications' => $team->smtp_notifications_status_changes ?? false,
-                    'server_disk_usage_email_notifications' => $team->smtp_notifications_server_disk_usage ?? true,
-                ]
-            );
+                        'deployment_success_email_notifications' => $team->smtp_notifications_deployments ?? false,
+                        'deployment_failure_email_notifications' => $team->smtp_notifications_deployments ?? true,
+                        'backup_success_email_notifications' => $team->smtp_notifications_database_backups ?? false,
+                        'backup_failure_email_notifications' => $team->smtp_notifications_database_backups ?? true,
+                        'scheduled_task_success_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? false,
+                        'scheduled_task_failure_email_notifications' => $team->smtp_notifications_scheduled_tasks ?? true,
+                        'status_change_email_notifications' => $team->smtp_notifications_status_changes ?? false,
+                        'server_disk_usage_email_notifications' => $team->smtp_notifications_server_disk_usage ?? true,
+                    ]
+                );
+            } catch (Exception $e) {
+                \Log::error('Error migrating email notification settings from teams table: '.$e->getMessage());
+            }
         }
 
         Schema::table('teams', function (Blueprint $table) {
@@ -97,30 +101,34 @@ return new class extends Migration
 
         $settings = DB::table('email_notification_settings')->get();
         foreach ($settings as $setting) {
-            DB::table('teams')
-                ->where('id', $setting->team_id)
-                ->update([
-                    'smtp_enabled' => $setting->smtp_enabled,
-                    'smtp_from_address' => Crypt::decryptString($setting->smtp_from_address),
-                    'smtp_from_name' => Crypt::decryptString($setting->smtp_from_name),
-                    'smtp_recipients' => Crypt::decryptString($setting->smtp_recipients),
-                    'smtp_host' => Crypt::decryptString($setting->smtp_host),
-                    'smtp_port' => $setting->smtp_port,
-                    'smtp_encryption' => $setting->smtp_encryption,
-                    'smtp_username' => Crypt::decryptString($setting->smtp_username),
-                    'smtp_password' => $setting->smtp_password,
-                    'smtp_timeout' => $setting->smtp_timeout,
+            try {
+                DB::table('teams')
+                    ->where('id', $setting->team_id)
+                    ->update([
+                        'smtp_enabled' => $setting->smtp_enabled,
+                        'smtp_from_address' => $setting->smtp_from_address ? Crypt::decryptString($setting->smtp_from_address) : null,
+                        'smtp_from_name' => $setting->smtp_from_name ? Crypt::decryptString($setting->smtp_from_name) : null,
+                        'smtp_recipients' => $setting->smtp_recipients ? Crypt::decryptString($setting->smtp_recipients) : null,
+                        'smtp_host' => $setting->smtp_host ? Crypt::decryptString($setting->smtp_host) : null,
+                        'smtp_port' => $setting->smtp_port,
+                        'smtp_encryption' => $setting->smtp_encryption,
+                        'smtp_username' => $setting->smtp_username ? Crypt::decryptString($setting->smtp_username) : null,
+                        'smtp_password' => $setting->smtp_password,
+                        'smtp_timeout' => $setting->smtp_timeout,
 
-                    'use_instance_email_settings' => $setting->use_instance_email_settings,
+                        'use_instance_email_settings' => $setting->use_instance_email_settings,
 
-                    'resend_enabled' => $setting->resend_enabled,
-                    'resend_api_key' => $setting->resend_api_key,
+                        'resend_enabled' => $setting->resend_enabled,
+                        'resend_api_key' => $setting->resend_api_key,
 
-                    'smtp_notifications_deployments' => $setting->deployment_success_email_notifications || $setting->deployment_failure_email_notifications,
-                    'smtp_notifications_database_backups' => $setting->backup_success_email_notifications || $setting->backup_failure_email_notifications,
-                    'smtp_notifications_scheduled_tasks' => $setting->scheduled_task_success_email_notifications || $setting->scheduled_task_failure_email_notifications,
-                    'smtp_notifications_status_changes' => $setting->status_change_email_notifications,
-                ]);
+                        'smtp_notifications_deployments' => $setting->deployment_success_email_notifications || $setting->deployment_failure_email_notifications,
+                        'smtp_notifications_database_backups' => $setting->backup_success_email_notifications || $setting->backup_failure_email_notifications,
+                        'smtp_notifications_scheduled_tasks' => $setting->scheduled_task_success_email_notifications || $setting->scheduled_task_failure_email_notifications,
+                        'smtp_notifications_status_changes' => $setting->status_change_email_notifications,
+                    ]);
+            } catch (Exception $e) {
+                \Log::error('Error migrating email notification settings from teams table: '.$e->getMessage());
+            }
         }
     }
 };

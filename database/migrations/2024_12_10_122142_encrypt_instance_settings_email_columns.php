@@ -15,22 +15,26 @@ return new class extends Migration
     {
         if (DB::table('instance_settings')->exists()) {
             Schema::table('instance_settings', function (Blueprint $table) {
-                $table->text('smtp_from_address')->change();
-                $table->text('smtp_from_name')->change();
-                $table->text('smtp_recipients')->change();
-                $table->text('smtp_host')->change();
-                $table->text('smtp_username')->change();
+                $table->text('smtp_from_address')->nullable()->change();
+                $table->text('smtp_from_name')->nullable()->change();
+                $table->text('smtp_recipients')->nullable()->change();
+                $table->text('smtp_host')->nullable()->change();
+                $table->text('smtp_username')->nullable()->change();
             });
 
             $settings = DB::table('instance_settings')->get();
             foreach ($settings as $setting) {
-                DB::table('instance_settings')->where('id', $setting->id)->update([
-                    'smtp_from_address' => Crypt::encryptString($setting->smtp_from_address),
-                    'smtp_from_name' => Crypt::encryptString($setting->smtp_from_name),
-                    'smtp_recipients' => Crypt::encryptString($setting->smtp_recipients),
-                    'smtp_host' => Crypt::encryptString($setting->smtp_host),
-                    'smtp_username' => Crypt::encryptString($setting->smtp_username),
-                ]);
+                try {
+                    DB::table('instance_settings')->where('id', $setting->id)->update([
+                        'smtp_from_address' => $setting->smtp_from_address ? Crypt::encryptString($setting->smtp_from_address) : null,
+                        'smtp_from_name' => $setting->smtp_from_name ? Crypt::encryptString($setting->smtp_from_name) : null,
+                        'smtp_recipients' => $setting->smtp_recipients ? Crypt::encryptString($setting->smtp_recipients) : null,
+                        'smtp_host' => $setting->smtp_host ? Crypt::encryptString($setting->smtp_host) : null,
+                        'smtp_username' => $setting->smtp_username ? Crypt::encryptString($setting->smtp_username) : null,
+                    ]);
+                } catch (Exception $e) {
+                    \Log::error('Error encrypting instance settings email columns: '.$e->getMessage());
+                }
             }
         }
     }
@@ -51,13 +55,17 @@ return new class extends Migration
         if (DB::table('instance_settings')->exists()) {
             $settings = DB::table('instance_settings')->get();
             foreach ($settings as $setting) {
-                DB::table('instance_settings')->where('id', $setting->id)->update([
-                    'smtp_from_address' => Crypt::decryptString($setting->smtp_from_address),
-                    'smtp_from_name' => Crypt::decryptString($setting->smtp_from_name),
-                    'smtp_recipients' => Crypt::decryptString($setting->smtp_recipients),
-                    'smtp_host' => Crypt::decryptString($setting->smtp_host),
-                    'smtp_username' => Crypt::decryptString($setting->smtp_username),
-                ]);
+                try {
+                    DB::table('instance_settings')->where('id', $setting->id)->update([
+                        'smtp_from_address' => $setting->smtp_from_address ? Crypt::decryptString($setting->smtp_from_address) : null,
+                        'smtp_from_name' => $setting->smtp_from_name ? Crypt::decryptString($setting->smtp_from_name) : null,
+                        'smtp_recipients' => $setting->smtp_recipients ? Crypt::decryptString($setting->smtp_recipients) : null,
+                        'smtp_host' => $setting->smtp_host ? Crypt::decryptString($setting->smtp_host) : null,
+                        'smtp_username' => $setting->smtp_username ? Crypt::decryptString($setting->smtp_username) : null,
+                    ]);
+                } catch (Exception $e) {
+                    \Log::error('Error decrypting instance settings email columns: '.$e->getMessage());
+                }
             }
         }
     }
