@@ -5,13 +5,18 @@ namespace App\Livewire\Notifications;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Notifications\Test;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Telegram extends Component
 {
+    protected $listeners = ['refresh' => '$refresh'];
+
+    #[Locked]
     public Team $team;
 
+    #[Locked]
     public TelegramNotificationSettings $settings;
 
     #[Validate(['boolean'])]
@@ -141,7 +146,6 @@ class Telegram extends Component
             $this->settings->telegram_notifications_server_unreachable_topic_id = $this->telegramNotificationsServerUnreachableTopicId;
 
             $this->settings->save();
-            refreshSession();
         } else {
             $this->telegramEnabled = $this->settings->telegram_enabled;
             $this->telegramToken = $this->settings->telegram_token;
@@ -181,6 +185,8 @@ class Telegram extends Component
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
@@ -210,6 +216,8 @@ class Telegram extends Component
             $this->telegramEnabled = false;
 
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 

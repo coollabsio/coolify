@@ -5,22 +5,27 @@ namespace App\Livewire\Notifications;
 use App\Models\PushoverNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Pushover extends Component
 {
+    protected $listeners = ['refresh' => '$refresh'];
+
+    #[Locked]
     public Team $team;
 
+    #[Locked]
     public PushoverNotificationSettings $settings;
 
     #[Validate(['boolean'])]
     public bool $pushoverEnabled = false;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $pushoverUserKey = null;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $pushoverApiToken = null;
 
     #[Validate(['boolean'])]
@@ -75,7 +80,7 @@ class Pushover extends Component
         if ($toModel) {
             $this->validate();
             $this->settings->pushover_enabled = $this->pushoverEnabled;
-            $this->settings->pushover_user_key_key = $this->pushoverUserKey;
+            $this->settings->pushover_user_key = $this->pushoverUserKey;
             $this->settings->pushover_api_token = $this->pushoverApiToken;
 
             $this->settings->deployment_success_pushover_notifications = $this->deploymentSuccessPushoverNotifications;
@@ -95,7 +100,7 @@ class Pushover extends Component
             refreshSession();
         } else {
             $this->pushoverEnabled = $this->settings->pushover_enabled;
-            $this->pushoverUserKey = $this->settings->pushover_user_key_key;
+            $this->pushoverUserKey = $this->settings->pushover_user_key;
             $this->pushoverApiToken = $this->settings->pushover_api_token;
 
             $this->deploymentSuccessPushoverNotifications = $this->settings->deployment_success_pushover_notifications;
@@ -128,6 +133,8 @@ class Pushover extends Component
             $this->pushoverEnabled = false;
 
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
@@ -137,6 +144,8 @@ class Pushover extends Component
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
