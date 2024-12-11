@@ -31,8 +31,8 @@ class DockerController extends Controller
         $filter = $request->input('filter', 'all'); // Default to 'all' if no filter is provided
 
         // Validate filter
-        if (!in_array($filter, ['all', 'unused', 'used', 'dangling'])) {
-            return response()->json(['error' => 'Invalid filter. Allowed values are: all, unused, used, dangling.'], 400);
+        if (!in_array($filter, ['all', 'dangling'])) {
+            return response()->json(['error' => 'Invalid filter. Allowed values are: all, dangling.'], 400);
         }
 
         return ListServerDockerImages::run($server, $filter);
