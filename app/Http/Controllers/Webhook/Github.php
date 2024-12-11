@@ -463,7 +463,7 @@ class Github extends Controller
             $private_key = data_get($data, 'pem');
             $webhook_secret = data_get($data, 'webhook_secret');
             $private_key = PrivateKey::create([
-                'name' => $slug,
+                'name' => "github-app-{$slug}",
                 'private_key' => $private_key,
                 'team_id' => $github_app->team_id,
                 'is_git_related' => true,

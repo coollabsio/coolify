@@ -20,7 +20,7 @@ abstract class BaseModel extends Model
         });
     }
 
-    public function name(): Attribute
+    public function sanitizedName(): Attribute
     {
         return new Attribute(
             get: fn () => sanitize_string($this->getRawOriginal('name')),

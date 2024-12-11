@@ -1,2 +1,0 @@
-#!/command/execlineb -P
-php /var/www/html/artisan migrate --force --isolated

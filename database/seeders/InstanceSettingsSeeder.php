@@ -16,7 +16,6 @@ class InstanceSettingsSeeder extends Seeder
         InstanceSettings::create([
             'id' => 0,
             'is_registration_enabled' => true,
-            'is_resale_license_active' => true,
             'smtp_enabled' => true,
             'smtp_host' => 'coolify-mail',
             'smtp_port' => 1025,

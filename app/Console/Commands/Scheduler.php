@@ -13,7 +13,7 @@ class Scheduler extends Command
     public function handle()
     {
         if (config('constants.horizon.is_scheduler_enabled')) {
-            $this->info('[x]: Scheduler is enabled. Starting.');
+            $this->info('Scheduler is enabled on this server.');
             $this->call('schedule:work');
             exit(0);
         } else {

@@ -1,5 +1,0 @@
-#!/command/execlineb -P
-foreground { composer -d /var/www/html/ install }
-foreground { php /var/www/html/artisan migrate --step }
-foreground { php /var/www/html/artisan dev --init }
-

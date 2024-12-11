@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->string('redirect')->enum('www', 'non-www', 'both')->default('both')->after('domain');
+            $table->enum('redirect', ['www', 'non-www', 'both'])->default('both')->after('domain');
         });
     }
 

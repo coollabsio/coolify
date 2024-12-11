@@ -10,20 +10,18 @@ class TeamController extends Controller
 {
     private function removeSensitiveData($team)
     {
-        $token = auth()->user()->currentAccessToken();
         $team->makeHidden([
             'custom_server_limit',
             'pivot',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($team);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $team->makeHidden([
+                'smtp_username',
+                'smtp_password',
+                'resend_api_key',
+                'telegram_token',
+            ]);
         }
-        $team->makeHidden([
-            'smtp_username',
-            'smtp_password',
-            'resend_api_key',
-            'telegram_token',
-        ]);
 
         return serializeApiResponse($team);
     }

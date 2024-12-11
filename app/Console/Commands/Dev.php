@@ -76,7 +76,5 @@ class Dev extends Command
         } else {
             echo "Instance already initialized.\n";
         }
-        // Set permissions
-        Process::run(['chmod', '-R', 'o+rwx', '.']);
     }
 }

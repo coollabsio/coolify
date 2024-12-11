@@ -65,7 +65,7 @@ class Deploy extends Component
     public function restart()
     {
         try {
-            $this->stop(forceStop: false);
+            $this->stop();
             $this->dispatch('checkProxy');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -105,6 +105,7 @@ class Deploy extends Component
 
             $startTime = Carbon::now()->getTimestamp();
             while ($process->running()) {
+                ray('running');
                 if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
                     $this->forceStopContainer($containerName);
                     break;

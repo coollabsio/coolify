@@ -1,6 +1,7 @@
 # documentation: https://pairdrop.net/
 # slogan: Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.
 # tags: file, sharing, collaboration, teamwork
+# logo: svgs/pairdrop.png
 # port: 3000
 
 services:

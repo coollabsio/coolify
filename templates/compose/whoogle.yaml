@@ -1,6 +1,7 @@
 # documentation: https://github.com/benbusby/whoogle-search?tab=readme-ov-file
 # slogan: Whoogle is a self-hosted, privacy-focused search engine front-end for accessing Google search results without tracking and data collection.
 # tags: privacy, search engine
+# logo: svgs/whoogle.png
 # port: 5000
 
 services:

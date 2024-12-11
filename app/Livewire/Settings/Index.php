@@ -23,9 +23,6 @@ class Index extends Component
     #[Validate('nullable|string|max:255')]
     public ?string $fqdn = null;
 
-    #[Validate('nullable|string|max:255')]
-    public ?string $resale_license = null;
-
     #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_min;
 
@@ -83,7 +80,6 @@ class Index extends Component
         } else {
             $this->settings = instanceSettings();
             $this->fqdn = $this->settings->fqdn;
-            $this->resale_license = $this->settings->resale_license;
             $this->public_port_min = $this->settings->public_port_min;
             $this->public_port_max = $this->settings->public_port_max;
             $this->custom_dns_servers = $this->settings->custom_dns_servers;
@@ -122,7 +118,6 @@ class Index extends Component
         }
 
         $this->settings->fqdn = $this->fqdn;
-        $this->settings->resale_license = $this->resale_license;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->custom_dns_servers = $this->custom_dns_servers;

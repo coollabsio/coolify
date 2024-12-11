@@ -1,0 +1,22 @@
+#!/command/execlineb -P
+
+# Use with-contenv to ensure environment variables are available
+with-contenv
+cd /var/www/html
+foreground {
+    composer
+    install
+}
+foreground {
+    php
+    artisan
+    migrate
+    --step
+}
+foreground {
+    php
+    artisan
+    dev
+    --init
+}
+

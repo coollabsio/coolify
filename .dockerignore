@@ -3,7 +3,6 @@
 /public/build
 /public/hot
 /public/storage
-/storage/*.key
 /vendor
 .env
 .env.backup
@@ -25,3 +24,15 @@ yarn-error.log
 .ignition.json
 .env.dusk.local
 docker/coolify-realtime/node_modules
+
+/storage/*.key
+/storage/app/backups
+/storage/app/ssh/keys
+/storage/app/ssh/mux
+/storage/app/tmp
+/storage/app/debugbar
+/storage/logs
+/storage/pail
+
+
+

@@ -13,7 +13,7 @@ class Horizon extends Command
     public function handle()
     {
         if (config('constants.horizon.is_horizon_enabled')) {
-            $this->info('[x]: Horizon is enabled. Starting.');
+            $this->info('Horizon is enabled on this server.');
             $this->call('horizon');
             exit(0);
         } else {

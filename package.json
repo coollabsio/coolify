@@ -7,24 +7,24 @@
         "build": "vite build"
     },
     "devDependencies": {
-        "@vitejs/plugin-vue": "5.2.0",
+        "@vitejs/plugin-vue": "5.2.1",
         "autoprefixer": "10.4.20",
-        "axios": "1.7.7",
-        "laravel-echo": "1.17.0",
-        "laravel-vite-plugin": "1.0.6",
+        "axios": "1.7.9",
+        "laravel-echo": "1.17.1",
+        "laravel-vite-plugin": "1.1.1",
         "postcss": "8.4.49",
         "pusher-js": "8.4.0-rc2",
         "tailwind-scrollbar": "^3.1.0",
-        "tailwindcss": "3.4.14",
-        "vite": "5.4.11",
-        "vue": "3.5.12"
+        "tailwindcss": "3.4.16",
+        "vite": "6.0.3",
+        "vue": "3.5.13"
     },
     "dependencies": {
         "@tailwindcss/forms": "0.5.9",
         "@tailwindcss/typography": "0.5.15",
         "@xterm/addon-fit": "^0.10.0",
         "@xterm/xterm": "^5.5.0",
-        "alpinejs": "3.14.3",
+        "alpinejs": "3.14.7",
         "ioredis": "5.4.1"
     }
 }
