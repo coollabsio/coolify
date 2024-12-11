@@ -695,6 +695,20 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "fileflows": {
+        "documentation": "https://fileflows.com/docs/?utm_source=coolify.io",
+        "slogan": "FileFlows can drastically reduce your files, up to 90%, saving you space and money. No need to buy more hard drives, just shrink your files and start saving.",
+        "compose": "c2VydmljZXM6CiAgcmFkYXJyOgogICAgaW1hZ2U6IHJldmVuei9maWxlZmxvd3MKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSUxFRkxPV1NfNTAwMAogICAgICAtIF9BUFBfVVJMPSRTRVJWSUNFX0ZRRE5fRklMRV9GTE9XUwogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAnZmlsZWZsb3dzLXRlbXA6L3RlbXAnCiAgICAgIC0gJ2ZpbGVmbG93cy1jb25maWdzOi9hcHAvRGF0YScKICAgICAgLSAnZmlsZWZsb3dzLWxvZ3M6L2FwcC9Mb2dzJwogICAgICAtICdmaWxlZmxvd3MtY29tbW9uOi9hcHAvY29tbW9uJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUwMDAvYXBpL3N5c3RlbS92ZXJzaW9uJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "media",
+            "transcode",
+            "convert",
+            "h265"
+        ],
+        "logo": "svgs/fileflows.svg",
+        "minversion": "0.0.0",
+        "port": "5000"
+    },
     "firefly": {
         "documentation": "https://firefly-iii.org?utm_source=coolify.io",
         "slogan": "A personal finances manager that can help you save money.",
