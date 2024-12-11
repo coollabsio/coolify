@@ -1331,7 +1331,9 @@ class Application extends BaseModel
                 $currentPath = '';
                 foreach ($parts as $part) {
                     $currentPath .= ($currentPath ? '/' : '').$part;
-                    $paths->push($currentPath);
+                    if (str($currentPath)->isNotEmpty()) {
+                        $paths->push($currentPath);
+                    }
                 }
 
                 return $paths;
@@ -1341,7 +1343,7 @@ class Application extends BaseModel
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
                 $cloneCommand,
-                'git sparse-checkout init --cone',
+                'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
                 "cat .$workdir$composeFile",
