@@ -44,16 +44,16 @@
                         <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessTelegramNotifications"
                             label="Deployment Success" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsDeploymentSuccessTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsDeploymentSuccessThreadId" />
                 </div>
                 <div class="pl-1 flex gap-2">
                     <div class="w-96">
                         <x-forms.checkbox instantSave="saveModel" id="deploymentFailureTelegramNotifications"
                             label="Deployment Failure" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsDeploymentFailureTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsDeploymentFailureThreadId" />
                 </div>
                 <div class="pl-1 flex gap-2">
                     <div class="w-96">
@@ -61,8 +61,8 @@
                             label="Container Status Changes"
                             helper="Send a notification when a container status changes. It will send a notification for Stopped and Restarted events of a container." />
                     </div>
-                    <x-forms.input type="password" id="telegramNotificationsStatusChangeTopicId"
-                        placeholder="Custom Telegram Topic ID" />
+                    <x-forms.input type="password" id="telegramNotificationsStatusChangeThreadId"
+                        placeholder="Custom Telegram Thread ID" />
                 </div>
             </div>
         </div>
@@ -74,8 +74,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="backupSuccessTelegramNotifications"
                             label="Backup Success" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsBackupSuccessTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsBackupSuccessThreadId" />
                 </div>
 
                 <div class="pl-1 flex gap-2">
@@ -83,8 +83,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="backupFailureTelegramNotifications"
                             label="Backup Failure" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsBackupFailureTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsBackupFailureThreadId" />
                 </div>
             </div>
         </div>
@@ -97,8 +97,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="scheduledTaskSuccessTelegramNotifications"
                             label="Scheduled Task Success" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsScheduledTaskSuccessTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsScheduledTaskSuccessThreadId" />
                 </div>
 
                 <div class="pl-1 flex gap-2">
@@ -106,8 +106,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="scheduledTaskFailureTelegramNotifications"
                             label="Scheduled Task Failure" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsScheduledTaskFailureTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsScheduledTaskFailureThreadId" />
                 </div>
             </div>
         </div>
@@ -120,8 +120,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="dockerCleanupSuccessTelegramNotifications"
                             label="Docker Cleanup Success" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsDockerCleanupSuccessTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsDockerCleanupSuccessThreadId" />
                 </div>
 
                 <div class="pl-1 flex gap-2">
@@ -129,8 +129,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="dockerCleanupFailureTelegramNotifications"
                             label="Docker Cleanup Failure" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsDockerCleanupFailureTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsDockerCleanupFailureThreadId" />
                 </div>
 
                 <div class="pl-1 flex gap-2">
@@ -138,8 +138,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="serverDiskUsageTelegramNotifications"
                             label="Server Disk Usage" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsServerDiskUsageTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsServerDiskUsageThreadId" />
                 </div>
 
                 <div class="pl-1 flex gap-2">
@@ -147,8 +147,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="serverReachableTelegramNotifications"
                             label="Server Reachable" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsServerReachableTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsServerReachableThreadId" />
                 </div>
 
 
@@ -157,8 +157,8 @@
                         <x-forms.checkbox instantSave="saveModel" id="serverUnreachableTelegramNotifications"
                             label="Server Unreachable" />
                     </div>
-                    <x-forms.input type="password" placeholder="Custom Telegram Topic ID"
-                        id="telegramNotificationsServerUnreachableTopicId" />
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsServerUnreachableThreadId" />
                 </div>
             </div>
         </div>

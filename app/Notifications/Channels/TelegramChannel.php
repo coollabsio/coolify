@@ -16,24 +16,24 @@ class TelegramChannel
         $telegramToken = $settings->telegram_token;
         $chatId = $settings->telegram_chat_id;
 
-        $topicId = match (get_class($notification)) {
-            \App\Notifications\Application\DeploymentSuccess::class => $settings->telegram_notifications_deployment_success_topic_id,
-            \App\Notifications\Application\DeploymentFailed::class => $settings->telegram_notifications_deployment_failure_topic_id,
+        $threadId = match (get_class($notification)) {
+            \App\Notifications\Application\DeploymentSuccess::class => $settings->telegram_notifications_deployment_success_thread_id,
+            \App\Notifications\Application\DeploymentFailed::class => $settings->telegram_notifications_deployment_failure_thread_id,
             \App\Notifications\Application\StatusChanged::class,
             \App\Notifications\Container\ContainerRestarted::class,
-            \App\Notifications\Container\ContainerStopped::class => $settings->telegram_notifications_status_change_topic_id,
+            \App\Notifications\Container\ContainerStopped::class => $settings->telegram_notifications_status_change_thread_id,
 
-            \App\Notifications\Database\BackupSuccess::class => $settings->telegram_notifications_backup_success_topic_id,
-            \App\Notifications\Database\BackupFailed::class => $settings->telegram_notifications_backup_failure_topic_id,
+            \App\Notifications\Database\BackupSuccess::class => $settings->telegram_notifications_backup_success_thread_id,
+            \App\Notifications\Database\BackupFailed::class => $settings->telegram_notifications_backup_failure_thread_id,
 
-            \App\Notifications\ScheduledTask\TaskSuccess::class => $settings->telegram_notifications_scheduled_task_success_topic_id,
-            \App\Notifications\ScheduledTask\TaskFailed::class => $settings->telegram_notifications_scheduled_task_failure_topic_id,
+            \App\Notifications\ScheduledTask\TaskSuccess::class => $settings->telegram_notifications_scheduled_task_success_thread_id,
+            \App\Notifications\ScheduledTask\TaskFailed::class => $settings->telegram_notifications_scheduled_task_failure_thread_id,
 
-            \App\Notifications\Server\DockerCleanupSuccess::class => $settings->telegram_notifications_docker_cleanup_success_topic_id,
-            \App\Notifications\Server\DockerCleanupFailed::class => $settings->telegram_notifications_docker_cleanup_failure_topic_id,
-            \App\Notifications\Server\HighDiskUsage::class => $settings->telegram_notifications_server_disk_usage_topic_id,
-            \App\Notifications\Server\Unreachable::class => $settings->telegram_notifications_server_unreachable_topic_id,
-            \App\Notifications\Server\Reachable::class => $settings->telegram_notifications_server_reachable_topic_id,
+            \App\Notifications\Server\DockerCleanupSuccess::class => $settings->telegram_notifications_docker_cleanup_success_thread_id,
+            \App\Notifications\Server\DockerCleanupFailed::class => $settings->telegram_notifications_docker_cleanup_failure_thread_id,
+            \App\Notifications\Server\HighDiskUsage::class => $settings->telegram_notifications_server_disk_usage_thread_id,
+            \App\Notifications\Server\Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
+            \App\Notifications\Server\Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
 
             default => null,
         };
@@ -42,6 +42,6 @@ class TelegramChannel
             return;
         }
 
-        SendMessageToTelegramJob::dispatch($message, $buttons, $telegramToken, $chatId, $topicId);
+        SendMessageToTelegramJob::dispatch($message, $buttons, $telegramToken, $chatId, $threadId);
     }
 }

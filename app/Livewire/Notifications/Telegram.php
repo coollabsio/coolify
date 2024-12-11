@@ -65,40 +65,40 @@ class Telegram extends Component
     public bool $serverUnreachableTelegramNotifications = true;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsDeploymentSuccessTopicId = null;
+    public ?string $telegramNotificationsDeploymentSuccessThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsDeploymentFailureTopicId = null;
+    public ?string $telegramNotificationsDeploymentFailureThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsStatusChangeTopicId = null;
+    public ?string $telegramNotificationsStatusChangeThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsBackupSuccessTopicId = null;
+    public ?string $telegramNotificationsBackupSuccessThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsBackupFailureTopicId = null;
+    public ?string $telegramNotificationsBackupFailureThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsScheduledTaskSuccessTopicId = null;
+    public ?string $telegramNotificationsScheduledTaskSuccessThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsScheduledTaskFailureTopicId = null;
+    public ?string $telegramNotificationsScheduledTaskFailureThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsDockerCleanupSuccessTopicId = null;
+    public ?string $telegramNotificationsDockerCleanupSuccessThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsDockerCleanupFailureTopicId = null;
+    public ?string $telegramNotificationsDockerCleanupFailureThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsServerDiskUsageTopicId = null;
+    public ?string $telegramNotificationsServerDiskUsageThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsServerReachableTopicId = null;
+    public ?string $telegramNotificationsServerReachableThreadId = null;
 
     #[Validate(['nullable', 'string'])]
-    public ?string $telegramNotificationsServerUnreachableTopicId = null;
+    public ?string $telegramNotificationsServerUnreachableThreadId = null;
 
     public function mount()
     {
@@ -132,18 +132,18 @@ class Telegram extends Component
             $this->settings->server_reachable_telegram_notifications = $this->serverReachableTelegramNotifications;
             $this->settings->server_unreachable_telegram_notifications = $this->serverUnreachableTelegramNotifications;
 
-            $this->settings->telegram_notifications_deployment_success_topic_id = $this->telegramNotificationsDeploymentSuccessTopicId;
-            $this->settings->telegram_notifications_deployment_failure_topic_id = $this->telegramNotificationsDeploymentFailureTopicId;
-            $this->settings->telegram_notifications_status_change_topic_id = $this->telegramNotificationsStatusChangeTopicId;
-            $this->settings->telegram_notifications_backup_success_topic_id = $this->telegramNotificationsBackupSuccessTopicId;
-            $this->settings->telegram_notifications_backup_failure_topic_id = $this->telegramNotificationsBackupFailureTopicId;
-            $this->settings->telegram_notifications_scheduled_task_success_topic_id = $this->telegramNotificationsScheduledTaskSuccessTopicId;
-            $this->settings->telegram_notifications_scheduled_task_failure_topic_id = $this->telegramNotificationsScheduledTaskFailureTopicId;
-            $this->settings->telegram_notifications_docker_cleanup_success_topic_id = $this->telegramNotificationsDockerCleanupSuccessTopicId;
-            $this->settings->telegram_notifications_docker_cleanup_failure_topic_id = $this->telegramNotificationsDockerCleanupFailureTopicId;
-            $this->settings->telegram_notifications_server_disk_usage_topic_id = $this->telegramNotificationsServerDiskUsageTopicId;
-            $this->settings->telegram_notifications_server_reachable_topic_id = $this->telegramNotificationsServerReachableTopicId;
-            $this->settings->telegram_notifications_server_unreachable_topic_id = $this->telegramNotificationsServerUnreachableTopicId;
+            $this->settings->telegram_notifications_deployment_success_thread_id = $this->telegramNotificationsDeploymentSuccessThreadId;
+            $this->settings->telegram_notifications_deployment_failure_thread_id = $this->telegramNotificationsDeploymentFailureThreadId;
+            $this->settings->telegram_notifications_status_change_thread_id = $this->telegramNotificationsStatusChangeThreadId;
+            $this->settings->telegram_notifications_backup_success_thread_id = $this->telegramNotificationsBackupSuccessThreadId;
+            $this->settings->telegram_notifications_backup_failure_thread_id = $this->telegramNotificationsBackupFailureThreadId;
+            $this->settings->telegram_notifications_scheduled_task_success_thread_id = $this->telegramNotificationsScheduledTaskSuccessThreadId;
+            $this->settings->telegram_notifications_scheduled_task_failure_thread_id = $this->telegramNotificationsScheduledTaskFailureThreadId;
+            $this->settings->telegram_notifications_docker_cleanup_success_thread_id = $this->telegramNotificationsDockerCleanupSuccessThreadId;
+            $this->settings->telegram_notifications_docker_cleanup_failure_thread_id = $this->telegramNotificationsDockerCleanupFailureThreadId;
+            $this->settings->telegram_notifications_server_disk_usage_thread_id = $this->telegramNotificationsServerDiskUsageThreadId;
+            $this->settings->telegram_notifications_server_reachable_thread_id = $this->telegramNotificationsServerReachableThreadId;
+            $this->settings->telegram_notifications_server_unreachable_thread_id = $this->telegramNotificationsServerUnreachableThreadId;
 
             $this->settings->save();
         } else {
@@ -164,18 +164,18 @@ class Telegram extends Component
             $this->serverReachableTelegramNotifications = $this->settings->server_reachable_telegram_notifications;
             $this->serverUnreachableTelegramNotifications = $this->settings->server_unreachable_telegram_notifications;
 
-            $this->telegramNotificationsDeploymentSuccessTopicId = $this->settings->telegram_notifications_deployment_success_topic_id;
-            $this->telegramNotificationsDeploymentFailureTopicId = $this->settings->telegram_notifications_deployment_failure_topic_id;
-            $this->telegramNotificationsStatusChangeTopicId = $this->settings->telegram_notifications_status_change_topic_id;
-            $this->telegramNotificationsBackupSuccessTopicId = $this->settings->telegram_notifications_backup_success_topic_id;
-            $this->telegramNotificationsBackupFailureTopicId = $this->settings->telegram_notifications_backup_failure_topic_id;
-            $this->telegramNotificationsScheduledTaskSuccessTopicId = $this->settings->telegram_notifications_scheduled_task_success_topic_id;
-            $this->telegramNotificationsScheduledTaskFailureTopicId = $this->settings->telegram_notifications_scheduled_task_failure_topic_id;
-            $this->telegramNotificationsDockerCleanupSuccessTopicId = $this->settings->telegram_notifications_docker_cleanup_success_topic_id;
-            $this->telegramNotificationsDockerCleanupFailureTopicId = $this->settings->telegram_notifications_docker_cleanup_failure_topic_id;
-            $this->telegramNotificationsServerDiskUsageTopicId = $this->settings->telegram_notifications_server_disk_usage_topic_id;
-            $this->telegramNotificationsServerReachableTopicId = $this->settings->telegram_notifications_server_reachable_topic_id;
-            $this->telegramNotificationsServerUnreachableTopicId = $this->settings->telegram_notifications_server_unreachable_topic_id;
+            $this->telegramNotificationsDeploymentSuccessThreadId = $this->settings->telegram_notifications_deployment_success_thread_id;
+            $this->telegramNotificationsDeploymentFailureThreadId = $this->settings->telegram_notifications_deployment_failure_thread_id;
+            $this->telegramNotificationsStatusChangeThreadId = $this->settings->telegram_notifications_status_change_thread_id;
+            $this->telegramNotificationsBackupSuccessThreadId = $this->settings->telegram_notifications_backup_success_thread_id;
+            $this->telegramNotificationsBackupFailureThreadId = $this->settings->telegram_notifications_backup_failure_thread_id;
+            $this->telegramNotificationsScheduledTaskSuccessThreadId = $this->settings->telegram_notifications_scheduled_task_success_thread_id;
+            $this->telegramNotificationsScheduledTaskFailureThreadId = $this->settings->telegram_notifications_scheduled_task_failure_thread_id;
+            $this->telegramNotificationsDockerCleanupSuccessThreadId = $this->settings->telegram_notifications_docker_cleanup_success_thread_id;
+            $this->telegramNotificationsDockerCleanupFailureThreadId = $this->settings->telegram_notifications_docker_cleanup_failure_thread_id;
+            $this->telegramNotificationsServerDiskUsageThreadId = $this->settings->telegram_notifications_server_disk_usage_thread_id;
+            $this->telegramNotificationsServerReachableThreadId = $this->settings->telegram_notifications_server_reachable_thread_id;
+            $this->telegramNotificationsServerUnreachableThreadId = $this->settings->telegram_notifications_server_unreachable_thread_id;
         }
     }
 
