@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -33,6 +34,17 @@ return new class extends Migration
 
             $table->unique(['team_id']);
         });
+        $teams = DB::table('teams')->get();
+
+        foreach ($teams as $team) {
+            try {
+                DB::table('slack_notification_settings')->insert([
+                    'team_id' => $team->id,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::error('Error migrating slack notification settings from teams table: '.$e->getMessage());
+            }
+        }
     }
 
     /**

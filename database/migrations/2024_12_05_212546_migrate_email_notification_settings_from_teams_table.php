@@ -92,6 +92,7 @@ return new class extends Migration
 
             $table->text('resend_api_key')->nullable();
 
+            $table->boolean('smtp_notifications_test')->default(false);
             $table->boolean('smtp_notifications_deployments')->default(false);
             $table->boolean('smtp_notifications_database_backups')->default(true);
             $table->boolean('smtp_notifications_scheduled_tasks')->default(false);
