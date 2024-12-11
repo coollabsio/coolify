@@ -1,13 +1,12 @@
 # documentation: https://help.sonatype.com/en/sonatype-nexus-repository.html
 # slogan: Open source Universal Repository Manager (ARM version, community edition), default credentials: admin/admin123
 # tags: repository, manager, open source, docker, docker, registry, container
-# logo: svgs/nexus-arm.png
+# logo: svgs/nexus.png
 # port: 8081
 
 services:
   nexus:
     image: sonatypecommunity/nexus3
-    restart: on-failure
     environment:
       - SERVICE_FQDN_NEXUS_8081
       - NEXUS_SECURITY_RANDOMPASSWORD=false
