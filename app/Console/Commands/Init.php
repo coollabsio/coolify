@@ -55,10 +55,8 @@ class Init extends Command
         } else {
             $this->cleanup_in_progress_application_deployments();
         }
-        echo "[3]: Cleanup Redis keys.\n";
         $this->call('cleanup:redis');
 
-        echo "[4]: Cleanup stucked resources.\n";
         $this->call('cleanup:stucked-resources');
 
         try {
@@ -114,7 +112,6 @@ class Init extends Command
 
     private function optimize()
     {
-        echo "[1]: Optimizing Laravel (caching config, routes, views).\n";
         Artisan::call('optimize:clear');
         Artisan::call('optimize');
     }
@@ -189,7 +186,6 @@ class Init extends Command
                     }
                 }
                 if ($commands->isNotEmpty()) {
-                    echo "Cleaning up unused networks from coolify proxy\n";
                     remote_process(command: $commands, type: ActivityTypes::INLINE->value, server: $server, ignore_errors: false);
                 }
             } catch (\Throwable $e) {
@@ -232,15 +228,14 @@ class Init extends Command
         $settings = instanceSettings();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
-            echo "[2]: Skipping sending live signal as do_not_track is enabled\n";
+            echo "Do_not_track is enabled\n";
 
             return;
         }
         try {
             Http::get("https://undead.coolify.io/v4/alive?appId=$id&version=$version");
-            echo "[2]: Sending live signal!\n";
         } catch (\Throwable $e) {
-            echo "[2]: Error in sending live signal: {$e->getMessage()}\n";
+            echo "Error in sending live signal: {$e->getMessage()}\n";
         }
     }
 
@@ -253,7 +248,6 @@ class Init extends Command
             }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
-                echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
             }

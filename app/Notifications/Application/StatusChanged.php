@@ -35,7 +35,7 @@ class StatusChanged extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'status_changes');
+        return $notifiable->getEnabledChannels('status_change');
     }
 
     public function toMail(): MailMessage

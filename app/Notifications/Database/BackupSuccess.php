@@ -24,7 +24,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'database_backups');
+        return $notifiable->getEnabledChannels('backup_success');
     }
 
     public function toMail(): MailMessage

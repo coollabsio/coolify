@@ -17,7 +17,7 @@ class HighDiskUsage extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'server_disk_usage');
+        return $notifiable->getEnabledChannels('server_disk_usage');
     }
 
     public function toMail(): MailMessage

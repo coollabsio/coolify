@@ -22,9 +22,9 @@ class ProductionSeeder extends Seeder
     public function run(): void
     {
         if (isCloud()) {
-            echo "[x]: Running in cloud mode.\n";
+            echo "  Running in cloud mode.\n";
         } else {
-            echo "[x]: Running in self-hosted mode.\n";
+            echo "  Running in self-hosted mode.\n";
         }
 
         // Fix for 4.0.0-beta.37
