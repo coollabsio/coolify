@@ -37,6 +37,10 @@ return [
         'is_migration_enabled' => env('MIGRATION_ENABLED', true),
     ],
 
+    'seeder' => [
+        'is_seeder_enabled' => env('SEEDER_ENABLED', true),
+    ],
+
     'horizon' => [
         'is_horizon_enabled' => env('HORIZON_ENABLED', true),
         'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
