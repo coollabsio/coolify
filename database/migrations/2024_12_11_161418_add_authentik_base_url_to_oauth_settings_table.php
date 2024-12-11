@@ -12,9 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('oauth_settings', function (Blueprint $table) {
-            Schema::table('oauth_settings', function (Blueprint $table) {
-                $table->string('base_url')->nullable();
-            });
+            $table->string('base_url')->nullable();
         });
     }
 
@@ -24,9 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('oauth_settings', function (Blueprint $table) {
-            Schema::table('oauth_settings', function (Blueprint $table) {
-                $table->dropColumn('base_url');
-            });
+            $table->dropColumn('base_url');
         });
     }
 };
