@@ -14,7 +14,7 @@ class Migration extends Command
     {
         if (config('constants.migration.is_migration_enabled')) {
             $this->info('Migration is enabled on this server.');
-            $this->call('migrate --force --isolated');
+            $this->call('migrate', ['--force' => true, '--isolated' => true]);
             exit(0);
         } else {
             $this->info('Migration is disabled on this server.');
