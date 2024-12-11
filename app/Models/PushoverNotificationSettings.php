@@ -15,7 +15,7 @@ class PushoverNotificationSettings extends Model
         'team_id',
 
         'pushover_enabled',
-        'pushover_user_key_key',
+        'pushover_user_key',
         'pushover_api_token',
 
         'deployment_success_pushover_notifications',
@@ -33,7 +33,7 @@ class PushoverNotificationSettings extends Model
 
     protected $casts = [
         'pushover_enabled' => 'boolean',
-        'pushover_user_key_key' => 'encrypted',
+        'pushover_user_key' => 'encrypted',
         'pushover_api_token' => 'encrypted',
 
         'deployment_success_pushover_notifications' => 'boolean',

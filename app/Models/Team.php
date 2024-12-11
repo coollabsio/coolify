@@ -160,7 +160,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function routeNotificationForPushover()
     {
         return [
-            'user' => data_get($this, 'pushover_user_key_key', null),
+            'user' => data_get($this, 'pushover_user_key', null),
             'token' => data_get($this, 'pushover_api_token', null),
         ];
     }
