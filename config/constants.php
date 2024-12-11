@@ -33,6 +33,10 @@ return [
         'app_key' => env('PUSHER_APP_KEY'),
     ],
 
+    'migration' => [
+        'is_migration_enabled' => env('MIGRATION_ENABLED', true),
+    ],
+
     'horizon' => [
         'is_horizon_enabled' => env('HORIZON_ENABLED', true),
         'is_scheduler_enabled' => env('SCHEDULER_ENABLED', true),
