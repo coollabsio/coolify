@@ -38,4 +38,11 @@ return [
         'tenant' => env('AZURE_TENANT_ID'),
         'proxy' => env('AZURE_PROXY'),
     ],
+
+    'authentik' => [
+        'base_url' => env('AUTHENTIK_BASE_URL'),
+        'client_id' => env('AUTHENTIK_CLIENT_ID'),
+        'client_secret' => env('AUTHENTIK_CLIENT_SECRET'),
+        'redirect' => env('AUTHENTIK_REDIRECT_URI'),
+    ],
 ];

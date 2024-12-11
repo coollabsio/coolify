@@ -32,6 +32,10 @@
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.tenant"
                                 label="Tenant" />
                         @endif
+                        @if ($oauth_setting->provider == 'authentik')
+                            <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.base_url"
+                                label="Base URL" />
+                        @endif
                     </div>
                 </div>
             @endforeach
