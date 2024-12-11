@@ -46,11 +46,7 @@ class StartDragonfly
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'labels' => [
-                        'coolify.managed' => 'true',
-                        'coolify.type' => 'database',
-                        'coolify.databaseId' => $this->database->id,
-                    ],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
                         'test' => "redis-cli -a {$this->database->dragonfly_password} ping",
                         'interval' => '5s',

@@ -43,11 +43,7 @@ class StartMysql
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'labels' => [
-                        'coolify.managed' => 'true',
-                        'coolify.type' => 'database',
-                        'coolify.databaseId' => $this->database->id,
-                    ],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
                         'test' => ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}"],
                         'interval' => '5s',
