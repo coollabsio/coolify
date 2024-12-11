@@ -75,6 +75,10 @@ trait HasNotificationSettings
             'slack' => SlackChannel::class,
         ];
 
+        if ($event === 'general') {
+            unset($channelMap['email']);
+        }
+
         foreach ($channelMap as $channel => $channelClass) {
             if ($this->isNotificationEnabled($channel) && $this->isNotificationTypeEnabled($channel, $event)) {
                 $channels[] = $channelClass;
