@@ -7535,6 +7535,56 @@
             "time": "2024-11-24T11:02:20+00:00"
         },
         {
+            "name": "socialiteproviders/authentik",
+            "version": "5.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Authentik.git",
+                "reference": "4cf129cf04728a38e0531c54454464b162f0fa66"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Authentik/zipball/4cf129cf04728a38e0531c54454464b162f0fa66",
+                "reference": "4cf129cf04728a38e0531c54454464b162f0fa66",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^8.0",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Authentik\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "rf152",
+                    "email": "git@rf152.co.uk"
+                }
+            ],
+            "description": "Authentik OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "authentik",
+                "laravel",
+                "oauth",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "docs": "https://socialiteproviders.com/authentik",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2023-11-07T22:21:16+00:00"
+        },
+        {
             "name": "socialiteproviders/manager",
             "version": "v4.7.0",
             "source": {
