@@ -16,8 +16,8 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
 
             $table->boolean('pushover_enabled')->default(false);
-            $table->text('pushover_user')->nullable();
-            $table->text('pushover_token')->nullable();
+            $table->text('pushover_user_key')->nullable();
+            $table->text('pushover_api_token')->nullable();
 
             $table->boolean('deployment_success_pushover_notifications')->default(false);
             $table->boolean('deployment_failure_pushover_notifications')->default(true);
@@ -44,4 +44,3 @@ return new class extends Migration
         Schema::dropIfExists('pushover_notification_settings');
     }
 };
-

@@ -18,10 +18,10 @@ class Pushover extends Component
     public bool $pushoverEnabled = false;
 
     #[Validate(['string', 'nullable'])]
-    public ?string $pushoverToken = null;
-    
+    public ?string $pushoverUserKey = null;
+
     #[Validate(['string', 'nullable'])]
-    public ?string $pushoverUser = null;
+    public ?string $pushoverApiToken = null;
 
     #[Validate(['boolean'])]
     public bool $deploymentSuccessPushoverNotifications = false;
@@ -59,7 +59,6 @@ class Pushover extends Component
     #[Validate(['boolean'])]
     public bool $serverUnreachablePushoverNotifications = true;
 
-
     public function mount()
     {
         try {
@@ -76,8 +75,8 @@ class Pushover extends Component
         if ($toModel) {
             $this->validate();
             $this->settings->pushover_enabled = $this->pushoverEnabled;
-            $this->settings->pushover_user = $this->pushoverUser;
-            $this->settings->pushover_token = $this->pushoverToken;
+            $this->settings->pushover_user_key_key = $this->pushoverUserKey;
+            $this->settings->pushover_api_token = $this->pushoverApiToken;
 
             $this->settings->deployment_success_pushover_notifications = $this->deploymentSuccessPushoverNotifications;
             $this->settings->deployment_failure_pushover_notifications = $this->deploymentFailurePushoverNotifications;
@@ -96,8 +95,8 @@ class Pushover extends Component
             refreshSession();
         } else {
             $this->pushoverEnabled = $this->settings->pushover_enabled;
-            $this->pushoverUser = $this->settings->pushover_user;
-            $this->pushoverToken = $this->settings->pushover_token;
+            $this->pushoverUserKey = $this->settings->pushover_user_key_key;
+            $this->pushoverApiToken = $this->settings->pushover_api_token;
 
             $this->deploymentSuccessPushoverNotifications = $this->settings->deployment_success_pushover_notifications;
             $this->deploymentFailurePushoverNotifications = $this->settings->deployment_failure_pushover_notifications;
@@ -118,11 +117,11 @@ class Pushover extends Component
     {
         try {
             $this->validate([
-                'pushoverUser' => 'required',
-                'pushoverToken' => 'required',
+                'pushoverUserKey' => 'required',
+                'pushoverApiToken' => 'required',
             ], [
-                'pushoverUser.required' => 'Pushover User is required.',
-                'pushoverToken.required' => 'Pushover Token is required.',
+                'pushoverUserKey.required' => 'Pushover User Key is required.',
+                'pushoverApiToken.required' => 'Pushover API Token is required.',
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {

@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
-use App\Notifications\Channels\SendsSlack;
 use App\Notifications\Channels\SendsPushover;
+use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -33,7 +33,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack, SendsPushover
+class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
     use HasNotificationSettings, Notifiable;
 
@@ -156,12 +156,12 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack, SendsP
     {
         return data_get($this, 'slack_webhook_url', null);
     }
-    
+
     public function routeNotificationForPushover()
     {
         return [
-            'user' => data_get($this, 'pushover_user', null),
-            'token' => data_get($this, 'pushover_token', null),
+            'user' => data_get($this, 'pushover_user_key_key', null),
+            'token' => data_get($this, 'pushover_api_token', null),
         ];
     }
 
@@ -287,7 +287,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsSlack, SendsP
     {
         return $this->hasOne(SlackNotificationSettings::class);
     }
-    
+
     public function pushoverNotificationSettings()
     {
         return $this->hasOne(PushoverNotificationSettings::class);

@@ -23,12 +23,12 @@
             <div class="w-32">
                 <x-forms.checkbox instantSave="instantSavePushoverEnabled" id="pushoverEnabled" label="Enabled" />
             </div>
-            <x-forms.input type="text"
-                helper="Get your user key in Pushover.<br><a href='https://pushover.net' target='_blank'>Pushover</a>" required
-                id="pushoverUser" label="User" />
             <x-forms.input type="password"
-                helper="Generate a token in Pushover.<br>Example: https://pushover.net/apps/build/...." required
-                id="pushoverToken" label="Token" />
+                helper="Get your User Key in Pushover. You need to be logged in to Pushover to see your user key in the top right corner. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/' target='_blank'>Pushover Dashboard</a>" required
+                id="pushoverUserKey" label="User Key" />
+            <x-forms.input type="password"
+                helper="Generate an API Token/Key in Pushover by creating a new application. <br><a class='inline-block underline dark:text-white' href='https://pushover.net/apps/build' target='_blank'>Create Pushover Application</a>" required
+                id="pushoverApiToken" label="API Token" />
         </form>
         <h2 class="mt-4">Notification Settings</h2>
         <p class="mb-4">
