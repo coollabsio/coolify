@@ -115,6 +115,12 @@ class Application extends BaseModel
 
     protected static function booted()
     {
+        static::addGlobalScope('withRelations', function ($builder) {
+            $builder->withCount([
+                'additional_servers',
+                'additional_networks',
+            ]);
+        });
         static::saving(function ($application) {
             $payload = [];
             if ($application->isDirty('fqdn')) {
@@ -551,20 +557,21 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->additional_servers->count() === 0) {
-                    return $this->destination->server->isFunctional();
-                } else {
-                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                    $main_server_status = $this->destination->server->isFunctional();
-                    foreach ($additional_servers_status as $status) {
-                        $server_status = str($status)->before(':')->value();
-                        if ($server_status !== 'running') {
-                            return false;
-                        }
-                    }
-
-                    return $main_server_status;
+                if (! $this->relationLoaded('additional_servers') || $this->additional_servers->count() === 0) {
+                    return $this->destination?->server?->isFunctional() ?? false;
                 }
+
+                $additional_servers_status = $this->additional_servers->pluck('pivot.status');
+                $main_server_status = $this->destination?->server?->isFunctional() ?? false;
+
+                foreach ($additional_servers_status as $status) {
+                    $server_status = str($status)->before(':')->value();
+                    if ($server_status !== 'running') {
+                        return false;
+                    }
+                }
+
+                return $main_server_status;
             }
         );
     }
