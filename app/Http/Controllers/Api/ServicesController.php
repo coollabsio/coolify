@@ -25,6 +25,8 @@ class ServicesController extends Controller
             $service->makeHidden([
                 'docker_compose_raw',
                 'docker_compose',
+                'value',
+                'real_value',
             ]);
         }
 
