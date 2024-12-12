@@ -12,7 +12,7 @@ services:
       - WWW_USER_ID=${WWW_USER_ID:-1000}
       - WWW_GROUP_ID=${WWW_GROUP_ID:-1000}
       - DOLI_DB_HOST=mariadb
-      - DOLI_DB_NAME=${MYSQL_DATABASE:-dolidb}
+      - DOLI_DB_NAME=${MYSQL_DATABASE:-dolibarr-db}
       - DOLI_DB_USER=${SERVICE_USER_MYSQL}
       - DOLI_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - DOLI_URL_ROOT=${SERVICE_URL_DOLIBARR}
@@ -26,15 +26,16 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
+
   mariadb:
     image: mariadb:latest
     environment:
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-dolidb}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-dolibarr-db}
       - MYSQL_USER=${SERVICE_USER_MYSQL}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
     volumes:
-      - mariadb-data:/var/lib/mysql
+      - dolibarr_mariadb_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
