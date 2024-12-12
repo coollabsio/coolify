@@ -26,6 +26,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
@@ -170,12 +171,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->onQueue('high');
 
-        $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
-        $this->application = Application::find($this->application_deployment_queue->application_id);
-        $this->build_pack = data_get($this->application, 'build_pack');
-        $this->build_args = collect([]);
-
         $this->application_deployment_queue_id = $application_deployment_queue_id;
+
+        // Load the deployment queue record
+        $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
+        if (! $this->application_deployment_queue) {
+            throw new Exception('Deployment queue not found.');
+        }
+
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
@@ -186,8 +189,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->force_rebuild = true;
         }
         $this->restart_only = $this->application_deployment_queue->restart_only;
-        $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
+
+        // Load the application
+        $this->application = Application::find($this->application_deployment_queue->application_id);
+        if (! $this->application) {
+            throw new Exception('Application not found.');
+        }
+
+        $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
 
         $this->git_type = data_get($this->application_deployment_queue, 'git_type');
 
@@ -195,7 +205,239 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($source) {
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
         }
+
+        // Load the server
         $this->server = Server::find($this->application_deployment_queue->server_id);
+        if (! $this->server) {
+            throw new Exception('Server not found.');
+        }
+
+        $this->timeout = $this->server->settings->dynamic_timeout;
+        $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
+        if (! $this->destination) {
+            throw new Exception('Destination not found.');
+        }
+
+        $this->server = $this->mainServer = $this->destination->server;
+        $this->serverUser = $this->server->user;
+        $this->is_this_additional_server = $this->application->additional_servers()->wherePivot('server_id', $this->server->id)->count() > 0;
+        $this->preserveRepository = $this->application->settings->is_preserve_repository_enabled;
+
+        $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
+        $this->workdir = "{$this->basedir}".rtrim($this->application->base_directory, '/');
+        $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
+        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+
+        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
+        if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
+            if ($this->pull_request_id === 0) {
+                $this->container_name = $this->application->settings->custom_internal_name;
+            } else {
+                $this->container_name = "{$this->application->settings->custom_internal_name}-pr-{$this->pull_request_id}";
+            }
+        }
+
+        $this->saved_outputs = collect();
+
+        // Set preview fqdn
+        if ($this->pull_request_id !== 0) {
+            $this->preview = $this->application->generate_preview_fqdn($this->pull_request_id);
+            if ($this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(
+                    application: $this->application,
+                    preview: $this->preview,
+                    deployment_uuid: $this->deployment_uuid,
+                    status: ProcessStatus::IN_PROGRESS
+                );
+            }
+            if ($this->application->build_pack === 'dockerfile') {
+                if (data_get($this->application, 'dockerfile_location')) {
+                    $this->dockerfile_location = $this->application->dockerfile_location;
+                }
+            }
+        }
+    }
+
+    public function tags(): array
+    {
+        return ['server:'.gethostname()];
+    }
+
+    public function handle(): void
+    {
+        $cleanup_attempted = false;
+
+        try {
+            DB::beginTransaction();
+
+            $this->application_deployment_queue = ApplicationDeploymentQueue::lockForUpdate()->find($this->application_deployment_queue_id);
+            if (! $this->application_deployment_queue) {
+                throw new Exception('Deployment queue not found.');
+            }
+
+            // Verify deployment is still valid
+            if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::IN_PROGRESS->value) {
+                throw new Exception('Deployment is no longer in progress.');
+            }
+
+            $this->application = Application::find($this->application_deployment_queue->application_id);
+            if (! $this->application) {
+                throw new Exception('Application not found.');
+            }
+
+            $this->server = $this->application_deployment_queue->server;
+            if (! $this->server) {
+                throw new Exception('Server not found.');
+            }
+
+            if ($this->server->isFunctional() === false) {
+                $this->application_deployment_queue->addLogEntry('Server is not functional.');
+                throw new Exception('Server is not functional.');
+            }
+
+            try {
+                // Generate custom host<->ip mapping
+                $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
+
+                if (! is_null($allContainers)) {
+                    $allContainers = format_docker_command_output_to_json($allContainers);
+                    $ips = collect([]);
+                    if (count($allContainers) > 0) {
+                        $allContainers = $allContainers[0];
+                        $allContainers = collect($allContainers)->sort()->values();
+                        foreach ($allContainers as $container) {
+                            $containerName = data_get($container, 'Name');
+                            if ($containerName === 'coolify-proxy') {
+                                continue;
+                            }
+                            if (preg_match('/-(\d{12})/', $containerName)) {
+                                continue;
+                            }
+                            $containerIp = data_get($container, 'IPv4Address');
+                            if ($containerName && $containerIp) {
+                                $containerIp = str($containerIp)->before('/');
+                                $ips->put($containerName, $containerIp->value());
+                            }
+                        }
+                    }
+                    $this->addHosts = $ips->map(function ($ip, $name) {
+                        return "--add-host $name:$ip";
+                    })->implode(' ');
+                }
+
+                if ($this->application->dockerfile_target_build) {
+                    $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
+                }
+
+                // Check custom port
+                ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
+
+                if (data_get($this->application, 'settings.is_build_server_enabled')) {
+                    $teamId = data_get($this->application, 'environment.project.team.id');
+                    $buildServers = Server::buildServers($teamId)->get();
+                    if ($buildServers->count() === 0) {
+                        $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
+                        $this->build_server = $this->server;
+                        $this->original_server = $this->server;
+                    } else {
+                        $this->build_server = $buildServers->random();
+                        $this->application_deployment_queue->build_server_id = $this->build_server->id;
+                        $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
+                        $this->original_server = $this->server;
+                        $this->use_build_server = true;
+                    }
+                } else {
+                    // Set build server & original_server to the same as deployment server
+                    $this->build_server = $this->server;
+                    $this->original_server = $this->server;
+                }
+            } catch (Exception $e) {
+                throw new Exception('Failed to initialize deployment: '.$e->getMessage());
+            }
+
+            DB::commit();
+
+            // Ensure cleanup happens in finally block
+            $this->decide_what_to_do();
+
+            // Mark deployment as successful
+            $this->application_deployment_queue->update([
+                'status' => ApplicationDeploymentStatus::FINISHED->value,
+            ]);
+
+            ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
+
+        } catch (Exception $e) {
+            DB::rollBack();
+
+            if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(
+                    application: $this->application,
+                    preview: $this->preview,
+                    deployment_uuid: $this->deployment_uuid,
+                    status: ProcessStatus::ERROR
+                );
+            }
+
+            // Mark deployment as failed
+            if (isset($this->application_deployment_queue)) {
+                $this->application_deployment_queue->update([
+                    'status' => ApplicationDeploymentStatus::FAILED->value,
+                    'error_message' => $e->getMessage(),
+                ]);
+            }
+
+            $this->fail($e);
+            throw $e;
+        } finally {
+            try {
+                $cleanup_attempted = true;
+
+                // Only cleanup if deployment was actually started
+                if ($this->deployment_uuid) {
+                    if ($this->use_build_server) {
+                        $this->server = $this->build_server;
+                    } else {
+                        $this->write_deployment_configurations();
+                    }
+
+                    // Check if container exists before removing
+                    $this->execute_remote_command([
+                        "docker ps -q -f name={$this->deployment_uuid} && docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+                        'hidden' => true,
+                        'ignore_errors' => true,
+                    ]);
+
+                    // Clean up any temporary files
+                    $this->execute_remote_command([
+                        "rm -rf {$this->basedir}",
+                        'hidden' => true,
+                        'ignore_errors' => true,
+                    ]);
+                }
+            } catch (Exception $e) {
+                // Log cleanup failure but don't fail the deployment
+                \Log::error("Cleanup failed for deployment {$this->deployment_uuid}: ".$e->getMessage());
+            } finally {
+                if (! $cleanup_attempted) {
+                    // Ensure next deployment is queued even if cleanup fails
+                    queue_next_deployment($this->application);
+                }
+            }
+        }
+    }
+
+    private function initialize_deployment()
+    {
+        $this->build_pack = data_get($this->application, 'build_pack');
+        $this->build_args = collect([]);
+
+        $this->git_type = data_get($this->application_deployment_queue, 'git_type');
+
+        $source = data_get($this->application, 'source');
+        if ($source) {
+            $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
+        }
         $this->timeout = $this->server->settings->dynamic_timeout;
         $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
         $this->server = $this->mainServer = $this->destination->server;
@@ -230,103 +472,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->dockerfile_location = $this->application->dockerfile_location;
                 }
             }
-        }
-    }
-
-    public function tags(): array
-    {
-        return ['server:'.gethostname()];
-    }
-
-    public function handle(): void
-    {
-        $this->application_deployment_queue->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
-        if ($this->server->isFunctional() === false) {
-            $this->application_deployment_queue->addLogEntry('Server is not functional.');
-            $this->fail('Server is not functional.');
-
-            return;
-        }
-        try {
-            // Generate custom host<->ip mapping
-            $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
-
-            if (! is_null($allContainers)) {
-                $allContainers = format_docker_command_output_to_json($allContainers);
-                $ips = collect([]);
-                if (count($allContainers) > 0) {
-                    $allContainers = $allContainers[0];
-                    $allContainers = collect($allContainers)->sort()->values();
-                    foreach ($allContainers as $container) {
-                        $containerName = data_get($container, 'Name');
-                        if ($containerName === 'coolify-proxy') {
-                            continue;
-                        }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
-                            continue;
-                        }
-                        $containerIp = data_get($container, 'IPv4Address');
-                        if ($containerName && $containerIp) {
-                            $containerIp = str($containerIp)->before('/');
-                            $ips->put($containerName, $containerIp->value());
-                        }
-                    }
-                }
-                $this->addHosts = $ips->map(function ($ip, $name) {
-                    return "--add-host $name:$ip";
-                })->implode(' ');
-            }
-
-            if ($this->application->dockerfile_target_build) {
-                $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
-            }
-
-            // Check custom port
-            ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
-
-            if (data_get($this->application, 'settings.is_build_server_enabled')) {
-                $teamId = data_get($this->application, 'environment.project.team.id');
-                $buildServers = Server::buildServers($teamId)->get();
-                if ($buildServers->count() === 0) {
-                    $this->application_deployment_queue->addLogEntry('No suitable build server found. Using the deployment server.');
-                    $this->build_server = $this->server;
-                    $this->original_server = $this->server;
-                } else {
-                    $this->build_server = $buildServers->random();
-                    $this->application_deployment_queue->build_server_id = $this->build_server->id;
-                    $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
-                    $this->original_server = $this->server;
-                    $this->use_build_server = true;
-                }
-            } else {
-                // Set build server & original_server to the same as deployment server
-                $this->build_server = $this->server;
-                $this->original_server = $this->server;
-            }
-            $this->decide_what_to_do();
-        } catch (Exception $e) {
-            if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
-            }
-            $this->fail($e);
-            throw $e;
-        } finally {
-            if ($this->use_build_server) {
-                $this->server = $this->build_server;
-            } else {
-                $this->write_deployment_configurations();
-            }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    'hidden' => true,
-                    'ignore_errors' => true,
-                ]
-            );
-
-            ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
 
