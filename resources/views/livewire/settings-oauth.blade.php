@@ -16,7 +16,7 @@
         <div class="flex flex-col gap-2 pt-4">
             @foreach ($oauth_settings_map as $oauth_setting)
                 <div class="p-4 border dark:border-coolgray-300">
-                    <h3>{{ ucfirst($oauth_setting->provider) }} Oauth</h3>
+                    <h3>{{ ucfirst($oauth_setting->provider) }}</h3>
                     <div class="w-32">
                         <x-forms.checkbox instantSave id="oauth_settings_map.{{ $oauth_setting->provider }}.enabled"
                             label="Enabled" />
@@ -31,6 +31,10 @@
                         @if ($oauth_setting->provider == 'azure')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.tenant"
                                 label="Tenant" />
+                        @endif
+                        @if ($oauth_setting->provider == 'authentik')
+                            <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.base_url"
+                                label="Base URL" />
                         @endif
                     </div>
                 </div>
