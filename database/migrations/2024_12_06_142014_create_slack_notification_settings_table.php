@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -42,7 +43,7 @@ return new class extends Migration
                     'team_id' => $team->id,
                 ]);
             } catch (\Throwable $e) {
-                \Log::error('Error migrating slack notification settings from teams table: '.$e->getMessage());
+                Log::error('Error creating slack notification settings for existing teams: '.$e->getMessage());
             }
         }
     }

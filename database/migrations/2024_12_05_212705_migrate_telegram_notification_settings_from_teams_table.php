@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -30,17 +31,17 @@ return new class extends Migration
                         'status_change_telegram_notifications' => $team->telegram_notifications_status_changes ?? false,
                         'server_disk_usage_telegram_notifications' => $team->telegram_notifications_server_disk_usage ?? true,
 
-                        'telegram_notifications_deployment_success_topic_id' => $team->telegram_notifications_deployments_message_thread_id ? Crypt::encryptString($team->telegram_notifications_deployments_message_thread_id) : null,
-                        'telegram_notifications_deployment_failure_topic_id' => $team->telegram_notifications_deployments_message_thread_id ? Crypt::encryptString($team->telegram_notifications_deployments_message_thread_id) : null,
-                        'telegram_notifications_backup_success_topic_id' => $team->telegram_notifications_database_backups_message_thread_id ? Crypt::encryptString($team->telegram_notifications_database_backups_message_thread_id) : null,
-                        'telegram_notifications_backup_failure_topic_id' => $team->telegram_notifications_database_backups_message_thread_id ? Crypt::encryptString($team->telegram_notifications_database_backups_message_thread_id) : null,
-                        'telegram_notifications_scheduled_task_success_topic_id' => $team->telegram_notifications_scheduled_tasks_thread_id ? Crypt::encryptString($team->telegram_notifications_scheduled_tasks_thread_id) : null,
-                        'telegram_notifications_scheduled_task_failure_topic_id' => $team->telegram_notifications_scheduled_tasks_thread_id ? Crypt::encryptString($team->telegram_notifications_scheduled_tasks_thread_id) : null,
-                        'telegram_notifications_status_change_topic_id' => $team->telegram_notifications_status_changes_message_thread_id ? Crypt::encryptString($team->telegram_notifications_status_changes_message_thread_id) : null,
+                        'telegram_notifications_deployment_success_thread_id' => $team->telegram_notifications_deployments_message_thread_id ? Crypt::encryptString($team->telegram_notifications_deployments_message_thread_id) : null,
+                        'telegram_notifications_deployment_failure_thread_id' => $team->telegram_notifications_deployments_message_thread_id ? Crypt::encryptString($team->telegram_notifications_deployments_message_thread_id) : null,
+                        'telegram_notifications_backup_success_thread_id' => $team->telegram_notifications_database_backups_message_thread_id ? Crypt::encryptString($team->telegram_notifications_database_backups_message_thread_id) : null,
+                        'telegram_notifications_backup_failure_thread_id' => $team->telegram_notifications_database_backups_message_thread_id ? Crypt::encryptString($team->telegram_notifications_database_backups_message_thread_id) : null,
+                        'telegram_notifications_scheduled_task_success_thread_id' => $team->telegram_notifications_scheduled_tasks_thread_id ? Crypt::encryptString($team->telegram_notifications_scheduled_tasks_thread_id) : null,
+                        'telegram_notifications_scheduled_task_failure_thread_id' => $team->telegram_notifications_scheduled_tasks_thread_id ? Crypt::encryptString($team->telegram_notifications_scheduled_tasks_thread_id) : null,
+                        'telegram_notifications_status_change_thread_id' => $team->telegram_notifications_status_changes_message_thread_id ? Crypt::encryptString($team->telegram_notifications_status_changes_message_thread_id) : null,
                     ]
                 );
             } catch (Exception $e) {
-                \Log::error('Error migrating telegram notification settings from teams table: '.$e->getMessage());
+                Log::error('Error migrating telegram notification settings from teams table: '.$e->getMessage());
             }
         }
 
@@ -101,13 +102,13 @@ return new class extends Migration
                         'telegram_notifications_scheduled_tasks' => $setting->scheduled_task_success_telegram_notifications || $setting->scheduled_task_failure_telegram_notifications,
                         'telegram_notifications_server_disk_usage' => $setting->server_disk_usage_telegram_notifications,
 
-                        'telegram_notifications_deployments_message_thread_id' => $setting->telegram_notifications_deployment_success_topic_id ? Crypt::decryptString($setting->telegram_notifications_deployment_success_topic_id) : null,
-                        'telegram_notifications_status_changes_message_thread_id' => $setting->telegram_notifications_status_change_topic_id ? Crypt::decryptString($setting->telegram_notifications_status_change_topic_id) : null,
-                        'telegram_notifications_database_backups_message_thread_id' => $setting->telegram_notifications_backup_success_topic_id ? Crypt::decryptString($setting->telegram_notifications_backup_success_topic_id) : null,
-                        'telegram_notifications_scheduled_tasks_thread_id' => $setting->telegram_notifications_scheduled_task_success_topic_id ? Crypt::decryptString($setting->telegram_notifications_scheduled_task_success_topic_id) : null,
+                        'telegram_notifications_deployments_message_thread_id' => $setting->telegram_notifications_deployment_success_thread_id ? Crypt::decryptString($setting->telegram_notifications_deployment_success_thread_id) : null,
+                        'telegram_notifications_status_changes_message_thread_id' => $setting->telegram_notifications_status_change_thread_id ? Crypt::decryptString($setting->telegram_notifications_status_change_thread_id) : null,
+                        'telegram_notifications_database_backups_message_thread_id' => $setting->telegram_notifications_backup_success_thread_id ? Crypt::decryptString($setting->telegram_notifications_backup_success_thread_id) : null,
+                        'telegram_notifications_scheduled_tasks_thread_id' => $setting->telegram_notifications_scheduled_task_success_thread_id ? Crypt::decryptString($setting->telegram_notifications_scheduled_task_success_thread_id) : null,
                     ]);
             } catch (Exception $e) {
-                \Log::error('Error migrating telegram notification settings from teams table: '.$e->getMessage());
+                Log::error('Error migrating telegram notification settings from teams table: '.$e->getMessage());
             }
         }
     }

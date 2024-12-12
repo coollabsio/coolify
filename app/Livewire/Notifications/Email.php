@@ -14,8 +14,10 @@ class Email extends Component
 {
     protected $listeners = ['refresh' => '$refresh'];
 
+    #[Locked]
     public Team $team;
 
+    #[Locked]
     public EmailNotificationSettings $settings;
 
     #[Locked]

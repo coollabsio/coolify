@@ -5,13 +5,18 @@ namespace App\Livewire\Notifications;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Slack extends Component
 {
+    protected $listeners = ['refresh' => '$refresh'];
+
+    #[Locked]
     public Team $team;
 
+    #[Locked]
     public SlackNotificationSettings $settings;
 
     #[Validate(['boolean'])]
@@ -121,6 +126,8 @@ class Slack extends Component
             $this->slackEnabled = false;
 
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
@@ -130,6 +137,8 @@ class Slack extends Component
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
