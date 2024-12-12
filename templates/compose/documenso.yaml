@@ -6,19 +6,19 @@
 
 services:
   documenso:
-    image: "documenso/documenso"
+    image: documenso/documenso
     depends_on:
       database:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_DOCUMENSO_3000
-      - NEXTAUTH_URL=$SERVICE_FQDN_DOCUMENSO_3000
-      - NEXTAUTH_SECRET=$SERVICE_BASE64_AUTHSECRET
-      - NEXT_PRIVATE_ENCRYPTION_KEY=$SERVICE_BASE64_ENCRYPTIONKEY
-      - NEXT_PRIVATE_ENCRYPTION_SECONDARY_KEY=$SERVICE_BASE64_SECONDARYENCRYPTIONKEY
-      - NEXT_PUBLIC_WEBAPP_URL=$SERVICE_FQDN_DOCUMENSO_3000
-      - NEXT_PRIVATE_DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@database/documenso?schema=public
-      - NEXT_PRIVATE_DIRECT_DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@database/documenso?schema=public
+      - NEXTAUTH_URL=${SERVICE_FQDN_DOCUMENSO_3000}
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_AUTHSECRET}
+      - NEXT_PRIVATE_ENCRYPTION_KEY=${SERVICE_BASE64_ENCRYPTIONKEY}
+      - NEXT_PRIVATE_ENCRYPTION_SECONDARY_KEY=${SERVICE_BASE64_SECONDARYENCRYPTIONKEY}
+      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_FQDN_DOCUMENSO_3000}
+      - NEXT_PRIVATE_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
+      - NEXT_PRIVATE_DIRECT_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
     healthcheck:
       test:
         - CMD-SHELL
@@ -28,17 +28,15 @@ services:
       retries: 20
 
   database:
-    image: "postgres:16-alpine"
+    image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=documenso
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-documenso-db}
     volumes:
-      - "postgresql-data:/var/lib/postgresql/data"
+      - documenso_postgresql_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        - CMD-SHELL
-        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
-      timeout: 10s
-      retries: 20
+      timeout: 20s
+      retries: 10
