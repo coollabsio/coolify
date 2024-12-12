@@ -338,6 +338,20 @@
         "minversion": "0.0.0",
         "port": "3000"
     },
+    "checkmate": {
+        "documentation": "https://bluewavelabs.gitbook.io/checkmate?utm_source=coolify.io",
+        "slogan": "An open source server monitoring application",
+        "compose": "c2VydmljZXM6CiAgY2xpZW50OgogICAgaW1hZ2U6ICdibHVld2F2ZXVwdGltZS91cHRpbWVfY2xpZW50OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DSEVDS01BVEVfODAKICAgICAgLSAnVVBUSU1FX0FQUF9BUElfQkFTRV9VUkw9JHtTRVJWSUNFX0ZRRE5fQ0hFQ0tNQVRFU0VSVkVSXzUwMDB9L2FwaS92MScKICAgIGRlcGVuZHNfb246CiAgICAgIC0gc2VydmVyCiAgc2VydmVyOgogICAgaW1hZ2U6ICdibHVld2F2ZXVwdGltZS91cHRpbWVfc2VydmVyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DSEVDS01BVEVTRVJWRVJfNTAwMAogICAgICAtICdKV1RfU0VDUkVUPSR7U0VSVklDRV9QQVNTV09SRF82NF9KV1R9JwogICAgICAtICdSRUZSRVNIX1RPS0VOX1NFQ1JFVD0ke1NFUlZJQ0VfUEFTU1dPUkRfNjRfUkVGUkVTSH0nCiAgICAgIC0gJ1NZU1RFTV9FTUFJTF9BRERSRVNTPSR7U1lTVEVNX0VNQUlMX0FERFJFU1M6LXRlc3RAZXhhbXBsZS5jb219JwogICAgICAtICdTWVNURU1fRU1BSUxfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEXzY0X0VNQUlMfScKICAgICAgLSAnU1lTVEVNX0VNQUlMX0hPU1Q9JHtTWVNURU1fRU1BSUxfSE9TVH0nCiAgICAgIC0gJ1NZU1RFTV9FTUFJTF9QT1JUPSR7U1lTVEVNX0VNQUlMX1BPUlR9JwogICAgICAtICdQQUdFU1BFRURfQVBJX0tFWT0ke1BBR0VTUEVFRF9BUElfS0VZfScKICAgICAgLSAnREJfQ09OTkVDVElPTl9TVFJJTkc9JHtEQl9DT05ORUNUSU9OX1NUUklORzotbW9uZ29kYjovL21vbmdvZGI6MjcwMTcvdXB0aW1lX2RifScKICAgICAgLSAnUkVESVNfSE9TVD0ke1JFRElTX0hPU1Q6LXJlZGlzfScKICAgICAgLSAnUkVESVNfUE9SVD0ke1JFRElTX1BPUlQ6LTYzNzl9JwogICAgICAtICdEQl9UWVBFPSR7REJfVFlQRTotTW9uZ29EQn0nCiAgICAgIC0gJ1RPS0VOX1RUTD0ke1RPS0VOX1RUTDotOTlkfScKICAgICAgLSAnUkVGUkVTSF9UT0tFTl9UVEw9JHtSRUZSRVNIX1RPS0VOX1RUTDotOTlkfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJy92YXIvcnVuL2RvY2tlci5zb2NrOi92YXIvcnVuL2RvY2tlci5zb2NrJwogICAgZGVwZW5kc19vbjoKICAgICAgLSByZWRpcwogICAgICAtIG1vbmdvZGIKICByZWRpczoKICAgIGltYWdlOiAnYmx1ZXdhdmV1cHRpbWUvdXB0aW1lX3JlZGlzOmxhdGVzdCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3JlZGlzOi9kYXRhJwogIG1vbmdvZGI6CiAgICBpbWFnZTogJ2JsdWV3YXZldXB0aW1lL3VwdGltZV9kYXRhYmFzZV9tb25nbzpsYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdtb25nb2RiOi9kYXRhL2RiJwogICAgY29tbWFuZDoKICAgICAgLSBtb25nb2QKICAgICAgLSAnLS1xdWlldCcK",
+        "tags": [
+            "monitoring",
+            "server",
+            "uptime",
+            "healthcheck"
+        ],
+        "logo": "svgs/checkmate.png",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "classicpress-with-mariadb": {
         "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
         "slogan": "A lightweight, stable, instantly familiar free open-source content management system, based on WordPress without the block editor (Gutenberg).",
@@ -2335,7 +2349,7 @@
     },
     "prowlarr": {
         "documentation": "https://hub.docker.com/r/linuxserver/prowlarr?utm_source=coolify.io",
-        "slogan": "Prowlarr\u2060 is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps. Prowlarr supports both Torrent Trackers and Usenet Indexers. It integrates seamlessly with Sonarr, Radarr, Lidarr, and Readarr offering complete management of your indexers with no per app Indexer setup required (we do it all).",
+        "slogan": "Prowlarr\u2060 is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps.",
         "compose": "c2VydmljZXM6CiAgcHJvd2xhcnI6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcHJvd2xhcnI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BST1dMQVJSXzk2OTYKICAgICAgLSBfQVBQX1VSTD0kU0VSVklDRV9GUUROX1BST1dMQVJSCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUFtZXJpY2EvVG9yb250b30nCiAgICB2b2x1bWVzOgogICAgICAtICdwcm93bGFyci1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo5Njk2L3BpbmcnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "media",
