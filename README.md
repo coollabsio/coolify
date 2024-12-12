@@ -40,7 +40,8 @@ Special thanks to our biggest sponsors!
 
 ### Special Sponsors
 
-![image](https://github.com/user-attachments/assets/726fb63e-c3b8-4260-b3ac-06780605ec5d)
+![image](https://github.com/user-attachments/assets/6022bc9c-8435-4d14-9497-8be230ed8cb1)
+
 
 * [CCCareers](https://cccareers.org/) - A career development platform connecting coding bootcamp graduates with job opportunities in the tech industry.
 * [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering affordable dedicated servers, cloud services, and web hosting solutions.
