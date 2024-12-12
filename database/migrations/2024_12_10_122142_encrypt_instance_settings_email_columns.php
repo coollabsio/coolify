@@ -45,11 +45,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->string('smtp_from_address')->nullable()->change();
-            $table->string('smtp_from_name')->nullable()->change();
-            $table->string('smtp_recipients')->nullable()->change();
-            $table->string('smtp_host')->nullable()->change();
-            $table->string('smtp_username')->nullable()->change();
+            $table->text('smtp_from_address')->nullable()->change();
+            $table->text('smtp_from_name')->nullable()->change();
+            $table->text('smtp_recipients')->nullable()->change();
+            $table->text('smtp_host')->nullable()->change();
+            $table->text('smtp_username')->nullable()->change();
         });
 
         if (DB::table('instance_settings')->exists()) {
