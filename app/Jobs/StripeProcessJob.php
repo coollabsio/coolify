@@ -173,8 +173,8 @@ class StripeProcessJob implements ShouldQueue
                     $userId = data_get($data, 'metadata.user_id');
                     $customerId = data_get($data, 'customer');
                     $status = data_get($data, 'status');
-                    $subscriptionId = data_get($data, 'items.data.0.subscription');
-                    $planId = data_get($data, 'items.data.0.plan.id');
+                    $subscriptionId = data_get($data, 'items.data.0.subscription') ?? data_get($data, 'id');
+                    $planId = data_get($data, 'items.data.0.plan.id') ?? data_get($data, 'plan.id');
                     if (Str::contains($excludedPlans, $planId)) {
                         send_internal_notification('Subscription excluded.');
                         break;
@@ -218,9 +218,18 @@ class StripeProcessJob implements ShouldQueue
                         'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                     ]);
                     if ($status === 'paused' || $status === 'incomplete_expired') {
-                        $subscription->update([
-                            'stripe_invoice_paid' => false,
-                        ]);
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_invoice_paid' => false,
+                            ]);
+                        }
+                    }
+                    if ($status === 'active') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_invoice_paid' => true,
+                            ]);
+                        }
                     }
                     if ($feedback) {
                         $reason = "Cancellation feedback for {$customerId}: '".$feedback."'";
@@ -228,13 +237,24 @@ class StripeProcessJob implements ShouldQueue
                             $reason .= ' with comment: \''.$comment."'";
                         }
                     }
+
                     break;
                 case 'customer.subscription.deleted':
-                    // End subscription
                     $customerId = data_get($data, 'customer');
-                    $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
-                    $team = data_get($subscription, 'team');
-                    $team?->subscriptionEnded();
+                    $subscriptionId = data_get($data, 'id');
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->where('stripe_subscription_id', $subscriptionId)->first();
+                    if ($subscription) {
+                        $team = data_get($subscription, 'team');
+                        if ($team) {
+                            $team->subscriptionEnded();
+                        } else {
+                            send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
+                            throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                        }
+                    } else {
+                        send_internal_notification('Subscription deleted but no subscription found in Coolify for customer: '.$customerId);
+                        throw new \RuntimeException("No subscription found in Coolify for customer: {$customerId}");
+                    }
                     break;
                 default:
                     throw new \RuntimeException("Unhandled event type: {$type}");
