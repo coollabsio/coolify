@@ -115,6 +115,12 @@ class Application extends BaseModel
 
     protected static function booted()
     {
+        static::addGlobalScope('withRelations', function ($builder) {
+            $builder->withCount([
+                'additional_servers',
+                'additional_networks',
+            ]);
+        });
         static::saving(function ($application) {
             $payload = [];
             if ($application->isDirty('fqdn')) {
@@ -327,7 +333,7 @@ class Application extends BaseModel
         return null;
     }
 
-    public function failedTaskLink($task_uuid)
+    public function taskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.application.scheduled-tasks', [
@@ -551,20 +557,21 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->additional_servers->count() === 0) {
-                    return $this->destination->server->isFunctional();
-                } else {
-                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                    $main_server_status = $this->destination->server->isFunctional();
-                    foreach ($additional_servers_status as $status) {
-                        $server_status = str($status)->before(':')->value();
-                        if ($server_status !== 'running') {
-                            return false;
-                        }
-                    }
-
-                    return $main_server_status;
+                if (! $this->relationLoaded('additional_servers') || $this->additional_servers->count() === 0) {
+                    return $this->destination?->server?->isFunctional() ?? false;
                 }
+
+                $additional_servers_status = $this->additional_servers->pluck('pivot.status');
+                $main_server_status = $this->destination?->server?->isFunctional() ?? false;
+
+                foreach ($additional_servers_status as $status) {
+                    $server_status = str($status)->before(':')->value();
+                    if ($server_status !== 'running') {
+                        return false;
+                    }
+                }
+
+                return $main_server_status;
             }
         );
     }
@@ -1321,17 +1328,45 @@ class Application extends BaseModel
         if (! $gitRemoteStatus['is_accessible']) {
             throw new \RuntimeException("Failed to read Git source:\n\n{$gitRemoteStatus['error']}");
         }
+        $getGitVersion = instant_remote_process(['git --version'], $this->destination->server, false);
+        $gitVersion = str($getGitVersion)->explode(' ')->last();
 
-        $commands = collect([
-            "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid}",
-            "cd /tmp/{$uuid}",
-            $cloneCommand,
-            'git sparse-checkout init --cone',
-            "git sparse-checkout set {$fileList->implode(' ')}",
-            'git read-tree -mu HEAD',
-            "cat .$workdir$composeFile",
-        ]);
+        if (version_compare($gitVersion, '2.35.1', '<')) {
+            $fileList = $fileList->map(function ($file) {
+                $parts = explode('/', trim($file, '.'));
+                $paths = collect();
+                $currentPath = '';
+                foreach ($parts as $part) {
+                    $currentPath .= ($currentPath ? '/' : '').$part;
+                    if (str($currentPath)->isNotEmpty()) {
+                        $paths->push($currentPath);
+                    }
+                }
+
+                return $paths;
+            })->flatten()->unique()->values();
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+                'git sparse-checkout init',
+                "git sparse-checkout set {$fileList->implode(' ')}",
+                'git read-tree -mu HEAD',
+                "cat .$workdir$composeFile",
+            ]);
+        } else {
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+                "mkdir -p /tmp/{$uuid}",
+                "cd /tmp/{$uuid}",
+                $cloneCommand,
+                'git sparse-checkout init --cone',
+                "git sparse-checkout set {$fileList->implode(' ')}",
+                'git read-tree -mu HEAD',
+                "cat .$workdir$composeFile",
+            ]);
+        }
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
         } catch (\Exception $e) {

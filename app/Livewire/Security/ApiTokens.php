@@ -11,13 +11,7 @@ class ApiTokens extends Component
 
     public $tokens = [];
 
-    public bool $viewSensitiveData = false;
-
-    public bool $readOnly = true;
-
-    public bool $rootAccess = false;
-
-    public array $permissions = ['read-only'];
+    public array $permissions = ['read'];
 
     public $isApiEnabled;
 
@@ -29,51 +23,28 @@ class ApiTokens extends Component
     public function mount()
     {
         $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
+        $this->getTokens();
+    }
+
+    private function getTokens()
+    {
         $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
     }
 
-    public function updatedViewSensitiveData()
+    public function updatedPermissions($permissionToUpdate)
     {
-        if ($this->viewSensitiveData) {
-            $this->permissions[] = 'view:sensitive';
-            $this->permissions = array_diff($this->permissions, ['*']);
-            $this->rootAccess = false;
+        if ($permissionToUpdate == 'root') {
+            $this->permissions = ['root'];
+        } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions)) {
+            $this->permissions[] = 'read';
+        } elseif ($permissionToUpdate == 'deploy') {
+            $this->permissions = ['deploy'];
         } else {
-            $this->permissions = array_diff($this->permissions, ['view:sensitive']);
+            if (count($this->permissions) == 0) {
+                $this->permissions = ['read'];
+            }
         }
-        $this->makeSureOneIsSelected();
-    }
-
-    public function updatedReadOnly()
-    {
-        if ($this->readOnly) {
-            $this->permissions[] = 'read-only';
-            $this->permissions = array_diff($this->permissions, ['*']);
-            $this->rootAccess = false;
-        } else {
-            $this->permissions = array_diff($this->permissions, ['read-only']);
-        }
-        $this->makeSureOneIsSelected();
-    }
-
-    public function updatedRootAccess()
-    {
-        if ($this->rootAccess) {
-            $this->permissions = ['*'];
-            $this->readOnly = false;
-            $this->viewSensitiveData = false;
-        } else {
-            $this->readOnly = true;
-            $this->permissions = ['read-only'];
-        }
-    }
-
-    public function makeSureOneIsSelected()
-    {
-        if (count($this->permissions) == 0) {
-            $this->permissions = ['read-only'];
-            $this->readOnly = true;
-        }
+        sort($this->permissions);
     }
 
     public function addNewToken()
@@ -82,8 +53,8 @@ class ApiTokens extends Component
             $this->validate([
                 'description' => 'required|min:3|max:255',
             ]);
-            $token = auth()->user()->createToken($this->description, $this->permissions);
-            $this->tokens = auth()->user()->tokens;
+            $token = auth()->user()->createToken($this->description, array_values($this->permissions));
+            $this->getTokens();
             session()->flash('token', $token->plainTextToken);
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -92,8 +63,12 @@ class ApiTokens extends Component
 
     public function revoke(int $id)
     {
-        $token = auth()->user()->tokens()->where('id', $id)->first();
-        $token->delete();
-        $this->tokens = auth()->user()->tokens;
+        try {
+            $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
+            $token->delete();
+            $this->getTokens();
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 }

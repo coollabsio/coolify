@@ -1,3 +1,0 @@
-#!/command/execlineb -P
-s6-setuidgid webuser
-php /var/www/html/artisan app:init

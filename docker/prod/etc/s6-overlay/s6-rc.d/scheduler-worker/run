@@ -1,5 +1,0 @@
-#!/command/execlineb -P
-foreground {
-  s6-sleep 5
-  su - webuser -c "php /var/www/html/artisan start:scheduler"
-}

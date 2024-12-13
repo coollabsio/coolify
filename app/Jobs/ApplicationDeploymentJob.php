@@ -140,6 +140,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $buildTarget = null;
 
+    private bool $disableBuildCache = false;
+
     private Collection $saved_outputs;
 
     private ?string $full_healthcheck_url = null;
@@ -178,7 +180,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
         $this->rollback = $this->application_deployment_queue->rollback;
+        $this->disableBuildCache = $this->application->settings->disable_build_cache;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
+        if ($this->disableBuildCache) {
+            $this->force_rebuild = true;
+        }
         $this->restart_only = $this->application_deployment_queue->restart_only;
         $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
@@ -1976,6 +1982,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->build_args = $this->build_args->implode(' ');
 
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        if ($this->disableBuildCache) {
+            $this->application_deployment_queue->addLogEntry('Docker build cache is disabled. It will not be used during the build process.');
+        }
         if ($this->application->build_pack === 'static') {
             $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
         } else {
@@ -2400,7 +2409,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            //$this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
     }
 

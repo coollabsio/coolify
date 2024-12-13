@@ -3011,13 +3011,17 @@
                                         "type": "string",
                                         "description": "Mongo initdb root password"
                                     },
-                                    "mongo_initdb_init_database": {
+                                    "mongo_initdb_database": {
                                         "type": "string",
                                         "description": "Mongo initdb init database"
                                     },
                                     "mysql_root_password": {
                                         "type": "string",
                                         "description": "MySQL root password"
+                                    },
+                                    "mysql_password": {
+                                        "type": "string",
+                                        "description": "MySQL password"
                                     },
                                     "mysql_user": {
                                         "type": "string",
@@ -3841,6 +3845,10 @@
                                     "mysql_root_password": {
                                         "type": "string",
                                         "description": "MySQL root password"
+                                    },
+                                    "mysql_password": {
+                                        "type": "string",
+                                        "description": "MySQL password"
                                     },
                                     "mysql_user": {
                                         "type": "string",

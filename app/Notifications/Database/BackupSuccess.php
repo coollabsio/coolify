@@ -5,6 +5,8 @@ namespace App\Notifications\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class BackupSuccess extends CustomEmailNotification
@@ -23,7 +25,7 @@ class BackupSuccess extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'database_backups');
+        return $notifiable->getEnabledChannels('backup_success');
     }
 
     public function toMail(): MailMessage
@@ -59,5 +61,30 @@ class BackupSuccess extends CustomEmailNotification
         return [
             'message' => $message,
         ];
+    }
+
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'Database backup successful',
+            level: 'success',
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.",
+        );
+    }
+
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Database backup successful';
+        $description = "Database backup for {$this->name} (db:{$this->database_name}) was successful.";
+
+        $description .= "\n\n**Frequency:** {$this->frequency}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::successColor()
+        );
     }
 }

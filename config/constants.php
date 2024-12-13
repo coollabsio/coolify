@@ -2,7 +2,7 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.376',
+        'version' => '4.0.0-beta.377',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -31,6 +31,14 @@ return [
         'host' => env('PUSHER_HOST'),
         'port' => env('PUSHER_PORT'),
         'app_key' => env('PUSHER_APP_KEY'),
+    ],
+
+    'migration' => [
+        'is_migration_enabled' => env('MIGRATION_ENABLED', true),
+    ],
+
+    'seeder' => [
+        'is_seeder_enabled' => env('SEEDER_ENABLED', true),
     ],
 
     'horizon' => [
@@ -75,11 +83,6 @@ return [
             'ultimate' => true,
             'dynamic' => true,
         ],
-    ],
-
-    'waitlist' => [
-        'enabled' => env('WAITLIST', false),
-        'expiration' => 10,
     ],
 
     'sentry' => [

@@ -12,25 +12,62 @@ class OauthSettingSeeder extends Seeder
      */
     public function run(): void
     {
-        OauthSetting::firstOrCreate([
-            'id' => 0,
-            'provider' => 'azure',
+        $providers = collect([
+            'azure',
+            'bitbucket',
+            'github',
+            'gitlab',
+            'google',
+            'authentik',
         ]);
-        OauthSetting::firstOrCreate([
-            'id' => 1,
-            'provider' => 'bitbucket',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 2,
-            'provider' => 'github',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 3,
-            'provider' => 'gitlab',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 4,
-            'provider' => 'google',
-        ]);
+
+        $isOauthSeeded = OauthSetting::count() > 0;
+
+        // We changed how providers are defined in the database, so we authentik does not exists, we need to recreate all of the auth providers
+        // Before authentik was a provider, providers started with 0 id
+
+        $isOauthAuthentik = OauthSetting::where('provider', 'authentik')->exists();
+        if ($isOauthSeeded) {
+            if (! $isOauthAuthentik) {
+                $allProviders = OauthSetting::all();
+                $notFoundProviders = $providers->diff($allProviders->pluck('provider'));
+
+                $allProviders->each(function ($provider) {
+                    $provider->delete();
+                });
+                $allProviders->each(function ($provider) use ($providers) {
+                    $providerName = $provider->provider;
+
+                    $foundProvider = $providers->first(function ($provider) use ($providerName) {
+                        return $provider === $providerName;
+                    });
+
+                    if ($foundProvider) {
+                        $newProvder = new OauthSetting;
+                        $newProvder = $provider;
+                        unset($newProvder->id);
+                        $newProvder->save();
+                    }
+                });
+
+                foreach ($notFoundProviders as $provider) {
+                    OauthSetting::create([
+                        'provider' => $provider,
+                    ]);
+                }
+            } else {
+                foreach ($providers as $provider) {
+                    OauthSetting::updateOrCreate([
+                        'provider' => $provider,
+                    ]);
+                }
+            }
+        } else {
+            foreach ($providers as $provider) {
+                OauthSetting::updateOrCreate([
+                    'provider' => $provider,
+                ]);
+            }
+        }
     }
 }

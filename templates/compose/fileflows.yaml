@@ -1,0 +1,28 @@
+# documentation: https://fileflows.com/docs/
+# slogan: FileFlows can drastically reduce your files, up to 90%, saving you space and money. No need to buy more hard drives, just shrink your files and start saving.
+# tags: media, transcode, convert, h265
+# logo: svgs/fileflows.svg
+# port: 5000
+
+services:
+  radarr:
+    image: revenz/fileflows
+    environment:
+      - SERVICE_FQDN_FILEFLOWS_5000
+      - _APP_URL=$SERVICE_FQDN_FILE_FLOWS
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Toronto}
+    #devices:
+    #  - "/dev/dri:/dev/dri" # Enable hardware transcoding
+    volumes:
+      - fileflows_temp:/temp
+      - fileflows_configs:/app/Data
+      - fileflows_logs:/app/Logs
+      - fileflows_common:/app/common
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/system/version"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
