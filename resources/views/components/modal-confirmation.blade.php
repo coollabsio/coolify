@@ -92,8 +92,9 @@
             });
     },
     copyConfirmationText() {
+        const textToCopy = this.confirmationText;
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(this.confirmationText)
+            navigator.clipboard.writeText(textToCopy)
                 .then(() => {
                     this.copied = true;
                     setTimeout(() => {
@@ -102,7 +103,7 @@
                 });
         } else {
             const textarea = document.createElement('textarea');
-            textarea.value = this.confirmationText;
+            textarea.value = textToCopy;
             textarea.style.position = 'fixed';
             textarea.style.opacity = '0';
             document.body.appendChild(textarea);
