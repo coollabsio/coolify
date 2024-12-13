@@ -32,8 +32,10 @@ class OauthSettingSeeder extends Seeder
                 $allProviders = OauthSetting::all();
                 $notFoundProviders = $providers->diff($allProviders->pluck('provider'));
 
-                $allProviders->each(function ($provider) use ($providers) {
+                $allProviders->each(function ($provider) {
                     $provider->delete();
+                });
+                $allProviders->each(function ($provider) use ($providers) {
                     $providerName = $provider->provider;
 
                     $foundProvider = $providers->first(function ($provider) use ($providerName) {
