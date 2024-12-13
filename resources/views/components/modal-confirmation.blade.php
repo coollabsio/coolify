@@ -92,28 +92,11 @@
             });
     },
     copyConfirmationText() {
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(this.confirmationText)
-                .then(() => {
-                    this.copied = true;
-                    setTimeout(() => {
-                        this.copied = false;
-                    }, 2000);
-                });
-        } else {
-            const input = document.createElement('input');
-            input.setAttribute('readonly', '');
-            input.setAttribute('value', this.confirmationText);
-            document.body.appendChild(input);
-            input.select();
-            input.setSelectionRange(0, 99999);
-            document.execCommand('copy');
-            document.body.removeChild(input);
-            this.copied = true;
-            setTimeout(() => {
-                this.copied = false;
-            }, 2000);
-        }
+        navigator.clipboard.writeText(this.confirmationText);
+        this.copied = true;
+        setTimeout(() => {
+            this.copied = false;
+        }, 2000);
     },
     toggleAction(id) {
         const index = this.selectedActions.indexOf(id);
