@@ -1,10 +1,8 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -14,10 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::table('instance_settings')->exists()) {
-            Schema::table('instance_settings', function (Blueprint $table) {
-                $table->text('resend_api_key')->nullable()->change();
-            });
-
             $settings = DB::table('instance_settings')->get();
             foreach ($settings as $setting) {
                 try {
@@ -36,10 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('instance_settings', function (Blueprint $table) {
-            $table->text('resend_api_key')->nullable()->change();
-        });
-
         if (DB::table('instance_settings')->exists()) {
             $settings = DB::table('instance_settings')->get();
             foreach ($settings as $setting) {
