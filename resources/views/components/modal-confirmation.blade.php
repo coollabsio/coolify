@@ -92,9 +92,8 @@
             });
     },
     copyConfirmationText() {
-        const textToCopy = this.confirmationText;
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(textToCopy)
+            navigator.clipboard.writeText(this.confirmationText)
                 .then(() => {
                     this.copied = true;
                     setTimeout(() => {
@@ -103,9 +102,10 @@
                 });
         } else {
             const textarea = document.createElement('textarea');
-            textarea.value = textToCopy;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
+            textarea.value = this.confirmationText;
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '0';
             document.body.appendChild(textarea);
             textarea.select();
             try {
