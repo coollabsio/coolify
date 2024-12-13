@@ -92,11 +92,33 @@
             });
     },
     copyConfirmationText() {
-        navigator.clipboard.writeText(this.confirmationText);
-        this.copied = true;
-        setTimeout(() => {
-            this.copied = false;
-        }, 2000);
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(this.confirmationText)
+                .then(() => {
+                    this.copied = true;
+                    setTimeout(() => {
+                        this.copied = false;
+                    }, 2000);
+                });
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = this.confirmationText;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                this.copied = true;
+                setTimeout(() => {
+                    this.copied = false;
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text:', err);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
     },
     toggleAction(id) {
         const index = this.selectedActions.indexOf(id);
