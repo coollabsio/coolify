@@ -58,7 +58,7 @@ class OauthSettingSeeder extends Seeder
             }
         } else {
             foreach ($providers as $provider) {
-                OauthSetting::create([
+                OauthSetting::updateOrCreate([
                     'provider' => $provider,
                 ]);
             }
