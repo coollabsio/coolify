@@ -218,7 +218,7 @@ class Kernel extends ConsoleKernel
                 }
             }
             if ($service) {
-                if (str($service->status())->contains('running') === false) {
+                if (str($service->status)->contains('running') === false) {
                     continue;
                 }
             }
