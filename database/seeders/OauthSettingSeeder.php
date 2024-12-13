@@ -22,9 +22,13 @@ class OauthSettingSeeder extends Seeder
         ]);
 
         $isOauthSeeded = OauthSetting::count() > 0;
-        $isOauthWithZeroId = OauthSetting::where('id', 0)->exists();
+
+        // We changed how providers are defined in the database, so we authentik does not exists, we need to recreate all of the auth providers
+        // Before authentik was a provider, providers started with 0 id
+
+        $isOauthAuthentik = OauthSetting::where('provider', 'authentik')->exists();
         if ($isOauthSeeded) {
-            if ($isOauthWithZeroId) {
+            if (! $isOauthAuthentik) {
                 $allProviders = OauthSetting::all();
                 $notFoundProviders = $providers->diff($allProviders->pluck('provider'));
 
