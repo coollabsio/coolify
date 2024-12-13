@@ -45,6 +45,10 @@ class SettingsOauth extends Component
             }
             $oauth->save();
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
+        } else {
+            foreach (array_values($this->oauth_settings_map) as &$setting) {
+                $setting->save();
+            }
         }
     }
 
