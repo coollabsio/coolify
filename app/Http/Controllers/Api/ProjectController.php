@@ -90,11 +90,12 @@ class ProjectController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $project = Project::whereTeamId($teamId)->whereUuid(request()->uuid)->first()->load(['environments']);
+        $project = Project::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
+        $project->load(['environments']);
         return response()->json(
             serializeApiResponse($project),
         );
