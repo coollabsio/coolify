@@ -342,8 +342,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -659,8 +671,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -976,8 +1000,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -1222,8 +1258,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -1451,8 +1499,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -1533,8 +1593,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
