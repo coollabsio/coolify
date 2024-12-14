@@ -185,8 +185,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -291,8 +300,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -397,8 +415,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -487,8 +514,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -574,8 +610,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -627,8 +672,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -815,7 +869,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'private-gh-app') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
@@ -914,7 +968,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'private-deploy-key') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
@@ -1010,7 +1064,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'dockerfile') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'dockerfile-'.new Cuid2);
@@ -1095,7 +1149,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'docker-image-'.new Cuid2);
@@ -1159,7 +1213,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'dockercompose') {
             $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
 
@@ -1241,7 +1295,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($service, 'uuid'),
                 'domains' => data_get($service, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
