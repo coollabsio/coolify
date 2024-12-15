@@ -2028,10 +2028,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $additional_build_parameters = " {$this->addHosts} --network host {$this->build_args} --progress plain";
                     }
 
-                    $base64_build_command = base64_encode($build_command);
+                    $base64_additional_build_parameters = base64_encode($additional_build_parameters);
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$additional_build_parameters}' | base64 -d | cat {$this->workdir}/.nixpacks/build.sh - | tee /artifacts/build.sh > /dev/null"),
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_additional_build_parameters}' | base64 -d | cat {$this->workdir}/.nixpacks/build.sh - | tee /artifacts/build.sh > /dev/null"),
                             'hidden' => true,
                         ],
                         [
