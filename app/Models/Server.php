@@ -1024,14 +1024,58 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        // If the server is reachable, send the reachable notification if it was sent before
+
+        ray('Server Reachability Check', [
+            'server_id' => $this->id,
+            'unreachable_notification_sent' => $unreachableNotificationSent,
+            'is_reachable' => $isReachable,
+            'unreachable_count' => $this->unreachable_count,
+        ]);
+
         if ($isReachable === true) {
+            ray('Server is reachable - resetting counts');
+            $this->unreachable_count = 0;
+            $this->save();
+
             if ($unreachableNotificationSent === true) {
+                ray('Sending reachable notification');
                 $this->sendReachableNotification();
             }
-        } else {
-            // If the server is unreachable, send the unreachable notification if it was not sent before
-            if ($unreachableNotificationSent === false) {
+
+            return;
+        }
+
+        ray('Server is not reachable - incrementing count');
+        $this->increment('unreachable_count');
+        ray('Unreachable count: '.$this->unreachable_count);
+        if ($this->unreachable_count === 1) {
+            $this->settings->is_reachable = true;
+            $this->settings->saveQuietly();
+
+            return;
+        }
+
+        if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
+            ray('Starting additional checks', [
+                'unreachable_count' => $this->unreachable_count,
+            ]);
+            $failedChecks = 0;
+            for ($i = 0; $i < 2; $i++) {
+                sleep(5);
+                $status = $this->status();
+                ray('Check attempt '.($i + 1), ['status' => $status]);
+                if (! $status) {
+                    $failedChecks++;
+                }
+            }
+
+            ray('Additional checks complete', [
+                'failed_checks' => $failedChecks,
+                'will_send_notification' => ($failedChecks === 2 && ! $unreachableNotificationSent),
+            ]);
+
+            if ($failedChecks === 2 && ! $unreachableNotificationSent) {
+                ray('Sending unreachable notification');
                 $this->sendUnreachableNotification();
             }
         }
