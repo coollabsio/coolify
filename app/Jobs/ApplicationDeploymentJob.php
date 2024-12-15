@@ -2019,19 +2019,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ]);
-                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                        $additional_build_parameters = " --no-cache {$this->addHosts} --network host {$this->build_args} --progress plain";
                     } else {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ]);
-                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                        $additional_build_parameters = " {$this->addHosts} --network host {$this->build_args} --progress plain";
                     }
 
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [
-                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
+                            executeInDocker($this->deployment_uuid, "echo '{$additional_build_parameters}' | base64 -d | cat {$this->workdir}/.nixpacks/build.sh - | tee /artifacts/build.sh > /dev/null"),
                             'hidden' => true,
                         ],
                         [
