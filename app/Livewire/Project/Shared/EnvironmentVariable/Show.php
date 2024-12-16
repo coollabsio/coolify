@@ -5,15 +5,12 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
     public $parameters;
 
     public ModelsEnvironmentVariable|SharedEnvironmentVariable $env;
-
-    public ?string $modalId = null;
 
     public bool $isDisabled = false;
 
@@ -61,7 +58,6 @@ class Show extends Component
         if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
-        $this->modalId = new Cuid2;
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
     }
