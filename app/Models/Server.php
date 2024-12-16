@@ -1048,7 +1048,7 @@ $schema://$host {
         if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
             $failedChecks = 0;
             for ($i = 0; $i < 3; $i++) {
-                $status = $this->status();
+                $status = $this->serverStatus();
                 sleep(5);
                 if (! $status) {
                     $failedChecks++;
