@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
+use App\Events\ServerReachabilityChanged;
 use App\Models\Server;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
@@ -202,6 +203,7 @@ class Show extends Component
             $this->server->settings->is_reachable = $this->isReachable = true;
             $this->server->settings->is_usable = $this->isUsable = true;
             $this->server->settings->save();
+            ServerReachabilityChanged::dispatch($this->server);
             $this->dispatch('proxyStatusUpdated');
         } else {
             $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
