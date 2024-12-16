@@ -5,6 +5,7 @@ namespace App\Notifications\Application;
 use App\Models\Application;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -75,6 +76,23 @@ class StatusChanged extends CustomEmailNotification
                 ],
             ],
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        $message = $this->resource_name . ' has been stopped.';
+
+        return new PushoverMessage(
+            title: 'Application stopped',
+            level: 'error',
+            message: $message,
+            buttons: [
+                [
+                    'text' => 'Open Application in Coolify',
+                    'url' => $this->resource_url,
+                ],
+            ],
+        );
     }
 
     public function toSlack(): SlackMessage

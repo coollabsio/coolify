@@ -32,18 +32,18 @@ return new class extends Migration
             $table->boolean('server_reachable_telegram_notifications')->default(false);
             $table->boolean('server_unreachable_telegram_notifications')->default(true);
 
-            $table->text('telegram_notifications_deployment_success_topic_id')->nullable();
-            $table->text('telegram_notifications_deployment_failure_topic_id')->nullable();
-            $table->text('telegram_notifications_status_change_topic_id')->nullable();
-            $table->text('telegram_notifications_backup_success_topic_id')->nullable();
-            $table->text('telegram_notifications_backup_failure_topic_id')->nullable();
-            $table->text('telegram_notifications_scheduled_task_success_topic_id')->nullable();
-            $table->text('telegram_notifications_scheduled_task_failure_topic_id')->nullable();
-            $table->text('telegram_notifications_docker_cleanup_success_topic_id')->nullable();
-            $table->text('telegram_notifications_docker_cleanup_failure_topic_id')->nullable();
-            $table->text('telegram_notifications_server_disk_usage_topic_id')->nullable();
-            $table->text('telegram_notifications_server_reachable_topic_id')->nullable();
-            $table->text('telegram_notifications_server_unreachable_topic_id')->nullable();
+            $table->text('telegram_notifications_deployment_success_thread_id')->nullable();
+            $table->text('telegram_notifications_deployment_failure_thread_id')->nullable();
+            $table->text('telegram_notifications_status_change_thread_id')->nullable();
+            $table->text('telegram_notifications_backup_success_thread_id')->nullable();
+            $table->text('telegram_notifications_backup_failure_thread_id')->nullable();
+            $table->text('telegram_notifications_scheduled_task_success_thread_id')->nullable();
+            $table->text('telegram_notifications_scheduled_task_failure_thread_id')->nullable();
+            $table->text('telegram_notifications_docker_cleanup_success_thread_id')->nullable();
+            $table->text('telegram_notifications_docker_cleanup_failure_thread_id')->nullable();
+            $table->text('telegram_notifications_server_disk_usage_thread_id')->nullable();
+            $table->text('telegram_notifications_server_reachable_thread_id')->nullable();
+            $table->text('telegram_notifications_server_unreachable_thread_id')->nullable();
 
             $table->unique(['team_id']);
         });

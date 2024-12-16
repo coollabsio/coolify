@@ -830,6 +830,12 @@ function generateEnvValue(string $command, Service|Application|null $service = n
         case 'PASSWORD_64':
             $generatedValue = Str::password(length: 64, symbols: false);
             break;
+        case 'PASSWORDWITHSYMBOLS':
+            $generatedValue = Str::password(symbols: true);
+            break;
+        case 'PASSWORDWITHSYMBOLS_64':
+            $generatedValue = Str::password(length: 64, symbols: true);
+            break;
             // This is not base64, it's just a random string
         case 'BASE64_64':
             $generatedValue = Str::random(64);

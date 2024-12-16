@@ -24,7 +24,7 @@
             <x-forms.checkbox instantSave="instantSaveSlackEnabled" id="slackEnabled" label="Enabled" />
         </div>
         <x-forms.input type="password"
-            helper="Generate a webhook in Slack.<br>Example: https://hooks.slack.com/services/...." required
+            helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>" required
             id="slackWebhookUrl" label="Webhook" />
     </form>
     <h2 class="mt-4">Notification Settings</h2>

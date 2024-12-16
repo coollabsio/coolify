@@ -24,7 +24,7 @@
             <x-forms.checkbox instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
         </div>
         <x-forms.input type="password"
-            helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required
+            helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>" required
             id="discordWebhookUrl" label="Webhook" />
     </form>
     <h2 class="mt-4">Notification Settings</h2>

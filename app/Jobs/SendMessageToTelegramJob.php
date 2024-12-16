@@ -32,7 +32,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         public array $buttons,
         public string $token,
         public string $chatId,
-        public ?string $topicId = null,
+        public ?string $threadId = null,
     ) {
         $this->onQueue('high');
     }
@@ -67,8 +67,8 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
             'chat_id' => $this->chatId,
             'text' => $this->text,
         ];
-        if ($this->topicId) {
-            $payload['message_thread_id'] = $this->topicId;
+        if ($this->threadId) {
+            $payload['message_thread_id'] = $this->threadId;
         }
         $response = Http::post($url, $payload);
         if ($response->failed()) {

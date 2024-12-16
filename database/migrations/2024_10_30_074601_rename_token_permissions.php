@@ -40,7 +40,7 @@ return new class extends Migration
             $tokens = PersonalAccessToken::all();
             foreach ($tokens as $token) {
                 $abilities = collect();
-                if (in_array('write', $token->abilities)) {
+                if (in_array('root', $token->abilities)) {
                     $abilities->push('*');
                 } else {
                     if (in_array('read', $token->abilities)) {

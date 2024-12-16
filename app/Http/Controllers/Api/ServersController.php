@@ -154,11 +154,7 @@ class ServersController extends Controller
                     'created_at' => $resource->created_at,
                     'updated_at' => $resource->updated_at,
                 ];
-                if ($resource->type() === 'service') {
-                    $payload['status'] = $resource->status();
-                } else {
-                    $payload['status'] = $resource->status;
-                }
+                $payload['status'] = $resource->status;
 
                 return $payload;
             });
@@ -237,11 +233,7 @@ class ServersController extends Controller
                 'created_at' => $resource->created_at,
                 'updated_at' => $resource->updated_at,
             ];
-            if ($resource->type() === 'service') {
-                $payload['status'] = $resource->status();
-            } else {
-                $payload['status'] = $resource->status;
-            }
+            $payload['status'] = $resource->status;
 
             return $payload;
         });

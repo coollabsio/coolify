@@ -12,7 +12,7 @@
                         @endforeach
                     </div>
                 @endif
-                <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
+                <div class="p-6 space-y-4 md:space-y-3 sm:p-8">
                     <form action="/login" method="POST" class="flex flex-col gap-2">
                         @csrf
                         @env('local')

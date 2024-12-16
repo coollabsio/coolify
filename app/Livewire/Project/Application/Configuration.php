@@ -8,7 +8,13 @@ use Livewire\Component;
 
 class Configuration extends Component
 {
+    public $currentRoute;
+
     public Application $application;
+
+    public $project;
+
+    public $environment;
 
     public $servers;
 
@@ -16,6 +22,7 @@ class Configuration extends Component
 
     public function mount()
     {
+        $this->currentRoute = request()->route()->getName();
         $project = currentTeam()
             ->projects()
             ->select('id', 'uuid', 'team_id')
@@ -30,6 +37,8 @@ class Configuration extends Component
             ->where('uuid', request()->route('application_uuid'))
             ->firstOrFail();
 
+        $this->project = $project;
+        $this->environment = $environment;
         $this->application = $application;
         if ($application->destination && $application->destination->server) {
             $mainServer = $application->destination->server;

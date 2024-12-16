@@ -12,6 +12,7 @@ use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
+use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Profile\Index as ProfileIndex;
@@ -133,6 +134,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
         Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
+        Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
     });
 
     Route::prefix('storages')->group(function () {
@@ -181,6 +183,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/{environment_name}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
+        Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
+        Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
+        Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
+        Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
+        Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
+        Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
+        Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
+        Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
+        Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
+        Route::get('/healthcheck', ApplicationConfiguration::class)->name('project.application.healthcheck');
+        Route::get('/rollback', ApplicationConfiguration::class)->name('project.application.rollback');
+        Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
+        Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
+        Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+        Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
+        Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
+
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');

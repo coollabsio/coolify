@@ -6,10 +6,7 @@ cd /var/www/html
 foreground {
     php
     artisan
-    db:seed
-    --class
-    ProductionSeeder
-    --force
+    start:seeder
 }
 
 

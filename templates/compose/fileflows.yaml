@@ -5,7 +5,7 @@
 # port: 5000
 
 services:
-  radarr:
+  fileflows:
     image: revenz/fileflows
     environment:
       - SERVICE_FQDN_FILEFLOWS_5000
@@ -16,10 +16,10 @@ services:
     #devices:
     #  - "/dev/dri:/dev/dri" # Enable hardware transcoding
     volumes:
-      - fileflows-temp:/temp
-      - fileflows-configs:/app/Data
-      - fileflows-logs:/app/Logs
-      - fileflows-common:/app/common
+      - fileflows_temp:/temp
+      - fileflows_configs:/app/Data
+      - fileflows_logs:/app/Logs
+      - fileflows_common:/app/common
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/system/version"]

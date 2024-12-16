@@ -3,6 +3,7 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,6 +39,15 @@ class GeneralNotification extends Notification implements ShouldQueue
         return [
             'message' => $this->message,
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'General Notification',
+            level: 'info',
+            message: $this->message,
+        );
     }
 
     public function toSlack(): SlackMessage
