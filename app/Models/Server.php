@@ -6,6 +6,7 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
+use App\Events\ServerReachabilityChanged;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -1050,7 +1051,7 @@ $schema://$host {
         ray('Unreachable count: '.$this->unreachable_count);
         if ($this->unreachable_count === 1) {
             $this->settings->is_reachable = true;
-            $this->settings->saveQuietly();
+            $this->settings->save();
 
             return;
         }
@@ -1060,21 +1061,22 @@ $schema://$host {
                 'unreachable_count' => $this->unreachable_count,
             ]);
             $failedChecks = 0;
-            for ($i = 0; $i < 2; $i++) {
-                sleep(5);
+            for ($i = 0; $i < 3; $i++) {
                 $status = $this->status();
+                sleep(5);
                 ray('Check attempt '.($i + 1), ['status' => $status]);
                 if (! $status) {
                     $failedChecks++;
+
                 }
             }
 
             ray('Additional checks complete', [
                 'failed_checks' => $failedChecks,
-                'will_send_notification' => ($failedChecks === 2 && ! $unreachableNotificationSent),
+                'will_send_notification' => ($failedChecks === 3 && ! $unreachableNotificationSent),
             ]);
 
-            if ($failedChecks === 2 && ! $unreachableNotificationSent) {
+            if ($failedChecks === 3 && ! $unreachableNotificationSent) {
                 ray('Sending unreachable notification');
                 $this->sendUnreachableNotification();
             }
@@ -1109,6 +1111,7 @@ $schema://$host {
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
+                ServerReachabilityChanged::dispatch($this);
             }
 
             return ['uptime' => true, 'error' => null];
@@ -1119,6 +1122,7 @@ $schema://$host {
             if ($this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
+                ServerReachabilityChanged::dispatch($this);
             }
 
             return ['uptime' => false, 'error' => $e->getMessage()];
@@ -1209,6 +1213,7 @@ $schema://$host {
         $this->settings->is_reachable = true;
         $this->settings->is_usable = true;
         $this->settings->save();
+        ServerReachabilityChanged::dispatch($this);
 
         return true;
     }
