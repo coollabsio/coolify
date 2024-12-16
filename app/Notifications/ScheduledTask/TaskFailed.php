@@ -5,6 +5,7 @@ namespace App\Notifications\ScheduledTask;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -16,15 +17,15 @@ class TaskFailed extends CustomEmailNotification
     {
         $this->onQueue('high');
         if ($task->application) {
-            $this->url = $task->application->failedTaskLink($task->uuid);
+            $this->url = $task->application->taskLink($task->uuid);
         } elseif ($task->service) {
-            $this->url = $task->service->failedTaskLink($task->uuid);
+            $this->url = $task->service->taskLink($task->uuid);
         }
     }
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'scheduled_tasks');
+        return $notifiable->getEnabledChannels('scheduled_task_failure');
     }
 
     public function toMail(): MailMessage
@@ -68,6 +69,30 @@ class TaskFailed extends CustomEmailNotification
         return [
             'message' => $message,
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        $message = "Scheduled task ({$this->task->name}) failed<br/>";
+
+        if ($this->output) {
+            $message .= "<br/><b>Error Output:</b>{$this->output}";
+        }
+
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
+            ];
+        }
+
+        return new PushoverMessage(
+            title: 'Scheduled task failed',
+            level: 'error',
+            message: $message,
+            buttons: $buttons,
+        );
     }
 
     public function toSlack(): SlackMessage

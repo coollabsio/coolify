@@ -338,6 +338,20 @@
         "minversion": "0.0.0",
         "port": "3000"
     },
+    "checkmate": {
+        "documentation": "https://bluewavelabs.gitbook.io/checkmate?utm_source=coolify.io",
+        "slogan": "An open source server monitoring application",
+        "compose": "c2VydmljZXM6CiAgY2xpZW50OgogICAgaW1hZ2U6ICdibHVld2F2ZXVwdGltZS91cHRpbWVfY2xpZW50OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DSEVDS01BVEVfODAKICAgICAgLSAnVVBUSU1FX0FQUF9BUElfQkFTRV9VUkw9JHtTRVJWSUNFX0ZRRE5fQ0hFQ0tNQVRFU0VSVkVSXzUwMDB9L2FwaS92MScKICAgIGRlcGVuZHNfb246CiAgICAgIC0gc2VydmVyCiAgc2VydmVyOgogICAgaW1hZ2U6ICdibHVld2F2ZXVwdGltZS91cHRpbWVfc2VydmVyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DSEVDS01BVEVTRVJWRVJfNTAwMAogICAgICAtICdKV1RfU0VDUkVUPSR7U0VSVklDRV9QQVNTV09SRF82NF9KV1R9JwogICAgICAtICdSRUZSRVNIX1RPS0VOX1NFQ1JFVD0ke1NFUlZJQ0VfUEFTU1dPUkRfNjRfUkVGUkVTSH0nCiAgICAgIC0gJ1NZU1RFTV9FTUFJTF9BRERSRVNTPSR7U1lTVEVNX0VNQUlMX0FERFJFU1M6LXRlc3RAZXhhbXBsZS5jb219JwogICAgICAtICdTWVNURU1fRU1BSUxfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEXzY0X0VNQUlMfScKICAgICAgLSAnU1lTVEVNX0VNQUlMX0hPU1Q9JHtTWVNURU1fRU1BSUxfSE9TVH0nCiAgICAgIC0gJ1NZU1RFTV9FTUFJTF9QT1JUPSR7U1lTVEVNX0VNQUlMX1BPUlR9JwogICAgICAtICdQQUdFU1BFRURfQVBJX0tFWT0ke1BBR0VTUEVFRF9BUElfS0VZfScKICAgICAgLSAnREJfQ09OTkVDVElPTl9TVFJJTkc9JHtEQl9DT05ORUNUSU9OX1NUUklORzotbW9uZ29kYjovL21vbmdvZGI6MjcwMTcvdXB0aW1lX2RifScKICAgICAgLSAnUkVESVNfSE9TVD0ke1JFRElTX0hPU1Q6LXJlZGlzfScKICAgICAgLSAnUkVESVNfUE9SVD0ke1JFRElTX1BPUlQ6LTYzNzl9JwogICAgICAtICdEQl9UWVBFPSR7REJfVFlQRTotTW9uZ29EQn0nCiAgICAgIC0gJ1RPS0VOX1RUTD0ke1RPS0VOX1RUTDotOTlkfScKICAgICAgLSAnUkVGUkVTSF9UT0tFTl9UVEw9JHtSRUZSRVNIX1RPS0VOX1RUTDotOTlkfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJy92YXIvcnVuL2RvY2tlci5zb2NrOi92YXIvcnVuL2RvY2tlci5zb2NrJwogICAgZGVwZW5kc19vbjoKICAgICAgLSByZWRpcwogICAgICAtIG1vbmdvZGIKICByZWRpczoKICAgIGltYWdlOiAnYmx1ZXdhdmV1cHRpbWUvdXB0aW1lX3JlZGlzOmxhdGVzdCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3JlZGlzOi9kYXRhJwogIG1vbmdvZGI6CiAgICBpbWFnZTogJ2JsdWV3YXZldXB0aW1lL3VwdGltZV9kYXRhYmFzZV9tb25nbzpsYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdtb25nb2RiOi9kYXRhL2RiJwogICAgY29tbWFuZDoKICAgICAgLSBtb25nb2QKICAgICAgLSAnLS1xdWlldCcK",
+        "tags": [
+            "monitoring",
+            "server",
+            "uptime",
+            "healthcheck"
+        ],
+        "logo": "svgs/checkmate.png",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "classicpress-with-mariadb": {
         "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
         "slogan": "A lightweight, stable, instantly familiar free open-source content management system, based on WordPress without the block editor (Gutenberg).",
@@ -523,6 +537,25 @@
         "minversion": "0.0.0",
         "port": "3000"
     },
+    "documenso": {
+        "documentation": "https://docs.documenso.com/?utm_source=coolify.io",
+        "slogan": "Document signing, finally open source",
+        "compose": "c2VydmljZXM6CiAgZG9jdW1lbnNvOgogICAgaW1hZ2U6IGRvY3VtZW5zby9kb2N1bWVuc28KICAgIGRlcGVuZHNfb246CiAgICAgIGRhdGFiYXNlOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fRE9DVU1FTlNPXzMwMDAKICAgICAgLSAnTkVYVEFVVEhfVVJMPSR7U0VSVklDRV9GUUROX0RPQ1VNRU5TT18zMDAwfScKICAgICAgLSAnTkVYVEFVVEhfU0VDUkVUPSR7U0VSVklDRV9CQVNFNjRfQVVUSFNFQ1JFVH0nCiAgICAgIC0gJ05FWFRfUFJJVkFURV9FTkNSWVBUSU9OX0tFWT0ke1NFUlZJQ0VfQkFTRTY0X0VOQ1JZUFRJT05LRVl9JwogICAgICAtICdORVhUX1BSSVZBVEVfRU5DUllQVElPTl9TRUNPTkRBUllfS0VZPSR7U0VSVklDRV9CQVNFNjRfU0VDT05EQVJZRU5DUllQVElPTktFWX0nCiAgICAgIC0gJ05FWFRfUFVCTElDX1dFQkFQUF9VUkw9JHtTRVJWSUNFX0ZRRE5fRE9DVU1FTlNPXzMwMDB9JwogICAgICAtICdORVhUX1BSSVZBVEVfREFUQUJBU0VfVVJMPXBvc3RncmVzcWw6Ly8ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU306JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfUBkYXRhYmFzZS8ke1BPU1RHUkVTX0RCOi1kb2N1bWVuc28tZGJ9P3NjaGVtYT1wdWJsaWMnCiAgICAgIC0gJ05FWFRfUFJJVkFURV9ESVJFQ1RfREFUQUJBU0VfVVJMPXBvc3RncmVzcWw6Ly8ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU306JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfUBkYXRhYmFzZS8ke1BPU1RHUkVTX0RCOi1kb2N1bWVuc28tZGJ9P3NjaGVtYT1wdWJsaWMnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gIndnZXQgLXEgLU8gLSBodHRwOi8vZG9jdW1lbnNvOjMwMDAvIHwgZ3JlcCAtcSAnU2lnbiBpbiB0byB5b3VyIGFjY291bnQnIgogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDIwCiAgZGF0YWJhc2U6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2LWFscGluZScKICAgIGVudmlyb25tZW50OgogICAgICAtICdQT1NUR1JFU19VU0VSPSR7U0VSVklDRV9VU0VSX1BPU1RHUkVTfScKICAgICAgLSAnUE9TVEdSRVNfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfScKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotZG9jdW1lbnNvLWRifScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2RvY3VtZW5zb19wb3N0Z3Jlc3FsX2RhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "signing",
+            "opensource",
+            "document",
+            "pdf",
+            "e-signature",
+            "digital-signature",
+            "document-signing",
+            "pdf-signing",
+            "docusign"
+        ],
+        "logo": "svgs/documenso.png",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "docuseal-with-postgres": {
         "documentation": "https://www.docuseal.co/?utm_source=coolify.io",
         "slogan": "Document Signing for Everyone free forever for individuals, extensible for businesses and developers. Open Source Alternative to DocuSign, PandaDoc and more.",
@@ -557,6 +590,18 @@
         ],
         "logo": "svgs/dokuwiki.png",
         "minversion": "0.0.0"
+    },
+    "dolibarr": {
+        "documentation": "https://www.dolibarr.org/documentation-home.php?utm_source=coolify.io",
+        "slogan": "Dolibarr is a modern software package to manage your organization's activity (contacts, quotes, invoices, orders, stocks, agenda, hr, expense reports, accountancy, ecm, manufacturing, ...).",
+        "compose": "c2VydmljZXM6CiAgZG9saWJhcnI6CiAgICBpbWFnZTogJ2RvbGliYXJyL2RvbGliYXJyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ET0xJQkFSUl84MAogICAgICAtICdXV1dfVVNFUl9JRD0ke1dXV19VU0VSX0lEOi0xMDAwfScKICAgICAgLSAnV1dXX0dST1VQX0lEPSR7V1dXX0dST1VQX0lEOi0xMDAwfScKICAgICAgLSBET0xJX0RCX0hPU1Q9bWFyaWFkYgogICAgICAtICdET0xJX0RCX05BTUU9JHtNWVNRTF9EQVRBQkFTRTotZG9saWJhcnItZGJ9JwogICAgICAtICdET0xJX0RCX1VTRVI9JHtTRVJWSUNFX1VTRVJfTVlTUUx9JwogICAgICAtICdET0xJX0RCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0nCiAgICAgIC0gJ0RPTElfVVJMX1JPT1Q9JHtTRVJWSUNFX1VSTF9ET0xJQkFSUn0nCiAgICAgIC0gJ0RPTElfQURNSU5fTE9HSU49JHtTRVJWSUNFX1VTRVJfRE9MSUJBUlJ9JwogICAgICAtICdET0xJX0FETUlOX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9ET0xJQkFSUn0nCiAgICAgIC0gJ0RPTElfQ1JPTj0ke0RPTElfQ1JPTjotMH0nCiAgICAgIC0gJ0RPTElfSU5JVF9ERU1PPSR7RE9MSV9JTklUX0RFTU86LTB9JwogICAgICAtICdET0xJX0NPTVBBTllfTkFNRT0ke0RPTElfQ09NUEFOWV9OQU1FOi1NeUJpZ0NvbXBhbnl9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1CiAgbWFyaWFkYjoKICAgIGltYWdlOiAnbWFyaWFkYjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTVlTUUxfREFUQUJBU0U9JHtNWVNRTF9EQVRBQkFTRTotZG9saWJhcnItZGJ9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX01ZU1FMfScKICAgICAgLSAnTVlTUUxfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMfScKICAgICAgLSAnTVlTUUxfUk9PVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUk9PVH0nCiAgICB2b2x1bWVzOgogICAgICAtICdkb2xpYmFycl9tYXJpYWRiX2RhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "crm",
+            "erp"
+        ],
+        "logo": "svgs/dolibarr.png",
+        "minversion": "0.0.0",
+        "port": "80"
     },
     "dozzle-with-auth": {
         "documentation": "https://dozzle.dev/?utm_source=coolify.io",
@@ -694,6 +739,20 @@
         "logo": "svgs/filebrowser.svg",
         "minversion": "0.0.0",
         "port": "80"
+    },
+    "fileflows": {
+        "documentation": "https://fileflows.com/docs/?utm_source=coolify.io",
+        "slogan": "FileFlows can drastically reduce your files, up to 90%, saving you space and money. No need to buy more hard drives, just shrink your files and start saving.",
+        "compose": "c2VydmljZXM6CiAgZmlsZWZsb3dzOgogICAgaW1hZ2U6IHJldmVuei9maWxlZmxvd3MKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSUxFRkxPV1NfNTAwMAogICAgICAtIF9BUFBfVVJMPSRTRVJWSUNFX0ZRRE5fRklMRV9GTE9XUwogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1BbWVyaWNhL1Rvcm9udG99JwogICAgdm9sdW1lczoKICAgICAgLSAnZmlsZWZsb3dzX3RlbXA6L3RlbXAnCiAgICAgIC0gJ2ZpbGVmbG93c19jb25maWdzOi9hcHAvRGF0YScKICAgICAgLSAnZmlsZWZsb3dzX2xvZ3M6L2FwcC9Mb2dzJwogICAgICAtICdmaWxlZmxvd3NfY29tbW9uOi9hcHAvY29tbW9uJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUwMDAvYXBpL3N5c3RlbS92ZXJzaW9uJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "media",
+            "transcode",
+            "convert",
+            "h265"
+        ],
+        "logo": "svgs/fileflows.svg",
+        "minversion": "0.0.0",
+        "port": "5000"
     },
     "firefly": {
         "documentation": "https://firefly-iii.org?utm_source=coolify.io",
@@ -1908,6 +1967,40 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "nexus-arm": {
+        "documentation": "https://help.sonatype.com/en/sonatype-nexus-repository.html?utm_source=coolify.io",
+        "slogan": "Open source Universal Repository Manager (ARM version, community edition), default credentials: admin/admin123",
+        "compose": "c2VydmljZXM6CiAgbmV4dXM6CiAgICBpbWFnZTogc29uYXR5cGVjb21tdW5pdHkvbmV4dXMzCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTkVYVVNfODA4MQogICAgICAtIE5FWFVTX1NFQ1VSSVRZX1JBTkRPTVBBU1NXT1JEPWZhbHNlCiAgICAgIC0gJ0lOU1RBTEw0Sl9BRERfVk1fUEFSQU1TPS1YbXMyNzAzbSAtWG14MjcwM20gLVhYOk1heERpcmVjdE1lbW9yeVNpemU9MjcwM20gLURqYXZhLnV0aWwucHJlZnMudXNlclJvb3Q9L25leHVzLWRhdGEvamF2YXByZWZzJwogICAgdm9sdW1lczoKICAgICAgLSAnbmV4dXNfZGF0YTovbmV4dXMtZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MDgxL3NlcnZpY2UvcmVzdC92MS9zdGF0dXMnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMKICAgICAgc3RhcnRfcGVyaW9kOiA2MHMK",
+        "tags": [
+            "repository",
+            "manager",
+            "open source",
+            "docker",
+            "docker",
+            "registry",
+            "container"
+        ],
+        "logo": "svgs/nexus.png",
+        "minversion": "0.0.0",
+        "port": "8081"
+    },
+    "nexus": {
+        "documentation": "https://help.sonatype.com/en/sonatype-nexus-repository.html?utm_source=coolify.io",
+        "slogan": "Open source Universal Repository Manager (x86_64 version, official), default credentials: admin/admin123",
+        "compose": "c2VydmljZXM6CiAgbmV4dXM6CiAgICBpbWFnZTogc29uYXR5cGUvbmV4dXMzCiAgICBwbGF0Zm9ybTogbGludXgvYW1kNjQKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ORVhVU184MDgxCiAgICAgIC0gJ05FWFVTX1NFQ1VSSVRZX1JBTkRPTVBBU1NXT1JEPSR7TkVYVVNfU0VDVVJJVFlfUkFORE9NUEFTU1dPUkQ6LWZhbHNlfScKICAgICAgLSAnSU5TVEFMTDRKX0FERF9WTV9QQVJBTVM9LVhtczI3MDNtIC1YbXgyNzAzbSAtWFg6TWF4RGlyZWN0TWVtb3J5U2l6ZT0yNzAzbSAtRGphdmEudXRpbC5wcmVmcy51c2VyUm9vdD0vbmV4dXMtZGF0YS9qYXZhcHJlZnMnCiAgICB2b2x1bWVzOgogICAgICAtICduZXh1c19kYXRhOi9uZXh1cy1kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwODEvc2VydmljZS9yZXN0L3YxL3N0YXR1cycKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMwogICAgICBzdGFydF9wZXJpb2Q6IDYwcwo=",
+        "tags": [
+            "repository",
+            "manager",
+            "open source",
+            "docker",
+            "docker",
+            "registry",
+            "container"
+        ],
+        "logo": "svgs/nexus.png",
+        "minversion": "0.0.0",
+        "port": "8081"
+    },
     "nitropage-with-postgresql": {
         "documentation": "https://nitropage.com?utm_source=coolify.io",
         "slogan": "Nitropage is an extensible visual website builder, offering a growing collection of versatile building blocks, focal-point image cropping and sovereign font management.",
@@ -2287,7 +2380,7 @@
     },
     "prowlarr": {
         "documentation": "https://hub.docker.com/r/linuxserver/prowlarr?utm_source=coolify.io",
-        "slogan": "Prowlarr\u2060 is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps. Prowlarr supports both Torrent Trackers and Usenet Indexers. It integrates seamlessly with Sonarr, Radarr, Lidarr, and Readarr offering complete management of your indexers with no per app Indexer setup required (we do it all).",
+        "slogan": "Prowlarr\u2060 is a indexer manager/proxy built on the popular arr .net/reactjs base stack to integrate with your various PVR apps.",
         "compose": "c2VydmljZXM6CiAgcHJvd2xhcnI6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcHJvd2xhcnI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BST1dMQVJSXzk2OTYKICAgICAgLSBfQVBQX1VSTD0kU0VSVklDRV9GUUROX1BST1dMQVJSCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUFtZXJpY2EvVG9yb250b30nCiAgICB2b2x1bWVzOgogICAgICAtICdwcm93bGFyci1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo5Njk2L3BpbmcnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "media",
@@ -2707,19 +2800,6 @@
             "scheduler"
         ],
         "logo": "svgs/trigger.png",
-        "minversion": "0.0.0",
-        "port": "3000"
-    },
-    "twenty": {
-        "documentation": "https://docs.twenty.com?utm_source=coolify.io",
-        "slogan": "Twenty is a CRM designed to fit your unique business needs.",
-        "compose": "c2VydmljZXM6CiAgdHdlbnR5OgogICAgaW1hZ2U6ICd0d2VudHljcm0vdHdlbnR5OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9UV0VOVFlfMzAwMAogICAgICAtIFNFUlZFUl9VUkw9JFNFUlZJQ0VfRlFETl9UV0VOVFkKICAgICAgLSBGUk9OVF9CQVNFX1VSTD0kU0VSVklDRV9GUUROX1RXRU5UWQogICAgICAtIEVOQUJMRV9EQl9NSUdSQVRJT05TPXRydWUKICAgICAgLSAnQ0FDSEVfU1RPUkFHRV9UWVBFPSR7Q0FDSEVfU1RPUkFHRV9UWVBFOi1yZWRpc30nCiAgICAgIC0gJ1JFRElTX1VSTD1yZWRpczovL3JlZGlzOjYzNzknCiAgICAgIC0gJ0FQSV9SQVRFX0xJTUlUSU5HX1RUTD0ke0FQSV9SQVRFX0xJTUlUSU5HX1RUTDotMTAwfScKICAgICAgLSAnQVBJX1JBVEVfTElNSVRJTkdfTElNSVQ9JHtBUElfUkFURV9MSU1JVElOR19MSU1JVDotMTAwfScKICAgICAgLSBBUFBfU0VDUkVUPSRTRVJWSUNFX0JBU0U2NF8zMl9TRUNSRVQKICAgICAgLSBQT1NUR1JFU19BRE1JTl9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgICAtICdQR19EQVRBQkFTRV9VUkw9cG9zdGdyZXM6Ly9wb3N0Z3JlczokU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU0Bwb3N0Z3Jlczo1NDMyL2RlZmF1bHQnCiAgICAgIC0gJ0lTX1NJR05fVVBfRElTQUJMRUQ9JHtJU19TSUdOX1VQX0RJU0FCTEVEOi1mYWxzZX0nCiAgICAgIC0gJ1BBU1NXT1JEX1JFU0VUX1RPS0VOX0VYUElSRVNfSU49JHtQQVNTV09SRF9SRVNFVF9UT0tFTl9FWFBJUkVTX0lOOi01bX0nCiAgICAgIC0gV09SS1NQQUNFX0lOQUNUSVZFX0RBWVNfQkVGT1JFX05PVElGSUNBVElPTj0kV09SS1NQQUNFX0lOQUNUSVZFX0RBWVNfQkVGT1JFX05PVElGSUNBVElPTgogICAgICAtIFdPUktTUEFDRV9JTkFDVElWRV9EQVlTX0JFRk9SRV9ERUxFVElPTj0kV09SS1NQQUNFX0lOQUNUSVZFX0RBWVNfQkVGT1JFX0RFTEVUSU9OCiAgICAgIC0gJ1NUT1JBR0VfVFlQRT0ke1NUT1JBR0VfVFlQRTotbG9jYWx9JwogICAgICAtIFNUT1JBR0VfUzNfUkVHSU9OPSRTVE9SQUdFX1MzX1JFR0lPTgogICAgICAtIFNUT1JBR0VfUzNfTkFNRT0kU1RPUkFHRV9TM19OQU1FCiAgICAgIC0gU1RPUkFHRV9TM19FTkRQT0lOVD0kU1RPUkFHRV9TM19FTkRQT0lOVAogICAgICAtIFNUT1JBR0VfUzNfQUNDRVNTX0tFWV9JRD0kU1RPUkFHRV9TM19BQ0NFU1NfS0VZX0lECiAgICAgIC0gU1RPUkFHRV9TM19TRUNSRVRfQUNDRVNTX0tFWT0kU1RPUkFHRV9TM19TRUNSRVRfQUNDRVNTX0tFWQogICAgICAtICdNRVNTQUdFX1FVRVVFX1RZUEU9JHtNRVNTQUdFX1FVRVVFX1RZUEU6LXBnLWJvc3N9JwogICAgICAtIEVNQUlMX0ZST01fQUREUkVTUz0kRU1BSUxfRlJPTV9BRERSRVNTCiAgICAgIC0gRU1BSUxfRlJPTV9OQU1FPSRFTUFJTF9GUk9NX05BTUUKICAgICAgLSBFTUFJTF9TWVNURU1fQUREUkVTUz0kRU1BSUxfU1lTVEVNX0FERFJFU1MKICAgICAgLSAnRU1BSUxfRFJJVkVSPSR7RU1BSUxfRFJJVkVSOi1sb2dnZXJ9JwogICAgICAtIEVNQUlMX1NNVFBfSE9TVD0kRU1BSUxfU01UUF9IT1NUCiAgICAgIC0gRU1BSUxfU01UUF9QT1JUPSRFTUFJTF9TTVRQX1BPUlQKICAgICAgLSBFTUFJTF9TTVRQX1VTRVI9JEVNQUlMX1NNVFBfVVNFUgogICAgICAtIEVNQUlMX1NNVFBfUEFTU1dPUkQ9JEVNQUlMX1NNVFBfUEFTU1dPUkQKICAgICAgLSBTSUdOX0lOX1BSRUZJTExFRD1mYWxzZQogICAgICAtICdERUJVR19NT0RFPSR7REVCVUdfTU9ERTotZmFsc2V9JwogICAgICAtICdURUxFTUVUUllfRU5BQkxFRD0ke1RFTEVNRVRSWV9FTkFCTEVEOi1mYWxzZX0nCiAgICBkZXBlbmRzX29uOgogICAgICBwb3N0Z3JlczoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjMwMDAvaGVhbHRoeicKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQogIHBvc3RncmVzOgogICAgaW1hZ2U6ICd0d2VudHljcm0vdHdlbnR5LXBvc3RncmVzOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFBPU1RHUkVTX1VTRVI9cG9zdGdyZXMKICAgICAgLSBQT1NUR1JFU19QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgICAtIFBPU1RHUkVTX0RCPWRlZmF1bHQKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3BnLWRhdGE6L2JpdG5hbWkvcG9zdGdyZXNxbCcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICByZWRpczoKICAgIGltYWdlOiAncmVkaXM6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAncmVkaXMtZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSByZWRpcy1jbGkKICAgICAgICAtIHBpbmcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
-        "tags": [
-            "crm",
-            "self-hosted",
-            "dashboard"
-        ],
-        "logo": "svgs/twenty.svg",
         "minversion": "0.0.0",
         "port": "3000"
     },

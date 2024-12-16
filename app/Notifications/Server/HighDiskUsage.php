@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -17,7 +18,7 @@ class HighDiskUsage extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'server_disk_usage');
+        return $notifiable->getEnabledChannels('server_disk_usage');
     }
 
     public function toMail(): MailMessage
@@ -55,6 +56,19 @@ class HighDiskUsage extends CustomEmailNotification
         return [
             'message' => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->server_disk_usage_notification_threshold}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.",
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'High disk usage detected',
+            level: 'warning',
+            message: "Server '{$this->server->name}' high disk usage detected!<br/><br/><b>Disk usage:</b> {$this->disk_usage}%.<br/><b>Threshold:</b> {$this->server_disk_usage_notification_threshold}%.<br/>Please cleanup your disk to prevent data-loss.",
+            buttons: [
+                'Change settings' => base_url().'/server/'.$this->server->uuid."#advanced",
+                'Tips for cleanup' => "https://coolify.io/docs/knowledge-base/server/automated-cleanup",
+            ],
+        );
     }
 
     public function toSlack(): SlackMessage

@@ -46,7 +46,7 @@ class Service extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['server_status'];
+    protected $appends = ['server_status', 'status'];
 
     protected static function booted()
     {
@@ -105,12 +105,12 @@ class Service extends BaseModel
 
     public function isRunning()
     {
-        return (bool) str($this->status())->contains('running');
+        return (bool) str($this->status)->contains('running');
     }
 
     public function isExited()
     {
-        return (bool) str($this->status())->contains('exited');
+        return (bool) str($this->status)->contains('exited');
     }
 
     public function type()
@@ -213,7 +213,7 @@ class Service extends BaseModel
         instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 
-    public function status()
+    public function getStatusAttribute()
     {
         $applications = $this->applications;
         $databases = $this->databases;
@@ -1140,7 +1140,7 @@ class Service extends BaseModel
         return null;
     }
 
-    public function failedTaskLink($task_uuid)
+    public function taskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.service.scheduled-tasks', [

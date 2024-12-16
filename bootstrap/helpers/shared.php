@@ -25,23 +25,15 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\SlackChannel;
-use App\Notifications\Channels\TelegramChannel;
-use App\Notifications\Internal\GeneralNotification;
 use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Mail\Message;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Process\Pool;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Request;
@@ -267,43 +259,6 @@ function generate_application_name(string $git_repository, string $git_branch, ?
     return Str::kebab("$git_repository:$git_branch-$cuid");
 }
 
-function is_transactional_emails_active(): bool
-{
-    return isEmailEnabled(\App\Models\InstanceSettings::get());
-}
-
-function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string
-{
-    if (! $settings) {
-        $settings = instanceSettings();
-    }
-    config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
-    config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
-    if (data_get($settings, 'resend_enabled')) {
-        config()->set('mail.default', 'resend');
-        config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
-
-        return 'resend';
-    }
-    if (data_get($settings, 'smtp_enabled')) {
-        config()->set('mail.default', 'smtp');
-        config()->set('mail.mailers.smtp', [
-            'transport' => 'smtp',
-            'host' => data_get($settings, 'smtp_host'),
-            'port' => data_get($settings, 'smtp_port'),
-            'encryption' => data_get($settings, 'smtp_encryption'),
-            'username' => data_get($settings, 'smtp_username'),
-            'password' => data_get($settings, 'smtp_password'),
-            'timeout' => data_get($settings, 'smtp_timeout'),
-            'local_domain' => null,
-        ]);
-
-        return 'smtp';
-    }
-
-    return null;
-}
-
 function base_ip(): string
 {
     if (isDev()) {
@@ -414,85 +369,7 @@ function validate_timezone(string $timezone): bool
 {
     return in_array($timezone, timezone_identifiers_list());
 }
-function send_internal_notification(string $message): void
-{
-    try {
-        $team = Team::find(0);
-        $team?->notify(new GeneralNotification($message));
-    } catch (\Throwable $e) {
-        ray($e->getMessage());
-    }
-}
-function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
-{
-    $settings = instanceSettings();
-    $type = set_transanctional_email_settings($settings);
-    if (! $type) {
-        throw new Exception('No email settings found.');
-    }
-    if ($cc) {
-        Mail::send(
-            [],
-            [],
-            fn (Message $message) => $message
-                ->to($email)
-                ->replyTo($email)
-                ->cc($cc)
-                ->subject($mail->subject)
-                ->html((string) $mail->render())
-        );
-    } else {
-        Mail::send(
-            [],
-            [],
-            fn (Message $message) => $message
-                ->to($email)
-                ->subject($mail->subject)
-                ->html((string) $mail->render())
-        );
-    }
-}
-function isTestEmailEnabled($notifiable)
-{
-    if (data_get($notifiable, 'use_instance_email_settings') && isInstanceAdmin()) {
-        return true;
-    } elseif (data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') && auth()->user()->isAdminFromSession()) {
-        return true;
-    }
 
-    return false;
-}
-function isEmailEnabled($notifiable)
-{
-    return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') || data_get($notifiable, 'use_instance_email_settings');
-}
-function setNotificationChannels($notifiable, $event)
-{
-    $channels = [];
-    $isEmailEnabled = isEmailEnabled($notifiable);
-    $isSlackEnabled = data_get($notifiable, 'slack_enabled');
-    $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-    $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-    $isSubscribedToEmailEvent = data_get($notifiable, "smtp_notifications_$event");
-    $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
-    $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
-    $isSubscribedToSlackEvent = data_get($notifiable, "slack_notifications_$event");
-
-    if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-        $channels[] = DiscordChannel::class;
-    }
-    if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-        $channels[] = EmailChannel::class;
-    }
-    if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
-        $channels[] = TelegramChannel::class;
-    }
-    if ($isSlackEnabled && $isSubscribedToSlackEvent) {
-        $channels[] = SlackChannel::class;
-    }
-
-    return $channels;
-}
 function parseEnvFormatToArray($env_file_contents)
 {
     $env_array = [];
@@ -946,6 +823,12 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             break;
         case 'PASSWORD_64':
             $generatedValue = Str::password(length: 64, symbols: false);
+            break;
+        case 'PASSWORDWITHSYMBOLS':
+            $generatedValue = Str::password(symbols: true);
+            break;
+        case 'PASSWORDWITHSYMBOLS_64':
+            $generatedValue = Str::password(length: 64, symbols: true);
             break;
             // This is not base64, it's just a random string
         case 'BASE64_64':

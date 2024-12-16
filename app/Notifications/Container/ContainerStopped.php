@@ -5,6 +5,7 @@ namespace App\Notifications\Container;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 
@@ -17,7 +18,7 @@ class ContainerStopped extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'status_changes');
+        return $notifiable->getEnabledChannels('status_change');
     }
 
     public function toMail(): MailMessage
@@ -67,6 +68,25 @@ class ContainerStopped extends CustomEmailNotification
 
         return $payload;
     }
+
+    public function toPushover(): PushoverMessage
+    {
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open Application in Coolify',
+                'url' => $this->url,
+            ];
+        }
+
+        return new PushoverMessage(
+            title: 'Resource stopped',
+            level: 'error',
+            message: "A resource ({$this->name}) has been stopped unexpectedly on {$this->server->name}",
+            buttons: $buttons,
+        );
+    }
+
 
     public function toSlack(): SlackMessage
     {

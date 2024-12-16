@@ -25,6 +25,8 @@ class ServicesController extends Controller
             $service->makeHidden([
                 'docker_compose_raw',
                 'docker_compose',
+                'value',
+                'real_value',
             ]);
         }
 
@@ -1070,7 +1072,7 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        if (str($service->status())->contains('running')) {
+        if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
         StartService::dispatch($service);
@@ -1148,7 +1150,7 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        if (str($service->status())->contains('stopped') || str($service->status())->contains('exited')) {
+        if (str($service->status)->contains('stopped') || str($service->status)->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
         StopService::dispatch($service);

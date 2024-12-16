@@ -9,7 +9,7 @@
             <div
                 class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
-                    @if (is_transactional_emails_active())
+                    @if (is_transactional_emails_enabled())
                     <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
                         @csrf
                         <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" />
