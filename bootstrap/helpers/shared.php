@@ -48,7 +48,6 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Token\Builder;
 use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
-use Poliander\Cron\CronExpression;
 use PurplePixie\PhpDns\DNSQuery;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -341,11 +340,6 @@ function isCloud(): bool
     return ! config('constants.coolify.self_hosted');
 }
 
-function translate_cron_expression($expression_to_validate): string
-{
-    if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
-        return VALID_CRON_STRINGS[$expression_to_validate];
-    }
 
     return $expression_to_validate;
 }
