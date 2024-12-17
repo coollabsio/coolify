@@ -25,7 +25,7 @@
             <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
                 @foreach ($projects as $project)
                     <div class="gap-2 border border-transparent cursor-pointer box group"
-                        onclick="gotoProject('{{ $project->uuid }}','{{ $project->default_environment }}')">
+                        wire:click="navigateToProject('{{ $project->uuid }}')">
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
                                 <div class="box-title">{{ $project->name }}</div>
@@ -34,10 +34,15 @@
                                 </div>
                             </div>
                             <div class="flex items-center justify-center gap-2 text-xs font-bold">
-                                <a class="hover:underline"
-                                    href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_name' => data_get($project, 'default_environment', 'production')]) }}">
-                                    <span class="p-2 font-bold">+ Add Resource</span>
-                                </a>
+                                @if ($project->environments->first())
+                                    <a class="hover:underline"
+                                        href="{{ route('project.resource.create', [
+                                            'project_uuid' => $project->uuid,
+                                            'environment_uuid' => $project->environments->first()->uuid,
+                                        ]) }}">
+                                        <span class="p-2 font-bold">+ Add Resource</span>
+                                    </a>
+                                @endif
                                 <a class="hover:underline"
                                     href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                     Settings
@@ -167,15 +172,4 @@
             </div>
         </section>
     @endif
-
-
-    <script>
-        function gotoProject(uuid, environment) {
-            if (environment) {
-                window.location.href = '/project/' + uuid + '/' + environment;
-            } else {
-                window.location.href = '/project/' + uuid;
-            }
-        }
-    </script>
 </div>

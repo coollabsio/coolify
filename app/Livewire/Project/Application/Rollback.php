@@ -37,7 +37,7 @@ class Rollback extends Component
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $deployment_uuid,
-            'environment_name' => $this->parameters['environment_name'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
         ]);
     }
 
