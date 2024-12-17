@@ -46,7 +46,7 @@ CMD ["nginx", "-g", "daemon off;"]
         $destination_class = $destination->getMorphClass();
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+        $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
         $port = get_port_from_dockerfile($this->dockerfile);
         if (! $port) {
@@ -78,7 +78,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
         return redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
-            'environment_name' => $environment->name,
+            'environment_uuid' => $environment->uuid,
             'project_uuid' => $project->uuid,
         ]);
     }

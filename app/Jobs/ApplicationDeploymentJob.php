@@ -1405,7 +1405,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'project_uuid' => data_get($this->application, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->application, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,
-                'environment_name' => data_get($this->application, 'environment.name'),
+                'environment_uuid' => data_get($this->application, 'environment.uuid'),
             ]));
         }
     }

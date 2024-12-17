@@ -24,8 +24,8 @@ class Configuration extends Component
             ->where('uuid', request()->route('project_uuid'))
             ->firstOrFail();
         $environment = $project->environments()
-            ->select('id', 'name', 'project_id')
-            ->where('name', request()->route('environment_name'))
+            ->select('id', 'name', 'project_id', 'uuid')
+            ->where('uuid', request()->route('environment_uuid'))
             ->firstOrFail();
         $database = $environment->databases()
             ->where('uuid', request()->route('database_uuid'))

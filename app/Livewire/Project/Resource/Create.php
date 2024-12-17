@@ -25,7 +25,7 @@ class Create extends Component
             return redirect()->route('dashboard');
         }
         $this->project = $project;
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
             return redirect()->route('dashboard');
         }
@@ -57,7 +57,7 @@ class Create extends Component
 
                 return redirect()->route('project.database.configuration', [
                     'project_uuid' => $project->uuid,
-                    'environment_name' => $environment->name,
+                    'environment_uuid' => $environment->uuid,
                     'database_uuid' => $database->uuid,
                 ]);
             }
@@ -107,7 +107,7 @@ class Create extends Component
 
                     return redirect()->route('project.service.configuration', [
                         'service_uuid' => $service->uuid,
-                        'environment_name' => $environment->name,
+                        'environment_uuid' => $environment->uuid,
                         'project_uuid' => $project->uuid,
                     ]);
                 }

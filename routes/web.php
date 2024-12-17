@@ -147,7 +147,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
         Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
         Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
-        Route::get('/environment/{project_uuid}/{environment_name}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
+        Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
     });
 
     Route::prefix('team')->group(function () {
@@ -175,13 +175,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}/application/{application_uuid}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
         Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
@@ -206,7 +206,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
         Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
@@ -224,7 +224,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');

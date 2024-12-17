@@ -12,7 +12,7 @@ class CloneMe extends Component
 {
     public string $project_uuid;
 
-    public string $environment_name;
+    public string $environment_uuid;
 
     public int $project_id;
 
@@ -44,7 +44,7 @@ class CloneMe extends Component
     {
         $this->project_uuid = $project_uuid;
         $this->project = Project::where('uuid', $project_uuid)->firstOrFail();
-        $this->environment = $this->project->environments->where('name', $this->environment_name)->first();
+        $this->environment = $this->project->environments->where('uuid', $this->environment_uuid)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()->servers;
         $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
@@ -89,6 +89,7 @@ class CloneMe extends Component
                 if ($this->environment->name !== 'production') {
                     $project->environments()->create([
                         'name' => $this->environment->name,
+                        'uuid' => (string) new Cuid2,
                     ]);
                 }
                 $environment = $project->environments->where('name', $this->environment->name)->first();
@@ -100,6 +101,7 @@ class CloneMe extends Component
                 $project = $this->project;
                 $environment = $this->project->environments()->create([
                     'name' => $this->newName,
+                    'uuid' => (string) new Cuid2,
                 ]);
             }
             $applications = $this->environment->applications;
@@ -174,7 +176,7 @@ class CloneMe extends Component
 
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $project->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
             ]);
         } catch (\Exception $e) {
             return handleError($e, $this);

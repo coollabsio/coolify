@@ -28,8 +28,8 @@ class Configuration extends Component
             ->where('uuid', request()->route('project_uuid'))
             ->firstOrFail();
         $environment = $project->environments()
-            ->select('id', 'name', 'project_id')
-            ->where('name', request()->route('environment_name'))
+            ->select('id', 'uuid', 'name', 'project_id')
+            ->where('uuid', request()->route('environment_uuid'))
             ->firstOrFail();
         $application = $environment->applications()
             ->with(['destination'])
@@ -39,7 +39,6 @@ class Configuration extends Component
         $this->project = $project;
         $this->environment = $environment;
         $this->application = $application;
-
     }
 
     public function render()
