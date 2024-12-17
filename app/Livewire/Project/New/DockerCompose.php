@@ -59,7 +59,7 @@ class DockerCompose extends Component
             }
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
@@ -87,7 +87,8 @@ class DockerCompose extends Component
                     'value' => $variable,
                     'is_build_time' => false,
                     'is_preview' => false,
-                    'service_id' => $service->id,
+                    'resourceable_id' => $service->id,
+                    'resourceable_type' => $service->getMorphClass(),
                 ]);
             }
             $service->name = "service-$service->uuid";
@@ -96,7 +97,7 @@ class DockerCompose extends Component
 
             return redirect()->route('project.service.configuration', [
                 'service_uuid' => $service->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
         } catch (\Throwable $e) {

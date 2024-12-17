@@ -6,6 +6,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
@@ -33,15 +34,24 @@ class Show extends Component
             $environment = Environment::create([
                 'name' => $this->name,
                 'project_id' => $this->project->id,
+                'uuid' => (string) new Cuid2,
             ]);
 
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $this->project->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
             ]);
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    public function navigateToEnvironment($projectUuid, $environmentUuid)
+    {
+        return redirect()->route('project.resource.index', [
+            'project_uuid' => $projectUuid,
+            'environment_uuid' => $environmentUuid,
+        ]);
     }
 
     public function render()

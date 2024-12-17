@@ -13,14 +13,11 @@ class Advanced extends Component
 
     public array $parameters = [];
 
-    #[Validate(['integer', 'min:1'])]
-    public int $concurrentBuilds = 1;
+    #[Validate(['string'])]
+    public string $serverDiskUsageCheckFrequency = '0 23 * * *';
 
-    #[Validate(['integer', 'min:1'])]
-    public int $dynamicTimeout = 1;
-
-    #[Validate('boolean')]
-    public bool $forceDockerCleanup = false;
+    #[Validate(['integer', 'min:1', 'max:99'])]
+    public int $serverDiskUsageNotificationThreshold = 50;
 
     #[Validate(['string', 'required'])]
     public string $dockerCleanupFrequency = '*/10 * * * *';
@@ -28,14 +25,20 @@ class Advanced extends Component
     #[Validate(['integer', 'min:1', 'max:99'])]
     public int $dockerCleanupThreshold = 10;
 
-    #[Validate(['integer', 'min:1', 'max:99'])]
-    public int $serverDiskUsageNotificationThreshold = 50;
+    #[Validate('boolean')]
+    public bool $forceDockerCleanup = false;
 
     #[Validate('boolean')]
     public bool $deleteUnusedVolumes = false;
 
     #[Validate('boolean')]
     public bool $deleteUnusedNetworks = false;
+
+    #[Validate(['integer', 'min:1'])]
+    public int $concurrentBuilds = 1;
+
+    #[Validate(['integer', 'min:1'])]
+    public int $dynamicTimeout = 1;
 
     public function mount(string $server_uuid)
     {
@@ -60,6 +63,7 @@ class Advanced extends Component
             $this->server->settings->server_disk_usage_notification_threshold = $this->serverDiskUsageNotificationThreshold;
             $this->server->settings->delete_unused_volumes = $this->deleteUnusedVolumes;
             $this->server->settings->delete_unused_networks = $this->deleteUnusedNetworks;
+            $this->server->settings->server_disk_usage_check_frequency = $this->serverDiskUsageCheckFrequency;
             $this->server->settings->save();
         } else {
             $this->concurrentBuilds = $this->server->settings->concurrent_builds;
@@ -70,6 +74,7 @@ class Advanced extends Component
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
             $this->deleteUnusedVolumes = $this->server->settings->delete_unused_volumes;
             $this->deleteUnusedNetworks = $this->server->settings->delete_unused_networks;
+            $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
         }
     }
 
@@ -99,6 +104,10 @@ class Advanced extends Component
             if (! validate_cron_expression($this->dockerCleanupFrequency)) {
                 $this->dockerCleanupFrequency = $this->server->settings->getOriginal('docker_cleanup_frequency');
                 throw new \Exception('Invalid Cron / Human expression for Docker Cleanup Frequency.');
+            }
+            if (! validate_cron_expression($this->serverDiskUsageCheckFrequency)) {
+                $this->serverDiskUsageCheckFrequency = $this->server->settings->getOriginal('server_disk_usage_check_frequency');
+                throw new \Exception('Invalid Cron / Human expression for Disk Usage Check Frequency.');
             }
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');

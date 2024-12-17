@@ -54,7 +54,7 @@ services:
       - SSH_MUX_ENABLED
       - SSH_MUX_PERSIST_TIME
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "${APP_PORT:-8000}:8080"
     expose:
       - "${APP_PORT:-8000}"
     healthcheck:
@@ -93,7 +93,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.4'
+    image: 'ghcr.io/coollabsio/coolify-realtime:next'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"

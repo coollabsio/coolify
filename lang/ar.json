@@ -5,6 +5,7 @@
     "auth.login.github": "تسجيل الدخول باستخدام GitHub",
     "auth.login.gitlab": "تسجيل الدخول باستخدام Gitlab",
     "auth.login.google": "تسجيل الدخول باستخدام Google",
+    "auth.login.infomaniak": "تسجيل الدخول باستخدام Infomaniak",
     "auth.already_registered": "هل سبق لك التسجيل؟",
     "auth.confirm_password": "تأكيد كلمة المرور",
     "auth.forgot_password": "نسيت كلمة المرور",
