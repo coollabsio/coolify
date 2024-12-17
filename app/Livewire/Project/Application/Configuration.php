@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
-use App\Models\Server;
 use Livewire\Component;
 
 class Configuration extends Component
@@ -40,15 +39,7 @@ class Configuration extends Component
         $this->project = $project;
         $this->environment = $environment;
         $this->application = $application;
-        if ($application->destination && $application->destination->server) {
-            $mainServer = $application->destination->server;
-            $this->servers = Server::ownedByCurrentTeam()
-                ->select('id', 'name')
-                ->where('id', '!=', $mainServer->id)
-                ->get();
-        } else {
-            $this->servers = collect();
-        }
+
     }
 
     public function render()

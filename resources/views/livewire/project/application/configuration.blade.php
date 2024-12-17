@@ -98,7 +98,7 @@
             @elseif (request()->route()->getName() === 'project.application.source' && $application->git_based())
                 <livewire:project.application.source :application="$application" />
             @elseif (request()->route()->getName() === 'project.application.servers')
-                <livewire:project.shared.destination :resource="$application" :servers="$servers" />
+                <livewire:project.shared.destination :resource="$application" />
             @elseif (request()->route()->getName() === 'project.application.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$application" />
             @elseif (request()->route()->getName() === 'project.application.webhooks')

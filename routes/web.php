@@ -208,6 +208,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
+        Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
+        Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
+        Route::get('/import-backups', DatabaseConfiguration::class)->name('project.database.import-backups');
+        Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
+        Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
+        Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
+        Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
+        Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
+        Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
+
         Route::get('/logs', Logs::class)->name('project.database.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
