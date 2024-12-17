@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 
 class DockerController extends Controller
 {
-    public function list_server_docker_images($server_uuid, Request $request,)
+    public function list_server_docker_images($server_uuid)
     {
 
         $query = Server::query();
@@ -28,14 +28,7 @@ class DockerController extends Controller
             return response()->json(['error' => 'server is not reachable.'], 403);
         }
 
-        $filter = $request->input('filter', 'all'); // Default to 'all' if no filter is provided
-
-        // Validate filter
-        if (!in_array($filter, ['all', 'used', 'unused', 'dangling'])) {
-            return response()->json(['error' => 'Invalid filter. Allowed values are: all, dangling.'], 400);
-        }
-
-        return ListServerDockerImages::run($server, $filter);
+        return ListServerDockerImages::run($server);
     }
 
     public function get_server_docker_image_details($server_uuid, $id)
