@@ -33,12 +33,22 @@ const verifyClient = async (info, callback) => {
 
     try {
         // Authenticate with Laravel backend
-        const response = await axios.post(`http://coolify/terminal/auth`, null, {
-            headers: {
-                'Cookie': `${sessionCookieName}=${laravelSession}`,
-                'X-XSRF-TOKEN': xsrfToken
-            },
-        });
+        let response;
+        try {
+            response = await axios.post(`http://coolify:8080/terminal/auth`, null, {
+                headers: {
+                    'Cookie': `${sessionCookieName}=${laravelSession}`,
+                    'X-XSRF-TOKEN': xsrfToken
+                },
+            });
+        } catch (error) {
+            response = await axios.post(`http://coolify/terminal/auth`, null, {
+                headers: {
+                    'Cookie': `${sessionCookieName}=${laravelSession}`,
+                    'X-XSRF-TOKEN': xsrfToken
+                },
+            });
+        }
 
         if (response.status === 200) {
             // Authentication successful
