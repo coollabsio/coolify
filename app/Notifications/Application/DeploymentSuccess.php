@@ -147,7 +147,7 @@ class DeploymentSuccess extends CustomEmailNotification
     {
         if ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
-            $message = 'New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '';
+            $message = 'New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
             if ($this->preview->fqdn) {
                 $buttons[] = [
                     'text' => 'Open Application',
@@ -156,7 +156,7 @@ class DeploymentSuccess extends CustomEmailNotification
             }
         } else {
             $title = 'New version successfully deployed';
-            $message = 'New version successfully deployed of ' . $this->application_name . '';
+            $message = 'New version successfully deployed of '.$this->application_name.'';
             if ($this->fqdn) {
                 $buttons[] = [
                     'text' => 'Open Application',
