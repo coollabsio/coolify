@@ -215,6 +215,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
+        Route::get('/logs', Logs::class)->name('project.service.logs');
+        Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
+        Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+        Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
+        Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
+        Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
+        Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
+        Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');

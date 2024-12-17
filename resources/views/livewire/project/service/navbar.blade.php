@@ -1,4 +1,4 @@
-<div wire:poll.10000ms="check_status_without_notification">
+<div>
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
@@ -13,6 +13,10 @@
             <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
+            </a>
+            <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.service.logs', $parameters) }}">
+                <button>Logs</button>
             </a>
             <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.command', $parameters) }}">
