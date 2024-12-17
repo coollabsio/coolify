@@ -211,7 +211,7 @@
             },
             goto(item) {
                 const hrefLink = item.hrefLink;
-                window.location.href = `${hrefLink}#tags`;
+                window.location.href = `${hrefLink}/tags`;
             },
             filterAndSort(items) {
                 if (this.search === '') {

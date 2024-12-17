@@ -9,31 +9,31 @@
     <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>General</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.application.advanced', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.advanced', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Advanced</a>
             @if ($application->destination->server->isSwarm())
                 <a class="menu-item"
                     wire:current.exact="menu-item-active
-                    href="{{ route('project.application.swarm', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                    href="{{ route('project.application.swarm', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                     wire:navigate>Swarm
                     Configuration</a>
             @endif
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.application.environment-variables', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Environment Variables</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.application.persistent-storage', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Persistent Storage</a>
             @if ($application->git_based())
                 <a class='menu-item' wire:current.exact="menu-item-active"
-                    href="{{ route('project.application.source', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                    href="{{ route('project.application.source', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                     wire:navigate>Git Source</a>
             @endif
             <a class="menu-item flex items-center gap-2" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.servers', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.servers', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Servers
                 @if (str($application->status)->contains('degraded'))
                     <span title="Some servers are unavailable">
@@ -53,35 +53,35 @@
                 @endif
             </a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Scheduled Tasks</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Webhooks</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Preview Deployments</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Healthcheck</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Rollback</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.resource-limits', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.resource-limits', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Resource Limits</a>
 
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.resource-operations', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Resource Operations</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.metrics', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Metrics</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.tags', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Tags</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.danger', ['project_uuid' => $project->uuid, 'environment_name' => $environment->name, 'application_uuid' => $application->uuid]) }}"
+                href="{{ route('project.application.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Danger Zone</a>
         </div>
         <div class="w-full">

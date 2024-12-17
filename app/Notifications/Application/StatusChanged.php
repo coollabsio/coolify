@@ -17,6 +17,8 @@ class StatusChanged extends CustomEmailNotification
 
     public string $environment_uuid;
 
+    public string $environment_name;
+
     public ?string $resource_url = null;
 
     public ?string $fqdn;
@@ -27,6 +29,7 @@ class StatusChanged extends CustomEmailNotification
         $this->resource_name = data_get($resource, 'name');
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
         $this->environment_uuid = data_get($resource, 'environment.uuid');
+        $this->environment_name = data_get($resource, 'environment.name');
         $this->fqdn = data_get($resource, 'fqdn', null);
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
@@ -80,7 +83,7 @@ class StatusChanged extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        $message = $this->resource_name . ' has been stopped.';
+        $message = $this->resource_name.' has been stopped.';
 
         return new PushoverMessage(
             title: 'Application stopped',

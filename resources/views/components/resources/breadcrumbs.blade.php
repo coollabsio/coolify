@@ -21,7 +21,10 @@
         <li>
             <div class="flex items-center">
                 <a class="text-xs truncate lg:text-sm"
-                    href="{{ route('project.resource.index', ['environment_uuid' => $this->parameters['environment_uuid', 'project_uuid' => data_get($resource, 'environment.project.uuid')]) }}">{{ data_get($resource, 'environment.name') }}</a>
+                    href="{{ route('project.resource.index', [
+                        'environment_uuid' => data_get($resource, 'environment.uuid'),
+                        'project_uuid' => data_get($resource, 'environment.project.uuid'),
+                    ]) }}">{{ data_get($resource, 'environment.name') }}</a>
                 <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold dark:text-warning" fill="currentColor"
                     viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd"

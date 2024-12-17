@@ -166,6 +166,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
 {
     $request->offsetUnset('project_uuid');
     $request->offsetUnset('environment_name');
+    $request->offsetUnset('environment_uuid');
     $request->offsetUnset('destination_uuid');
     $request->offsetUnset('server_uuid');
     $request->offsetUnset('type');

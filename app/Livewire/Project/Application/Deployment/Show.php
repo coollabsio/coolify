@@ -34,14 +34,6 @@ class Show extends Component
         if (! $application) {
             return redirect()->route('dashboard');
         }
-        // $activity = Activity::where('properties->type_uuid', '=', $deploymentUuid)->first();
-        // if (!$activity) {
-        //     return redirect()->route('project.application.deployment.index', [
-        //         'project_uuid' => $project->uuid,
-        //         'environment_name' => $environment->name,
-        //         'application_uuid' => $application->uuid,
-        //     ]);
-        // }
         $application_deployment_queue = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)->first();
         if (! $application_deployment_queue) {
             return redirect()->route('project.application.deployment.index', [

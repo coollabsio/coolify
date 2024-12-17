@@ -21,7 +21,6 @@ class Configuration extends Component
 
     public function mount()
     {
-
         $this->currentRoute = request()->route()->getName();
         $project = currentTeam()
             ->projects()
@@ -29,7 +28,7 @@ class Configuration extends Component
             ->where('uuid', request()->route('project_uuid'))
             ->firstOrFail();
         $environment = $project->environments()
-            ->select('id', 'name', 'project_id')
+            ->select('id', 'uuid', 'name', 'project_id')
             ->where('uuid', request()->route('environment_uuid'))
             ->firstOrFail();
         $application = $environment->applications()
@@ -40,7 +39,6 @@ class Configuration extends Component
         $this->project = $project;
         $this->environment = $environment;
         $this->application = $application;
-
     }
 
     public function render()
