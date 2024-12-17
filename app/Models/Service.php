@@ -1120,7 +1120,8 @@ class Service extends BaseModel
                     'key' => $key,
                     'value' => $value,
                     'is_build_time' => false,
-                    'service_id' => $this->id,
+                    'resourceable_id' => $this->id,
+                    'resourceable_type' => $this->getMorphClass(),
                     'is_preview' => false,
                 ]);
             }
@@ -1232,14 +1233,17 @@ class Service extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
-    public function environment_variables(): HasMany
+    public function environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderBy('key', 'asc');
     }
 
-    public function environment_variables_preview(): HasMany
+    public function environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function workdir()

@@ -20,6 +20,9 @@ class ServicesController extends Controller
     {
         $service->makeHidden([
             'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === false) {
             $service->makeHidden([
@@ -333,7 +336,8 @@ class ServicesController extends Controller
                         EnvironmentVariable::create([
                             'key' => $key,
                             'value' => $generatedValue,
-                            'service_id' => $service->id,
+                            'resourceable_id' => $service->id,
+                            'resourceable_type' => $service->getMorphClass(),
                             'is_build_time' => false,
                             'is_preview' => false,
                         ]);
@@ -673,7 +677,8 @@ class ServicesController extends Controller
             ], 422);
         }
 
-        $env = $service->environment_variables()->where('key', $request->key)->first();
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $env = $service->environment_variables()->where('key', $key)->first();
         if (! $env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
@@ -799,9 +804,9 @@ class ServicesController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
-
+            $key = str($item['key'])->trim()->replace(' ', '_')->value;
             $env = $service->environment_variables()->updateOrCreate(
-                ['key' => $item['key']],
+                ['key' => $key],
                 $item
             );
 
@@ -909,7 +914,8 @@ class ServicesController extends Controller
             ], 422);
         }
 
-        $existingEnv = $service->environment_variables()->where('key', $request->key)->first();
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $existingEnv = $service->environment_variables()->where('key', $key)->first();
         if ($existingEnv) {
             return response()->json([
                 'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -995,7 +1001,8 @@ class ServicesController extends Controller
         }
 
         $env = EnvironmentVariable::where('uuid', $request->env_uuid)
-            ->where('service_id', $service->id)
+            ->where('resourceable_type', Service::class)
+            ->where('resourceable_id', $service->id)
             ->first();
 
         if (! $env) {

@@ -27,6 +27,9 @@ class ApplicationsController extends Controller
     {
         $application->makeHidden([
             'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === false) {
             $application->makeHidden([
@@ -1893,8 +1896,9 @@ class ApplicationsController extends Controller
         $is_preview = $request->is_preview ?? false;
         $is_build_time = $request->is_build_time ?? false;
         $is_literal = $request->is_literal ?? false;
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -1921,7 +1925,7 @@ class ApplicationsController extends Controller
                 ], 404);
             }
         } else {
-            $env = $application->environment_variables->where('key', $request->key)->first();
+            $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -2064,6 +2068,7 @@ class ApplicationsController extends Controller
         $bulk_data = collect($bulk_data)->map(function ($item) {
             return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal']);
         });
+        $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
             $validator = customApiValidator($item, [
                 'key' => 'string|required',
@@ -2085,8 +2090,9 @@ class ApplicationsController extends Controller
             $is_literal = $item->get('is_literal') ?? false;
             $is_multi_line = $item->get('is_multiline') ?? false;
             $is_shown_once = $item->get('is_shown_once') ?? false;
+            $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
+                $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2111,10 +2117,12 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'resourceable_type' => get_class($application),
+                        'resourceable_id' => $application->id,
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $item->get('key'))->first();
+                $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2139,12 +2147,15 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'resourceable_type' => get_class($application),
+                        'resourceable_id' => $application->id,
                     ]);
                 }
             }
+            $returnedEnvs->push($this->removeSensitiveData($env));
         }
 
-        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+        return response()->json($returnedEnvs)->setStatusCode(201);
     }
 
     #[OA\Post(
@@ -2257,8 +2268,10 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -2272,6 +2285,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'resourceable_type' => get_class($application),
+                    'resourceable_id' => $application->id,
                 ]);
 
                 return response()->json([
@@ -2279,7 +2294,7 @@ class ApplicationsController extends Controller
                 ])->setStatusCode(201);
             }
         } else {
-            $env = $application->environment_variables->where('key', $request->key)->first();
+            $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -2293,6 +2308,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'resourceable_type' => get_class($application),
+                    'resourceable_id' => $application->id,
                 ]);
 
                 return response()->json([
@@ -2380,7 +2397,10 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
-        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)->where('application_id', $application->id)->first();
+        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
+            ->where('resourceable_type', Application::class)
+            ->where('resourceable_id', $application->id)
+            ->first();
         if (! $found_env) {
             return response()->json([
                 'message' => 'Environment variable not found.',

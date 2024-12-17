@@ -60,7 +60,8 @@ class ResourceOperations extends Component
             $environmentVaribles = $this->resource->environment_variables()->get();
             foreach ($environmentVaribles as $environmentVarible) {
                 $newEnvironmentVariable = $environmentVarible->replicate()->fill([
-                    'application_id' => $new_resource->id,
+                    'resourceable_id' => $new_resource->id,
+                    'resourceable_type' => $new_resource->getMorphClass(),
                 ]);
                 $newEnvironmentVariable->save();
             }

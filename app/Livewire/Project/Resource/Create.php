@@ -95,7 +95,8 @@ class Create extends Component
                                 EnvironmentVariable::create([
                                     'key' => $key,
                                     'value' => $value,
-                                    'service_id' => $service->id,
+                                    'resourceable_id' => $service->id,
+                                    'resourceable_type' => $service->getMorphClass(),
                                     'is_build_time' => false,
                                     'is_preview' => false,
                                 ]);

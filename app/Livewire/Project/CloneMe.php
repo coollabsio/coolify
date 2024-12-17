@@ -119,7 +119,7 @@ class CloneMe extends Component
                 $environmentVaribles = $application->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
                     $newEnvironmentVariable = $environmentVarible->replicate()->fill([
-                        'application_id' => $newApplication->id,
+                        'resourceable_id' => $newApplication->id,
                     ]);
                     $newEnvironmentVariable->save();
                 }
@@ -145,17 +145,8 @@ class CloneMe extends Component
                 $environmentVaribles = $database->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
                     $payload = [];
-                    if ($database->type() === 'standalone-postgresql') {
-                        $payload['standalone_postgresql_id'] = $newDatabase->id;
-                    } elseif ($database->type() === 'standalone-redis') {
-                        $payload['standalone_redis_id'] = $newDatabase->id;
-                    } elseif ($database->type() === 'standalone-mongodb') {
-                        $payload['standalone_mongodb_id'] = $newDatabase->id;
-                    } elseif ($database->type() === 'standalone-mysql') {
-                        $payload['standalone_mysql_id'] = $newDatabase->id;
-                    } elseif ($database->type() === 'standalone-mariadb') {
-                        $payload['standalone_mariadb_id'] = $newDatabase->id;
-                    }
+                    $payload['resourceable_id'] = $newDatabase->id;
+                    $payload['resourceable_type'] = $newDatabase->getMorphClass();
                     $newEnvironmentVariable = $environmentVarible->replicate()->fill($payload);
                     $newEnvironmentVariable->save();
                 }
