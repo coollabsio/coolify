@@ -30,7 +30,7 @@ class StartMongodb
         }
 
         $this->commands = [
-            "echo 'Starting {$database->name}.'",
+            "echo 'Starting database.'",
             "mkdir -p $this->configuration_dir",
         ];
 

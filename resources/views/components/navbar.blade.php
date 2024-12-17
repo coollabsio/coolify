@@ -7,8 +7,13 @@
             }
             window.location.reload();
         },
+        setZoom(zoom) {
+            localStorage.setItem('zoom', zoom);
+            window.location.reload();
+        },
         init() {
             this.full = localStorage.getItem('pageWidth');
+            this.zoom = localStorage.getItem('zoom');
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 const userSettings = localStorage.getItem('theme');
                 if (userSettings !== 'system') {
@@ -21,6 +26,7 @@
                 }
             });
             this.queryTheme();
+            this.checkZoom();
         },
         setTheme(type) {
             this.theme = type;
@@ -43,6 +49,30 @@
             } else if (!darkModePreference) {
                 this.theme = 'system';
                 document.documentElement.classList.remove('dark');
+            }
+        },
+        checkZoom() {
+            if (this.zoom === null) {
+                this.setZoom(100);
+            }
+            if (this.zoom === '90') {
+                const style = document.createElement('style');
+                style.textContent = `
+                    html {
+                        font-size: 93.75%;
+                    }
+
+                    :root {
+                        --vh: 1vh;
+                    }
+
+                    @media (min-width: 1024px) {
+                        html {
+                            font-size: 87.5%;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
             }
         }
 }">
@@ -69,7 +99,7 @@
                     </div>
                 </x-slot:title>
                 <div class="flex flex-col gap-1">
-                    <div class="mb-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
+                    <div class="font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Color</div>
                     <button @click="setTheme('dark')" class="px-1 dropdown-item-no-padding">Dark</button>
                     <button @click="setTheme('light')" class="px-1 dropdown-item-no-padding">Light</button>
                     <button @click="setTheme('system')" class="px-1 dropdown-item-no-padding">System</button>
@@ -78,6 +108,9 @@
                         x-show="full === 'full'">Center</button>
                     <button @click="switchWidth()" class="px-1 dropdown-item-no-padding"
                         x-show="full === 'center'">Full</button>
+                    <div class="my-1 font-bold border-b dark:border-coolgray-500 dark:text-white text-md">Zoom</div>
+                    <button @click="setZoom(100)" class="px-1 dropdown-item-no-padding">100%</button>
+                    <button @click="setZoom(90)" class="px-1 dropdown-item-no-padding">90%</button>
                 </div>
             </x-dropdown>
         </div>
@@ -163,8 +196,8 @@
                             class="{{ request()->is('storages*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('storage.index') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2">
+                                <g fill="none" stroke="currentColor" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2">
                                     <path d="M4 6a8 3 0 1 0 16 0A8 3 0 1 0 4 6" />
                                     <path d="M4 6v6a8 3 0 0 0 16 0V6" />
                                     <path d="M4 12v6a8 3 0 0 0 16 0v-6" />
@@ -307,17 +340,19 @@
                         </li>
                     @endif
 
-                    @if (isCloud() && isInstanceAdmin())
-                        <li>
-                            <a title="Admin" class="menu-item" href="/admin">
-                                <svg class="text-pink-600 icon" viewBox="0 0 256 256"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path fill="currentColor"
-                                        d="M177.62 159.6a52 52 0 0 1-34 34a12.2 12.2 0 0 1-3.6.55a12 12 0 0 1-3.6-23.45a28 28 0 0 0 18.32-18.32a12 12 0 0 1 22.9 7.2ZM220 144a92 92 0 0 1-184 0c0-28.81 11.27-58.18 33.48-87.28a12 12 0 0 1 17.9-1.33l19.69 19.11L127 19.89a12 12 0 0 1 18.94-5.12C168.2 33.25 220 82.85 220 144m-24 0c0-41.71-30.61-78.39-52.52-99.29l-20.21 55.4a12 12 0 0 1-19.63 4.5L80.71 82.36C67 103.38 60 124.06 60 144a68 68 0 0 0 136 0" />
-                                </svg>
-                                Admin
-                            </a>
-                        </li>
+                    @if (isCloud() || isDev())
+                        @if (isInstanceAdmin() || session('impersonating'))
+                            <li>
+                                <a title="Admin" class="menu-item" href="/admin">
+                                    <svg class="text-pink-600 icon" viewBox="0 0 256 256"
+                                        xmlns="http://www.w3.org/2000/svg">
+                                        <path fill="currentColor"
+                                            d="M177.62 159.6a52 52 0 0 1-34 34a12.2 12.2 0 0 1-3.6.55a12 12 0 0 1-3.6-23.45a28 28 0 0 0 18.32-18.32a12 12 0 0 1 22.9 7.2ZM220 144a92 92 0 0 1-184 0c0-28.81 11.27-58.18 33.48-87.28a12 12 0 0 1 17.9-1.33l19.69 19.11L127 19.89a12 12 0 0 1 18.94-5.12C168.2 33.25 220 82.85 220 144m-24 0c0-41.71-30.61-78.39-52.52-99.29l-20.21 55.4a12 12 0 0 1-19.63 4.5L80.71 82.36C67 103.38 60 124.06 60 144a68 68 0 0 0 136 0" />
+                                    </svg>
+                                    Admin
+                                </a>
+                            </li>
+                        @endif
                     @endif
                     <div class="flex-1"></div>
                     @if (isInstanceAdmin() && !isCloud())

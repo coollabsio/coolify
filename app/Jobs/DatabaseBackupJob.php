@@ -32,8 +32,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public ScheduledDatabaseBackup $backup;
-
     public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
 
     public ?string $container_name = null;
@@ -58,15 +56,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?S3Storage $s3 = null;
 
-    public function __construct($backup)
+    public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
-        $this->backup = $backup;
     }
 
     public function handle(): void
     {
         try {
+            $databasesToBackup = null;
+
             $this->team = Team::find($this->backup->team_id);
             if (! $this->team) {
                 $this->backup->delete();
@@ -198,8 +197,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databaseType = $this->database->type();
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
-
-            if (filled($databasesToBackup)) {
+            if (blank($databasesToBackup)) {
                 if (str($databaseType)->contains('postgres')) {
                     $databasesToBackup = [$this->database->postgres_db];
                 } elseif (str($databaseType)->contains('mongodb')) {
@@ -305,7 +303,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
-                    $this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
+
+                    $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
+
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $this->backup_output,

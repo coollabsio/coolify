@@ -40,7 +40,8 @@ Special thanks to our biggest sponsors!
 
 ### Special Sponsors
 
-![image](https://github.com/user-attachments/assets/152bd1e0-e0c1-4d47-8a4f-0eb3700d2e61)
+![image](https://github.com/user-attachments/assets/6022bc9c-8435-4d14-9497-8be230ed8cb1)
+
 
 * [CCCareers](https://cccareers.org/) - A career development platform connecting coding bootcamp graduates with job opportunities in the tech industry.
 * [Hetzner](http://htznr.li/CoolifyXHetzner) - A German web hosting company offering affordable dedicated servers, cloud services, and web hosting solutions.
@@ -50,8 +51,11 @@ Special thanks to our biggest sponsors!
 * [QuantCDN](https://www.quantcdn.io/?ref=coolify.io) - A content delivery network (CDN) optimizing website performance through global content distribution.
 * [Arcjet](https://arcjet.com/?ref=coolify.io) - A cloud-based platform providing real-time protection against API abuse and bot attacks.
 * [SupaGuide](https://supa.guide/?ref=coolify.io) - A comprehensive resource hub offering guides and tutorials for web development using Supabase.
+* [GoldenVM](https://billing.goldenvm.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
 * [Tigris](https://tigrisdata.com/?ref=coolify.io) - A fully managed serverless object storage service compatible with Amazon S3 API. Offers high performance, scalability, and built-in search capabilities for efficient data management.
-* [Advin](https://coolify.ad.vin/?ref=coolify.io) - A digital advertising agency specializing in programmatic advertising and data-driven marketing strategies.
+* [Cloudify.ro](https://cloudify.ro/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
+* [Syntaxfm](https://syntax.fm/?ref=coolify.io) - Podcast for web developers.
+* [PFGlabs](https://pfglabs.com/?ref=coolify.io) - Build real project with Golang.
 * [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered search and discovery platform for enhancing information retrieval in large datasets.
 * [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-native platform for automating infrastructure provisioning and management across multiple cloud providers.
 * [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in creating custom digital experiences and brand identities.
@@ -90,8 +94,10 @@ Special thanks to our biggest sponsors!
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
 <a href="https://formbricks.com/?utm_source=coolify.io"><img src="https://github.com/formbricks.png" width="60px" alt="Formbricks" /></a>
-<a href="https://x.com/adithsuhas17?utm_source=coolify.io"><img src="https://github.com/adith-suhas-sv.png" width="60px" alt="Adith Suhas" /></a>
 <a href="https://startupfa.me?utm_source=coolify.io"><img src="https://github.com/startupfame.png" width="60px" alt="StartupFame" /></a>
+<a href="https://bsky.app/profile/jyc.dev"><img src="https://github.com/jycouet.png" width="60px" alt="jyc.dev" /></a>
+<a href="https://bitlaunch.io/?utm_source=coolify.io"><img src="https://github.com/bitlaunchio.png" width="60px" alt="BitLaunch" /></a>
+<a href="https://internetgarden.co/?utm_source=coolify.io"><img src="./other/logos/internetgarden.ico" width="60px" alt="Internet Garden" /></a>
 <a href="https://jonasjaeger.com?utm_source=coolify.io"><img src="https://github.com/toxin20.png" width="60px" alt="Jonas Jaeger" /></a>
 <a href="https://github.com/therealjp?utm_source=coolify.io"><img src="https://github.com/therealjp.png" width="60px" alt="JP" /></a>
 <a href="https://evercam.io/?utm_source=coolify.io"><img src="https://github.com/evercam.png" width="60px" alt="Evercam" /></a>
@@ -147,10 +153,10 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 
 # Core Maintainers
 
-| Andras Bacsai | Peak |
+| Andras Bacsai | 🏔️ Peak |
 |------------|------------|
-| <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="Peak Labs" /> |
-| <a href="https://x.com/heyandras"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Twitter.svg" width="25px"></a> <a href="https://github.com/andrasbacsai"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Github.svg" width="25px"></a> | <a href="https://x.com/peaklabs_dev"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Twitter.svg" width="25px"></a> <a href="https://github.com/peaklabs-dev"><img src="https://raw.githubusercontent.com/gauravghongde/social-icons/master/SVG/Color/Github.svg" width="25px"></a> |
+| <img src="https://github.com/andrasbacsai.png" width="200px" alt="Andras Bacsai" /> | <img src="https://github.com/peaklabs-dev.png" width="200px" alt="peaklabs-dev" /> |
+| <a href="https://github.com/andrasbacsai"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/heyandras"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/heyandras.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> | <a href="https://github.com/peaklabs-dev"><img src="https://api.iconify.design/devicon:github.svg" width="25px"></a> <a href="https://x.com/peaklabs_dev"><img src="https://api.iconify.design/devicon:twitter.svg" width="25px"></a> <a href="https://bsky.app/profile/peaklabs.dev"><img src="https://api.iconify.design/simple-icons:bluesky.svg" width="25px"></a> |
 
 # Repo Activity
 

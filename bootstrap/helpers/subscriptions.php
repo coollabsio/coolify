@@ -67,9 +67,9 @@ function allowedPathsForUnsubscribedAccounts()
         'subscription/new',
         'login',
         'logout',
-        'waitlist',
         'force-password-reset',
         'livewire/update',
+        'admin',
     ];
 }
 function allowedPathsForBoardingAccounts()

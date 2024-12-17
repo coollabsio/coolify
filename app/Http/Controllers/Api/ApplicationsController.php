@@ -25,26 +25,27 @@ class ApplicationsController extends Controller
 {
     private function removeSensitiveData($application)
     {
-        $token = auth()->user()->currentAccessToken();
         $application->makeHidden([
             'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($application);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $application->makeHidden([
+                'custom_labels',
+                'dockerfile',
+                'docker_compose',
+                'docker_compose_raw',
+                'manual_webhook_secret_bitbucket',
+                'manual_webhook_secret_gitea',
+                'manual_webhook_secret_github',
+                'manual_webhook_secret_gitlab',
+                'private_key_id',
+                'value',
+                'real_value',
+            ]);
         }
-        $application->makeHidden([
-            'custom_labels',
-            'dockerfile',
-            'docker_compose',
-            'docker_compose_raw',
-            'manual_webhook_secret_bitbucket',
-            'manual_webhook_secret_gitea',
-            'manual_webhook_secret_github',
-            'manual_webhook_secret_gitlab',
-            'private_key_id',
-            'value',
-            'real_value',
-        ]);
 
         return serializeApiResponse($application);
     }
@@ -70,7 +71,8 @@ class ApplicationsController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/Application')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -180,8 +182,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -284,8 +288,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -388,8 +394,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -476,8 +484,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -561,8 +571,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -612,8 +624,10 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -1268,7 +1282,8 @@ class ApplicationsController extends Controller
                             ref: '#/components/schemas/Application'
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1340,7 +1355,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1466,8 +1482,10 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                         ],
-                    )),
-            ]),
+                    )
+                ),
+            ]
+        ),
         responses: [
             new OA\Response(
                 response: 200,
@@ -1482,7 +1500,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1591,16 +1610,33 @@ class ApplicationsController extends Controller
         }
         $domains = $request->domains;
         if ($request->has('domains') && $server->isProxyShouldRun()) {
-            $errors = [];
+            $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-            $application->fqdn = $fqdn;
-            if (! $application->settings->is_container_label_readonly_enabled) {
-                $customLabels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-                $application->custom_labels = base64_encode($customLabels);
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                $domain = trim($domain);
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false || ! preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
+                    $errors[] = 'Invalid domain: '.$domain;
+                }
+
+                return $domain;
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
             }
-            $request->offsetUnset('domains');
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'One of the domain is already used.',
+                    ],
+                ], 422);
+            }
         }
 
         $dockerComposeDomainsJson = collect();
@@ -1690,7 +1726,8 @@ class ApplicationsController extends Controller
                             items: new OA\Items(ref: '#/components/schemas/EnvironmentVariable')
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1796,7 +1833,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -1858,8 +1896,9 @@ class ApplicationsController extends Controller
         $is_preview = $request->is_preview ?? false;
         $is_build_time = $request->is_build_time ?? false;
         $is_literal = $request->is_literal ?? false;
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -1886,7 +1925,7 @@ class ApplicationsController extends Controller
                 ], 404);
             }
         } else {
-            $env = $application->environment_variables->where('key', $request->key)->first();
+            $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -1984,7 +2023,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2028,6 +2068,7 @@ class ApplicationsController extends Controller
         $bulk_data = collect($bulk_data)->map(function ($item) {
             return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal']);
         });
+        $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
             $validator = customApiValidator($item, [
                 'key' => 'string|required',
@@ -2049,8 +2090,9 @@ class ApplicationsController extends Controller
             $is_literal = $item->get('is_literal') ?? false;
             $is_multi_line = $item->get('is_multiline') ?? false;
             $is_shown_once = $item->get('is_shown_once') ?? false;
+            $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
+                $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2075,10 +2117,12 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'resourceable_type' => get_class($application),
+                        'resourceable_id' => $application->id,
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $item->get('key'))->first();
+                $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2103,12 +2147,15 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'resourceable_type' => get_class($application),
+                        'resourceable_id' => $application->id,
                     ]);
                 }
             }
+            $returnedEnvs->push($this->removeSensitiveData($env));
         }
 
-        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+        return response()->json($returnedEnvs)->setStatusCode(201);
     }
 
     #[OA\Post(
@@ -2165,7 +2212,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2220,8 +2268,10 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -2235,6 +2285,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'resourceable_type' => get_class($application),
+                    'resourceable_id' => $application->id,
                 ]);
 
                 return response()->json([
@@ -2242,7 +2294,7 @@ class ApplicationsController extends Controller
                 ])->setStatusCode(201);
             }
         } else {
-            $env = $application->environment_variables->where('key', $request->key)->first();
+            $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -2256,6 +2308,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'resourceable_type' => get_class($application),
+                    'resourceable_id' => $application->id,
                 ]);
 
                 return response()->json([
@@ -2314,7 +2368,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2342,7 +2397,10 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
-        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)->where('application_id', $application->id)->first();
+        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
+            ->where('resourceable_type', Application::class)
+            ->where('resourceable_id', $application->id)
+            ->first();
         if (! $found_env) {
             return response()->json([
                 'message' => 'Environment variable not found.',
@@ -2406,9 +2464,11 @@ class ApplicationsController extends Controller
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Deployment request queued.', 'description' => 'Message.'],
                                 'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
-                            ])
+                            ]
+                        )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2494,7 +2554,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
             new OA\Response(
                 response: 401,
                 ref: '#/components/responses/401',
@@ -2568,7 +2629,8 @@ class ApplicationsController extends Controller
                             ]
                         )
                     ),
-                ]),
+                ]
+            ),
 
             new OA\Response(
                 response: 401,

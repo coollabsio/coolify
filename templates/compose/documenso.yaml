@@ -1,0 +1,42 @@
+# documentation: https://docs.documenso.com/
+# slogan: Document signing, finally open source
+# tags: signing, opensource, document, pdf, e-signature, digital-signature, document-signing, pdf-signing, docusign
+# logo: svgs/documenso.png
+# port: 3000
+
+services:
+  documenso:
+    image: documenso/documenso
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_DOCUMENSO_3000
+      - NEXTAUTH_URL=${SERVICE_FQDN_DOCUMENSO_3000}
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_AUTHSECRET}
+      - NEXT_PRIVATE_ENCRYPTION_KEY=${SERVICE_BASE64_ENCRYPTIONKEY}
+      - NEXT_PRIVATE_ENCRYPTION_SECONDARY_KEY=${SERVICE_BASE64_SECONDARYENCRYPTIONKEY}
+      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_FQDN_DOCUMENSO_3000}
+      - NEXT_PRIVATE_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
+      - NEXT_PRIVATE_DIRECT_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -q -O - http://documenso:3000/ | grep -q 'Sign in to your account'"
+      interval: 2s
+      timeout: 10s
+      retries: 20
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-documenso-db}
+    volumes:
+      - documenso_postgresql_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

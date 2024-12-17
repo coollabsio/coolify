@@ -173,13 +173,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function getProxyType()
     {
-        // Set Default Proxy Type
         $this->selectProxy(ProxyTypes::TRAEFIK->value);
-        // $proxyTypeSet = $this->createdServer->proxy->type;
-        // if (!$proxyTypeSet) {
-        //     $this->currentState = 'select-proxy';
-        //     return;
-        // }
         $this->getProjects();
     }
 
@@ -190,7 +184,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
             return;
         }
-        $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
+        $this->createdPrivateKey = PrivateKey::where('team_id', currentTeam()->id)->where('id', $this->selectedExistingPrivateKey)->first();
         $this->privateKey = $this->createdPrivateKey->private_key;
         $this->currentState = 'create-server';
     }

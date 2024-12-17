@@ -3,20 +3,14 @@
 namespace App\Notifications\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class BackupFailed extends Notification implements ShouldQueue
+class BackupFailed extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $backoff = 10;
-
-    public $tries = 2;
-
     public string $name;
 
     public string $frequency;
@@ -30,13 +24,13 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'database_backups');
+        return $notifiable->getEnabledChannels('backup_failure');
     }
 
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
+        $mail->subject("Coolify: [ACTION REQUIRED] Database Backup FAILED for {$this->database->name}");
         $mail->view('emails.backup-failed', [
             'name' => $this->name,
             'database_name' => $this->database_name,
@@ -69,5 +63,29 @@ class BackupFailed extends Notification implements ShouldQueue
         return [
             'message' => $message,
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'Database backup failed',
+            level: 'error',
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED<br/><br/><b>Frequency:</b> {$this->frequency} .<br/><b>Reason:</b> {$this->output}",
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Database backup failed';
+        $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
+
+        $description .= "\n\n**Frequency:** {$this->frequency}";
+        $description .= "\n\n**Error Output:**\n{$this->output}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

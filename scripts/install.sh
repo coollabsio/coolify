@@ -30,7 +30,7 @@ WARNING_SPACE=false
 
 if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
     WARNING_SPACE=true
-    cat << 'EOF'
+    cat << EOF
 WARNING: Insufficient total disk space!
 
 Total disk space:     ${TOTAL_SPACE}GB
@@ -41,7 +41,7 @@ EOF
 fi
 
 if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
-    cat << 'EOF'
+    cat << EOF
 WARNING: Insufficient available disk space!
 
 Available disk space:   ${AVAILABLE_SPACE}GB
@@ -49,7 +49,7 @@ Required available space: ${REQUIRED_AVAILABLE_SPACE}GB
 
 ==================
 EOF
-    WARNING_SPACE=true
+WARNING_SPACE=true
 fi
 
 if [ "$WARNING_SPACE" = true ]; then
@@ -80,6 +80,11 @@ ENV_FILE="/data/coolify/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
+    OS_TYPE="arch"
+fi
+
+# Check if the OS is Endeavour OS, if so, change it to arch
+if [ "$OS_TYPE" = "endeavouros" ]; then
     OS_TYPE="arch"
 fi
 

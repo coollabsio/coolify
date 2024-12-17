@@ -1,6 +1,7 @@
 # documentation: https://invoiceninja.github.io/selfhost.html
 # slogan: The leading open-source invoicing platform
 # tags: invoicing, billing, accounting, finance, self-hosted
+# logo: svgs/invoiceninja.png
 # port: 9000
 
 services:

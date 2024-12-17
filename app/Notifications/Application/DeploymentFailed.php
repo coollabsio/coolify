@@ -4,18 +4,14 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class DeploymentFailed extends Notification implements ShouldQueue
+class DeploymentFailed extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public Application $application;
 
     public ?ApplicationPreview $preview = null;
@@ -53,7 +49,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'deployments');
+        return $notifiable->getEnabledChannels('deployment_failure');
     }
 
     public function toMail(): MailMessage
@@ -136,5 +132,57 @@ class DeploymentFailed extends Notification implements ShouldQueue
                 ...$buttons,
             ],
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
+            $message = "Pull request deployment failed for {$this->application_name}";
+        } else {
+            $title = 'Deployment failed';
+            $message = "Deployment failed for {$this->application_name}";
+        }
+
+        $buttons[] = [
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
+        ];
+
+        return new PushoverMessage(
+            title: $title,
+            level: 'error',
+            message: $message,
+            buttons: [
+                ...$buttons,
+            ],
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
+            $description = "Pull request deployment failed for {$this->application_name}";
+            if ($this->preview->fqdn) {
+                $description .= "\nPreview URL: {$this->preview->fqdn}";
+            }
+        } else {
+            $title = 'Deployment failed';
+            $description = "Deployment failed for {$this->application_name}";
+            if ($this->fqdn) {
+                $description .= "\nApplication URL: {$this->fqdn}";
+            }
+        }
+
+        $description .= "\n\n**Project:** ".data_get($this->application, 'environment.project.name');
+        $description .= "\n**Environment:** {$this->environment_name}";
+        $description .= "\n**Deployment Logs:** {$this->deployment_url}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

@@ -42,9 +42,11 @@ class ResourceOperations extends Component
         $uuid = (string) new Cuid2;
         $server = $new_destination->server;
         if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+            $name = 'clone-of-'.str($this->resource->name)->limit(20).'-'.$uuid;
+
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
-                'name' => $this->resource->name.'-clone-'.$uuid,
+                'name' => $name,
                 'fqdn' => generateFqdn($server, $uuid),
                 'status' => 'exited',
                 'destination_id' => $new_destination->id,
@@ -58,14 +60,19 @@ class ResourceOperations extends Component
             $environmentVaribles = $this->resource->environment_variables()->get();
             foreach ($environmentVaribles as $environmentVarible) {
                 $newEnvironmentVariable = $environmentVarible->replicate()->fill([
-                    'application_id' => $new_resource->id,
+                    'resourceable_id' => $new_resource->id,
+                    'resourceable_type' => $new_resource->getMorphClass(),
                 ]);
                 $newEnvironmentVariable->save();
             }
             $persistentVolumes = $this->resource->persistentStorages()->get();
             foreach ($persistentVolumes as $volume) {
+                $volumeName = str($volume->name)->replace($this->resource->uuid, $new_resource->uuid)->value();
+                if ($volumeName === $volume->name) {
+                    $volumeName = $new_resource->uuid.'-'.str($volume->name)->afterLast('-');
+                }
                 $newPersistentVolume = $volume->replicate()->fill([
-                    'name' => $new_resource->uuid.'-'.str($volume->name)->afterLast('-'),
+                    'name' => $volumeName,
                     'resource_id' => $new_resource->id,
                 ]);
                 $newPersistentVolume->save();

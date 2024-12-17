@@ -19,25 +19,22 @@ class ServersController extends Controller
 {
     private function removeSensitiveDataFromSettings($settings)
     {
-        $token = auth()->user()->currentAccessToken();
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($settings);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $settings = $settings->makeHidden([
+                'sentinel_token',
+            ]);
         }
-        $settings = $settings->makeHidden([
-            'sentinel_token',
-        ]);
 
         return serializeApiResponse($settings);
     }
 
     private function removeSensitiveData($server)
     {
-        $token = auth()->user()->currentAccessToken();
         $server->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($server);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            // Do nothing
         }
 
         return serializeApiResponse($server);
@@ -157,11 +154,7 @@ class ServersController extends Controller
                     'created_at' => $resource->created_at,
                     'updated_at' => $resource->updated_at,
                 ];
-                if ($resource->type() === 'service') {
-                    $payload['status'] = $resource->status();
-                } else {
-                    $payload['status'] = $resource->status;
-                }
+                $payload['status'] = $resource->status;
 
                 return $payload;
             });
@@ -240,11 +233,7 @@ class ServersController extends Controller
                 'created_at' => $resource->created_at,
                 'updated_at' => $resource->updated_at,
             ];
-            if ($resource->type() === 'service') {
-                $payload['status'] = $resource->status();
-            } else {
-                $payload['status'] = $resource->status;
-            }
+            $payload['status'] = $resource->status;
 
             return $payload;
         });
@@ -567,6 +556,9 @@ class ServersController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Server updated.',
@@ -596,8 +588,7 @@ class ServersController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'array',
-                            items: new OA\Items(ref: '#/components/schemas/Server')
+                            ref: '#/components/schemas/Server'
                         )
                     ),
                 ]),
@@ -679,7 +670,7 @@ class ServersController extends Controller
         }
 
         return response()->json([
-
+            'uuid' => $server->uuid,
         ])->setStatusCode(201);
     }
 

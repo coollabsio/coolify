@@ -3,21 +3,14 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class Unreachable extends Notification implements ShouldQueue
+class Unreachable extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     protected bool $isRateLimited = false;
 
     public function __construct(public Server $server)
@@ -34,22 +27,7 @@ class Unreachable extends Notification implements ShouldQueue
             return [];
         }
 
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isEmailEnabled) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('server_unreachable');
     }
 
     public function toMail(): ?MailMessage
@@ -81,5 +59,27 @@ class Unreachable extends Notification implements ShouldQueue
         return [
             'message' => "Coolify: Your server '{$this->server->name}' is unreachable. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server and turn on all automations & integrations.",
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'Server unreachable',
+            level: 'error',
+            message: "Your server '{$this->server->name}' is unreachable.<br/>All automations & integrations are turned off!<br/><br/><b>IMPORTANT:</b> We automatically try to revive your server and turn on all automations & integrations.",
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $description = "Your server '{$this->server->name}' is unreachable.\n";
+        $description .= "All automations & integrations are turned off!\n\n";
+        $description .= '*IMPORTANT:* We automatically try to revive your server and turn on all automations & integrations.';
+
+        return new SlackMessage(
+            title: 'Server unreachable',
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

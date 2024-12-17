@@ -1,4 +1,4 @@
-<div wire:poll.10000ms="check_status_without_notification">
+<div>
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
@@ -14,6 +14,10 @@
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
+            <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
+                href="{{ route('project.service.logs', $parameters) }}">
+                <button>Logs</button>
+            </a>
             <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.command', $parameters) }}">
                 <button>Terminal</button>
@@ -22,7 +26,7 @@
         </nav>
         @if ($service->isDeployable)
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
-                @if (str($service->status())->contains('running'))
+                @if (str($service->status)->contains('running'))
                     <x-dropdown>
                         <x-slot:title>
                             Advanced
@@ -70,7 +74,7 @@
                             Stop
                         </x-slot:button-title>
                     </x-modal-confirmation>
-                @elseif (str($service->status())->contains('degraded'))
+                @elseif (str($service->status)->contains('degraded'))
                     <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
                         <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -99,7 +103,7 @@
                             Stop
                         </x-slot:button-title>
                     </x-modal-confirmation>
-                @elseif (str($service->status())->contains('exited'))
+                @elseif (str($service->status)->contains('exited'))
                     <button wire:click='stop(true)' class="gap-2 button">
                         <svg class="w-5 h-5" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                             <path fill="red" d="M26 20h-6v-2h6zm4 8h-6v-2h6zm-2-4h-6v-2h6z" />
@@ -150,8 +154,7 @@
         @else
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
                 <div class="text-error">
-                    Unable to deploy. <a
-                        class="underline font-bold cursor-pointer"
+                    Unable to deploy. <a class="underline font-bold cursor-pointer"
                         @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'">
                         Required environment variables missing.</a>
                 </div>

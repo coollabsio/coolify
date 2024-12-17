@@ -3,7 +3,7 @@
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
             <div class="flex flex-col items-center">
-                <x-modal-input buttonTitle="+ Add" title="New Environment Variable">
+                <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
                     <livewire:project.shared.environment-variable.add />
                 </x-modal-input>
             </div>
@@ -13,7 +13,7 @@
         <div>Environment variables (secrets) for this resource. </div>
         @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
             <div class="w-64 pt-2">
-                <x-forms.checkbox id="resource.settings.is_env_sorting_enabled" label="Sort alphabetically"
+                <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
                     helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
                     instantSave></x-forms.checkbox>
             </div>
@@ -38,7 +38,7 @@
             <div>Environment (secrets) variables for Production.</div>
         </div>
         @php
-            $requiredEmptyVars = $resource->environment_variables->filter(function($env) {
+            $requiredEmptyVars = $resource->environment_variables->filter(function ($env) {
                 return $env->is_required && empty($env->value);
             });
             $otherVars = $resource->environment_variables->diff($requiredEmptyVars);
@@ -55,18 +55,20 @@
                 <h3>Preview Deployments Environment Variables</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview as $env)
+            {{-- @foreach ($resource->environment_variables_preview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
-            @endforeach
+            @endforeach --}}
         @endif
     @else
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
-            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables" label="Production Environment Variables"></x-forms.textarea>
+            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables" wire:model="variables"
+                label="Production Environment Variables"></x-forms.textarea>
 
             @if ($showPreview)
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Deployments Environment Variables"
-                    id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap"
+                    label="Preview Deployments Environment Variables" id="variablesPreview"
+                    wire:model="variablesPreview"></x-forms.textarea>
             @endif
 
             <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>

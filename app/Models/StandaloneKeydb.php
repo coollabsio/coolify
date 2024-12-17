@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneKeydb extends BaseModel
@@ -251,14 +250,9 @@ class StandaloneKeydb extends BaseModel
         return $this->morphTo();
     }
 
-    public function environment_variables(): HasMany
+    public function runtime_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class);
-    }
-
-    public function runtime_environment_variables(): HasMany
-    {
-        return $this->hasMany(EnvironmentVariable::class);
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function persistentStorages()
@@ -318,5 +312,11 @@ class StandaloneKeydb extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return false;
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderBy('key', 'asc');
     }
 }

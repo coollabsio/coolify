@@ -2,6 +2,7 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Events\ProxyStarted;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -37,11 +38,16 @@ class StartProxy
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            $caddfile = 'import /dynamic/*.caddy';
+            if (isDev()) {
+                if ($proxyType === ProxyTypes::CADDY->value) {
+                    $proxy_path = '/data/coolify/proxy/caddy';
+                }
+            }
+            $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
-                "echo '$caddfile' > $proxy_path/dynamic/Caddyfile",
+                "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
                 'docker compose pull',

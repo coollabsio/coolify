@@ -3,18 +3,14 @@
 namespace App\Notifications\Application;
 
 use App\Models\Application;
+use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class StatusChanged extends Notification implements ShouldQueue
+class StatusChanged extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-
     public string $resource_name;
 
     public string $project_uuid;
@@ -40,7 +36,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'status_changes');
+        return $notifiable->getEnabledChannels('status_change');
     }
 
     public function toMail(): MailMessage
@@ -80,5 +76,38 @@ class StatusChanged extends Notification implements ShouldQueue
                 ],
             ],
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        $message = $this->resource_name . ' has been stopped.';
+
+        return new PushoverMessage(
+            title: 'Application stopped',
+            level: 'error',
+            message: $message,
+            buttons: [
+                [
+                    'text' => 'Open Application in Coolify',
+                    'url' => $this->resource_url,
+                ],
+            ],
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $title = 'Application stopped';
+        $description = "{$this->resource_name} has been stopped";
+
+        $description .= "\n\n**Project:** ".data_get($this->resource, 'environment.project.name');
+        $description .= "\n**Environment:** {$this->environment_name}";
+        $description .= "\n**Application URL:** {$this->resource_url}";
+
+        return new SlackMessage(
+            title: $title,
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

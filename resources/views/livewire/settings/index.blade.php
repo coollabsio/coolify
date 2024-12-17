@@ -23,7 +23,7 @@
                     <div class="w-full" x-data="{
                         open: false,
                         search: '{{ $settings->instance_timezone ?: '' }}',
-                        timezones: @js($timezones),
+                        timezones: @js($this->timezones),
                         placeholder: '{{ $settings->instance_timezone ? 'Search timezone...' : 'Select Server Timezone' }}',
                         init() {
                             this.$watch('search', value => {
@@ -154,7 +154,7 @@
                         <x-modal-confirmation title="Disable Two Step Confirmation?"
                             buttonTitle="Disable Two Step Confirmation" isErrorButton
                             submitAction="toggleTwoStepConfirmation" :actions="[
-                                'Tow Step confimation will be disabled globally.',
+                                'Two Step confimation will be disabled globally.',
                                 'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
                                 'The risk of accidental actions will increase.',
                             ]"

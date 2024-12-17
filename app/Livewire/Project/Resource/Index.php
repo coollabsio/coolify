@@ -46,126 +46,83 @@ class Index extends Component
             return redirect()->route('dashboard');
         }
         $this->project = $project;
-        $this->environment = $environment;
-        $this->applications = $this->environment->applications->load(['tags']);
+        $this->environment = $environment->loadCount([
+            'applications',
+            'redis',
+            'postgresqls',
+            'mysqls',
+            'keydbs',
+            'dragonflies',
+            'clickhouses',
+            'mariadbs',
+            'mongodbs',
+            'services',
+        ]);
+
+        // Eager load all relationships for applications including nested ones
+        $this->applications = $this->environment->applications()->with([
+            'tags',
+            'additional_servers.settings',
+            'additional_networks',
+            'destination.server.settings',
+            'settings',
+        ])->get()->sortBy('name');
         $this->applications = $this->applications->map(function ($application) {
-            if (data_get($application, 'environment.project.uuid')) {
-                $application->hrefLink = route('project.application.configuration', [
+            $application->hrefLink = route('project.application.configuration', [
                     'project_uuid' => data_get($application, 'environment.project.uuid'),
                     'environment_uuid' => data_get($application, 'environment.uuid'),
                     'application_uuid' => data_get($application, 'uuid'),
-                ]);
-            }
+            ]);
 
             return $application;
         });
-        $this->postgresqls = $this->environment->postgresqls->load(['tags'])->sortBy('name');
-        $this->postgresqls = $this->postgresqls->map(function ($postgresql) {
-            if (data_get($postgresql, 'environment.project.uuid')) {
-                $postgresql->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($postgresql, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($postgresql, 'environment.uuid'),
-                    'database_uuid' => data_get($postgresql, 'uuid'),
-                ]);
-            }
 
-            return $postgresql;
-        });
-        $this->redis = $this->environment->redis->load(['tags'])->sortBy('name');
-        $this->redis = $this->redis->map(function ($redis) {
-            if (data_get($redis, 'environment.project.uuid')) {
-                $redis->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($redis, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($redis, 'environment.uuid'),
-                    'database_uuid' => data_get($redis, 'uuid'),
-                ]);
-            }
+        // Load all database resources in a single query per type
+        $databaseTypes = [
+            'postgresqls' => 'postgresqls',
+            'redis' => 'redis',
+            'mongodbs' => 'mongodbs',
+            'mysqls' => 'mysqls',
+            'mariadbs' => 'mariadbs',
+            'keydbs' => 'keydbs',
+            'dragonflies' => 'dragonflies',
+            'clickhouses' => 'clickhouses',
+        ];
 
-            return $redis;
-        });
-        $this->mongodbs = $this->environment->mongodbs->load(['tags'])->sortBy('name');
-        $this->mongodbs = $this->mongodbs->map(function ($mongodb) {
-            if (data_get($mongodb, 'environment.project.uuid')) {
-                $mongodb->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($mongodb, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($mongodb, 'environment.uuid'),
-                    'database_uuid' => data_get($mongodb, 'uuid'),
-                ]);
-            }
+        // Load all server-related data first to prevent duplicate queries
+        $serverData = $this->environment->applications()
+            ->with(['destination.server.settings'])
+            ->get()
+            ->pluck('destination.server')
+            ->filter()
+            ->unique('id');
 
-            return $mongodb;
-        });
-        $this->mysqls = $this->environment->mysqls->load(['tags'])->sortBy('name');
-        $this->mysqls = $this->mysqls->map(function ($mysql) {
-            if (data_get($mysql, 'environment.project.uuid')) {
-                $mysql->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($mysql, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($mysql, 'environment.uuid'),
-                    'database_uuid' => data_get($mysql, 'uuid'),
+        foreach ($databaseTypes as $property => $relation) {
+            $this->{$property} = $this->environment->{$relation}()->with([
+                'tags',
+                'destination.server.settings',
+            ])->get()->sortBy('name');
+            $this->{$property} = $this->{$property}->map(function ($db) {
+                $db->hrefLink = route('project.database.configuration', [
+                    'project_uuid' => $this->project->uuid,
+                    'database_uuid' => $db->uuid,
+                    'environment_uuid' => data_get($this->environment, 'uuid'),
                 ]);
-            }
+                return $db;
+            });
+        }
 
-            return $mysql;
-        });
-        $this->mariadbs = $this->environment->mariadbs->load(['tags'])->sortBy('name');
-        $this->mariadbs = $this->mariadbs->map(function ($mariadb) {
-            if (data_get($mariadb, 'environment.project.uuid')) {
-                $mariadb->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($mariadb, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($mariadb, 'environment.uuid'),
-                    'database_uuid' => data_get($mariadb, 'uuid'),
-                ]);
-            }
-
-            return $mariadb;
-        });
-        $this->keydbs = $this->environment->keydbs->load(['tags'])->sortBy('name');
-        $this->keydbs = $this->keydbs->map(function ($keydb) {
-            if (data_get($keydb, 'environment.project.uuid')) {
-                $keydb->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($keydb, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($keydb, 'environment.uuid'),
-                    'database_uuid' => data_get($keydb, 'uuid'),
-                ]);
-            }
-
-            return $keydb;
-        });
-        $this->dragonflies = $this->environment->dragonflies->load(['tags'])->sortBy('name');
-        $this->dragonflies = $this->dragonflies->map(function ($dragonfly) {
-            if (data_get($dragonfly, 'environment.project.uuid')) {
-                $dragonfly->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($dragonfly, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($dragonfly, 'environment.uuid'),
-                    'database_uuid' => data_get($dragonfly, 'uuid'),
-                ]);
-            }
-
-            return $dragonfly;
-        });
-        $this->clickhouses = $this->environment->clickhouses->load(['tags'])->sortBy('name');
-        $this->clickhouses = $this->clickhouses->map(function ($clickhouse) {
-            if (data_get($clickhouse, 'environment.project.uuid')) {
-                $clickhouse->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => data_get($clickhouse, 'environment.project.uuid'),
-                    'environment_uuid' => data_get($clickhouse, 'environment.uuid'),
-                    'database_uuid' => data_get($clickhouse, 'uuid'),
-                ]);
-            }
-
-            return $clickhouse;
-        });
-        $this->services = $this->environment->services->load(['tags'])->sortBy('name');
+        // Load services with their tags and server
+        $this->services = $this->environment->services()->with([
+            'tags',
+            'destination.server.settings',
+        ])->get()->sortBy('name');
         $this->services = $this->services->map(function ($service) {
-            if (data_get($service, 'environment.project.uuid')) {
-                $service->hrefLink = route('project.service.configuration', [
+            $service->hrefLink = route('project.service.configuration', [
                     'project_uuid' => data_get($service, 'environment.project.uuid'),
                     'environment_uuid' => data_get($service, 'environment.uuid'),
                     'service_uuid' => data_get($service, 'uuid'),
-                ]);
-                $service->status = $service->status();
-            }
-
+            ]);
             return $service;
         });
     }

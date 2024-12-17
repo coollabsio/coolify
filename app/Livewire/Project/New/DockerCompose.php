@@ -87,7 +87,8 @@ class DockerCompose extends Component
                     'value' => $variable,
                     'is_build_time' => false,
                     'is_preview' => false,
-                    'service_id' => $service->id,
+                    'resourceable_id' => $service->id,
+                    'resourceable_type' => $service->getMorphClass(),
                 ]);
             }
             $service->name = "service-$service->uuid";
