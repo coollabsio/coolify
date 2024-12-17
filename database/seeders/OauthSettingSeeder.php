@@ -22,7 +22,7 @@ class OauthSettingSeeder extends Seeder
                 'google',
                 'authentik',
                 'infomaniak',
-            ])
+            ]);
 
             $isOauthSeeded = OauthSetting::count() > 0;
 
