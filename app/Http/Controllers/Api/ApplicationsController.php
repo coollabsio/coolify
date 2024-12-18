@@ -1744,7 +1744,10 @@ class ApplicationsController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->all();
-        data_set($data, 'fqdn', $domains);
+        if ($request->has('domains') && $server->isProxyShouldRun()) {
+            data_set($data, 'fqdn', $domains);
+        }
+
         if ($dockerComposeDomainsJson->count() > 0) {
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
         }
