@@ -418,6 +418,21 @@
         "logo": "svgs/cloudflared.svg",
         "minversion": "0.0.0"
     },
+    "cockpit": {
+        "documentation": "https://getcockpit.com/documentation/?utm_source=coolify.io",
+        "slogan": "Cockpit is a headless content platform that is lightweight, fast and ready for takeoff.",
+        "compose": "c2VydmljZXM6CiAgY29ja3BpdDoKICAgIGltYWdlOiAnY29ja3BpdGhxL2NvY2twaXQ6Y29yZS1sYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdjb2NrcGl0LWNvbmZpZzovdmFyL3d3dy9odG1sL2NvbmZpZycKICAgICAgLSAnY29ja3BpdC1zcGFjZXM6L3Zhci93d3cvaHRtbC8uc3BhY2VzJwogICAgICAtICdjb2NrcGl0LXN0b3JhZ2U6L3Zhci93d3cvaHRtbC9zdG9yYWdlJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xL2FwaS9zeXN0ZW0vaGVhbHRoY2hlY2snCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "cockpit",
+            "headless",
+            "cms",
+            "database",
+            "nosql"
+        ],
+        "logo": "svgs/cockpit.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "code-server": {
         "documentation": "https://coder.com/docs/code-server/latest?utm_source=coolify.io",
         "slogan": "Code-Server is a web-based code editor that enables remote coding and collaboration from any device, anywhere.",
