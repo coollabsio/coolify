@@ -1819,7 +1819,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'key' => $key,
                                 'value' => $fqdn,
                                 'is_build_time' => false,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -1831,7 +1832,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $env = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
@@ -1854,14 +1856,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($value?->startsWith('$')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'service_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
                         $value = replaceVariables($value);
                         $key = $value;
                         if ($value->startsWith('SERVICE_')) {
                             $foundEnv = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                             if (! is_null($command)) {
@@ -1895,7 +1899,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'key' => $key,
                                             'value' => $fqdn,
                                             'is_build_time' => false,
-                                            'service_id' => $resource->id,
+                                            'resourceable_type' => get_class($resource),
+                                            'resourceable_id' => $resource->id,
                                             'is_preview' => false,
                                         ]);
                                     }
@@ -1912,7 +1917,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             }
                                             $env = EnvironmentVariable::where([
                                                 'key' => $key,
-                                                'service_id' => $resource->id,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
                                             ])->first();
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
@@ -1932,7 +1938,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'key' => $key,
                                             'value' => $generatedValue,
                                             'is_build_time' => false,
-                                            'service_id' => $resource->id,
+                                            'resourceable_type' => get_class($resource),
+                                            'resourceable_id' => $resource->id,
                                             'is_preview' => false,
                                         ]);
                                     }
@@ -1957,18 +1964,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $foundEnv = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             if ($foundEnv) {
                                 $defaultValue = data_get($foundEnv, 'value');
                             }
                             EnvironmentVariable::updateOrCreate([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ], [
                                 'value' => $defaultValue,
                                 'is_build_time' => false,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -2831,6 +2841,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_set($service, 'container_name', $containerName);
             data_forget($service, 'volumes.*.content');
             data_forget($service, 'volumes.*.isDirectory');
+            data_forget($service, 'volumes.*.is_directory');
+            data_forget($service, 'exclude_from_hc');
+            data_set($service, 'environment', $serviceVariables->toArray());
+            updateCompose($savedService);
 
             return $service;
         });
@@ -2869,13 +2883,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     if ($isApplication) {
-        $nameOfId = 'application_id';
         $pullRequestId = $pull_request_id;
         $isPullRequest = $pullRequestId == 0 ? false : true;
         $server = data_get($resource, 'destination.server');
         $fileStorages = $resource->fileStorages();
     } elseif ($isService) {
-        $nameOfId = 'service_id';
         $server = data_get($resource, 'server');
         $allServices = get_service_templates();
     } else {
@@ -3042,9 +3054,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
 
                     if (substr_count(str($key)->value(), '_') === 2) {
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3053,9 +3066,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                     if (substr_count(str($key)->value(), '_') === 3) {
                         $newKey = str($key)->beforeLast('_');
-                        $resource->environment_variables()->where('key', $newKey->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $newKey->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3071,7 +3085,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     $key = str($key);
                     $value = replaceVariables($value);
                     $command = parseCommandFromMagicEnvVariable($key);
-                    $found = $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->first();
+                    $found = $resource->environment_variables()->where('key', $key->value())->where('resourceable_type', get_class($resource))->where('resourceable_id', $resource->id)->first();
                     if ($found) {
                         continue;
                     }
@@ -3085,9 +3099,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         } elseif ($isService) {
                             $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3104,9 +3119,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
                         $fqdn = str($fqdn)->replace('http://', '')->replace('https://', '');
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3114,9 +3130,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         ]);
                     } else {
                         $value = generateEnvValue($command, $resource);
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $value,
                             'is_build_time' => false,
@@ -3464,9 +3481,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
             if ($value->startsWith('$SERVICE_')) {
-                $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
-                    $nameOfId => $resource->id,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_build_time' => false,
@@ -3480,9 +3498,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
             if ($key->value() === $parsedValue->value()) {
                 $value = null;
-                $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
-                    $nameOfId => $resource->id,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_build_time' => false,
@@ -3516,22 +3535,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     if ($originalValue->value() === $value->value()) {
                         // This means the variable does not have a default value, so it needs to be created in Coolify
                         $parsedKeyValue = replaceVariables($value);
-                        $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $parsedKeyValue,
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'is_build_time' => false,
                             'is_preview' => false,
                             'is_required' => $isRequired,
                         ]);
                         // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->first()->value;
+                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where('resourceable_type', get_class($resource))->where('resourceable_id', $resource->id)->first()->value;
 
                         continue;
                     }
-                    $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $key,
-                        $nameOfId => $resource->id,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
                         'is_build_time' => false,

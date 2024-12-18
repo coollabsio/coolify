@@ -27,6 +27,9 @@ class ApplicationsController extends Controller
     {
         $application->makeHidden([
             'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === false) {
             $application->makeHidden([
@@ -114,11 +117,12 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
@@ -220,11 +224,12 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'github_app_uuid' => ['type' => 'string', 'description' => 'The Github App UUID.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
@@ -326,11 +331,12 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'private_key_uuid', 'git_repository', 'git_branch', 'build_pack', 'ports_exposes'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'private_key_uuid' => ['type' => 'string', 'description' => 'The private key UUID.'],
                             'git_repository' => ['type' => 'string', 'description' => 'The git repository URL.'],
                             'git_branch' => ['type' => 'string', 'description' => 'The git branch.'],
@@ -432,11 +438,12 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'dockerfile'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'dockerfile'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
                             'build_pack' => ['type' => 'string', 'enum' => ['nixpacks', 'static', 'dockerfile', 'dockercompose'], 'description' => 'The build pack type.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
@@ -522,11 +529,12 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'docker_registry_image_name', 'ports_exposes'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_registry_image_name', 'ports_exposes'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'ports_exposes' => ['type' => 'string', 'description' => 'The ports to expose.'],
@@ -609,11 +617,12 @@ class ApplicationsController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['project_uuid', 'server_uuid', 'environment_name', 'docker_compose_raw'],
+                        required: ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
                         properties: [
                             'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
                             'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
-                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                             'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                             'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID if the server has more than one destinations.'],
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
@@ -647,7 +656,7 @@ class ApplicationsController extends Controller
 
     private function create_application(Request $request, $type)
     {
-        $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -661,7 +670,8 @@ class ApplicationsController extends Controller
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'project_uuid' => 'string|required',
-            'environment_name' => 'string|required',
+            'environment_name' => 'string|nullable',
+            'environment_uuid' => 'string|nullable',
             'server_uuid' => 'string|required',
             'destination_uuid' => 'string',
         ]);
@@ -681,6 +691,11 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
+        $environmentUuid = $request->environment_uuid;
+        $environmentName = $request->environment_name;
+        if (blank($environmentUuid) && blank($environmentName)) {
+            return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
+        }
         $serverUuid = $request->server_uuid;
         $fqdn = $request->domains;
         $instantDeploy = $request->instant_deploy;
@@ -713,7 +728,10 @@ class ApplicationsController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
-        $environment = $project->environments()->where('name', $request->environment_name)->first();
+        $environment = $project->environments()->where('name', $environmentName)->first();
+        if (! $environment) {
+            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
+        }
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
@@ -730,12 +748,6 @@ class ApplicationsController extends Controller
         }
         $destination = $destinations->first();
         if ($type === 'public') {
-            if (! $request->has('name')) {
-                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
-            }
-            if ($request->build_pack === 'dockercompose') {
-                $request->offsetSet('ports_exposes', '80');
-            }
             $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
@@ -745,13 +757,19 @@ class ApplicationsController extends Controller
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
             ];
-            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
+            }
+            if (! $request->has('name')) {
+                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
             }
 
             $return = $this->validateDataApplications($request, $server);
@@ -817,12 +835,6 @@ class ApplicationsController extends Controller
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'private-gh-app') {
-            if (! $request->has('name')) {
-                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
-            }
-            if ($request->build_pack === 'dockercompose') {
-                $request->offsetSet('ports_exposes', '80');
-            }
             $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
@@ -833,7 +845,7 @@ class ApplicationsController extends Controller
                 'docker_compose_location' => 'string',
                 'docker_compose_raw' => 'string|nullable',
             ];
-            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validationRules = array_merge(sharedDataApplications(), $validationRules);
 
             $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
@@ -842,6 +854,14 @@ class ApplicationsController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
+
+            if (! $request->has('name')) {
+                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
+            }
+
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
@@ -916,12 +936,6 @@ class ApplicationsController extends Controller
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'private-deploy-key') {
-            if (! $request->has('name')) {
-                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
-            }
-            if ($request->build_pack === 'dockercompose') {
-                $request->offsetSet('ports_exposes', '80');
-            }
 
             $validationRules = [
                 'git_repository' => 'string|required',
@@ -934,7 +948,7 @@ class ApplicationsController extends Controller
                 'docker_compose_raw' => 'string|nullable',
             ];
 
-            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
 
             if ($validator->fails()) {
@@ -943,6 +957,13 @@ class ApplicationsController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
+            if (! $request->has('name')) {
+                $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
+            }
+            if ($request->build_pack === 'dockercompose') {
+                $request->offsetSet('ports_exposes', '80');
+            }
+
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
@@ -1012,14 +1033,10 @@ class ApplicationsController extends Controller
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'dockerfile') {
-            if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
-            }
-
             $validationRules = [
                 'dockerfile' => 'string|required',
             ];
-            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
 
             if ($validator->fails()) {
@@ -1028,6 +1045,10 @@ class ApplicationsController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
+            if (! $request->has('name')) {
+                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
+            }
+
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
@@ -1097,15 +1118,12 @@ class ApplicationsController extends Controller
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'dockerimage') {
-            if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2);
-            }
             $validationRules = [
                 'docker_registry_image_name' => 'string|required',
                 'docker_registry_image_tag' => 'string',
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
             ];
-            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
 
             if ($validator->fails()) {
@@ -1113,6 +1131,9 @@ class ApplicationsController extends Controller
                     'message' => 'Validation failed.',
                     'errors' => $validator->errors(),
                 ], 422);
+            }
+            if (! $request->has('name')) {
+                $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
@@ -1161,7 +1182,7 @@ class ApplicationsController extends Controller
                 'domains' => data_get($application, 'domains'),
             ]));
         } elseif ($type === 'dockercompose') {
-            $allowedFields = ['project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
+            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
 
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -1183,7 +1204,7 @@ class ApplicationsController extends Controller
             $validationRules = [
                 'docker_compose_raw' => 'string|required',
             ];
-            $validationRules = array_merge($validationRules, sharedDataApplications());
+            $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
 
             if ($validator->fails()) {
@@ -1551,7 +1572,7 @@ class ApplicationsController extends Controller
             'docker_compose_custom_build_command' => 'string|nullable',
             'custom_nginx_configuration' => 'string|nullable',
         ];
-        $validationRules = array_merge($validationRules, sharedDataApplications());
+        $validationRules = array_merge(sharedDataApplications(), $validationRules);
         $validator = customApiValidator($request->all(), $validationRules);
 
         // Validate ports_exposes
@@ -1893,8 +1914,9 @@ class ApplicationsController extends Controller
         $is_preview = $request->is_preview ?? false;
         $is_build_time = $request->is_build_time ?? false;
         $is_literal = $request->is_literal ?? false;
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -1921,7 +1943,7 @@ class ApplicationsController extends Controller
                 ], 404);
             }
         } else {
-            $env = $application->environment_variables->where('key', $request->key)->first();
+            $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -2064,6 +2086,7 @@ class ApplicationsController extends Controller
         $bulk_data = collect($bulk_data)->map(function ($item) {
             return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal']);
         });
+        $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
             $validator = customApiValidator($item, [
                 'key' => 'string|required',
@@ -2085,8 +2108,9 @@ class ApplicationsController extends Controller
             $is_literal = $item->get('is_literal') ?? false;
             $is_multi_line = $item->get('is_multiline') ?? false;
             $is_shown_once = $item->get('is_shown_once') ?? false;
+            $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $item->get('key'))->first();
+                $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2111,10 +2135,12 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'resourceable_type' => get_class($application),
+                        'resourceable_id' => $application->id,
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $item->get('key'))->first();
+                $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2139,12 +2165,15 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'resourceable_type' => get_class($application),
+                        'resourceable_id' => $application->id,
                     ]);
                 }
             }
+            $returnedEnvs->push($this->removeSensitiveData($env));
         }
 
-        return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
+        return response()->json($returnedEnvs)->setStatusCode(201);
     }
 
     #[OA\Post(
@@ -2257,8 +2286,10 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $request->key)->first();
+            $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -2272,6 +2303,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'resourceable_type' => get_class($application),
+                    'resourceable_id' => $application->id,
                 ]);
 
                 return response()->json([
@@ -2279,7 +2312,7 @@ class ApplicationsController extends Controller
                 ])->setStatusCode(201);
             }
         } else {
-            $env = $application->environment_variables->where('key', $request->key)->first();
+            $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -2293,6 +2326,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'resourceable_type' => get_class($application),
+                    'resourceable_id' => $application->id,
                 ]);
 
                 return response()->json([
@@ -2380,7 +2415,10 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
-        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)->where('application_id', $application->id)->first();
+        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
+            ->where('resourceable_type', Application::class)
+            ->where('resourceable_id', $application->id)
+            ->first();
         if (! $found_env) {
             return response()->json([
                 'message' => 'Environment variable not found.',

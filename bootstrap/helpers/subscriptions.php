@@ -69,6 +69,7 @@ function allowedPathsForUnsubscribedAccounts()
         'logout',
         'force-password-reset',
         'livewire/update',
+        'admin',
     ];
 }
 function allowedPathsForBoardingAccounts()

@@ -5,6 +5,7 @@
     "auth.login.github": "Autentificare prin GitHub",
     "auth.login.gitlab": "Autentificare prin Gitlab",
     "auth.login.google": "Autentificare prin Google",
+    "auth.login.infomaniak": "Autentificare prin Infomaniak",
     "auth.already_registered": "Sunteți deja înregistrat?",
     "auth.confirm_password": "Confirmați parola",
     "auth.forgot_password": "Ați uitat parola",
