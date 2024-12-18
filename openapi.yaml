@@ -47,6 +47,7 @@ paths:
                 - project_uuid
                 - server_uuid
                 - environment_name
+                - environment_uuid
                 - git_repository
                 - git_branch
                 - build_pack
@@ -60,7 +61,10 @@ paths:
                   description: 'The server UUID.'
                 environment_name:
                   type: string
-                  description: 'The environment name.'
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 git_repository:
                   type: string
                   description: 'The git repository URL.'
@@ -278,6 +282,7 @@ paths:
                 - project_uuid
                 - server_uuid
                 - environment_name
+                - environment_uuid
                 - github_app_uuid
                 - git_repository
                 - git_branch
@@ -292,7 +297,10 @@ paths:
                   description: 'The server UUID.'
                 environment_name:
                   type: string
-                  description: 'The environment name.'
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 github_app_uuid:
                   type: string
                   description: 'The Github App UUID.'
@@ -513,6 +521,7 @@ paths:
                 - project_uuid
                 - server_uuid
                 - environment_name
+                - environment_uuid
                 - private_key_uuid
                 - git_repository
                 - git_branch
@@ -527,7 +536,10 @@ paths:
                   description: 'The server UUID.'
                 environment_name:
                   type: string
-                  description: 'The environment name.'
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 private_key_uuid:
                   type: string
                   description: 'The private key UUID.'
@@ -748,6 +760,7 @@ paths:
                 - project_uuid
                 - server_uuid
                 - environment_name
+                - environment_uuid
                 - dockerfile
               properties:
                 project_uuid:
@@ -758,7 +771,10 @@ paths:
                   description: 'The server UUID.'
                 environment_name:
                   type: string
-                  description: 'The environment name.'
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 dockerfile:
                   type: string
                   description: 'The Dockerfile content.'
@@ -930,6 +946,7 @@ paths:
                 - project_uuid
                 - server_uuid
                 - environment_name
+                - environment_uuid
                 - docker_registry_image_name
                 - ports_exposes
               properties:
@@ -941,7 +958,10 @@ paths:
                   description: 'The server UUID.'
                 environment_name:
                   type: string
-                  description: 'The environment name.'
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 docker_registry_image_name:
                   type: string
                   description: 'The docker registry image name.'
@@ -1103,6 +1123,7 @@ paths:
                 - project_uuid
                 - server_uuid
                 - environment_name
+                - environment_uuid
                 - docker_compose_raw
               properties:
                 project_uuid:
@@ -1113,7 +1134,10 @@ paths:
                   description: 'The server UUID.'
                 environment_name:
                   type: string
-                  description: 'The environment name.'
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 docker_compose_raw:
                   type: string
                   description: 'The Docker Compose raw content.'
@@ -2173,6 +2197,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2182,7 +2207,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 postgres_user:
                   type: string
                   description: 'PostgreSQL user'
@@ -2271,6 +2299,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2280,7 +2309,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -2357,6 +2389,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2366,7 +2399,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -2440,6 +2476,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2449,7 +2486,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -2526,6 +2566,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2535,7 +2576,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -2612,6 +2656,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2621,7 +2666,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -2707,6 +2755,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2716,7 +2765,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -2802,6 +2854,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -2811,7 +2864,10 @@ paths:
                   description: 'UUID of the project'
                 environment_name:
                   type: string
-                  description: 'Name of the environment'
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'
@@ -3329,13 +3385,13 @@ paths:
       security:
         -
           bearerAuth: []
-  '/projects/{uuid}/{environment_name}':
+  '/projects/{uuid}/{environment_name_or_uuid}':
     get:
       tags:
         - Projects
       summary: Environment
-      description: 'Get environment by name.'
-      operationId: get-environment-by-name
+      description: 'Get environment by name or UUID.'
+      operationId: get-environment-by-name-or-uuid
       parameters:
         -
           name: uuid
@@ -3345,9 +3401,9 @@ paths:
           schema:
             type: string
         -
-          name: environment_name
+          name: environment_name_or_uuid
           in: path
-          description: 'Environment name'
+          description: 'Environment name or UUID'
           required: true
           schema:
             type: string
@@ -3908,6 +3964,7 @@ paths:
                 - server_uuid
                 - project_uuid
                 - environment_name
+                - environment_uuid
                 - type
               properties:
                 type:
@@ -3927,7 +3984,10 @@ paths:
                   description: 'Project UUID.'
                 environment_name:
                   type: string
-                  description: 'Environment name.'
+                  description: 'Environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'
                 server_uuid:
                   type: string
                   description: 'Server UUID.'
@@ -4892,11 +4952,9 @@ components:
           type: integer
         uuid:
           type: string
-        application_id:
-          type: integer
-        service_id:
-          type: integer
-        database_id:
+        resourceable_type:
+          type: string
+        resourceable_id:
           type: integer
         is_build_time:
           type: boolean
