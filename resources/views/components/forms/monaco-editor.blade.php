@@ -1,5 +1,6 @@
 <div wire:key="{{ rand() }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
+        monacoVersion: '0.52.2',
         monacoContent: @entangle($id),
         monacoLanguage: '',
         monacoPlaceholder: true,
@@ -30,7 +31,7 @@
         },
         monacoEditorAddLoaderScriptToHead() {
             let script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js';
+            script.src = `/js/monaco-editor-${this.monacoVersion}/min/vs/loader.js`;
             document.head.appendChild(script);
         }
     }" x-modelable="monacoContent">
@@ -40,8 +41,8 @@
         checkTheme();
         let monacoLoaderInterval = setInterval(() => {
             if (typeof _amdLoaderGlobal !== 'undefined') {
-                require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
-                let proxy = URL.createObjectURL(new Blob([` self.MonacoEnvironment = { baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min' }; importScripts('https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/base/worker/workerMain.min.js');`], { type: 'text/javascript' }));
+                require.config({ paths: { 'vs': `/js/monaco-editor-${monacoVersion}/min/vs` } });
+                let proxy = URL.createObjectURL(new Blob([`self.MonacoEnvironment={baseUrl:'${window.location.origin}/js/monaco-editor-${monacoVersion}/min'};importScripts('${window.location.origin}/js/monaco-editor-${monacoVersion}/min/vs/base/worker/workerMain.js');`], { type: 'text/javascript' }));
                 window.MonacoEnvironment = { getWorkerUrl: () => proxy };
                 require(['vs/editor/editor.main'], () => {
                     const editor = monaco.editor.create($refs.monacoEditorElement, {
@@ -55,7 +56,7 @@
                         automaticLayout: true,
                         language: '{{ $language }}'
                     });
-
+        
                     const observer = new MutationObserver((mutations) => {
                         mutations.forEach((mutation) => {
                             if (mutation.attributeName === 'class') {
@@ -64,32 +65,32 @@
                             }
                         });
                     });
-
+        
                     observer.observe(document.documentElement, {
                         attributes: true,
                         attributeFilter: ['class']
                     });
-
+        
                     monacoEditor(editor);
-
+        
                     document.getElementById(monacoId).editor = editor;
                     document.getElementById(monacoId).addEventListener('monaco-editor-focused', (event) => {
                         editor.focus();
                     });
-
+        
                     updatePlaceholder(editor.getValue());
-
+        
                     $watch('monacoContent', value => {
                         if (editor.getValue() !== value) {
                             editor.setValue(value);
                         }
                     });
-
-
+        
+        
                 });
                 clearInterval(monacoLoaderInterval);
                 monacoLoader = false;
-
+        
             }
         }, 5);" :id="monacoId">
         </div>
