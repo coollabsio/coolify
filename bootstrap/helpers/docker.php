@@ -188,7 +188,8 @@ function get_port_from_dockerfile($dockerfile): ?int
     return null;
 }
 
-function defaultDatabaseLabels($database) {
+function defaultDatabaseLabels($database)
+{
     $labels = collect([]);
     $labels->push('coolify.managed=true');
     $labels->push('coolify.type=database');
@@ -197,6 +198,7 @@ function defaultDatabaseLabels($database) {
     $labels->push('coolify.serviceName='.Str::slug($database->name));
     $labels->push('coolify.projectName='.Str::slug($database->project()->name));
     $labels->push('coolify.environmentName='.Str::slug($database->environment->name));
+    $labels->push('coolify.database.subType='.$database->type());
 
     return $labels;
 }
