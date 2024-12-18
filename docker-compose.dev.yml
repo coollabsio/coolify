@@ -80,11 +80,11 @@ services:
     container_name: coolify-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dev_coolify_data:/data/coolify
-      - dev_backups_data:/data/coolify/backups
-      - dev_postgres_data:/data/coolify/_volumes/database
-      - dev_redis_data:/data/coolify/_volumes/redis
-      - dev_minio_data:/data/coolify/_volumes/minio
+      - dev_coolify_data:${BASE_CONFIG_PATH:-/data/coolify}
+      - dev_backups_data:${BASE_CONFIG_PATH:-/data/coolify}/backups
+      - dev_postgres_data:${BASE_CONFIG_PATH:-/data/coolify}/_volumes/database
+      - dev_redis_data:${BASE_CONFIG_PATH:-/data/coolify}/_volumes/redis
+      - dev_minio_data:${BASE_CONFIG_PATH:-/data/coolify}/_volumes/minio
     networks:
       - coolify
   mailpit:
