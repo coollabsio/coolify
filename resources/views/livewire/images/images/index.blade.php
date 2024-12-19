@@ -26,8 +26,7 @@
                         Prune Unused
                     </x-forms.button>
                     <x-forms.button wire:click="deleteSelectedImages"
-                        wire:confirm="Are you sure you want to delete selected images?" :disabled="empty($selectedImages)"
-                        class="bg-red-600 hover:bg-red-700">
+                        wire:confirm="Are you sure you want to delete selected images?" :disabled="empty($selectedImages)" isError>
                         Delete Selected ({{ count($selectedImages) }})
                     </x-forms.button>
                 </div>
@@ -97,7 +96,7 @@
                                                 </x-forms.button>
                                                 <x-forms.button wire:click="deleteImage('{{ $image['ID'] }}')"
                                                     wire:confirm="Are you sure you want to delete this image?"
-                                                    class="bg-red-600 hover:bg-red-700">
+                                                    class="" isError>
                                                     Delete
                                                 </x-forms.button>
                                             </div>
@@ -126,12 +125,22 @@
                 <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold">Image Details</h3>
-                        <button wire:click="$set('imageDetails', null)"
-                            class="text-gray-500 hover:text-gray-700">×</button>
+                        <div class="flex gap-2">
+                            <x-forms.button wire:click="pruneUnused"
+                                wire:confirm="Are you sure you want to prune unused images?">
+                                Prune Unused
+                            </x-forms.button>
+                            <x-forms.button wire:click="deleteImage('{{ $imageDetails[0]['Id'] }}')"
+                                wire:confirm="Are you sure you want to delete this image?" isError> Delete Image
+                            </x-forms.button>
+                            <button wire:click="$set('imageDetails', null)" class="">×</button>
+                        </div>
+
+
                     </div>
 
                     <div class="space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1">
                             <div>
                                 <h4 class="font-semibold">ID:</h4>
                                 <p class="font-mono text-sm">{{ $imageDetails[0]['Id'] ?? 'N/A' }}</p>
@@ -144,10 +153,10 @@
                                 <h4 class="font-semibold">Size:</h4>
                                 <p>{{ $imageDetails[0]['FormattedSize'] ?? 'N/A' }}</p>
                             </div>
-                            <div>
+                            {{-- <div>
                                 <h4 class="font-semibold">Container Count:</h4>
                                 <p>{{ $imageDetails[0]['ContainerCount'] ?? 'N/A' }}</p>
-                            </div>
+                            </div> --}}
                         </div>
 
                         @if (isset($imageDetails[0]['Config']))
@@ -199,17 +208,7 @@
                             </div>
                         @endif
 
-                        <div class="flex justify-end gap-2 border-t pt-4">
-                            <x-forms.button wire:click="pruneUnused"
-                                wire:confirm="Are you sure you want to prune unused images?">
-                                Prune Unused
-                            </x-forms.button>
-                            <x-forms.button wire:click="deleteImage('{{ $imageDetails[0]['Id'] }}')"
-                                wire:confirm="Are you sure you want to delete this image?"
-                                class="bg-red-600 hover:bg-red-700">
-                                Delete Image
-                            </x-forms.button>
-                        </div>
+
                     </div>
                 </div>
             </div>
