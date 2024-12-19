@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Channels;
 
-use App\Jobs\SendMessageToPushoverJob;
+use App\Jobs\Notifications\SendMessageToPushoverJob;
 use Illuminate\Notifications\Notification;
 
 class PushoverChannel

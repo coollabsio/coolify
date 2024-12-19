@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Channels;
 
-use App\Jobs\SendMessageToTelegramJob;
+use App\Jobs\Notifications\SendMessageToTelegramJob;
 
 class TelegramChannel
 {
