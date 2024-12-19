@@ -1990,7 +1990,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
-                $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+                $defaultLabels = defaultLabels(
+                    id: $resource->id,
+                    name: $containerName,
+                    projectName: $resource->project()->name,
+                    resourceName: $resource->name,
+                    type: 'service',
+                    subType: $isDatabase ? 'database' : 'application', 
+                    subId: $savedService->id,
+                    subName: $savedService->name,
+                    environment: $resource->environment->name,
+                );
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
@@ -2818,7 +2828,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
             }
-            $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
+
+            $defaultLabels = defaultLabels(
+                id: $resource->id,
+                name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
+                environment: $resource->environment->name,
+                pull_request_id: $pull_request_id,
+                type: 'application'
+            );
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
             if ($server->isLogDrainEnabled()) {
@@ -3612,11 +3631,15 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                 }
             }
+
             $defaultLabels = defaultLabels(
                 id: $resource->id,
                 name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
                 pull_request_id: $pullRequestId,
-                type: 'application'
+                type: 'application',
+                environment: $resource->environment->name,
             );
         } elseif ($isService) {
             if ($savedService->serviceType()) {
@@ -3624,7 +3647,18 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             } else {
                 $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
             }
-            $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+
+            $defaultLabels = defaultLabels(
+                id: $resource->id,
+                name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
+                type: 'service',
+                subType: $isDatabase ? 'database' : 'application',
+                subId: $savedService->id,
+                subName: $savedService->human_name ?? $savedService->name,
+                environment: $resource->environment->name,
+            );
         }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {

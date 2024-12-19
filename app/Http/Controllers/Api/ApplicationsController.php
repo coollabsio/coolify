@@ -189,8 +189,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -296,8 +305,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -403,8 +421,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -494,8 +521,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -582,8 +618,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -636,8 +681,17 @@ class ApplicationsController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Application created successfully.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => ['type' => 'string'],
+                        ]
+                    )
+                )
             ),
             new OA\Response(
                 response: 401,
@@ -833,7 +887,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'private-gh-app') {
             $validationRules = [
                 'git_repository' => 'string|required',
@@ -904,12 +958,12 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->source_type = $githubApp->getMorphClass();
             $application->source_id = $githubApp->id;
+            $application->save();
+            $application->refresh();
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            $application->save();
-            $application->refresh();
             if (! $application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -934,7 +988,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'private-deploy-key') {
 
             $validationRules = [
@@ -1001,12 +1055,12 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
+            $application->save();
+            $application->refresh();
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            $application->save();
-            $application->refresh();
             if (! $application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -1031,7 +1085,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'dockerfile') {
             $validationRules = [
                 'dockerfile' => 'string|required',
@@ -1087,15 +1141,16 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            if (isset($useBuildServer)) {
-                $application->settings->is_build_server_enabled = $useBuildServer;
-                $application->settings->save();
-            }
 
+            
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
             if (! $application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -1116,7 +1171,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'dockerimage') {
             $validationRules = [
                 'docker_registry_image_name' => 'string|required',
@@ -1151,15 +1206,15 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            if (isset($useBuildServer)) {
-                $application->settings->is_build_server_enabled = $useBuildServer;
-                $application->settings->save();
-            }
-
+            
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
             $application->refresh();
+            if (isset($useBuildServer)) {
+                $application->settings->is_build_server_enabled = $useBuildServer;
+                $application->settings->save();
+            }
             if (! $application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
@@ -1180,7 +1235,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         } elseif ($type === 'dockercompose') {
             $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
 
@@ -1262,7 +1317,7 @@ class ApplicationsController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($service, 'uuid'),
                 'domains' => data_get($service, 'domains'),
-            ]));
+            ]))->setStatusCode(201);
         }
 
         return response()->json(['message' => 'Invalid type.'], 400);
@@ -1689,7 +1744,10 @@ class ApplicationsController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->all();
-        data_set($data, 'fqdn', $domains);
+        if ($request->has('domains') && $server->isProxyShouldRun()) {
+            data_set($data, 'fqdn', $domains);
+        }
+
         if ($dockerComposeDomainsJson->count() > 0) {
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
         }

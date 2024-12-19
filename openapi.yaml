@@ -250,8 +250,14 @@ paths:
                   description: 'Use build server.'
               type: object
       responses:
-        '200':
+        '201':
           description: 'Application created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -483,8 +489,14 @@ paths:
                   description: 'Use build server.'
               type: object
       responses:
-        '200':
+        '201':
           description: 'Application created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -716,8 +728,14 @@ paths:
                   description: 'Use build server.'
               type: object
       responses:
-        '200':
+        '201':
           description: 'Application created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -896,8 +914,14 @@ paths:
                   description: 'Use build server.'
               type: object
       responses:
-        '200':
+        '201':
           description: 'Application created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -1067,8 +1091,14 @@ paths:
                   description: 'Use build server.'
               type: object
       responses:
-        '200':
+        '201':
           description: 'Application created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -1129,8 +1159,14 @@ paths:
                   description: 'Use build server.'
               type: object
       responses:
-        '200':
+        '201':
           description: 'Application created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
