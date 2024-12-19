@@ -32,8 +32,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public ScheduledDatabaseBackup $backup;
-
     public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
 
     public ?string $container_name = null;
@@ -58,10 +56,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?S3Storage $s3 = null;
 
-    public function __construct($backup)
+    public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
-        $this->backup = $backup;
     }
 
     public function handle(): void
@@ -306,7 +303,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
-                    //$this->team?->notify(new BackupSuccess($this->backup, $this->database, $database));
+
+                    $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
+
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $this->backup_output,

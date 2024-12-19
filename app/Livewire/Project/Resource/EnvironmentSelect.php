@@ -15,7 +15,7 @@ class EnvironmentSelect extends Component
 
     public function mount()
     {
-        $this->selectedEnvironment = request()->route('environment_name');
+        $this->selectedEnvironment = request()->route('environment_uuid');
         $this->project_uuid = request()->route('project_uuid');
     }
 
@@ -28,7 +28,7 @@ class EnvironmentSelect extends Component
         } else {
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $this->project_uuid,
-                'environment_name' => $value,
+                'environment_uuid' => $value,
             ]);
         }
     }

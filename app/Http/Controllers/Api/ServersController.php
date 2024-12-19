@@ -19,25 +19,22 @@ class ServersController extends Controller
 {
     private function removeSensitiveDataFromSettings($settings)
     {
-        $token = auth()->user()->currentAccessToken();
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($settings);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            $settings = $settings->makeHidden([
+                'sentinel_token',
+            ]);
         }
-        $settings = $settings->makeHidden([
-            'sentinel_token',
-        ]);
 
         return serializeApiResponse($settings);
     }
 
     private function removeSensitiveData($server)
     {
-        $token = auth()->user()->currentAccessToken();
         $server->makeHidden([
             'id',
         ]);
-        if ($token->can('view:sensitive')) {
-            return serializeApiResponse($server);
+        if (request()->attributes->get('can_read_sensitive', false) === false) {
+            // Do nothing
         }
 
         return serializeApiResponse($server);
@@ -157,11 +154,7 @@ class ServersController extends Controller
                     'created_at' => $resource->created_at,
                     'updated_at' => $resource->updated_at,
                 ];
-                if ($resource->type() === 'service') {
-                    $payload['status'] = $resource->status();
-                } else {
-                    $payload['status'] = $resource->status;
-                }
+                $payload['status'] = $resource->status;
 
                 return $payload;
             });
@@ -240,11 +233,7 @@ class ServersController extends Controller
                 'created_at' => $resource->created_at,
                 'updated_at' => $resource->updated_at,
             ];
-            if ($resource->type() === 'service') {
-                $payload['status'] = $resource->status();
-            } else {
-                $payload['status'] = $resource->status;
-            }
+            $payload['status'] = $resource->status;
 
             return $payload;
         });

@@ -49,5 +49,6 @@
         <div class="order-first sm:order-last">
             <livewire:server.proxy.deploy :server="$server" />
         </div>
+
     </div>
 </div>
