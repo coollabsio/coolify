@@ -9,6 +9,7 @@ use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\DockerRegistry;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -206,8 +207,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->preserveRepository = $this->application->settings->is_preserve_repository_enabled;
 
         $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
-        $this->workdir = "{$this->basedir}".rtrim($this->application->base_directory, '/');
-        $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
+        $this->workdir = "{$this->basedir}" . rtrim($this->application->base_directory, '/');
+        $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
@@ -237,7 +238,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function tags(): array
     {
-        return ['server:'.gethostname()];
+        return ['server:' . gethostname()];
     }
 
     public function handle(): void
@@ -377,7 +378,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->server = $this->build_server;
         }
         $dockerfile_base64 = base64_encode($this->application->dockerfile);
+
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name} to {$this->server->name}.");
+
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
@@ -395,17 +398,36 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_dockerimage_buildpack()
     {
-        $this->dockerImage = $this->application->docker_registry_image_name;
-        if (str($this->application->docker_registry_image_tag)->isEmpty()) {
-            $this->dockerImageTag = 'latest';
-        } else {
-            $this->dockerImageTag = $this->application->docker_registry_image_tag;
+        try {
+            // setup
+            $this->dockerImage = $this->application->docker_registry_image_name;
+            if (str($this->application->docker_registry_image_tag)->isEmpty()) {
+                $this->dockerImageTag = 'latest';
+            } else {
+                $this->dockerImageTag = $this->application->docker_registry_image_tag;
+            }
+
+            $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
+            // login if use custom registry
+            if ($this->application->docker_use_custom_registry) {
+                $this->handleRegistryAuth();
+            }
+
+            $this->generate_image_names();
+            $this->prepare_builder_image();
+            $this->generate_compose_file();
+            $this->rolling_update();
+        } catch (Exception $e) {
+            throw $e;
+        } finally {
+            if ($this->application->docker_use_custom_registry) {
+                $this->application_deployment_queue->addLogEntry('Logging out from registry...');
+                $this->execute_remote_command([
+                    'docker logout',
+                    'hidden' => true
+                ]);
+            }
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
-        $this->generate_image_names();
-        $this->prepare_builder_image();
-        $this->generate_compose_file();
-        $this->rolling_update();
     }
 
     private function deploy_docker_compose_buildpack()
@@ -416,13 +438,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (data_get($this->application, 'docker_compose_custom_start_command')) {
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
             if (! str($this->docker_compose_custom_start_command)->contains('--project-directory')) {
-                $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory '.$this->workdir)->value();
+                $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory ' . $this->workdir)->value();
             }
         }
         if (data_get($this->application, 'docker_compose_custom_build_command')) {
             $this->docker_compose_custom_build_command = $this->application->docker_compose_custom_build_command;
             if (! str($this->docker_compose_custom_build_command)->contains('--project-directory')) {
-                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory '.$this->workdir)->value();
+                $this->docker_compose_custom_build_command = str($this->docker_compose_custom_build_command)->replaceFirst('compose', 'compose --project-directory ' . $this->workdir)->value();
             }
         }
         if ($this->pull_request_id === 0) {
@@ -436,7 +458,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->preserveRepository) {
             foreach ($this->application->fileStorages as $fileStorage) {
                 $path = $fileStorage->fs_path;
-                $saveName = 'file_stat_'.$fileStorage->id;
+                $saveName = 'file_stat_' . $fileStorage->id;
                 $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
                 // check if the file is a directory or a file inside the repository
                 $this->execute_remote_command(
@@ -931,12 +953,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $real_value = $env->real_value;
                 } else {
                     if ($env->is_literal || $env->is_multiline) {
-                        $real_value = '\''.$real_value.'\'';
+                        $real_value = '\'' . $real_value . '\'';
                     } else {
                         $real_value = escapeEnvVariables($env->real_value);
                     }
                 }
-                $envs->push($env->key.'='.$real_value);
+                $envs->push($env->key . '=' . $real_value);
             }
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
@@ -990,12 +1012,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $real_value = $env->real_value;
                 } else {
                     if ($env->is_literal || $env->is_multiline) {
-                        $real_value = '\''.$real_value.'\'';
+                        $real_value = '\'' . $real_value . '\'';
                     } else {
                         $real_value = escapeEnvVariables($env->real_value);
                     }
                 }
-                $envs->push($env->key.'='.$real_value);
+                $envs->push($env->key . '=' . $real_value);
             }
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
@@ -1403,7 +1425,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 destination: $destination,
                 no_questions_asked: true,
             );
-            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: ".route('project.application.deployment.show', [
+            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: " . route('project.application.deployment.show', [
                 'project_uuid' => data_get($this->application, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->application, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,
@@ -1744,27 +1766,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'CMD-SHELL',
                 $this->generate_healthcheck_commands(),
             ],
-            'interval' => $this->application->health_check_interval.'s',
-            'timeout' => $this->application->health_check_timeout.'s',
+            'interval' => $this->application->health_check_interval . 's',
+            'timeout' => $this->application->health_check_timeout . 's',
             'retries' => $this->application->health_check_retries,
-            'start_period' => $this->application->health_check_start_period.'s',
+            'start_period' => $this->application->health_check_start_period . 's',
         ];
 
         if (! is_null($this->application->limits_cpuset)) {
-            data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
+            data_set($docker_compose, 'services.' . $this->container_name . '.cpuset', $this->application->limits_cpuset);
         }
         if ($this->server->isSwarm()) {
-            data_forget($docker_compose, 'services.'.$this->container_name.'.container_name');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.expose');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.restart');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.container_name');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.expose');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.restart');
 
-            data_forget($docker_compose, 'services.'.$this->container_name.'.mem_limit');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.memswap_limit');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.mem_swappiness');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.mem_reservation');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.cpus');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.cpuset');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.cpu_shares');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.mem_limit');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.memswap_limit');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.mem_swappiness');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.mem_reservation');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.cpus');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.cpuset');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.cpu_shares');
 
             $docker_compose['services'][$this->container_name]['deploy'] = [
                 'mode' => 'replicated',
@@ -1826,20 +1848,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         if ($this->application->isHealthcheckDisabled()) {
-            data_forget($docker_compose, 'services.'.$this->container_name.'.healthcheck');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.healthcheck');
         }
         if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
             $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
         }
 
         if (count($persistent_storages) > 0) {
-            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+            if (! data_get($docker_compose, 'services.' . $this->container_name . '.volumes')) {
                 $docker_compose['services'][$this->container_name]['volumes'] = [];
             }
             $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_storages);
         }
         if (count($persistent_file_volumes) > 0) {
-            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
+            if (! data_get($docker_compose, 'services.' . $this->container_name . '.volumes')) {
                 $docker_compose['services'][$this->container_name]['volumes'] = [];
             }
             $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_file_volumes->map(function ($item) {
@@ -1907,9 +1929,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $volume_name = $persistentStorage->name;
             }
             if ($this->pull_request_id !== 0) {
-                $volume_name = $volume_name.'-pr-'.$this->pull_request_id;
+                $volume_name = $volume_name . '-pr-' . $this->pull_request_id;
             }
-            $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
+            $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
         }
 
         return $local_persistent_volumes;
@@ -1925,7 +1947,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $name = $persistentStorage->name;
 
             if ($this->pull_request_id !== 0) {
-                $name = $name.'-pr-'.$this->pull_request_id;
+                $name = $name . '-pr-' . $this->pull_request_id;
             }
 
             $local_persistent_volumes_names[$name] = [
@@ -2213,7 +2235,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             }
         } catch (\Exception $error) {
-            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
+            $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: " . $error->getMessage(), 'stderr');
         }
 
         $this->remove_container($containerName);
@@ -2236,7 +2258,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                 if ($this->pull_request_id === 0) {
                     $containers = $containers->filter(function ($container) {
-                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
+                        return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name . '-pr-' . $this->pull_request_id;
                     });
                 }
                 $containers->each(function ($container) {
@@ -2332,8 +2354,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
-            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container.'-'.$this->application->uuid)) {
-                $cmd = "sh -c '".str_replace("'", "'\''", $this->application->pre_deployment_command)."'";
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container . '-' . $this->application->uuid)) {
+                $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->pre_deployment_command) . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
                     [
@@ -2359,8 +2381,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
-            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container.'-'.$this->application->uuid)) {
-                $cmd = "sh -c '".str_replace("'", "'\''", $this->application->post_deployment_command)."'";
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
+                $cmd = "sh -c '" . str_replace("'", "'\''", $this->application->post_deployment_command) . "'";
                 $exec = "docker exec {$containerName} {$cmd}";
                 try {
                     $this->execute_remote_command(
@@ -2429,6 +2451,40 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     );
                 }
             }
+        }
+    }
+
+    private function handleRegistryAuth()
+    {
+        $registries = $this->application->registries;
+
+        if ($registries->isEmpty()) {
+            throw new Exception('No registries found.');
+        }
+
+        foreach ($registries as $registry) {
+            $token = escapeshellarg($registry->token);
+            $username = escapeshellarg($registry->username);
+
+            $url = match ($registry->type) {
+                'docker_hub' => '',
+                'custom' => escapeshellarg($registry->url),
+                default => escapeshellarg($registry->url)
+            };
+
+            $this->application_deployment_queue->addLogEntry("Attempting to log into registry {$registry->name}");
+
+            $command = $registry->type === 'docker_hub'
+                ? "echo {{secrets.token}} | docker login -u {$username} --password-stdin"
+                : "echo {{secrets.token}} | docker login {$url} -u {$username} --password-stdin";
+
+            $this->execute_remote_command([
+                'command' => $command,
+                'secrets' => [
+                    'token' => $token,
+                ],
+                'hidden' => true,
+            ]);
         }
     }
 }

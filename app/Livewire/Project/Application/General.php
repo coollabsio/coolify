@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
+use App\Models\DockerRegistry;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -28,6 +29,8 @@ class General extends Component
     public ?string $git_commit_sha = null;
 
     public string $build_pack;
+
+    public array $selectedRegistries = [];
 
     public ?string $ports_exposes = null;
 
@@ -71,6 +74,7 @@ class General extends Component
         'application.dockerfile' => 'nullable',
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
+        'application.docker_use_custom_registry' => 'boolean',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
         'application.docker_compose' => 'nullable',
@@ -92,6 +96,8 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
+        'selectedRegistries' => 'required_if:application.docker_use_custom_registry,true|array',
+        'selectedRegistries.*' => 'exists:docker_registries,id',
     ];
 
     protected $validationAttributes = [
@@ -113,6 +119,7 @@ class General extends Component
         'application.dockerfile' => 'Dockerfile',
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
+        'application.docker_use_custom_registry' => 'Use private registry',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
@@ -130,6 +137,7 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'Is preserve repository enabled',
         'application.watch_paths' => 'Watch paths',
         'application.redirect' => 'Redirect',
+        'selectedRegistries' => 'Registries',
     ];
 
     public function mount()
@@ -147,6 +155,10 @@ class General extends Component
         if ($this->application->build_pack === 'dockercompose') {
             $this->application->fqdn = null;
             $this->application->settings->save();
+        }
+
+        if ($this->application->docker_use_custom_registry) {
+            $this->selectedRegistries = $this->application->registries->pluck('id')->toArray();
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         $this->ports_exposes = $this->application->ports_exposes;
@@ -330,7 +342,7 @@ class General extends Component
     public function setRedirect()
     {
         try {
-            $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
+            $has_www = collect($this->application->fqdns)->filter(fn($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
 
@@ -389,6 +401,8 @@ class General extends Component
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
+                    'selectedRegistries' => 'required_if:application.docker_use_custom_registry,true|array',
+                    'selectedRegistries.*' => 'exists:docker_registries,id',
                 ]);
             }
 
@@ -424,6 +438,12 @@ class General extends Component
                 }
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
+            if ($this->application->docker_use_custom_registry) {
+                $this->application->registries()->sync($this->selectedRegistries);
+            } else {
+                $this->application->registries()->detach();
+            }
+
             $this->application->save();
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
@@ -447,7 +467,14 @@ class General extends Component
             echo $config;
         }, $fileName, [
             'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename='.$fileName,
+            'Content-Disposition' => 'attachment; filename=' . $fileName,
+        ]);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.application.general', [
+            'registries' => DockerRegistry::all(),
         ]);
     }
 }

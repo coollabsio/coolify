@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApplicationsController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\DockerController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
@@ -127,7 +128,14 @@ Route::group([
     Route::match(['get', 'post'], '/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:write']);
+
+    Route::get('/docker/{server_uuid}/images', [DockerController::class, 'list_server_docker_images'])->middleware(['api.ability:read']);
+    Route::get('/docker/{server_uuid}/image/{id}', [DockerController::class, 'get_server_docker_image_details'])->middleware(['api.ability:read']);
+    Route::delete('/docker/{server_uuid}/images/delete', [DockerController::class, 'delete_server_docker_images'])->middleware(['api.ability:write']);
+    Route::patch('/docker/{server_uuid}/image/{id}/update', [DockerController::class, 'update_server_docker_image_tag'])->middleware(['api.ability:write']);
 });
+
+
 
 Route::group([
     'prefix' => 'v1',

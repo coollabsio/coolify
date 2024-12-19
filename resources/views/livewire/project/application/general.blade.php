@@ -109,35 +109,66 @@
                                 target="_blank">here</a>.</div>
                     @endif
                 @endif
-                <div class="flex flex-col gap-2 xl:flex-row">
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-2 xl:flex-row">
+                        @if ($application->build_pack === 'dockerimage')
+                            @if ($application->destination->server->isSwarm())
+                                <x-forms.input required id="application.docker_registry_image_name"
+                                    label="Docker Image" />
+                                <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
+                            @else
+                                <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
+                                <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
+                            @endif
+                        @else
+                            @if (
+                                $application->destination->server->isSwarm() ||
+                                    $application->additional_servers->count() > 0 ||
+                                    $application->settings->is_build_server_enabled)
+                                <x-forms.input id="application.docker_registry_image_name" required label="Docker Image"
+                                    placeholder="Required!" />
+                                <x-forms.input id="application.docker_registry_image_tag"
+                                    helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                    placeholder="Empty means latest will be used." label="Docker Image Tag" />
+                            @else
+                                <x-forms.input id="application.docker_registry_image_name"
+                                    helper="Empty means it won't push the image to a docker registry."
+                                    placeholder="Empty means it won't push the image to a docker registry."
+                                    label="Docker Image" />
+                                <x-forms.input id="application.docker_registry_image_tag"
+                                    placeholder="Empty means only push commit sha tag."
+                                    helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                    label="Docker Image Tag" />
+                            @endif
+                        @endif
+                    </div>
+
                     @if ($application->build_pack === 'dockerimage')
-                        @if ($application->destination->server->isSwarm())
-                            <x-forms.input required id="application.docker_registry_image_name" label="Docker Image" />
-                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
-                        @else
-                            <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
-                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
-                        @endif
-                    @else
-                        @if (
-                            $application->destination->server->isSwarm() ||
-                                $application->additional_servers->count() > 0 ||
-                                $application->settings->is_build_server_enabled)
-                            <x-forms.input id="application.docker_registry_image_name" required label="Docker Image"
-                                placeholder="Required!" />
-                            <x-forms.input id="application.docker_registry_image_tag"
-                                helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
-                                placeholder="Empty means latest will be used." label="Docker Image Tag" />
-                        @else
-                            <x-forms.input id="application.docker_registry_image_name"
-                                helper="Empty means it won't push the image to a docker registry."
-                                placeholder="Empty means it won't push the image to a docker registry."
-                                label="Docker Image" />
-                            <x-forms.input id="application.docker_registry_image_tag"
-                                placeholder="Empty means only push commit sha tag."
-                                helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
-                                label="Docker Image Tag" />
-                        @endif
+                        <div class="pt-4 grid grid-cols-2 items-center gap-4">
+                            <div class="w-fit">
+                                <x-forms.checkbox wire:model.live="application.docker_use_custom_registry"
+                                    id="application.docker_use_custom_registry"
+                                    helper="Select a registry to pull the image from." label="Use Private Registry" />
+                            </div>
+
+
+                            @if ($application->docker_use_custom_registry)
+                                <div class="pt-4">
+                                    <x-forms.select multiple wire:model="selectedRegistries" id="selectedRegistries"
+                                        label="Select Registries"
+                                        required="required_if:application.docker_use_custom_registry,true"
+                                        helper="Select one or more registries to pull the image from">
+                                        @foreach ($registries as $registry)
+                                            <option value="{{ $registry->id }}"
+                                                {{ in_array($registry->id, $selectedRegistries) ? 'selected' : '' }}>
+                                                {{ $registry->name }}
+                                            </option>
+                                        @endforeach
+                                    </x-forms.select>
+                                </div>
+
+                            @endif
+                        </div>
                     @endif
                 </div>
             @endif

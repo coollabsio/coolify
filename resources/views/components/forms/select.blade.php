@@ -1,6 +1,7 @@
 <div class="w-full">
     @if ($label)
-        <label class="flex gap-1 items-center mb-1 text-sm font-medium">{{ $label }}
+        <label class="flex gap-1 items-center mb-1 text-sm font-medium" for="{{ $id }}">
+            {{ $label }}
             @if ($required)
                 <x-highlighted text="*" />
             @endif
@@ -11,8 +12,8 @@
     @endif
     <select {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
         wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-        wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled" name={{ $id }}
-        @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model={{ $id }} @endif>
+        wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
+        name="{{ $id }}" @if ($multiple) multiple @endif id="{{ $id }}">
         {{ $slot }}
     </select>
     @error($id)
