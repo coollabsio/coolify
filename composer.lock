@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "871067cb42e6347ca53ff36e81ac5079",
+    "content-hash": "5517a7becb5d31fa2ef3ecfaea06f7a7",
     "packages": [
         {
             "name": "3sidedcube/laravel-redoc",
@@ -7466,6 +7466,57 @@
                 "source": "https://github.com/socialiteproviders/providers"
             },
             "time": "2023-11-07T22:21:16+00:00"
+        },
+        {
+            "name": "socialiteproviders/infomaniak",
+            "version": "4.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Infomaniak.git",
+                "reference": "9796ad686204443bfdf3ff19a6c409e8771667e1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Infomaniak/zipball/9796ad686204443bfdf3ff19a6c409e8771667e1",
+                "reference": "9796ad686204443bfdf3ff19a6c409e8771667e1",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^8.0",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Infomaniak\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Leopold Jacquot",
+                    "email": "leopold.jacquot@infomaniak.com"
+                }
+            ],
+            "description": "Infomaniak OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "infomaniak",
+                "laravel",
+                "oauth",
+                "oauth2",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "docs": "https://socialiteproviders.com/qq",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2024-11-20T05:42:36+00:00"
         },
         {
             "name": "socialiteproviders/manager",

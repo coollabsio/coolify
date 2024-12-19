@@ -177,7 +177,7 @@ class GithubPrivateRepository extends Component
             $destination_class = $destination->getMorphClass();
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
             $application = Application::create([
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
@@ -211,7 +211,7 @@ class GithubPrivateRepository extends Component
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
         } catch (\Throwable $e) {

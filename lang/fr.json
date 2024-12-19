@@ -5,6 +5,7 @@
     "auth.login.github": "Connexion avec GitHub",
     "auth.login.gitlab": "Connexion avec Gitlab",
     "auth.login.google": "Connexion avec Google",
+    "auth.login.infomaniak": "Connexion avec Infomaniak",
     "auth.already_registered": "Déjà enregistré ?",
     "auth.confirm_password": "Confirmer le mot de passe",
     "auth.forgot_password": "Mot de passe oublié",

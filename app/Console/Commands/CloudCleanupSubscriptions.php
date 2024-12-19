@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Events\ServerReachabilityChanged;
 use App\Models\Team;
 use Illuminate\Console\Command;
 
@@ -92,6 +93,8 @@ class CloudCleanupSubscriptions extends Command
                 $server->update([
                     'ip' => '1.2.3.4',
                 ]);
+
+                ServerReachabilityChanged::dispatch($server);
             }
         }
     }

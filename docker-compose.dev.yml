@@ -7,7 +7,7 @@ services:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "${APP_PORT:-8000}:8080"
     environment:
       AUTORUN_ENABLED: false
       PUSHER_HOST: "${PUSHER_HOST}"

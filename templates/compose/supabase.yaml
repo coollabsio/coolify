@@ -315,6 +315,7 @@ services:
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
   supabase-db:
     image: supabase/postgres:15.1.1.78
     healthcheck:

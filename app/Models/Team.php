@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
@@ -202,6 +203,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
                 'is_usable' => false,
                 'is_reachable' => false,
             ]);
+            ServerReachabilityChanged::dispatch($server);
         }
     }
 

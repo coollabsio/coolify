@@ -61,7 +61,7 @@ class Select extends Component
         }
         $projectUuid = data_get($this->parameters, 'project_uuid');
         $this->environments = Project::whereUuid($projectUuid)->first()->environments;
-        $this->selectedEnvironment = data_get($this->parameters, 'environment_name');
+        $this->selectedEnvironment = data_get($this->parameters, 'environment_uuid');
     }
 
     public function render()
@@ -73,19 +73,9 @@ class Select extends Component
     {
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->selectedEnvironment,
+            'environment_uuid' => $this->selectedEnvironment,
         ]);
     }
-
-    // public function addExistingPostgresql()
-    // {
-    //     try {
-    //         instantCommand("psql {$this->existingPostgresqlUrl} -c 'SELECT 1'");
-    //         $this->dispatch('success', 'Successfully connected to the database.');
-    //     } catch (\Throwable $e) {
-    //         return handleError($e, $this);
-    //     }
-    // }
 
     public function loadServices()
     {
@@ -308,7 +298,7 @@ class Select extends Component
 
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->parameters['environment_name'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
@@ -323,7 +313,7 @@ class Select extends Component
         } else {
             return redirect()->route('project.resource.create', [
                 'project_uuid' => $this->parameters['project_uuid'],
-                'environment_name' => $this->parameters['environment_name'],
+                'environment_uuid' => $this->parameters['environment_uuid'],
                 'type' => $this->type,
                 'destination' => $this->destination_uuid,
                 'server_id' => $this->server_id,

@@ -258,6 +258,7 @@
                                         <input type="text" x-model="confirmationText"
                                             class="p-2 pr-10 w-full text-black rounded cursor-text input" readonly>
                                         <button @click="copyConfirmationText()"
+                                            x-show="window.isSecureContext"
                                             class="absolute right-2 top-1/2 text-gray-500 transform -translate-y-1/2 hover:text-gray-700"
                                             title="Copy confirmation text" x-ref="copyButton">
                                             <template x-if="!copied">

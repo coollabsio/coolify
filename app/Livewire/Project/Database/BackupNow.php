@@ -9,11 +9,9 @@ class BackupNow extends Component
 {
     public $backup;
 
-    public function backup_now()
+    public function backupNow()
     {
-        dispatch(new DatabaseBackupJob(
-            backup: $this->backup
-        ));
+        DatabaseBackupJob::dispatch($this->backup);
         $this->dispatch('success', 'Backup queued. It will be available in a few minutes.');
     }
 }

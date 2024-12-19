@@ -1,0 +1,19 @@
+# documentation: https://getcockpit.com/documentation/
+# slogan: Cockpit is a headless content platform that is lightweight, fast and ready for takeoff.
+# tags: cockpit, headless, cms, database, nosql
+# logo: svgs/cockpit.svg
+# port: 80
+
+services:
+  cockpit:
+    image: cockpithq/cockpit:core-latest
+    volumes:
+      - cockpit-config:/var/www/html/config
+      - cockpit-spaces:/var/www/html/.spaces
+      - cockpit-storage:/var/www/html/storage
+    healthcheck:
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/api/system/healthcheck"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

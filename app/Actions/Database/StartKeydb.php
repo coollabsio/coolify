@@ -48,11 +48,7 @@ class StartKeydb
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'labels' => [
-                        'coolify.managed' => 'true',
-                        'coolify.type' => 'database',
-                        'coolify.databaseId' => $this->database->id,
-                    ],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
                         'test' => "keydb-cli --pass {$this->database->keydb_password} ping",
                         'interval' => '5s',

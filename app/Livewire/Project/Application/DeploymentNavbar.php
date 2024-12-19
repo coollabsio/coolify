@@ -23,7 +23,7 @@ class DeploymentNavbar extends Component
 
     public function mount()
     {
-        $this->application = Application::find($this->application_deployment_queue->application_id);
+        $this->application = Application::ownedByCurrentTeam()->find($this->application_deployment_queue->application_id);
         $this->server = $this->application->destination->server;
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
     }

@@ -5,6 +5,7 @@
     "auth.login.github": "ورود با گیت هاب",
     "auth.login.gitlab": "ورود با گیت لب",
     "auth.login.google": "ورود با گوگل",
+    "auth.login.infomaniak": "ورود با Infomaniak",
     "auth.already_registered": "قبلاً ثبت نام کرده‌اید؟",
     "auth.confirm_password": "تایید رمز عبور",
     "auth.forgot_password": "فراموشی رمز عبور",

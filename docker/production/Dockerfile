@@ -99,6 +99,9 @@ RUN mkdir -p /usr/local/bin && \
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=1
 
+# Configure entrypoint
+COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d
+
 # Copy application files from previous stages
 COPY --from=base --chown=www-data:www-data /var/www/html/vendor ./vendor
 COPY --from=static-assets --chown=www-data:www-data /app/public/build ./public/build

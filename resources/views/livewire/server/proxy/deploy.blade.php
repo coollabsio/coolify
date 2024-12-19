@@ -20,17 +20,12 @@
                         </a>
                     </button>
                 @endif
-                <x-modal-confirmation 
-                    title="Confirm Proxy Restart?"
-                    buttonTitle="Restart Proxy"
-                    submitAction="restart"
-                    :actions="['This proxy will be stopped and started again.', 'All resources hosted on coolify will be unavailable during the restart.']"
-                    :confirmWithText="false"
-                    :confirmWithPassword="false"
-                    step2ButtonText="Restart Proxy"
-                    :dispatchEvent="true"
-                    dispatchEventType="restartEvent"
-                >
+                <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy" submitAction="restart"
+                    :actions="[
+                        'This proxy will be stopped and started again.',
+                        'All resources hosted on coolify will be unavailable during the restart.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Proxy"
+                    :dispatchEvent="true" dispatchEventType="restartEvent">
                     <x-slot:button-title>
                         <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -42,17 +37,12 @@
                         Restart Proxy
                     </x-slot:button-title>
                 </x-modal-confirmation>
-                <x-modal-confirmation 
-                    title="Confirm Proxy Stopping?"
-                    buttonTitle="Stop Proxy"
-                    submitAction="stop(true)"
-                    :actions="['The coolify proxy will be stopped.', 'All resources hosted on coolify will be unavailable.']"
-                    :confirmWithText="false"
-                    :confirmWithPassword="false"
-                    step2ButtonText="Stop Proxy"
-                    :dispatchEvent="true"
-                    dispatchEventType="stopEvent"
-                >
+                <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy" submitAction="stop(true)"
+                    :actions="[
+                        'The coolify proxy will be stopped.',
+                        'All resources hosted on coolify will be unavailable.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Stop Proxy" :dispatchEvent="true"
+                    dispatchEventType="stopEvent">
                     <x-slot:button-title>
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -82,7 +72,6 @@
     @script
         <script>
             $wire.$on('checkProxyEvent', () => {
-                $wire.$dispatch('info', 'Starting proxy.');
                 $wire.$call('checkProxy');
             });
             $wire.$on('restartEvent', () => {

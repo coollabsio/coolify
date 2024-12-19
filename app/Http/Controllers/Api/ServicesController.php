@@ -20,6 +20,9 @@ class ServicesController extends Controller
     {
         $service->makeHidden([
             'id',
+            'resourceable',
+            'resourceable_id',
+            'resourceable_type',
         ]);
         if (request()->attributes->get('can_read_sensitive', false) === false) {
             $service->makeHidden([
@@ -99,7 +102,7 @@ class ServicesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'type'],
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'type'],
                     properties: [
                         'type' => [
                             'description' => 'The one-click service type',
@@ -196,7 +199,8 @@ class ServicesController extends Controller
                         'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
                         'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
                         'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
-                        'environment_name' => ['type' => 'string', 'description' => 'Environment name.'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                        'environment_uuid' => ['type' => 'string', 'description' => 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
@@ -233,7 +237,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'server_uuid', 'destination_uuid', 'instant_deploy'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -247,7 +251,8 @@ class ServicesController extends Controller
         $validator = customApiValidator($request->all(), [
             'type' => 'string|required',
             'project_uuid' => 'string|required',
-            'environment_name' => 'string|required',
+            'environment_name' => 'string|nullable',
+            'environment_uuid' => 'string|nullable',
             'server_uuid' => 'string|required',
             'destination_uuid' => 'string',
             'name' => 'string|max:255',
@@ -269,6 +274,11 @@ class ServicesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        $environmentUuid = $request->environment_uuid;
+        $environmentName = $request->environment_name;
+        if (blank($environmentUuid) && blank($environmentName)) {
+            return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
+        }
         $serverUuid = $request->server_uuid;
         $instantDeploy = $request->instant_deploy ?? false;
         if ($request->is_public && ! $request->public_port) {
@@ -278,7 +288,10 @@ class ServicesController extends Controller
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
-        $environment = $project->environments()->where('name', $request->environment_name)->first();
+        $environment = $project->environments()->where('name', $environmentName)->first();
+        if (! $environment) {
+            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
+        }
         if (! $environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
@@ -333,7 +346,8 @@ class ServicesController extends Controller
                         EnvironmentVariable::create([
                             'key' => $key,
                             'value' => $generatedValue,
-                            'service_id' => $service->id,
+                            'resourceable_id' => $service->id,
+                            'resourceable_type' => $service->getMorphClass(),
                             'is_build_time' => false,
                             'is_preview' => false,
                         ]);
@@ -345,7 +359,11 @@ class ServicesController extends Controller
                 }
                 $domains = $service->applications()->get()->pluck('fqdn')->sort();
                 $domains = $domains->map(function ($domain) {
-                    return str($domain)->beforeLast(':')->value();
+                    if (count(explode(':', $domain)) > 2) {
+                        return str($domain)->beforeLast(':')->value();
+                    }
+
+                    return $domain;
                 });
 
                 return response()->json([
@@ -673,7 +691,8 @@ class ServicesController extends Controller
             ], 422);
         }
 
-        $env = $service->environment_variables()->where('key', $request->key)->first();
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $env = $service->environment_variables()->where('key', $key)->first();
         if (! $env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
@@ -799,9 +818,9 @@ class ServicesController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
-
+            $key = str($item['key'])->trim()->replace(' ', '_')->value;
             $env = $service->environment_variables()->updateOrCreate(
-                ['key' => $item['key']],
+                ['key' => $key],
                 $item
             );
 
@@ -909,7 +928,8 @@ class ServicesController extends Controller
             ], 422);
         }
 
-        $existingEnv = $service->environment_variables()->where('key', $request->key)->first();
+        $key = str($request->key)->trim()->replace(' ', '_')->value;
+        $existingEnv = $service->environment_variables()->where('key', $key)->first();
         if ($existingEnv) {
             return response()->json([
                 'message' => 'Environment variable already exists. Use PATCH request to update it.',
@@ -995,7 +1015,8 @@ class ServicesController extends Controller
         }
 
         $env = EnvironmentVariable::where('uuid', $request->env_uuid)
-            ->where('service_id', $service->id)
+            ->where('resourceable_type', Service::class)
+            ->where('resourceable_id', $service->id)
             ->first();
 
         if (! $env) {

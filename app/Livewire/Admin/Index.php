@@ -21,14 +21,26 @@ class Index extends Component
 
     public function mount()
     {
-        if (! isCloud()) {
+        if (! isCloud() && ! isDev()) {
             return redirect()->route('dashboard');
         }
-
-        if (Auth::id() !== 0) {
+        if (Auth::id() !== 0 && ! session('impersonating')) {
             return redirect()->route('dashboard');
         }
         $this->getSubscribers();
+    }
+
+    public function back()
+    {
+        if (session('impersonating')) {
+            session()->forget('impersonating');
+            $user = User::find(0);
+            $team_to_switch_to = $user->teams->first();
+            Auth::login($user);
+            refreshSession($team_to_switch_to);
+
+            return redirect(request()->header('Referer'));
+        }
     }
 
     public function submitSearch()
@@ -52,9 +64,10 @@ class Index extends Component
         if (Auth::id() !== 0) {
             return redirect()->route('dashboard');
         }
+        session(['impersonating' => true]);
         $user = User::find($user_id);
         $team_to_switch_to = $user->teams->first();
-        Cache::forget("team:{$user->id}");
+        // Cache::forget("team:{$user->id}");
         Auth::login($user);
         refreshSession($team_to_switch_to);
 

@@ -7,15 +7,15 @@
             <h1>Resources</h1>
             @if ($environment->isEmpty())
                 <a class="button"
-                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }}">
+                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
                     Clone
                 </a>
             @else
-                <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }}  "
+                <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
                     class="button">+
                     New</a>
                 <a class="button"
-                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }}">
+                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
                     Clone
                 </a>
             @endif
@@ -44,7 +44,7 @@
         </nav>
     </div>
     @if ($environment->isEmpty())
-        <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_name' => data_get($parameters, 'environment_name')]) }} "
+        <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
@@ -211,7 +211,7 @@
             },
             goto(item) {
                 const hrefLink = item.hrefLink;
-                window.location.href = `${hrefLink}#tags`;
+                window.location.href = `${hrefLink}/tags`;
             },
             filterAndSort(items) {
                 if (this.search === '') {

@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Redirect;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -47,6 +48,20 @@ class Dashboard extends Component
             'server_id',
             'status',
         ])->sortBy('id')->groupBy('server_name')->toArray();
+    }
+
+    public function navigateToProject($projectUuid)
+    {
+        $project = Project::where('uuid', $projectUuid)->first();
+
+        if ($project && $project->environments->count() === 1) {
+            return Redirect::route('project.resource.index', [
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $project->environments->first()->uuid,
+            ]);
+        }
+
+        return Redirect::route('project.show', ['project_uuid' => $projectUuid]);
     }
 
     public function render()

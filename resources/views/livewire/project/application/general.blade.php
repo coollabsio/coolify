@@ -84,7 +84,7 @@
                         <option value="non-www">Redirect to non-www.</option>
                     </x-forms.select>
                     <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
-                        submitAction="set_redirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
+                        submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
                         confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
                         shortConfirmationLabel="Application URL" :confirmWithPassword="false" step2ButtonText="Set Direction">
                         <x-slot:customButton>
@@ -161,8 +161,7 @@
                             </div>
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
-                                <a class="underline"
-                                    href="https://coolify.io/docs/applications">Framework
+                                <a class="underline" href="https://coolify.io/docs/applications">Framework
                                     Specific Docs</a>
                             </div>
                         @endif

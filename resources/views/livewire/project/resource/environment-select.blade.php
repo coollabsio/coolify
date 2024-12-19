@@ -1,8 +1,7 @@
     <x-forms.select wire:model.live="selectedEnvironment">
-        <option value="edit">Create / Edit</option>
-        <option disabled>-----</option>
         @foreach ($environments as $environment)
-            <option value="{{ $environment->name }}">{{ $environment->name }}
-            </option>
+            <option value="{{ $environment->uuid }}">{{ $environment->name }}</option>
         @endforeach
+        <option disabled>-----</option>
+        <option value="edit">Create / Edit</option>
     </x-forms.select>

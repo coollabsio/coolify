@@ -5,6 +5,7 @@
     "auth.login.github": "使用 GitHub 登入",
     "auth.login.gitlab": "使用 Gitlab 登入",
     "auth.login.google": "使用 Google 登入",
+    "auth.login.infomaniak": "使用 Infomaniak 登入",
     "auth.already_registered": "已經註冊？",
     "auth.confirm_password": "確認密碼",
     "auth.forgot_password": "忘記密碼",

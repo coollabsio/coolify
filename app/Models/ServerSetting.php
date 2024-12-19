@@ -85,9 +85,6 @@ class ServerSetting extends Model
             ) {
                 $settings->server->restartSentinel();
             }
-            if ($settings->isDirty('is_reachable')) {
-                $settings->server->isReachableChanged();
-            }
         });
     }
 

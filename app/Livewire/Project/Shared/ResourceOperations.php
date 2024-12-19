@@ -15,7 +15,7 @@ class ResourceOperations extends Component
 
     public $projectUuid;
 
-    public $environmentName;
+    public $environmentUuid;
 
     public $projects;
 
@@ -25,7 +25,7 @@ class ResourceOperations extends Component
     {
         $parameters = get_route_parameters();
         $this->projectUuid = data_get($parameters, 'project_uuid');
-        $this->environmentName = data_get($parameters, 'environment_name');
+        $this->environmentUuid = data_get($parameters, 'environment_uuid');
         $this->projects = Project::ownedByCurrentTeam()->get();
         $this->servers = currentTeam()->servers;
     }
@@ -42,9 +42,11 @@ class ResourceOperations extends Component
         $uuid = (string) new Cuid2;
         $server = $new_destination->server;
         if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+            $name = 'clone-of-'.str($this->resource->name)->limit(20).'-'.$uuid;
+
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
-                'name' => $this->resource->name.'-clone-'.$uuid,
+                'name' => $name,
                 'fqdn' => generateFqdn($server, $uuid),
                 'status' => 'exited',
                 'destination_id' => $new_destination->id,
@@ -58,21 +60,26 @@ class ResourceOperations extends Component
             $environmentVaribles = $this->resource->environment_variables()->get();
             foreach ($environmentVaribles as $environmentVarible) {
                 $newEnvironmentVariable = $environmentVarible->replicate()->fill([
-                    'application_id' => $new_resource->id,
+                    'resourceable_id' => $new_resource->id,
+                    'resourceable_type' => $new_resource->getMorphClass(),
                 ]);
                 $newEnvironmentVariable->save();
             }
             $persistentVolumes = $this->resource->persistentStorages()->get();
             foreach ($persistentVolumes as $volume) {
+                $volumeName = str($volume->name)->replace($this->resource->uuid, $new_resource->uuid)->value();
+                if ($volumeName === $volume->name) {
+                    $volumeName = $new_resource->uuid.'-'.str($volume->name)->afterLast('-');
+                }
                 $newPersistentVolume = $volume->replicate()->fill([
-                    'name' => $new_resource->uuid.'-'.str($volume->name)->afterLast('-'),
+                    'name' => $volumeName,
                     'resource_id' => $new_resource->id,
                 ]);
                 $newPersistentVolume->save();
             }
             $route = route('project.application.configuration', [
                 'project_uuid' => $this->projectUuid,
-                'environment_name' => $this->environmentName,
+                'environment_uuid' => $this->environmentUuid,
                 'application_uuid' => $new_resource->uuid,
             ]).'#resource-operations';
 
@@ -115,7 +122,7 @@ class ResourceOperations extends Component
             }
             $route = route('project.database.configuration', [
                 'project_uuid' => $this->projectUuid,
-                'environment_name' => $this->environmentName,
+                'environment_uuid' => $this->environmentUuid,
                 'database_uuid' => $new_resource->uuid,
             ]).'#resource-operations';
 
@@ -141,7 +148,7 @@ class ResourceOperations extends Component
             $new_resource->parse();
             $route = route('project.service.configuration', [
                 'project_uuid' => $this->projectUuid,
-                'environment_name' => $this->environmentName,
+                'environment_uuid' => $this->environmentUuid,
                 'service_uuid' => $new_resource->uuid,
             ]).'#resource-operations';
 
@@ -159,7 +166,7 @@ class ResourceOperations extends Component
             if ($this->resource->type() === 'application') {
                 $route = route('project.application.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
-                    'environment_name' => $new_environment->name,
+                    'environment_uuid' => $new_environment->uuid,
                     'application_uuid' => $this->resource->uuid,
                 ]).'#resource-operations';
 
@@ -167,7 +174,7 @@ class ResourceOperations extends Component
             } elseif (str($this->resource->type())->startsWith('standalone-')) {
                 $route = route('project.database.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
-                    'environment_name' => $new_environment->name,
+                    'environment_uuid' => $new_environment->uuid,
                     'database_uuid' => $this->resource->uuid,
                 ]).'#resource-operations';
 
@@ -175,7 +182,7 @@ class ResourceOperations extends Component
             } elseif ($this->resource->type() === 'service') {
                 $route = route('project.service.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
-                    'environment_name' => $new_environment->name,
+                    'environment_uuid' => $new_environment->uuid,
                     'service_uuid' => $this->resource->uuid,
                 ]).'#resource-operations';
 

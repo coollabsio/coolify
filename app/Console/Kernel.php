@@ -133,14 +133,14 @@ class Kernel extends ConsoleKernel
 
         foreach ($servers as $server) {
             $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+            if (validate_timezone($serverTimezone) === false) {
+                $serverTimezone = config('app.timezone');
+            }
 
             // Sentinel check
             $lastSentinelUpdate = $server->sentinel_updated_at;
             if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
                 // Check container status every minute if Sentinel does not activated
-                if (validate_timezone($serverTimezone) === false) {
-                    $serverTimezone = config('app.timezone');
-                }
                 if (isCloud()) {
                     $this->scheduleInstance->job(new ServerCheckJob($server))->timezone($serverTimezone)->everyFiveMinutes()->onOneServer();
                 } else {
@@ -148,14 +148,10 @@ class Kernel extends ConsoleKernel
                 }
                 // $this->scheduleInstance->job(new \App\Jobs\ServerCheckNewJob($server))->everyFiveMinutes()->onOneServer();
 
-                // Check storage usage every 10 minutes if Sentinel does not activated
-                $this->scheduleInstance->job(new ServerStorageCheckJob($server))->everyTenMinutes()->onOneServer();
+                $this->scheduleInstance->job(new ServerStorageCheckJob($server))->cron($server->settings->server_disk_usage_check_frequency)->timezone($serverTimezone)->onOneServer();
             }
-            if ($server->settings->force_docker_cleanup) {
-                $this->scheduleInstance->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
-            } else {
-                $this->scheduleInstance->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
-            }
+
+            $this->scheduleInstance->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
 
             // Cleanup multiplexed connections every hour
             // $this->scheduleInstance->job(new ServerCleanupMux($server))->hourly()->onOneServer();

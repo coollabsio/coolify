@@ -5,6 +5,7 @@
     "auth.login.github": "GitHub ile Giriş Yap",
     "auth.login.gitlab": "GitLab ile Giriş Yap",
     "auth.login.google": "Google ile Giriş Yap",
+    "auth.login.infomaniak": "Infomaniak ile Giriş Yap",
     "auth.already_registered": "Zaten kayıtlı mısınız?",
     "auth.confirm_password": "Şifreyi Onayla",
     "auth.forgot_password": "Şifremi Unuttum",

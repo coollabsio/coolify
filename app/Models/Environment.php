@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -18,7 +17,7 @@ use OpenApi\Attributes as OA;
         'description' => ['type' => 'string'],
     ]
 )]
-class Environment extends Model
+class Environment extends BaseModel
 {
     protected $guarded = [];
 

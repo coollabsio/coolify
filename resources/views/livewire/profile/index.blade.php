@@ -59,6 +59,7 @@
                                 class="font-mono pr-10"
                             />
                             <button
+                                x-show="window.isSecureContext"
                                 @click="navigator.clipboard.writeText(secretKey); copiedSecretKey = true; setTimeout(() => copiedSecretKey = false, 2000)"
                                 class="absolute right-2 bottom-1 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                             >
@@ -78,6 +79,7 @@
                                 class="font-mono pr-10"
                             />
                             <button
+                                x-show="window.isSecureContext"
                                 @click="navigator.clipboard.writeText(otpUrl); copiedOtpUrl = true; setTimeout(() => copiedOtpUrl = false, 2000)"
                                 class="absolute right-2 bottom-1 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                             >
