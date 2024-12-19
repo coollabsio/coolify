@@ -24,30 +24,36 @@ class ListServerDockerImages
         $command = "curl --unix-socket /var/run/docker.sock http://localhost/images/json";
         $imagesJson = json_decode(instant_remote_process([$command], $server), true);
 
-        return $imagesJson;
-
         $images = [];
 
         foreach ($imagesJson as $image) {
             $isRunning = key_exists($image['Id'], $runningImages);
 
-            foreach ($image['RepoTags'] as $tag) {
+            if ($image['RepoTags'] == []){
                 $imageCopy = $image;
-                $imageCopy["RepoTags"] = $tag;
 
-                if ($isRunning){
-                    $imageCopy["Status"] = 'in use';
-                }else{
-                    $imageCopy["Status"] = 'unused';
-                }
-
-                if ($image['RepoTags'] == []){
-                    $imageCopy["Dangling"] = true;
-                }else{
-                    $imageCopy["Dangling"] = false;
-                }
+                $imageCopy["Status"] = 'unused';
+                $imageCopy["Dangling"] = true;
 
                 array_push($images, $imageCopy);
+
+            }else{
+
+                foreach ($image['RepoTags'] as $tag) {
+                    $imageCopy = $image;
+
+                    $imageCopy["RepoTags"] = $tag;
+
+                    if ($isRunning){
+                        $imageCopy["Status"] = 'in use';
+                    }else{
+                        $imageCopy["Status"] = 'unused';
+                    }
+
+                    $imageCopy["Dangling"] = false;
+
+                    array_push($images, $imageCopy);
+                }
             }
         }
 
