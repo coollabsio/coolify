@@ -122,6 +122,12 @@ class Application extends BaseModel
 
     protected static function booted()
     {
+        static::addGlobalScope('withRelations', function ($builder) {
+            $builder->withCount([
+                'additional_servers',
+                'additional_networks',
+            ]);
+        });
         static::saving(function ($application) {
             $payload = [];
             if ($application->isDirty('fqdn')) {
@@ -326,7 +332,7 @@ class Application extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.application.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'application_uuid' => data_get($this, 'uuid'),
             ]);
         }
@@ -334,12 +340,12 @@ class Application extends BaseModel
         return null;
     }
 
-    public function failedTaskLink($task_uuid)
+    public function taskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.application.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'application_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
@@ -558,20 +564,21 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if ($this->additional_servers->count() === 0) {
-                    return $this->destination->server->isFunctional();
-                } else {
-                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
-                    $main_server_status = $this->destination->server->isFunctional();
-                    foreach ($additional_servers_status as $status) {
-                        $server_status = str($status)->before(':')->value();
-                        if ($server_status !== 'running') {
-                            return false;
-                        }
-                    }
-
-                    return $main_server_status;
+                if (! $this->relationLoaded('additional_servers') || $this->additional_servers->count() === 0) {
+                    return $this->destination?->server?->isFunctional() ?? false;
                 }
+
+                $additional_servers_status = $this->additional_servers->pluck('pivot.status');
+                $main_server_status = $this->destination?->server?->isFunctional() ?? false;
+
+                foreach ($additional_servers_status as $status) {
+                    $server_status = str($status)->before(':')->value();
+                    if ($server_status !== 'running') {
+                        return false;
+                    }
+                }
+
+                return $main_server_status;
             }
         );
     }
@@ -695,46 +702,62 @@ class Application extends BaseModel
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
     }
 
-    public function environment_variables(): HasMany
+    public function environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->orderBy('key', 'asc');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->orderBy('key', 'asc');
     }
 
-    public function runtime_environment_variables(): HasMany
+    public function runtime_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    // Preview Deployments
-
-    public function build_environment_variables(): HasMany
+    public function build_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('is_build_time', true)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    public function nixpacks_environment_variables(): HasMany
+    public function nixpacks_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('key', 'like', 'NIXPACKS_%');
     }
 
-    public function environment_variables_preview(): HasMany
+    public function environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
-    public function runtime_environment_variables_preview(): HasMany
+    public function runtime_environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    public function build_environment_variables_preview(): HasMany
+    public function build_environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('is_build_time', true)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    public function nixpacks_environment_variables_preview(): HasMany
+    public function nixpacks_environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('key', 'like', 'NIXPACKS_%');
     }
 
     public function scheduled_tasks(): HasMany
@@ -1338,7 +1361,9 @@ class Application extends BaseModel
                 $currentPath = '';
                 foreach ($parts as $part) {
                     $currentPath .= ($currentPath ? '/' : '').$part;
-                    $paths->push($currentPath);
+                    if (str($currentPath)->isNotEmpty()) {
+                        $paths->push($currentPath);
+                    }
                 }
 
                 return $paths;
@@ -1348,7 +1373,7 @@ class Application extends BaseModel
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
                 $cloneCommand,
-                'git sparse-checkout init --cone',
+                'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
                 "cat .$workdir$composeFile",

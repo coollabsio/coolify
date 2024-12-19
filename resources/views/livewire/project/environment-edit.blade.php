@@ -26,7 +26,7 @@
                 <li>
                     <div class="flex items-center">
                         <a class="text-xs truncate lg:text-sm"
-                            href="{{ route('project.resource.index', ['environment_name' => $environment->name, 'project_uuid' => $project->uuid]) }}">
+                            href="{{ route('project.resource.index', ['environment_uuid' => $environment->uuid, 'project_uuid' => $project->uuid]) }}">
                             {{ $environment->name }}
                         </a>
                     </div>

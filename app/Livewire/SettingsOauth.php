@@ -17,6 +17,7 @@ class SettingsOauth extends Component
             $carry["oauth_settings_map.$setting->provider.client_secret"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.redirect_uri"] = 'nullable';
             $carry["oauth_settings_map.$setting->provider.tenant"] = 'nullable';
+            $carry["oauth_settings_map.$setting->provider.base_url"] = 'nullable';
 
             return $carry;
         }, []);
@@ -34,16 +35,30 @@ class SettingsOauth extends Component
         }, []);
     }
 
-    private function updateOauthSettings()
+    private function updateOauthSettings(?string $provider = null)
     {
-        foreach (array_values($this->oauth_settings_map) as &$setting) {
-            $setting->save();
+        if ($provider) {
+            $oauth = $this->oauth_settings_map[$provider];
+            if (! $oauth->couldBeEnabled()) {
+                $oauth->update(['enabled' => false]);
+                throw new \Exception('OAuth settings are not complete for '.$oauth->provider.'.<br/>Please fill in all required fields.');
+            }
+            $oauth->save();
+            $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
+        } else {
+            foreach (array_values($this->oauth_settings_map) as &$setting) {
+                $setting->save();
+            }
         }
     }
 
-    public function instantSave()
+    public function instantSave(string $provider)
     {
-        $this->updateOauthSettings();
+        try {
+            $this->updateOauthSettings($provider);
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()

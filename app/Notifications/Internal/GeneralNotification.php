@@ -2,9 +2,9 @@
 
 namespace App\Notifications\Internal;
 
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -22,18 +22,7 @@ class GeneralNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('general');
     }
 
     public function toDiscord(): DiscordMessage
@@ -50,5 +39,23 @@ class GeneralNotification extends Notification implements ShouldQueue
         return [
             'message' => $this->message,
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'General Notification',
+            level: 'info',
+            message: $this->message,
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        return new SlackMessage(
+            title: 'Coolify: General Notification',
+            description: $this->message,
+            color: SlackMessage::infoColor(),
+        );
     }
 }

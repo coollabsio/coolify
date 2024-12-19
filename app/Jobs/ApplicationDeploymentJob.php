@@ -127,6 +127,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $nixpacks_plan = null;
 
+    private Collection $nixpacks_plan_json;
+
     private ?string $nixpacks_type = null;
 
     private string $dockerfile_location = '/Dockerfile';
@@ -1427,7 +1429,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'project_uuid' => data_get($this->application, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->application, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,
-                'environment_name' => data_get($this->application, 'environment.name'),
+                'environment_uuid' => data_get($this->application, 'environment.uuid'),
             ]));
         }
     }
@@ -1567,7 +1569,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Do any modifications here
                 $this->generate_env_variables();
-                $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
+                $merged_envs = collect(data_get($parsed, 'variables', []))->merge($this->env_args);
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
                 if (count($aptPkgs) === 0) {
                     $aptPkgs = ['curl', 'wget'];
@@ -1592,6 +1594,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->elixir_finetunes();
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
+                $this->nixpacks_plan_json = collect($parsed);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
                 if ($this->nixpacks_type === 'rust') {
                     // temporary: disable healthcheck for rust because the start phase does not have curl/wget
@@ -1712,7 +1715,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return escapeDollarSign($value);
             });
         }
-        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
+        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
@@ -2300,18 +2303,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_build_env_variables()
     {
-        $this->build_args = collect(["--build-arg SOURCE_COMMIT=\"{$this->commit}\""]);
-        if ($this->pull_request_id === 0) {
-            foreach ($this->application->build_environment_variables as $env) {
-                $value = escapeshellarg($env->real_value);
-                $this->build_args->push("--build-arg {$env->key}={$value}");
-            }
-        } else {
-            foreach ($this->application->build_environment_variables_preview as $env) {
-                $value = escapeshellarg($env->real_value);
-                $this->build_args->push("--build-arg {$env->key}={$value}");
-            }
-        }
+        $variables = collect($this->nixpacks_plan_json->get('variables'));
+        $this->build_args = $variables->map(function ($value, $key) {
+            return "--build-arg {$key}={$value}";
+        });
     }
 
     private function add_build_env_variables_to_dockerfile()
@@ -2431,7 +2426,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
-            //$this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
     }
 
