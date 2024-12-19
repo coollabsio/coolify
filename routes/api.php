@@ -131,7 +131,8 @@ Route::group([
 
     Route::get('/docker/{server_uuid}/images', [DockerController::class, 'list_server_docker_images'])->middleware(['api.ability:read']);
     Route::get('/docker/{server_uuid}/image/{id}', [DockerController::class, 'get_server_docker_image_details'])->middleware(['api.ability:read']);
-    Route::delete('/docker/{server_uuid}/images/delete/dangling', [DockerController::class, 'delete_all_dangling_server_docker_images'])->middleware(['api.ability:write']);
+    Route::delete('/docker/{server_uuid}/images/delete', [DockerController::class, 'delete_server_docker_images'])->middleware(['api.ability:write']);
+    Route::patch('/docker/{server_uuid}/image/{id}/update', [DockerController::class, 'update_server_docker_image_tag'])->middleware(['api.ability:write']);
 });
 
 
