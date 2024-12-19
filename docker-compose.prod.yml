@@ -3,15 +3,15 @@ services:
     image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     volumes:
       - type: bind
-        source: /data/coolify/source/.env
+        source: ${BASE_CONFIG_PATH:-/data/coolify}/source/.env
         target: /var/www/html/.env
         read_only: true
-      - /data/coolify/ssh:/var/www/html/storage/app/ssh
-      - /data/coolify/applications:/var/www/html/storage/app/applications
-      - /data/coolify/databases:/var/www/html/storage/app/databases
-      - /data/coolify/services:/var/www/html/storage/app/services
-      - /data/coolify/backups:/var/www/html/storage/app/backups
-      - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
+      - ${BASE_CONFIG_PATH:-/data/coolify}/ssh:/var/www/html/storage/app/ssh
+      - ${BASE_CONFIG_PATH:-/data/coolify}/applications:/var/www/html/storage/app/applications
+      - ${BASE_CONFIG_PATH:-/data/coolify}/databases:/var/www/html/storage/app/databases
+      - ${BASE_CONFIG_PATH:-/data/coolify}/services:/var/www/html/storage/app/services
+      - ${BASE_CONFIG_PATH:-/data/coolify}/backups:/var/www/html/storage/app/backups
+      - ${BASE_CONFIG_PATH:-/data/coolify}/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
       - APP_ENV=production
       - APP_NAME
@@ -98,7 +98,7 @@ services:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
     volumes:
-      - /data/coolify/ssh:/var/www/html/storage/app/ssh
+      - ${BASE_CONFIG_PATH:-/data/coolify}/ssh:/var/www/html/storage/app/ssh
     environment:
       APP_NAME: "${APP_NAME:-Coolify}"
       SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"

@@ -54,9 +54,11 @@ class UpdateCoolify
 
         instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$this->latestVersion}"], $this->server, false);
 
+        $base_path = config('coolify.base_config_path');
+
         remote_process([
-            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
+            "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o {$base_path}/source/upgrade.sh",
+            "bash {$base_path}/source/upgrade.sh $this->latestVersion",
         ], $this->server);
     }
 }
