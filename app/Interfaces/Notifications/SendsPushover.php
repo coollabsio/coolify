@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notifications\Channels;
+namespace App\Interfaces\Notifications;
 
 interface SendsPushover
 {
