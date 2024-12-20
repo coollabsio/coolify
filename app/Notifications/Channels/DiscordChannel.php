@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Channels;
 
-use App\Jobs\SendMessageToDiscordJob;
+use App\Jobs\Notifications\SendMessageToDiscordJob;
 use Illuminate\Notifications\Notification;
 
 class DiscordChannel

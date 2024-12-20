@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Channels;
 
-use App\Jobs\SendMessageToSlackJob;
+use App\Jobs\Notifications\SendMessageToSlackJob;
 use Illuminate\Notifications\Notification;
 
 class SlackChannel
