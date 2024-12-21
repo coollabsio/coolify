@@ -1,4 +1,3 @@
-# ignore: false
 # documentation: https://docs.nodebb.org/
 # slogan: A next-generation discussion platform.
 # tags: communication, forums, discussion
@@ -10,27 +9,28 @@ services:
     image: ghcr.io/nodebb/nodebb:latest
     restart: unless-stopped
     environment:
-      - SERVICE_FQDN_nodebb_4567
+      - SERVICE_FQDN_NODEBB_4567
     volumes:
       - nodebb-build:/usr/src/app/build
       - nodebb-uploads:/usr/src/app/public/uploads
       - nodebb-config:/opt/config
-      - type: bind
-        source: ./.docker/config/setup.json
-        target: /usr/src/app/setup.json
-        isDirectory: false
-        content: |
-          {
-              "defaults": {
-                  "postgres": {
-                      "host": "postgres",
-                      "port": 5432,
-                      "database": "nodebb",
-                      "username": "nodebb",
-                      "password": "nodebb"
-                  }
+    command: >
+      /bin/bash -c "
+      cat > /usr/src/app/setup.json <<EOL
+      {
+          \"defaults\": {
+              \"postgres\": {
+                  \"host\": \"postgres\",
+                  \"port\": 5432,
+                  \"database\": \"nodebb\",
+                  \"username\": \"${SERVICE_USER_POSTGRES}\",
+                  \"password\": \"${SERVICE_PASSWORD_POSTGRES}\"
               }
           }
+      }
+      EOL
+      && tini -- entrypoint.sh
+      "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4567"]
       interval: 30s
@@ -42,8 +42,8 @@ services:
     image: postgres:17.2-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: nodebb
-      POSTGRES_PASSWORD: nodebb
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
       POSTGRES_DB: nodebb
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -52,9 +52,3 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
-
-volumes:
-  postgres-data:
-  nodebb-build:
-  nodebb-uploads:
-  nodebb-config:
