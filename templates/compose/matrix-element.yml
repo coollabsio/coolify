@@ -1,32 +1,23 @@
-# documentation: https://github.com/kamyargerami/matrix-docker
-# slogan: An open network for secure, decentralised communication
-# tags: real-time-messaging,secure-communication,peer-to-peer
-# logo: svgs/matrix-element.svg
-# port: 80
-
-version: '3'
+# Documentation: https://github.com/kamyargerami/matrix-docker
+# Slogan: An open network for secure, decentralised communication
+# Tags: real-time-messaging, secure-communication, peer-to-peer
+# Logo: svgs/matrix-element.svg
+# Port: 80
 
 services:
+
   synapse:
     image: "docker.io/matrixdotorg/synapse:v1.84.1"
+    container_name: synapse
     environment:
-      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
-      - SYNAPSE_SERVER_NAME=${SERVICE_FQDN_ELEMENT}
-      - SYNAPSE_REPORT_STATS=no
+      - SERVICE_FQDN_MATRIX=${SERVICE_FQDN_MATRIX}
+      - SERVICE_SERVER_NAME=${SERVICE_FQDN_MATRIX}
+      - SYNAPSE_CONFIG_PATH=${SYNAPSE_CONFIG_PATH:-/data/homeserver.yaml}
+      - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
     volumes:
       - synapse_data:/data
     depends_on:
       - synapse_db
-    entrypoint: >
-      /bin/sh -c '
-        if [ ! -f /data/homeserver.yaml ]; then
-          echo "Config file not found, generating...";
-          docker run --rm -e SYNAPSE_SERVER_NAME=${SERVICE_FQDN_ELEMENT} \
-            -e SYNAPSE_REPORT_STATS=no \
-            -v /data:/data matrixdotorg/synapse:v1.84.1 generate;
-        fi;
-        exec /start.py;
-      '
     healthcheck:
       test:
         - CMD
@@ -34,16 +25,8 @@ services:
         - '-f'
         - 'http://127.0.0.1:80'
 
-  element:
-    image: "vectorim/element-web:latest"
-    environment:
-      - SERVICE_FQDN_ELEMENT=${SERVICE_FQDN_ELEMENT}
-    volumes:
-      - element:/app
-
   synapse_db:
     image: "docker.io/postgres:14-alpine"
-    restart: unless-stopped
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
@@ -55,3 +38,10 @@ services:
     image: "instrumentisto/coturn:latest"
     volumes:
       - coturn:/etc/coturn
+  element:
+    image: "vectorim/element-web:latest"
+    volumes:
+      - element:/app
+    environment:
+      - SERVICE_FQDN_ELEMENT=${SERVICE_FQDN_ELEMENT}
+      - HOMESERVER_URL=${SERVICE_FQDN_MATRIX}
