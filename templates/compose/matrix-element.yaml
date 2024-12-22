@@ -11,8 +11,6 @@ services:
     container_name: synapse
     environment:
       - SERVICE_FQDN_MATRIX=${SERVICE_FQDN_MATRIX}
-      - SERVICE_SERVER_NAME=${SERVICE_FQDN_MATRIX}
-      - SYNAPSE_CONFIG_PATH=${SYNAPSE_CONFIG_PATH:-/data/homeserver.yaml}
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
     volumes:
       - synapse_data:/data
@@ -24,13 +22,12 @@ services:
         - curl
         - '-f'
         - 'http://127.0.0.1:80'
-
+        
   synapse_db:
     image: "docker.io/postgres:14-alpine"
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
       - synapse_db_data:/var/lib/postgresql/data
 
@@ -38,10 +35,10 @@ services:
     image: "instrumentisto/coturn:latest"
     volumes:
       - coturn:/etc/coturn
+
   element:
     image: "vectorim/element-web:latest"
     volumes:
       - element:/app
     environment:
       - SERVICE_FQDN_ELEMENT=${SERVICE_FQDN_ELEMENT}
-      - HOMESERVER_URL=${SERVICE_FQDN_MATRIX}
