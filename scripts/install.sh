@@ -160,7 +160,8 @@ echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
 case "$OS_TYPE" in
 arch)
-    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
+    # inetutils provides the 'hostname' command
+    pacman -Sy --noconfirm --needed curl wget git jq openssl inetutils >/dev/null || true
     ;;
 alpine)
     sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
