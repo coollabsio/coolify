@@ -24,7 +24,6 @@
         "@tailwindcss/typography": "0.5.15",
         "@xterm/addon-fit": "^0.10.0",
         "@xterm/xterm": "^5.5.0",
-        "alpinejs": "3.14.7",
         "ioredis": "5.4.1"
     }
 }
