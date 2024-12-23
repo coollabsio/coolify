@@ -21,18 +21,20 @@ return new class extends Migration
             $table->text('smtp_username')->nullable()->change();
         });
 
-        $settings = DB::table('instance_settings')->get();
-        foreach ($settings as $setting) {
-            try {
-                DB::table('instance_settings')->where('id', $setting->id)->update([
-                    'smtp_from_address' => $setting->smtp_from_address ? Crypt::encryptString($setting->smtp_from_address) : null,
-                    'smtp_from_name' => $setting->smtp_from_name ? Crypt::encryptString($setting->smtp_from_name) : null,
-                    'smtp_recipients' => $setting->smtp_recipients ? Crypt::encryptString($setting->smtp_recipients) : null,
-                    'smtp_host' => $setting->smtp_host ? Crypt::encryptString($setting->smtp_host) : null,
-                    'smtp_username' => $setting->smtp_username ? Crypt::encryptString($setting->smtp_username) : null,
-                ]);
-            } catch (Exception $e) {
-                \Log::error('Error encrypting instance settings email columns: '.$e->getMessage());
+        if (DB::table('instance_settings')->exists()) {
+            $settings = DB::table('instance_settings')->get();
+            foreach ($settings as $setting) {
+                try {
+                    DB::table('instance_settings')->where('id', $setting->id)->update([
+                        'smtp_from_address' => $setting->smtp_from_address ? Crypt::encryptString($setting->smtp_from_address) : null,
+                        'smtp_from_name' => $setting->smtp_from_name ? Crypt::encryptString($setting->smtp_from_name) : null,
+                        'smtp_recipients' => $setting->smtp_recipients ? Crypt::encryptString($setting->smtp_recipients) : null,
+                        'smtp_host' => $setting->smtp_host ? Crypt::encryptString($setting->smtp_host) : null,
+                        'smtp_username' => $setting->smtp_username ? Crypt::encryptString($setting->smtp_username) : null,
+                    ]);
+                } catch (Exception $e) {
+                    \Log::error('Error encrypting instance settings email columns: '.$e->getMessage());
+                }
             }
         }
     }
@@ -43,11 +45,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->text('smtp_from_address')->nullable()->change();
-            $table->text('smtp_from_name')->nullable()->change();
-            $table->text('smtp_recipients')->nullable()->change();
-            $table->text('smtp_host')->nullable()->change();
-            $table->text('smtp_username')->nullable()->change();
+            $table->string('smtp_from_address')->nullable()->change();
+            $table->string('smtp_from_name')->nullable()->change();
+            $table->string('smtp_recipients')->nullable()->change();
+            $table->string('smtp_host')->nullable()->change();
+            $table->string('smtp_username')->nullable()->change();
         });
 
         if (DB::table('instance_settings')->exists()) {
