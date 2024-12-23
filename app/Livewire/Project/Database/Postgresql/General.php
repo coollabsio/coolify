@@ -9,8 +9,6 @@ use App\Models\StandalonePostgresql;
 use Exception;
 use Livewire\Component;
 
-use function Aws\filter;
-
 class General extends Component
 {
     public StandalonePostgresql $database;
@@ -126,10 +124,52 @@ class General extends Component
 
     public function save_init_script($script)
     {
-        $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);
-        $this->database->init_scripts = array_merge($this->database->init_scripts, [$script]);
+        $initScripts = collect($this->database->init_scripts ?? []);
+
+        $existingScript = $initScripts->firstWhere('filename', $script['filename']);
+        $oldScript = $initScripts->firstWhere('index', $script['index']);
+
+        if ($existingScript && $existingScript['index'] !== $script['index']) {
+            $this->dispatch('error', 'A script with this filename already exists.');
+
+            return;
+        }
+
+        $container_name = $this->database->uuid;
+        $configuration_dir = database_configuration_dir().'/'.$container_name;
+
+        if ($oldScript && $oldScript['filename'] !== $script['filename']) {
+            $old_file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$oldScript['filename']}";
+            $delete_command = "rm -f $old_file_path";
+            try {
+                instant_remote_process([$delete_command], $this->server);
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
+
+                return;
+            }
+        }
+
+        $index = $initScripts->search(function ($item) use ($script) {
+            return $item['index'] === $script['index'];
+        });
+
+        if ($index !== false) {
+            $initScripts[$index] = $script;
+        } else {
+            $initScripts->push($script);
+        }
+
+        $this->database->init_scripts = $initScripts->values()
+            ->map(function ($item, $index) {
+                $item['index'] = $index;
+
+                return $item;
+            })
+            ->all();
+
         $this->database->save();
-        $this->dispatch('success', 'Init script saved.');
+        $this->dispatch('success', 'Init script saved and updated.');
     }
 
     public function delete_init_script($script)
@@ -137,12 +177,32 @@ class General extends Component
         $collection = collect($this->database->init_scripts);
         $found = $collection->firstWhere('filename', $script['filename']);
         if ($found) {
-            $this->database->init_scripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray();
+            $container_name = $this->database->uuid;
+            $configuration_dir = database_configuration_dir().'/'.$container_name;
+            $file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$script['filename']}";
+
+            $command = "rm -f $file_path";
+            try {
+                instant_remote_process([$command], $this->server);
+            } catch (\Exception $e) {
+                $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
+
+                return;
+            }
+
+            $updatedScripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])
+                ->values()
+                ->map(function ($item, $index) {
+                    $item['index'] = $index;
+
+                    return $item;
+                })
+                ->all();
+
+            $this->database->init_scripts = $updatedScripts;
             $this->database->save();
             $this->refresh();
-            $this->dispatch('success', 'Init script deleted.');
-
-            return;
+            $this->dispatch('success', 'Init script deleted from the database and the server.');
         }
     }
 

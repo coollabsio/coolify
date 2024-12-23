@@ -10,40 +10,44 @@
                 <div class="flex items-center gap-2">
                     <h2>Advanced</h2>
                     <x-forms.button type="submit">Save</x-forms.button>
-                    <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Manual Cleanup"
-                        isHighlightedButton submitAction="manualCleanup" :actions="[
-                            'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
-                            'Permanently deletes all unused images',
-                            'Clears build cache',
-                            'Removes old versions of the Coolify helper image',
-                            'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
-                            'Optionally permanently deletes all unused networks (if enabled in advanced options).',
-                        ]" :confirmWithText="false"
-                        :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
                 </div>
-                <div>Advanced configuration for your server.</div>
+                <div class="mt-3 mb-4">Advanced configuration for your server.</div>
             </div>
 
-            <div class="flex flex-col gap-4">
+            <h3>Disk Usage</h3>
+            <div class="flex flex-col gap-6">
                 <div class="flex flex-col">
                     <div class="flex flex-wrap gap-2 sm:flex-nowrap pt-4">
+                        <x-forms.input placeholder="0 23 * * *" id="serverDiskUsageCheckFrequency"
+                            label="Disk usage check frequency" required
+                            helper="Cron expression for disk usage check frequency.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at 11:00 PM." />
                         <x-forms.input id="serverDiskUsageNotificationThreshold"
                             label="Server disk usage notification threshold (%)" required
                             helper="If the server disk usage exceeds this threshold, Coolify will send a notification to the team members." />
                     </div>
                 </div>
+
                 <div class="flex flex-col gap-2">
-                    <div class="flex items-center gap-2">
+                    <div class="flex gap-4">
                         <h3>Docker Cleanup</h3>
+                        <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Manual Cleanup"
+                            isHighlightedButton submitAction="manualCleanup" :actions="[
+                                'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
+                                'Permanently deletes all unused images',
+                                'Clears build cache',
+                                'Removes old versions of the Coolify helper image',
+                                'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
+                                'Optionally permanently deletes all unused networks (if enabled in advanced options).',
+                            ]" :confirmWithText="false"
+                            :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
                     </div>
                     <div class="flex flex-wrap items-center gap-4">
-                        @if ($forceDockerCleanup)
-                            <x-forms.input placeholder="*/10 * * * *" id="dockerCleanupFrequency"
-                                label="Docker cleanup frequency" required
-                                helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
-                        @else
-                            <x-forms.input id="dockerCleanupThreshold" label="Docker cleanup threshold (%)" required
-                                helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
+                        <x-forms.input placeholder="*/10 * * * *" id="dockerCleanupFrequency"
+                            label="Docker cleanup frequency" required
+                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
+                        @if (!$forceDockerCleanup)
+                        <x-forms.input id="dockerCleanupThreshold" label="Docker cleanup threshold (%)" required
+                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
                         @endif
                         <div class="w-96">
                             <x-forms.checkbox

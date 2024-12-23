@@ -6,11 +6,11 @@
 
 html,
 body {
-    @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400 w-full;
+    @apply min-h-full bg-neutral-50 dark:bg-base dark:text-neutral-400 w-full;
 }
 
 body {
-    @apply text-sm antialiased scrollbar;
+    @apply text-sm antialiased scrollbar min-h-screen;
 }
 
 .apexcharts-tooltip {
