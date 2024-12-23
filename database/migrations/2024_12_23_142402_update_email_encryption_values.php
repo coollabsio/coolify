@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 class UpdateEmailEncryptionValues extends Migration
 {
     /**
-     * The encryption mappings.
+     * Encryption mappings.
      */
     private array $encryptionMappings = [
         'tls' => 'starttls',
@@ -33,10 +33,7 @@ class UpdateEmailEncryptionValues extends Migration
                             ]);
                     }
                 } catch (\Exception $e) {
-                    \Log::error('Failed to update instance_settings encryption for ID: '.$setting->id, [
-                        'error' => $e->getMessage(),
-                        'old_value' => $setting->smtp_encryption,
-                    ]);
+                    \Log::error('Failed to update instance settings: '.$e->getMessage());
                 }
             }
 
@@ -51,19 +48,14 @@ class UpdateEmailEncryptionValues extends Migration
                             ]);
                     }
                 } catch (\Exception $e) {
-                    \Log::error('Failed to update email_notification_settings encryption for ID: '.$setting->id, [
-                        'error' => $e->getMessage(),
-                        'old_value' => $setting->smtp_encryption,
-                    ]);
+                    \Log::error('Failed to update email settings: '.$e->getMessage());
                 }
             }
 
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Failed to complete email encryption migration', [
-                'error' => $e->getMessage(),
-            ]);
+            \Log::error('Failed to update email encryption: '.$e->getMessage());
             throw $e;
         }
     }
@@ -93,10 +85,7 @@ class UpdateEmailEncryptionValues extends Migration
                             ]);
                     }
                 } catch (\Exception $e) {
-                    \Log::error('Failed to reverse instance_settings encryption for ID: '.$setting->id, [
-                        'error' => $e->getMessage(),
-                        'old_value' => $setting->smtp_encryption,
-                    ]);
+                    \Log::error('Failed to reverse instance settings: '.$e->getMessage());
                 }
             }
 
@@ -111,19 +100,14 @@ class UpdateEmailEncryptionValues extends Migration
                             ]);
                     }
                 } catch (\Exception $e) {
-                    \Log::error('Failed to reverse email_notification_settings encryption for ID: '.$setting->id, [
-                        'error' => $e->getMessage(),
-                        'old_value' => $setting->smtp_encryption,
-                    ]);
+                    \Log::error('Failed to reverse email settings: '.$e->getMessage());
                 }
             }
 
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Failed to complete email encryption rollback migration', [
-                'error' => $e->getMessage(),
-            ]);
+            \Log::error('Failed to reverse email encryption: '.$e->getMessage());
             throw $e;
         }
     }
