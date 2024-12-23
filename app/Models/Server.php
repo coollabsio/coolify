@@ -623,7 +623,7 @@ $schema://$host {
 
     public function getDiskUsage(): ?string
     {
-        return instant_remote_process(['df / --output=pcent | tr -cd 0-9'], $this, false);
+        return instant_remote_process(['df /var/lib/docker --output=pcent | tr -cd 0-9'], $this, false);
         // return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
 
@@ -1271,7 +1271,7 @@ $schema://$host {
     public function storageCheck(): ?string
     {
         $commands = [
-            'df / --output=pcent | tr -cd 0-9',
+            'df /var/lib/docker --output=pcent | tr -cd 0-9',
         ];
 
         return instant_remote_process($commands, $this, false);
