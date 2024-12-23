@@ -41,8 +41,8 @@ class Email extends Component
     #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
     public ?int $smtpPort = null;
 
-    #[Validate(['nullable', 'string', 'in:tls,ssl,none'])]
-    public ?string $smtpEncryption = 'tls';
+    #[Validate(['nullable', 'string', 'in:starttls,tls,none'])]
+    public ?string $smtpEncryption = null;
 
     #[Validate(['nullable', 'string'])]
     public ?string $smtpUsername = null;
@@ -235,7 +235,7 @@ class Email extends Component
                 'smtpFromName' => 'required|string',
                 'smtpHost' => 'required|string',
                 'smtpPort' => 'required|numeric',
-                'smtpEncryption' => 'required|string|in:tls,ssl,none',
+                'smtpEncryption' => 'required|string|in:starttls,tls,none',
                 'smtpUsername' => 'nullable|string',
                 'smtpPassword' => 'nullable|string',
                 'smtpTimeout' => 'nullable|numeric',
