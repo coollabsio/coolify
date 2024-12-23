@@ -22,6 +22,9 @@ class Index extends Component
     public string $searchQuery = '';
     public bool $showOnlyDangling = false;
     public bool $selectAll = false;
+    public bool $showDeleteConfirmation = false;
+    public array $imagesToDelete = [];
+    public string $confirmationText = '';
 
     public function mount()
     {
@@ -50,7 +53,13 @@ class Index extends Component
                 return;
             }
 
-            $this->serverImages = collect(ListServerDockerImages::run($server));
+            $images = collect(ListServerDockerImages::run($server));
+
+            // Format sizes for the list
+            $this->serverImages = $images->map(function ($image) {
+                $image['FormattedSize'] = $this->formatBytes($image['Size'] ?? 0);
+                return $image;
+            });
         } catch (\Exception $e) {
             $this->addError('images', "Error loading docker images: " . $e->getMessage());
         } finally {
@@ -65,24 +74,49 @@ class Index extends Component
             if (!$server) {
                 return;
             }
-            $this->imageDetails = GetServerDockerImageDetails::run($server, $imageId);
+            $details = GetServerDockerImageDetails::run($server, $imageId);
 
-            // Add formatted size
-            if (isset($this->imageDetails[0]['Size'])) {
-                $size = $this->imageDetails[0]['Size'];
-                $this->imageDetails[0]['FormattedSize'] = $this->formatBytes($size);
+            // Add formatted size (total size)
+            if (isset($details['Size'])) {
+                $details['FormattedSize'] = $this->formatBytes($details['Size']);
+            } else {
+                $details['FormattedSize'] = 'N/A';
+            }
+
+            // Add formatted virtual size
+            if (isset($details['VirtualSize'])) {
+                $details['FormattedVirtualSize'] = $this->formatBytes($details['VirtualSize']);
             }
 
             // Add formatted creation date
-            if (isset($this->imageDetails[0]['Created'])) {
-                $this->imageDetails[0]['FormattedCreated'] = \Carbon\Carbon::parse($this->imageDetails[0]['Created'])->diffForHumans();
+            if (isset($details['Created'])) {
+                $details['FormattedCreated'] = \Carbon\Carbon::parse($details['Created'])->diffForHumans();
+            } else {
+                $details['FormattedCreated'] = 'N/A';
             }
+
+            $this->imageDetails = $details;
         } catch (\Exception $e) {
             $this->addError('details', "Error loading image details: " . $e->getMessage());
         }
     }
 
-    public function deleteImage($imageId)
+    public function confirmDelete($imageIds = null)
+    {
+        if ($imageIds) {
+            $this->imagesToDelete = is_array($imageIds) ? $imageIds : [$imageIds];
+        } else {
+            $this->imagesToDelete = $this->selectedImages;
+        }
+
+        if (empty($this->imagesToDelete)) {
+            return;
+        }
+
+        $this->showDeleteConfirmation = true;
+    }
+
+    public function deleteImages()
     {
         try {
             $server = $this->servers->firstWhere('uuid', $this->selected_uuid);
@@ -90,11 +124,18 @@ class Index extends Component
                 return;
             }
 
-            instant_remote_process(["docker rmi -f {$imageId}"], $server);
+            DeleteServerDockerImages::run($server, $this->imagesToDelete);
+
+            // Reset states
+            $this->showDeleteConfirmation = false;
+            $this->imagesToDelete = [];
+            $this->selectedImages = [];
             $this->imageDetails = null;
+            $this->confirmationText = '';
+
             $this->loadServerImages();
         } catch (\Exception $e) {
-            $this->addError('delete', "Error deleting image: " . $e->getMessage());
+            $this->addError('delete', "Error deleting images: " . $e->getMessage());
         }
     }
 
@@ -118,14 +159,13 @@ class Index extends Component
         return $this->serverImages
             ->when($this->searchQuery, function ($collection) {
                 return $collection->filter(function ($image) {
-                    return str_contains(strtolower($image['Repository'] ?? ''), strtolower($this->searchQuery)) ||
-                        str_contains(strtolower($image['Tag'] ?? ''), strtolower($this->searchQuery)) ||
-                        str_contains(strtolower($image['ID'] ?? ''), strtolower($this->searchQuery));
+                    return str_contains(strtolower($image['RepoTags'][0] ?? ''), strtolower($this->searchQuery)) ||
+                        str_contains(strtolower($image['Id'] ?? ''), strtolower($this->searchQuery));
                 });
             })
             ->when($this->showOnlyDangling, function ($collection) {
                 return $collection->filter(function ($image) {
-                    return ($image['Repository'] ?? '') === '<none>' || ($image['Tag'] ?? '') === '<none>';
+                    return $image['Dangling'] ?? false;
                 });
             })
             ->values();
@@ -134,10 +174,22 @@ class Index extends Component
     public function updatedSelectAll($value)
     {
         if ($value) {
-            $this->selectedImages = $this->filteredImages->pluck('ID')->toArray();
+            $this->selectedImages = $this->filteredImages->pluck('Id')->toArray();
         } else {
             $this->selectedImages = [];
         }
+    }
+
+    public function updatedSearchQuery()
+    {
+        $this->selectAll = false;
+        $this->selectedImages = [];
+    }
+
+    public function updatedShowOnlyDangling()
+    {
+        $this->selectAll = false;
+        $this->selectedImages = [];
     }
 
     protected function formatBytes($bytes, $precision = 2)
