@@ -66,17 +66,24 @@ class EmailChannel
         }
 
         if ($emailSettings->smtp_enabled) {
+            $encryption = match (strtolower($emailSettings->smtp_encryption)) {
+                'starttls' => null,
+                'tls' => 'tls',
+                'none' => null,
+                default => null,
+            };
+
             config()->set('mail.default', 'smtp');
             config()->set('mail.mailers.smtp', [
                 'transport' => 'smtp',
                 'host' => $emailSettings->smtp_host,
                 'port' => $emailSettings->smtp_port,
-                'encryption' => $emailSettings->smtp_encryption === 'none' ? null : $emailSettings->smtp_encryption,
+                'encryption' => $encryption,
                 'username' => $emailSettings->smtp_username,
                 'password' => $emailSettings->smtp_password,
                 'timeout' => $emailSettings->smtp_timeout,
                 'local_domain' => null,
-                'auto_tls' => $emailSettings->smtp_encryption === 'none' ? '0' : '',
+                'auto_tls' => $emailSettings->smtp_encryption === 'none' ? '0' : '', // If encryption is "none", it will not try to upgrade to TLS via StartTLS to make sure it is unencrypted.
             ]);
         }
     }

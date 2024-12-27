@@ -67,17 +67,26 @@ function set_transanctional_email_settings(?InstanceSettings $settings = null): 
 
         return 'resend';
     }
+
+    $encryption = match (strtolower(data_get($settings, 'smtp_encryption'))) {
+        'starttls' => null,
+        'tls' => 'tls',
+        'none' => null,
+        default => null,
+    };
+
     if (data_get($settings, 'smtp_enabled')) {
         config()->set('mail.default', 'smtp');
         config()->set('mail.mailers.smtp', [
             'transport' => 'smtp',
             'host' => data_get($settings, 'smtp_host'),
             'port' => data_get($settings, 'smtp_port'),
-            'encryption' => data_get($settings, 'smtp_encryption'),
+            'encryption' => $encryption,
             'username' => data_get($settings, 'smtp_username'),
             'password' => data_get($settings, 'smtp_password'),
             'timeout' => data_get($settings, 'smtp_timeout'),
             'local_domain' => null,
+            'auto_tls' => data_get($settings, 'smtp_encryption') === 'none' ? '0' : '', // If encryption is "none", it will not try to upgrade to TLS via StartTLS to make sure it is unencrypted.
         ]);
 
         return 'smtp';

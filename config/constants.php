@@ -47,7 +47,7 @@ return [
     ],
 
     'docker' => [
-        'minimum_required_version' => '26.0',
+        'minimum_required_version' => '24.0',
     ],
 
     'ssh' => [
