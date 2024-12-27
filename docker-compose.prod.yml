@@ -58,7 +58,7 @@ services:
     expose:
       - "${APP_PORT:-8000}"
     healthcheck:
-      test: curl --fail http://127.0.0.1:80/api/health || exit 1
+      test: curl --fail http://127.0.0.1:8080/api/health || exit 1
       interval: 5s
       retries: 10
       timeout: 2s
@@ -93,7 +93,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.4'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.5'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
