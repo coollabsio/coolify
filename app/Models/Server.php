@@ -6,6 +6,7 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
+use App\Events\ServerReachabilityChanged;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
@@ -346,7 +347,7 @@ class Server extends BaseModel
                                 'loadBalancer' => [
                                     'servers' => [
                                         0 => [
-                                            'url' => 'http://coolify:80',
+                                            'url' => 'http://coolify:8080',
                                         ],
                                     ],
                                 ],
@@ -444,7 +445,7 @@ $schema://$host {
     handle /terminal/ws {
         reverse_proxy coolify-realtime:6002
     }
-    reverse_proxy coolify:80
+    reverse_proxy coolify:8080
 }";
                 $base64 = base64_encode($caddy_file);
                 instant_remote_process([
@@ -1024,14 +1025,63 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-        // If the server is reachable, send the reachable notification if it was sent before
+
+        \Log::debug('Server reachability check', [
+            'server_id' => $this->id,
+            'is_reachable' => $isReachable,
+            'notification_sent' => $unreachableNotificationSent,
+            'unreachable_count' => $this->unreachable_count,
+        ]);
+
         if ($isReachable === true) {
+            $this->unreachable_count = 0;
+            $this->save();
+
             if ($unreachableNotificationSent === true) {
+                \Log::debug('Server is now reachable, sending notification', [
+                    'server_id' => $this->id,
+                ]);
                 $this->sendReachableNotification();
             }
-        } else {
-            // If the server is unreachable, send the unreachable notification if it was not sent before
-            if ($unreachableNotificationSent === false) {
+
+            return;
+        }
+
+        $this->increment('unreachable_count');
+        \Log::debug('Incremented unreachable count', [
+            'server_id' => $this->id,
+            'new_count' => $this->unreachable_count,
+        ]);
+
+        if ($this->unreachable_count === 1) {
+            $this->settings->is_reachable = true;
+            $this->settings->save();
+            \Log::debug('First unreachable attempt, marking as reachable', [
+                'server_id' => $this->id,
+            ]);
+
+            return;
+        }
+
+        if ($this->unreachable_count >= 2 && ! $unreachableNotificationSent) {
+            $failedChecks = 0;
+            for ($i = 0; $i < 3; $i++) {
+                $status = $this->serverStatus();
+                \Log::debug('Additional reachability check', [
+                    'server_id' => $this->id,
+                    'attempt' => $i + 1,
+                    'status' => $status,
+                ]);
+                sleep(5);
+                if (! $status) {
+                    $failedChecks++;
+                }
+            }
+
+            if ($failedChecks === 3 && ! $unreachableNotificationSent) {
+                \Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
+                    'server_id' => $this->id,
+                ]);
                 $this->sendUnreachableNotification();
             }
         }
@@ -1065,6 +1115,7 @@ $schema://$host {
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
+                ServerReachabilityChanged::dispatch($this);
             }
 
             return ['uptime' => true, 'error' => null];
@@ -1075,6 +1126,7 @@ $schema://$host {
             if ($this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
+                ServerReachabilityChanged::dispatch($this);
             }
 
             return ['uptime' => false, 'error' => $e->getMessage()];
@@ -1165,6 +1217,7 @@ $schema://$host {
         $this->settings->is_reachable = true;
         $this->settings->is_usable = true;
         $this->settings->save();
+        ServerReachabilityChanged::dispatch($this);
 
         return true;
     }
