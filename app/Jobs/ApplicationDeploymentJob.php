@@ -493,6 +493,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Build new container to limit downtime.
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
+        $command = "cd {$this->basedir} && {$this->coolify_variables} docker compose pull";
+
+        $this->execute_remote_command(
+            [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
+        );
+
         if ($this->docker_compose_custom_build_command) {
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_build_command}"), 'hidden' => true],
