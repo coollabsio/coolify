@@ -65,26 +65,6 @@ return [
         ],
     ],
 
-    'limits' => [
-        'trial_period' => 0,
-        'server' => [
-            'zero' => 0,
-            'self-hosted' => 999999999999,
-            'basic' => env('LIMIT_SERVER_BASIC', 2),
-            'pro' => env('LIMIT_SERVER_PRO', 10),
-            'ultimate' => env('LIMIT_SERVER_ULTIMATE', 25),
-            'dynamic' => env('LIMIT_SERVER_DYNAMIC', 2),
-        ],
-        'email' => [
-            'zero' => true,
-            'self-hosted' => true,
-            'basic' => true,
-            'pro' => true,
-            'ultimate' => true,
-            'dynamic' => true,
-        ],
-    ],
-
     'sentry' => [
         'sentry_dsn' => env('SENTRY_DSN'),
     ],
