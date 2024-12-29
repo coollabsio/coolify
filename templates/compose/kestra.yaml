@@ -1,0 +1,82 @@
+# documentation: https://kestra.io/docs/
+# slogan: Open Source Declarative Orchestration Platform
+# tags: Orchestrate,Workflow,Automate,Schedule,Data Orchestration
+# logo: svgs/kestra.svg
+# port: 8080
+
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - kestra-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${SERVICE_USER_POSTGRES} -d kestra'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-kestra}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+
+  kestra:
+    user: "root"
+    command: "server standalone --config /etc/config/application.yaml"
+    image: kestra/kestra:latest
+    pull_policy: always
+    environment:
+      - SERVICE_FQDN_KESTRA_8080
+      - PASSWORD_POSTGRES=${SERVICE_PASSWORD_POSTGRES}
+      - USER_POSTGRES=${SERVICE_USER_POSTGRES}
+      - DB_NAME=${POSTGRES_DB}
+      - KESTRA_URL=${SERVICE_FQDN_KESTRA}
+      - BASIC_AUTH=${BASIC_AUTH:-false}
+      - BASIC_AUTH_USER=${BASIC_AUTH_EMAIL:-admin@example.com} # Change this to your 'VALID' email address
+      - BASIC_AUTH_PASSWORD=${SERVICE_PASSWORD_KESTRA}
+    volumes:
+      - kestra-data:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/kestra-wd:/tmp/kestra-wd
+      - type: bind
+        source: ./application.yml
+        target: /etc/config/application.yaml
+        isDirectory: false
+        content: |
+          datasources:
+            postgres:
+              url: jdbc:postgresql://postgres:5432/${DB_NAME}
+              driverClassName: org.postgresql.Driver
+              username: ${USER_POSTGRES}
+              password: ${PASSWORD_POSTGRES}
+          kestra:
+            server:
+              basicAuth:
+                enabled: ${BASIC_AUTH}
+                username: ${BASIC_AUTH_USER}
+                password: ${BASIC_AUTH_PASSWORD}
+            repository:
+              type: postgres
+            storage:
+              type: local
+              local:
+                basePath: "app/storage"
+            queue:
+              type: postgres
+            tasks:
+              tempDir:
+                path: /tmp/kestra-wd/tmp
+            url: ${KESTRA_URL}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          curl -f http://localhost:8081/health | grep -q '"status": "UP"' || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_started
