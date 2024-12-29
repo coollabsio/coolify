@@ -327,7 +327,7 @@ class General extends Component
         }
     }
 
-    public function set_redirect()
+    public function setRedirect()
     {
         try {
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
@@ -360,10 +360,10 @@ class General extends Component
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
-            $this->resetDefaultLabels();
+            // $this->resetDefaultLabels();
 
             if ($this->application->isDirty('redirect')) {
-                $this->set_redirect();
+                $this->setRedirect();
             }
 
             $this->checkFqdns();

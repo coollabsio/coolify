@@ -5,6 +5,7 @@ namespace App\Livewire\Project;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Support\Facades\Redirect;
 use Livewire\Component;
 
 class Index extends Component
@@ -29,5 +30,19 @@ class Index extends Component
     public function render()
     {
         return view('livewire.project.index');
+    }
+
+    public function navigateToProject($projectUuid)
+    {
+        $project = Project::where('uuid', $projectUuid)->first();
+
+        if ($project && $project->environments->count() === 1) {
+            return Redirect::route('project.resource.index', [
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $project->environments->first()->uuid,
+            ]);
+        }
+
+        return Redirect::route('project.show', ['project_uuid' => $projectUuid]);
     }
 }

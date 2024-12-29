@@ -120,22 +120,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return Attribute::make(
             get: function () {
                 if (config('constants.coolify.self_hosted') || $this->id === 0) {
-                    $subscription = 'self-hosted';
-                } else {
-                    $subscription = data_get($this, 'subscription');
-                    if (is_null($subscription)) {
-                        $subscription = 'zero';
-                    } else {
-                        $subscription = $subscription->type();
-                    }
-                }
-                if ($this->custom_server_limit) {
-                    $serverLimit = $this->custom_server_limit;
-                } else {
-                    $serverLimit = config('constants.limits.server')[strtolower($subscription)];
+                    return 999999999999;
                 }
 
-                return $serverLimit ?? 2;
+                return $this->custom_server_limit ?? 2;
             }
         );
     }
