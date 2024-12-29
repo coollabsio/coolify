@@ -23,6 +23,9 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
       - FROM_EMAIL=${FROM_EMAIL}
       - REPLY_TO_EMAIL=${REPLY_TO_EMAIL}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      
     healthcheck:
       test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"
       interval: 10s
