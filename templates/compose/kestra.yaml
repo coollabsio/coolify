@@ -6,6 +6,7 @@
 
 services:
   postgres:
+    container_name: kestra_postgres
     image: postgres:16
     volumes:
       - kestra-postgres-data:/var/lib/postgresql/data
@@ -23,26 +24,17 @@ services:
       - PGDATA=/var/lib/postgresql/data/pgdata
 
   kestra:
+    container_name: kestra_server
     user: "root"
-    command: "server standalone --config /etc/config/application.yaml"
     image: kestra/kestra:latest
     pull_policy: always
-    environment:
-      - SERVICE_FQDN_KESTRA_8080
-      - PASSWORD_POSTGRES=${SERVICE_PASSWORD_POSTGRES}
-      - USER_POSTGRES=${SERVICE_USER_POSTGRES}
-      - DB_NAME=${POSTGRES_DB}
-      - KESTRA_URL=${SERVICE_FQDN_KESTRA}
-      - BASIC_AUTH=${BASIC_AUTH:-false}
-      - BASIC_AUTH_USER=${BASIC_AUTH_EMAIL:-admin@example.com} # Change this to your 'VALID' email address
-      - BASIC_AUTH_PASSWORD=${SERVICE_PASSWORD_KESTRA}
     volumes:
       - kestra-data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
       - type: bind
-        source: ./application.yml
-        target: /etc/config/application.yaml
+        source: ./application.template.yml
+        target: /etc/config/application.template.yml
         isDirectory: false
         content: |
           datasources:
@@ -69,14 +61,38 @@ services:
               tempDir:
                 path: /tmp/kestra-wd/tmp
             url: ${KESTRA_URL}
+      - type: bind
+        source: ./docker-entrypoint.sh
+        target: /docker-entrypoint-mount.sh
+        isDirectory: false
+        content: |
+          #!/bin/bash
+
+          # Install envsubst if not already installed (for runtime installation)
+          apt-get update && apt-get install -y gettext
+
+          # Replace environment variables in the template with actual values
+          envsubst < /etc/config/application.template.yml > /etc/config/application.yml
+
+
+          # Start Kestra with the newly generated configuration file
+          /app/kestra server standalone --config /etc/config/application.yml
+    environment:
+      - SERVICE_FQDN_KESTRA_8080
+      - PASSWORD_POSTGRES=${SERVICE_PASSWORD_POSTGRES}
+      - USER_POSTGRES=${SERVICE_USER_POSTGRES}
+      - DB_NAME=${POSTGRES_DB}
+      - KESTRA_URL=${SERVICE_FQDN_KESTRA}
+      - BASIC_AUTH=${BASIC_AUTH:-false}
+      - BASIC_AUTH_USER=${BASIC_AUTH_EMAIL:-admin@example.com} # Change this to your 'VALID' email address
+      - BASIC_AUTH_PASSWORD=${SERVICE_PASSWORD_KESTRA}
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >
-          curl -f http://localhost:8081/health | grep -q '"status": "UP"' || exit 1
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_started
+    entrypoint: ["sh", "-c", "cp /docker-entrypoint-mount.sh /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh && /docker-entrypoint.sh"]
