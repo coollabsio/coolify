@@ -335,6 +335,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function decide_what_to_do()
     {
+        // login if use custom registry
+        if ($this->application->docker_use_custom_registry) {
+            $this->handleRegistryAuth();
+        }
+
         if ($this->restart_only) {
             $this->just_restart();
 
@@ -408,10 +413,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
-            // login if use custom registry
-            if ($this->application->docker_use_custom_registry) {
-                $this->handleRegistryAuth();
-            }
 
             $this->generate_image_names();
             $this->prepare_builder_image();

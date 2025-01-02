@@ -3,6 +3,7 @@
 namespace App\Livewire\Images\Images;
 
 use App\Actions\Docker\DeleteAllDanglingServerDockerImages;
+use App\Actions\Docker\DeleteServerDockerImages;
 use App\Actions\Docker\GetServerDockerImageDetails;
 use App\Actions\Docker\ListServerDockerImages;
 use App\Models\Server;
@@ -101,10 +102,10 @@ class Index extends Component
         }
     }
 
-    public function confirmDelete($imageIds = null)
+    public function confirmDelete($imageId = null)
     {
-        if ($imageIds) {
-            $this->imagesToDelete = is_array($imageIds) ? $imageIds : [$imageIds];
+        if ($imageId) {
+            $this->imagesToDelete = [$imageId];
         } else {
             $this->imagesToDelete = $this->selectedImages;
         }
@@ -124,6 +125,16 @@ class Index extends Component
                 return;
             }
 
+            if (empty($this->imagesToDelete)) {
+                $this->addError('delete', 'No images selected for deletion');
+                return;
+            }
+
+            if ($this->confirmationText !== 'delete') {
+                $this->addError('confirmation', 'Please type "delete" to confirm');
+                return;
+            }
+
             DeleteServerDockerImages::run($server, $this->imagesToDelete);
 
             // Reset states
@@ -132,8 +143,10 @@ class Index extends Component
             $this->selectedImages = [];
             $this->imageDetails = null;
             $this->confirmationText = '';
+            $this->selectAll = false;
 
             $this->loadServerImages();
+            $this->dispatch('success', 'Images deleted successfully.');
         } catch (\Exception $e) {
             $this->addError('delete', "Error deleting images: " . $e->getMessage());
         }
@@ -159,8 +172,14 @@ class Index extends Component
         return $this->serverImages
             ->when($this->searchQuery, function ($collection) {
                 return $collection->filter(function ($image) {
-                    return str_contains(strtolower($image['RepoTags'][0] ?? ''), strtolower($this->searchQuery)) ||
-                        str_contains(strtolower($image['Id'] ?? ''), strtolower($this->searchQuery));
+                    // Check if RepoTags is an array and has elements
+                    $tags = is_array($image['RepoTags']) ? $image['RepoTags'] : [$image['RepoTags']];
+                    $tags = array_filter($tags); // Remove empty values
+
+                    // Search in all tags and ID
+                    return collect($tags)->some(function ($tag) {
+                        return str_contains(strtolower($tag), strtolower($this->searchQuery));
+                    }) || str_contains(strtolower($image['Id'] ?? ''), strtolower($this->searchQuery));
                 });
             })
             ->when($this->showOnlyDangling, function ($collection) {

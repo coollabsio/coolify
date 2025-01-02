@@ -143,33 +143,33 @@
                         @endif
                     </div>
 
-                    @if ($application->build_pack === 'dockerimage')
-                        <div class="pt-4 grid grid-cols-2 items-center gap-4">
-                            <div class="w-fit">
-                                <x-forms.checkbox wire:model.live="application.docker_use_custom_registry"
-                                    id="application.docker_use_custom_registry"
-                                    helper="Select a registry to pull the image from." label="Use Private Registry" />
+                    {{-- @if ($application->build_pack === 'dockerimage') --}}
+                    <div class="pt-4 grid grid-cols-2 items-center gap-4">
+                        <div class="w-fit">
+                            <x-forms.checkbox wire:model.live="application.docker_use_custom_registry"
+                                id="application.docker_use_custom_registry"
+                                helper="Select a registry to pull the image from." label="Use Private Registry" />
+                        </div>
+
+
+                        @if ($application->docker_use_custom_registry)
+                            <div class="pt-4">
+                                <x-forms.select multiple wire:model="selectedRegistries" id="selectedRegistries"
+                                    label="Select Registries"
+                                    required="required_if:application.docker_use_custom_registry,true"
+                                    helper="Select one or more registries to pull the image from">
+                                    @foreach ($registries as $registry)
+                                        <option value="{{ $registry->id }}"
+                                            {{ in_array($registry->id, $selectedRegistries) ? 'selected' : '' }}>
+                                            {{ $registry->name }}
+                                        </option>
+                                    @endforeach
+                                </x-forms.select>
                             </div>
 
-
-                            @if ($application->docker_use_custom_registry)
-                                <div class="pt-4">
-                                    <x-forms.select multiple wire:model="selectedRegistries" id="selectedRegistries"
-                                        label="Select Registries"
-                                        required="required_if:application.docker_use_custom_registry,true"
-                                        helper="Select one or more registries to pull the image from">
-                                        @foreach ($registries as $registry)
-                                            <option value="{{ $registry->id }}"
-                                                {{ in_array($registry->id, $selectedRegistries) ? 'selected' : '' }}>
-                                                {{ $registry->name }}
-                                            </option>
-                                        @endforeach
-                                    </x-forms.select>
-                                </div>
-
-                            @endif
-                        </div>
-                    @endif
+                        @endif
+                    </div>
+                    {{-- @endif --}}
                 </div>
             @endif
             <div class="py-4 border-b dark:border-coolgray-200">
