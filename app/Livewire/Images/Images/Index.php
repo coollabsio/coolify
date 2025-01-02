@@ -104,6 +104,15 @@ class Index extends Component
 
     public function confirmDelete($imageId = null)
     {
+        dd($imageId);
+
+
+        $this->showDeleteConfirmation = true;
+    }
+
+    public function deleteImages($imageId = null)
+    {
+
         if ($imageId) {
             $this->imagesToDelete = [$imageId];
         } else {
@@ -111,14 +120,9 @@ class Index extends Component
         }
 
         if (empty($this->imagesToDelete)) {
+            dd('empty');
             return;
         }
-
-        $this->showDeleteConfirmation = true;
-    }
-
-    public function deleteImages()
-    {
         try {
             $server = $this->servers->firstWhere('uuid', $this->selected_uuid);
             if (!$server) {
@@ -127,11 +131,6 @@ class Index extends Component
 
             if (empty($this->imagesToDelete)) {
                 $this->addError('delete', 'No images selected for deletion');
-                return;
-            }
-
-            if ($this->confirmationText !== 'delete') {
-                $this->addError('confirmation', 'Please type "delete" to confirm');
                 return;
             }
 
@@ -148,6 +147,7 @@ class Index extends Component
             $this->loadServerImages();
             $this->dispatch('success', 'Images deleted successfully.');
         } catch (\Exception $e) {
+            dd($e);
             $this->addError('delete', "Error deleting images: " . $e->getMessage());
         }
     }
@@ -227,7 +227,7 @@ class Index extends Component
     public function render()
     {
         return view('livewire.images.images.index', [
-            'filteredImages' => $this->getFilteredImagesProperty()
+            'filteredImages' => $this->getFilteredImagesProperty(),
         ]);
     }
 }

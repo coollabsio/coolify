@@ -21,19 +21,19 @@
 
             @if ($selected_uuid !== 'default')
                 <div class="flex items-center gap-2">
-                    <x-forms.button wire:click="pruneUnused"
+                    {{-- <x-forms.button wire:click="pruneUnused"
                         wire:confirm="Are you sure you want to prune unused images?">
                         Prune Unused
-                    </x-forms.button>
-                    <x-modal-confirmation wire:model="showDeleteConfirmation" title="Confirm Image Deletion?"
-                        buttonTitle="Delete Selected ({{ count($selectedImages) }})" isErrorButton
-                        submitAction="deleteImages" :actions="[
-                            count($selectedImages) . ' image(s) will be permanently deleted.',
-                            'This action cannot be undone.',
-                            'All containers using these images must be stopped first.',
-                        ]" confirmationText="delete"
-                        confirmationLabel="Please type 'delete' to confirm" shortConfirmationLabel="Confirmation"
-                        step3ButtonText="Permanently Delete" wire:model.defer="confirmationText" :disabled="empty($selectedImages)" />
+                    </x-forms.button> --}}
+                    @if (!empty($selectedImages))
+                        <x-modal-confirmation title="Confirm Image Deletion?" buttonTitle="Delete Selected"
+                            isErrorButton submitAction="deleteImages" :actions="[
+                                count($selectedImages) . ' image(s) will be permanently deleted.',
+                                'This action cannot be undone.',
+                                // 'All containers using these images must be stopped first.',
+                            ]" submitAction="deleteImages"
+                            step2ButtonText="Permanently Delete" />
+                    @endif
                 </div>
             @endif
         </div>
@@ -136,19 +136,14 @@
                                                 <x-forms.button wire:click="getImageDetails('{{ $image['Id'] }}')">
                                                     Details
                                                 </x-forms.button>
-                                                <x-modal-confirmation wire:model="showDeleteConfirmation"
-                                                    title="Confirm Image Deletion?" buttonTitle="Delete" isErrorButton
-                                                    submitAction="deleteImages" :actions="[
+                                                <x-modal-confirmation title="Confirm Image Deletion?"
+                                                    buttonTitle="Delete" isErrorButton
+                                                    submitAction="deleteImages('{{ $image['Id'] }}')" :actions="[
                                                         '1 image will be permanently deleted.',
                                                         'This action cannot be undone.',
-                                                        'All containers using this image must be stopped first.',
+                                                        // 'All containers using this image must be stopped first.',
                                                     ]"
-                                                    confirmationText="delete"
-                                                    confirmationLabel="Please type 'delete' to confirm"
-                                                    shortConfirmationLabel="Confirmation"
-                                                    step3ButtonText="Permanently Delete"
-                                                    wire:model.defer="confirmationText"
-                                                    wire:click.prevent="confirmDelete('{{ $image['Id'] }}')" />
+                                                    step2ButtonText="Permanently Delete" />
                                             </div>
                                         </td>
                                     </tr>
@@ -179,15 +174,13 @@
                         <h3 class="text-lg font-semibold">Image Details</h3>
                         <div class="flex items-center gap-2">
                             <x-modal-confirmation wire:model="showDeleteConfirmation" title="Confirm Image Deletion?"
-                                buttonTitle="Delete Image" isErrorButton submitAction="deleteImages" :actions="[
+                                buttonTitle="Delete Image" isErrorButton
+                                submitAction="deleteImages('{{ $imageDetails['Id'] }}')" :actions="[
                                     '1 image will be permanently deleted.',
                                     'This action cannot be undone.',
-                                    'All containers using this image must be stopped first.',
+                                    // 'All containers using this image must be stopped first.',
                                 ]"
-                                confirmationText="delete" confirmationLabel="Please type 'delete' to confirm"
-                                shortConfirmationLabel="Confirmation" step3ButtonText="Permanently Delete"
-                                wire:model.defer="confirmationText"
-                                wire:click.prevent="confirmDelete('{{ $imageDetails['Id'] }}')" />
+                                step3ButtonText="Permanently Delete" />
                             <button wire:click="$set('imageDetails', null)"
                                 class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                 <span class="text-2xl">×</span>
@@ -203,8 +196,13 @@
                                     <h4 class="font-semibold mb-2">Basic Information</h4>
                                     <dl class="space-y-2">
                                         <div>
-                                            <dt class="text-sm text-gray-500 dark:text-gray-400">ID</dt>
+                                            <dt class="text-sm text-gray-500 dark:text-gray-400">ID:</dt>
                                             <dd class="font-mono text-sm break-all">{{ $imageDetails['Id'] }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-sm text-gray-500 dark:text-gray-400">Architecture:</dt>
+                                            <dd class="font-mono text-sm break-all">{{ $imageDetails['Architecture'] }}
+                                            </dd>
                                         </div>
                                         {{-- ... rest of basic information ... --}}
                                     </dl>
