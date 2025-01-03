@@ -1,0 +1,145 @@
+version: '3'
+services:
+  op-db:
+    image: 'postgres:14-alpine'
+    restart: always
+    volumes:
+      - 'op-db-data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U postgres'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - '5432:5432'
+    labels:
+      - coolify.proxy=true
+  op-kv:
+    image: 'redis:7.2.5-alpine'
+    restart: always
+    volumes:
+      - 'op-kv-data:/data'
+    command:
+      - redis-server
+      - '--maxmemory-policy'
+      - noeviction
+    labels:
+      - coolify.proxy=true
+  op-geo:
+    image: 'observabilitystack/geoip-api:latest'
+    restart: always
+    labels:
+      - coolify.proxy=true
+  op-ch:
+    image: 'clickhouse/clickhouse-server:24.3.2-alpine'
+    restart: always
+    volumes:
+      - 'op-ch-data:/var/lib/clickhouse'
+      - 'op-ch-logs:/var/log/clickhouse-server'
+      - '/path/to/openpanel/self-hosting/clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/op-config.xml:ro'
+      - '/path/to/openpanel/self-hosting/clickhouse/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/op-user-config.xml:ro'
+      - '/path/to/openpanel/self-hosting/clickhouse/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'clickhouse-client --query "SELECT 1"'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    labels:
+      - coolify.proxy=true
+  op-zk:
+    image: 'clickhouse/clickhouse-server:24.3.2-alpine'
+    volumes:
+      - 'op-zk-data:/var/lib/clickhouse'
+      - '/path/to/openpanel/self-hosting/clickhouse/clickhouse-keeper-config.xml:/etc/clickhouse-server/config.xml'
+    command:
+      - clickhouse-keeper
+      - '--config-file'
+      - /etc/clickhouse-server/config.xml
+    restart: always
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    labels:
+      - coolify.proxy=true
+  op-api:
+    image: 'lindesvard/openpanel-api:latest'
+    restart: always
+    command: "sh -c \"\n  echo 'Waiting for PostgreSQL to be ready...'\n  while ! nc -z op-db 5432; do\n    sleep 1\n  done\n  echo 'PostgreSQL is ready'\n\n  echo 'Waiting for ClickHouse to be ready...'\n  while ! nc -z op-ch 8123; do\n    sleep 1\n  done\n  echo 'ClickHouse is ready'\n\n  echo 'Running migrations...'\n  CI=true pnpm -r run migrate:deploy\n\n  pnpm start\n\"\n"
+    depends_on:
+      - op-db
+      - op-ch
+      - op-kv
+      - op-geo
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+  op-dashboard:
+    image: 'lindesvard/openpanel-dashboard:latest'
+    restart: always
+    depends_on:
+      - op-api
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+    labels:
+      - coolify.proxy=true
+  op-worker:
+    image: 'lindesvard/openpanel-worker:latest'
+    restart: always
+    depends_on:
+      - op-api
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+  op-worker-2:
+    image: 'lindesvard/openpanel-worker:latest'
+    restart: always
+    depends_on:
+      - op-api
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+  op-worker-3:
+    image: 'lindesvard/openpanel-worker:latest'
+    restart: always
+    depends_on:
+      - op-api
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+  op-worker-4:
+    image: 'lindesvard/openpanel-worker:latest'
+    restart: always
+    depends_on:
+      - op-api
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+  op-worker-5:
+    image: 'lindesvard/openpanel-worker:latest'
+    restart: always
+    depends_on:
+      - op-api
+    env_file:
+      - /path/to/openpanel/self-hosting/.env
+volumes:
+  op-db-data:
+    driver: local
+  op-kv-data:
+    driver: local
+  op-ch-data:
+    driver: local
+  op-ch-logs:
+    driver: local
+  op-proxy-data:
+    driver: local
+  op-proxy-config:
+    driver: local
+  op-zk-data:
+    driver: local
