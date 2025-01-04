@@ -12,7 +12,7 @@ services:
     volumes:
       - nocodb-data:/usr/app/data/
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/v1/health"]
       interval: 5s
       timeout: 20s
       retries: 10
