@@ -183,13 +183,13 @@ class Kernel extends ConsoleKernel
             if (is_null($server)) {
                 continue;
             }
-
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
             }
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
             $this->scheduleInstance->job(new DatabaseBackupJob(
                 backup: $scheduled_backup
-            ))->cron($scheduled_backup->frequency)->timezone($this->instanceTimezone)->onOneServer();
+            ))->cron($scheduled_backup->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
 
@@ -227,9 +227,10 @@ class Kernel extends ConsoleKernel
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
             $this->scheduleInstance->job(new ScheduledTaskJob(
                 task: $scheduled_task
-            ))->cron($scheduled_task->frequency)->timezone($this->instanceTimezone)->onOneServer();
+            ))->cron($scheduled_task->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
 

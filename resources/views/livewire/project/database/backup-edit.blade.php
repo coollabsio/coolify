@@ -70,6 +70,8 @@
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Frequency" id="frequency" />
+            <x-forms.input label="Timezone" id="timezone" disabled
+                helper="The timezone of the server where the backup is scheduled to run (if not set, the instance timezone will be used)" />
             <x-forms.input label="Number of backups to keep (locally)" id="numberOfBackupsLocally" />
         </div>
     </div>
