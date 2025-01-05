@@ -1712,9 +1712,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network => [
-                            'aliases' => [
-                                $this->container_name,
-                            ],
+                            'aliases' => array_merge(
+                                [$this->container_name],
+                                $this->application->network_aliases ? explode(',', $this->application->network_aliases) : []
+                            ),
                         ],
                     ],
                     'mem_limit' => $this->application->limits_memory,

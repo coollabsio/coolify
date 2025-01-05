@@ -43,6 +43,7 @@ use Visus\Cuid2\Cuid2;
         'start_command' => ['type' => 'string', 'description' => 'Start command.'],
         'ports_exposes' => ['type' => 'string', 'description' => 'Ports exposes.'],
         'ports_mappings' => ['type' => 'string', 'nullable' => true, 'description' => 'Ports mappings.'],
+        'network_aliases' => ['type' => 'string', 'nullable' => true, 'description' => 'Network aliases for Docker container.'],
         'base_directory' => ['type' => 'string', 'description' => 'Base directory for all commands.'],
         'publish_directory' => ['type' => 'string', 'description' => 'Publish directory.'],
         'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
@@ -112,6 +113,8 @@ class Application extends BaseModel
     protected $guarded = [];
 
     protected $appends = ['server_status'];
+
+    protected $casts = ['network_aliases' => 'array'];
 
     protected static function booted()
     {

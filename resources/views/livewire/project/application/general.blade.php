@@ -307,6 +307,11 @@
                         <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
+                    @if ($application->build_pack === 'dockerfile' || $application->build_pack === 'dockerimage')
+                        <x-forms.input id="application.network_aliases" label="Network Aliases"
+                            helper="A comma separated list of custom network aliases you would like to add for container in Docker network.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>api.internal,api.local"
+                            wire:model="application.network_aliases" />
+                    @endif
                 </div>
 
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
