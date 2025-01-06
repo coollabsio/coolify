@@ -2,15 +2,18 @@
 # slogan: Penpot is the first Open Source design and prototyping platform for product teams.
 # tags: penpot,design,prototyping,figma,open,source
 # logo: svgs/penpot.svg
+# port: 80
 
 services:
   frontend:
-    image: "penpotapp/frontend:latest"
+    image: penpotapp/frontend:latest
     volumes:
       - penpot-assets:/opt/data/assets
     depends_on:
-      - penpot-backend
-      - penpot-exporter
+      penpot-backend:
+        condition: service_healthy
+      penpot-exporter:
+        condition: service_healthy
     environment:
       - SERVICE_FQDN_FRONTEND
       - PENPOT_FLAGS=${PENPOT_FRONTEND_FLAGS:-enable-login-with-password}
@@ -19,13 +22,16 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
+
   penpot-backend:
     image: penpotapp/backend:latest
     volumes:
       - penpot-assets:/opt/data/assets
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - PENPOT_FLAGS=${PENPOT_BACKEND_FLAGS:-enable-login-with-password enable-smtp enable-prepl-server}
       - PENPOT_HTTP_SERVER_PORT=6060
@@ -53,6 +59,7 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
+
   penpot-exporter:
     image: penpotapp/exporter:latest
     environment:
@@ -63,10 +70,17 @@ services:
       interval: 2s
       timeout: 10s
       retries: 15
+
   mailpit:
-    image: "axllent/mailpit:latest"
+    image: axllent/mailpit:latest
     environment:
       - SERVICE_FQDN_MAILPIT_8025
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
   postgres:
     image: postgres:15
     volumes:
@@ -81,6 +95,7 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
