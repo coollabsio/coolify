@@ -21,10 +21,10 @@ function generateGithubToken(GithubApp $source, string $type)
 
     if ($timeDiff > 0) {
         throw new \Exception(
-            'System time is out of sync with GitHub API time:'.PHP_EOL.
-            '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC'.PHP_EOL.
-            '- GitHub time: '.$githubTime->format('Y-m-d H:i:s').' UTC'.PHP_EOL.
-            '- Difference: '.$timeDiff.' seconds'.PHP_EOL.
+            'System time is out of sync with GitHub API time:<br>'.
+            '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.
+            '- GitHub time: '.$githubTime->format('Y-m-d H:i:s').' UTC<br>'.
+            '- Difference: '.$timeDiff.' seconds<br>'.
             'Please synchronize your system clock.'
         );
     }
@@ -96,11 +96,11 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
         $remainingCalls = $response->header('X-RateLimit-Remaining', '0');
 
         throw new \Exception(
-            "GitHub API call failed:\n".
-                "Error: {$errorMessage}\n".
-                "Rate Limit Status:\n".
-                "- Remaining Calls: {$remainingCalls}\n".
-                "- Reset Time: {$resetTime} UTC"
+            'GitHub API call failed:<br>'.
+            "Error: {$errorMessage}<br>".
+            'Rate Limit Status:<br>'.
+            "- Remaining Calls: {$remainingCalls}<br>".
+            "- Reset Time: {$resetTime} UTC"
         );
     }
 
