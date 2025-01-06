@@ -105,7 +105,7 @@ class GithubPrivateRepository extends Component
         $this->page = 1;
         $this->selected_github_app_id = $github_app_id;
         $this->github_app = GithubApp::where('id', $github_app_id)->first();
-        $this->token = generate_github_installation_token($this->github_app);
+        $this->token = generateGithubInstallationToken($this->github_app);
         $this->loadRepositoryByPage();
         if ($this->repositories->count() < $this->total_repositories_count) {
             while ($this->repositories->count() < $this->total_repositories_count) {
