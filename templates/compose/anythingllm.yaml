@@ -23,6 +23,7 @@ services:
       - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
       - AUTH_TOKEN=${SERVICE_PASSWORD_AUTHTOKEN}
       - SERVER_PORT=${SERVER_PORT:-3001}
+      - VECTOR_DB=lancedb
     cap_add:
       - SYS_ADMIN
     volumes:
