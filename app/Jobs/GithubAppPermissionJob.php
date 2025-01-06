@@ -30,7 +30,7 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $github_access_token = generateGithubJwt($this->github_app);
             $response = Http::withHeaders([
                 'Authorization' => "Bearer $github_access_token",
-                'Accept' => 'application/vnd.github+json',
+                'Accept' => 'application/vnd.github.machine-man-preview+json',
             ])->get("{$this->github_app->api_url}/app");
             $response = $response->json();
             $permissions = data_get($response, 'permissions');
