@@ -5,8 +5,8 @@
         <h1 class="mt-4 font-bold tracking-tight dark:text-white">Wait, this is not cool...</h1>
         <p class="text-base leading-7 text-neutral-300">There has been an error, we are working on it.</p>
         @if ($exception->getMessage() !== '')
-            <div class="mt-6 text-xs text-left text-red-500 whitespace-pre-wrap">
-                Error: {!! nl2br(e($exception->getMessage())) !!}
+            <div class="mt-6 text-xs text-right text-red-500 whitespace-pre-wrap">
+                Error: {!! $exception->getMessage() !!}
             </div>
         @endif
         <div class="flex items-center mt-10 gap-x-6">
