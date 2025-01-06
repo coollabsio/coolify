@@ -10,7 +10,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -36,11 +35,6 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             ])->get("{$this->github_app->api_url}/app");
 
             if (! $response->successful()) {
-                Log::error('GitHub API request failed', [
-                    'status_code' => $response->status(),
-                    'error' => $response->body(),
-                    'app_id' => $this->github_app->app_id,
-                ]);
                 throw new \RuntimeException('Failed to fetch GitHub app permissions: '.$response->body());
             }
 
@@ -56,12 +50,6 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
         } catch (\Throwable $e) {
-            Log::error('GithubAppPermissionJob failed', [
-                'app_id' => $this->github_app->app_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
             send_internal_notification('GithubAppPermissionJob failed with: '.$e->getMessage());
             throw $e;
         }

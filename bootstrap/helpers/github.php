@@ -5,7 +5,6 @@ use App\Models\GitlabApp;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
@@ -21,11 +20,6 @@ function generateGithubToken(GithubApp $source, string $type)
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
     if ($timeDiff > 50) {
-        Log::error('System time out of sync with GitHub', [
-            'time_difference' => $timeDiff,
-            'server_time' => $serverTime->format('Y-m-d H:i:s'),
-            'github_time' => $githubTime->format('Y-m-d H:i:s'),
-        ]);
         throw new \Exception(
             'System time is out of sync with GitHub API time:<br>'.
             '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.
@@ -58,11 +52,6 @@ function generateGithubToken(GithubApp $source, string $type)
 
             if (! $response->successful()) {
                 $error = data_get($response->json(), 'message', 'no error message found');
-                Log::error('Failed to get installation token', [
-                    'status_code' => $response->status(),
-                    'error_message' => $error,
-                    'app_id' => $source->app_id,
-                ]);
                 throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
 
