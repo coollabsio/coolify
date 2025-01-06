@@ -5,6 +5,7 @@ use App\Models\GitlabApp;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
@@ -14,12 +15,29 @@ use Lcobucci\JWT\Token\Builder;
 
 function generateGithubToken(GithubApp $source, string $type)
 {
+    Log::debug('Generating GitHub token', [
+        'app_id' => $source->app_id,
+        'type' => $type,
+        'api_url' => $source->api_url,
+    ]);
+
     $response = Http::get("{$source->api_url}/zen");
     $serverTime = CarbonImmutable::now()->setTimezone('UTC');
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
+    Log::debug('Time synchronization check', [
+        'server_time' => $serverTime->format('Y-m-d H:i:s'),
+        'github_time' => $githubTime->format('Y-m-d H:i:s'),
+        'difference_seconds' => $timeDiff,
+    ]);
+
     if ($timeDiff > 50) {
+        Log::error('System time out of sync with GitHub', [
+            'time_difference' => $timeDiff,
+            'server_time' => $serverTime->format('Y-m-d H:i:s'),
+            'github_time' => $githubTime->format('Y-m-d H:i:s'),
+        ]);
         throw new \Exception(
             'System time is out of sync with GitHub API time:<br>'.
             '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.
@@ -41,17 +59,38 @@ function generateGithubToken(GithubApp $source, string $type)
         ->getToken($algorithm, $signingKey)
         ->toString();
 
+    Log::debug('JWT token generated', [
+        'token_type' => $type,
+        'issued_at' => $now->modify('-1 minute')->format('Y-m-d H:i:s'),
+        'expires_at' => $now->modify('+8 minutes')->format('Y-m-d H:i:s'),
+    ]);
+
     return match ($type) {
         'jwt' => $jwt,
         'installation' => (function () use ($source, $jwt) {
+            Log::debug('Requesting installation token', [
+                'app_id' => $source->app_id,
+                'installation_id' => $source->installation_id,
+            ]);
+
             $response = Http::withHeaders([
                 'Authorization' => "Bearer $jwt",
                 'Accept' => 'application/vnd.github.machine-man-preview+json',
             ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
 
             if (! $response->successful()) {
-                throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".data_get($response->json(), 'message', 'no error message found'));
+                $error = data_get($response->json(), 'message', 'no error message found');
+                Log::error('Failed to get installation token', [
+                    'status_code' => $response->status(),
+                    'error_message' => $error,
+                    'app_id' => $source->app_id,
+                ]);
+                throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
+
+            Log::debug('Successfully obtained installation token', [
+                'app_id' => $source->app_id,
+            ]);
 
             return $response->json()['token'];
         })(),
