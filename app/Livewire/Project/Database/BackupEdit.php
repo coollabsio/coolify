@@ -40,6 +40,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'string'])]
     public string $frequency = '';
 
+    #[Validate(['readonly', 'string'])]
+    public string $timezone = '';
+
     #[Validate(['required', 'integer', 'min:1'])]
     public int $numberOfBackupsLocally = 1;
 
@@ -80,6 +83,7 @@ class BackupEdit extends Component
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
+            $this->timezone = data_get($this->backup->server(), 'settings.server_timezone', 'Instance timezone');
             $this->numberOfBackupsLocally = $this->backup->number_of_backups_locally;
             $this->saveS3 = $this->backup->save_s3;
             $this->s3StorageId = $this->backup->s3_storage_id;
