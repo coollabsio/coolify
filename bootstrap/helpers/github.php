@@ -19,7 +19,7 @@ function generateGithubToken(GithubApp $source, string $type)
     $githubTime = Carbon::parse($response->header('date'));
     $timeDiff = abs($serverTime->diffInSeconds($githubTime));
 
-    if ($timeDiff > 0) {
+    if ($timeDiff > 50) {
         throw new \Exception(
             'System time is out of sync with GitHub API time:<br>'.
             '- System time: '.$serverTime->format('Y-m-d H:i:s').' UTC<br>'.

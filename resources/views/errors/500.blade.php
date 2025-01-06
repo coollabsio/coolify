@@ -5,7 +5,7 @@
         <h1 class="text-3xl font-bold tracking-tight dark:text-white">Wait, this is not cool...</h1>
         <p class="mt-2 text-lg leading-7 text-neutral-300">There has been an error with the following error message:</p>
         @if ($exception->getMessage() !== '')
-            <div class="mt-6 text-sm text-red-500 whitespace-pre-wrap leading-none">
+            <div class="mt-6 text-sm text-red-500">
                 {!! $exception->getMessage() !!}
             </div>
         @endif
