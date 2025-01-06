@@ -36,7 +36,7 @@
                 wire:navigate>Danger Zone</a>
         </div>
         <div class="w-full">
-            @if (request()->route()->getName() === 'project.service.configuration')
+            @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
@@ -165,9 +165,9 @@
                         </div>
                     @endforeach
                 </div>
-            @elseif (request()->route()->getName() === 'project.service.environment-variables')
+            @elseif ($currentRoute === 'project.service.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.storages')
+            @elseif ($currentRoute === 'project.service.storages')
                 <div class="flex gap-2 items-center">
                     <h2>Storages</h2>
                 </div>
@@ -181,15 +181,15 @@
                 @foreach ($databases as $database)
                     <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
-            @elseif (request()->route()->getName() === 'project.service.scheduled-tasks.show')
+            @elseif ($currentRoute === 'project.service.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.webhooks')
+            @elseif ($currentRoute === 'project.service.webhooks')
                 <livewire:project.shared.webhooks :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.resource-operations')
+            @elseif ($currentRoute === 'project.service.resource-operations')
                 <livewire:project.shared.resource-operations :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.tags')
+            @elseif ($currentRoute === 'project.service.tags')
                 <livewire:project.shared.tags :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.danger')
+            @elseif ($currentRoute === 'project.service.danger')
                 <livewire:project.shared.danger :resource="$service" />
             @endif
         </div>
