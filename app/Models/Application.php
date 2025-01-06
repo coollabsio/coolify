@@ -999,7 +999,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $base_command = "{$base_command} {$this->source->html_url}/{$customRepository}";
                 } else {
-                    $github_access_token = generate_github_installation_token($this->source);
+                    $github_access_token = generateGithubInstallationToken($this->source);
 
                     if ($exec_in_docker) {
                         $base_command = "{$base_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
@@ -1111,7 +1111,7 @@ class Application extends BaseModel
                         $commands->push($git_clone_command);
                     }
                 } else {
-                    $github_access_token = generate_github_installation_token($this->source);
+                    $github_access_token = generateGithubInstallationToken($this->source);
                     if ($exec_in_docker) {
                         $git_clone_command = "{$git_clone_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git {$baseDir}";
                         $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
