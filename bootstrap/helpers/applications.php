@@ -6,119 +6,180 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use Illuminate\Support\Facades\DB;
 use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
 {
-    $application_id = $application->id;
-    $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
-    $deployment_url = $deployment_link->getPath();
-    $server_id = $application->destination->server->id;
-    $server_name = $application->destination->server->name;
-    $destination_id = $application->destination->id;
+    return DB::transaction(function () use ($application, $deployment_uuid, $pull_request_id, $commit, $force_rebuild, $is_webhook, $is_api, $restart_only, $git_type, $no_questions_asked, $server, $destination, $only_this_server, $rollback) {
+        $application_id = $application->id;
+        $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
+        $deployment_url = $deployment_link->getPath();
 
-    if ($server) {
-        $server_id = $server->id;
-        $server_name = $server->name;
-    }
-    if ($destination) {
-        $destination_id = $destination->id;
-    }
-    $deployment = ApplicationDeploymentQueue::create([
-        'application_id' => $application_id,
-        'application_name' => $application->name,
-        'server_id' => $server_id,
-        'server_name' => $server_name,
-        'destination_id' => $destination_id,
-        'deployment_uuid' => $deployment_uuid,
-        'deployment_url' => $deployment_url,
-        'pull_request_id' => $pull_request_id,
-        'force_rebuild' => $force_rebuild,
-        'is_webhook' => $is_webhook,
-        'is_api' => $is_api,
-        'restart_only' => $restart_only,
-        'commit' => $commit,
-        'rollback' => $rollback,
-        'git_type' => $git_type,
-        'only_this_server' => $only_this_server,
-    ]);
+        $server_id = $application->destination->server->id;
+        $server_name = $application->destination->server->name;
+        $destination_id = $application->destination->id;
 
-    if ($no_questions_asked) {
-        ApplicationDeploymentJob::dispatch(
-            application_deployment_queue_id: $deployment->id,
-        );
-    } elseif (next_queuable($server_id, $application_id)) {
-        ApplicationDeploymentJob::dispatch(
-            application_deployment_queue_id: $deployment->id,
-        );
-    }
+        if ($server) {
+            $server_id = $server->id;
+            $server_name = $server->name;
+        }
+        if ($destination) {
+            $destination_id = $destination->id;
+        }
+
+        // Check if there's already a deployment in progress for this application
+        $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
+            ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing_deployment && ! $force_rebuild) {
+            throw new \RuntimeException('A deployment is already in progress or queued for this application.');
+        }
+
+        $deployment = ApplicationDeploymentQueue::create([
+            'application_id' => $application_id,
+            'application_name' => $application->name,
+            'server_id' => $server_id,
+            'server_name' => $server_name,
+            'destination_id' => $destination_id,
+            'deployment_uuid' => $deployment_uuid,
+            'deployment_url' => $deployment_url,
+            'pull_request_id' => $pull_request_id,
+            'force_rebuild' => $force_rebuild,
+            'is_webhook' => $is_webhook,
+            'is_api' => $is_api,
+            'restart_only' => $restart_only,
+            'commit' => $commit,
+            'rollback' => $rollback,
+            'git_type' => $git_type,
+            'only_this_server' => $only_this_server,
+            'status' => ApplicationDeploymentStatus::QUEUED,
+        ]);
+
+        if ($no_questions_asked || next_queuable($server_id, $application_id)) {
+            $deployment->update([
+                'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+            ]);
+
+            ApplicationDeploymentJob::dispatch(
+                application_deployment_queue_id: $deployment->id
+            )->onQueue('high');
+        }
+
+        return $deployment;
+    });
 }
 function force_start_deployment(ApplicationDeploymentQueue $deployment)
 {
-    $deployment->update([
-        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-    ]);
+    DB::transaction(function () use ($deployment) {
+        $deployment = ApplicationDeploymentQueue::lockForUpdate()->find($deployment->id);
 
-    ApplicationDeploymentJob::dispatch(
-        application_deployment_queue_id: $deployment->id,
-    );
-}
-function queue_next_deployment(Application $application)
-{
-    $server_id = $application->destination->server_id;
-    $next_found = ApplicationDeploymentQueue::where('server_id', $server_id)->where('status', ApplicationDeploymentStatus::QUEUED)->get()->sortBy('created_at')->first();
-    if ($next_found) {
-        $next_found->update([
+        if (! $deployment) {
+            throw new \RuntimeException('Deployment not found.');
+        }
+
+        $deployment->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
 
         ApplicationDeploymentJob::dispatch(
-            application_deployment_queue_id: $next_found->id,
-        );
-    }
+            application_deployment_queue_id: $deployment->id
+        )->onQueue('high');
+    });
+}
+function queue_next_deployment(Application $application)
+{
+    $server_id = $application->destination->server_id;
+
+    // Use transaction to prevent race conditions
+    DB::transaction(function () use ($server_id) {
+        // Lock the queued deployments for update to prevent race conditions
+        $next_found = ApplicationDeploymentQueue::where('server_id', $server_id)
+            ->where('status', ApplicationDeploymentStatus::QUEUED)
+            ->orderBy('created_at')
+            ->lockForUpdate()
+            ->first();
+
+        if ($next_found) {
+            // Check if we can start this deployment
+            $server = Server::find($server_id);
+            $concurrent_builds = $server->settings->concurrent_builds;
+
+            $in_progress_count = ApplicationDeploymentQueue::where('server_id', $server_id)
+                ->where('status', 'in_progress')
+                ->count();
+
+            if ($in_progress_count < $concurrent_builds) {
+                $next_found->update([
+                    'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ]);
+
+                ApplicationDeploymentJob::dispatch(
+                    application_deployment_queue_id: $next_found->id
+                )->onQueue('high');
+            }
+        }
+    });
 }
 
 function next_queuable(string $server_id, string $application_id): bool
 {
-    $deployments = ApplicationDeploymentQueue::where('server_id', $server_id)->whereIn('status', ['in_progress', ApplicationDeploymentStatus::QUEUED])->get()->sortByDesc('created_at');
+    $deployments = ApplicationDeploymentQueue::where('server_id', $server_id)
+        ->whereIn('status', ['in_progress', ApplicationDeploymentStatus::QUEUED])
+        ->get()
+        ->sortByDesc('created_at');
+
+    // Check if there are any deployments in progress for this application
     $same_application_deployments = $deployments->where('application_id', $application_id);
-    $in_progress = $same_application_deployments->filter(function ($value, $key) {
+    $in_progress = $same_application_deployments->filter(function ($value) {
         return $value->status === 'in_progress';
     });
+
     if ($in_progress->count() > 0) {
         return false;
     }
+
     $server = Server::find($server_id);
     $concurrent_builds = $server->settings->concurrent_builds;
 
-    // ray("serverId:{$server->id}", "concurrentBuilds:{$concurrent_builds}", "deployments:{$deployments->count()}", "sameApplicationDeployments:{$same_application_deployments->count()}")->green();
+    // Count only in_progress deployments for concurrent limit
+    $in_progress_count = $deployments->filter(function ($value) {
+        return $value->status === 'in_progress';
+    })->count();
 
-    if ($deployments->count() > $concurrent_builds) {
-        return false;
-    }
-
-    return true;
+    return $in_progress_count < $concurrent_builds;
 }
 function next_after_cancel(?Server $server = null)
 {
     if ($server) {
-        $next_found = ApplicationDeploymentQueue::where('server_id', data_get($server, 'id'))->where('status', ApplicationDeploymentStatus::QUEUED)->get()->sortBy('created_at');
-        if ($next_found->count() > 0) {
-            foreach ($next_found as $next) {
-                $server = Server::find($next->server_id);
+        DB::transaction(function () use ($server) {
+            // Lock the queued deployments for update to prevent race conditions
+            $next_found = ApplicationDeploymentQueue::where('server_id', $server->id)
+                ->where('status', ApplicationDeploymentStatus::QUEUED)
+                ->orderBy('created_at')
+                ->lockForUpdate()
+                ->first();
+
+            if ($next_found) {
+                $server = Server::find($next_found->server_id);
                 $concurrent_builds = $server->settings->concurrent_builds;
-                $inprogress_deployments = ApplicationDeploymentQueue::where('server_id', $next->server_id)->whereIn('status', [ApplicationDeploymentStatus::QUEUED])->get()->sortByDesc('created_at');
-                if ($inprogress_deployments->count() < $concurrent_builds) {
-                    $next->update([
+
+                $in_progress_count = ApplicationDeploymentQueue::where('server_id', $next_found->server_id)
+                    ->where('status', ApplicationDeploymentStatus::IN_PROGRESS)
+                    ->count();
+
+                if ($in_progress_count < $concurrent_builds) {
+                    $next_found->update([
                         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
                     ]);
 
                     ApplicationDeploymentJob::dispatch(
-                        application_deployment_queue_id: $next->id,
-                    );
+                        application_deployment_queue_id: $next_found->id
+                    )->onQueue('high');
                 }
-                break;
             }
-        }
+        });
     }
 }
