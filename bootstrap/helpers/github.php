@@ -51,6 +51,7 @@ function generateGithubToken(GithubApp $source, string $type)
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
     $now = CarbonImmutable::now()->setTimezone('UTC');
+    $now = $now->setTime($now->format('H'), $now->format('i'), $now->format('s'));
 
     $jwt = $tokenBuilder
         ->issuedBy($source->app_id)
