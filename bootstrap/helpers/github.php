@@ -14,6 +14,21 @@ use Lcobucci\JWT\Token\Builder;
 
 function generateGithubToken(GithubApp $source, string $type)
 {
+    $response = Http::get("{$source->api_url}/zen");
+    $serverTime = now();
+    $githubTime = Carbon::parse($response->header('date'));
+    $timeDiff = abs($serverTime->diffInSeconds($githubTime));
+
+    if ($timeDiff > 0) {
+        throw new \Exception(
+            "System time is out of sync with GitHub API time:\n".
+            "- System time: {$serverTime->format('Y-m-d H:i:s')} UTC\n".
+            "- GitHub time: {$githubTime->format('Y-m-d H:i:s')} UTC\n".
+            "- Difference: {$timeDiff} seconds\n".
+            'Please synchronize your system clock.'
+        );
+    }
+
     $signingKey = InMemory::plainText($source->privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
