@@ -49,6 +49,7 @@ class AppServiceProvider extends ServiceProvider
 
             return App::isProduction()
                 ? $rule->mixedCase()
+                    ->letters()
                     ->numbers()
                     ->symbols()
                     ->uncompromised()
