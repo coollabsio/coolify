@@ -12,77 +12,91 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Builder;
 
-function generate_github_installation_token(GithubApp $source)
+function generateGithubToken(GithubApp $source, string $type)
 {
     $signingKey = InMemory::plainText($source->privateKey->private_key);
     $algorithm = new Sha256;
     $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-    $now = CarbonImmutable::now();
-    $now = $now->setTime($now->format('H'), $now->format('i'));
-    $issuedToken = $tokenBuilder
-        ->issuedBy($source->app_id)
-        ->issuedAt($now)
-        ->expiresAt($now->modify('+10 minutes'))
-        ->getToken($algorithm, $signingKey)
-        ->toString();
-    $token = Http::withHeaders([
-        'Authorization' => "Bearer $issuedToken",
-        'Accept' => 'application/vnd.github.machine-man-preview+json',
-    ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
-    if ($token->failed()) {
-        throw new RuntimeException('Failed to get access token for '.$source->name.' with error: '.data_get($token->json(), 'message', 'no error message found'));
-    }
+    $now = CarbonImmutable::now()->setTimezone('UTC');
 
-    return $token->json()['token'];
-}
-
-function generate_github_jwt_token(GithubApp $source)
-{
-    $signingKey = InMemory::plainText($source->privateKey->private_key);
-    $algorithm = new Sha256;
-    $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-    $now = CarbonImmutable::now();
-    $now = $now->setTime($now->format('H'), $now->format('i'));
-
-    return $tokenBuilder
+    $jwt = $tokenBuilder
         ->issuedBy($source->app_id)
         ->issuedAt($now->modify('-1 minute'))
-        ->expiresAt($now->modify('+10 minutes'))
+        ->expiresAt($now->modify('+8 minutes'))
         ->getToken($algorithm, $signingKey)
         ->toString();
+
+    return match ($type) {
+        'jwt' => $jwt,
+        'installation' => (function () use ($source, $jwt) {
+            $response = Http::withHeaders([
+                'Authorization' => "Bearer $jwt",
+                'Accept' => 'application/vnd.github.machine-man-preview+json',
+            ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+
+            if (! $response->successful()) {
+                throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".data_get($response->json(), 'message', 'no error message found'));
+            }
+
+            return $response->json()['token'];
+        })(),
+        default => throw new \InvalidArgumentException("Unsupported token type: {$type}")
+    };
+}
+
+function generateGithubInstallationToken(GithubApp $source)
+{
+    return generateGithubToken($source, 'installation');
+}
+
+function generateGithubJwt(GithubApp $source)
+{
+    return generateGithubToken($source, 'jwt');
 }
 
 function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
 {
     if (is_null($source)) {
-        throw new \Exception('Not implemented yet.');
+        throw new \Exception('Source is required for API calls');
     }
-    if ($source->getMorphClass() === \App\Models\GithubApp::class) {
-        if ($source->is_public) {
-            $response = Http::github($source->api_url)->$method($endpoint);
+
+    if ($source->getMorphClass() !== GithubApp::class) {
+        throw new \InvalidArgumentException("Unsupported source type: {$source->getMorphClass()}");
+    }
+
+    if ($source->is_public) {
+        $response = Http::GitHub($source->api_url)->$method($endpoint);
+    } else {
+        $token = generateGithubInstallationToken($source);
+        if ($data && in_array(strtolower($method), ['post', 'patch', 'put'])) {
+            $response = Http::GitHub($source->api_url, $token)->$method($endpoint, $data);
         } else {
-            $github_access_token = generate_github_installation_token($source);
-            if ($data && ($method === 'post' || $method === 'patch' || $method === 'put')) {
-                $response = Http::github($source->api_url, $github_access_token)->$method($endpoint, $data);
-            } else {
-                $response = Http::github($source->api_url, $github_access_token)->$method($endpoint);
-            }
+            $response = Http::GitHub($source->api_url, $token)->$method($endpoint);
         }
     }
-    $json = $response->json();
-    if ($response->failed() && $throwError) {
-        ray($json);
-        throw new \Exception("Failed to get data from {$source->name} with error:<br><br>".$json['message'].'<br><br>Rate Limit resets at: '.Carbon::parse((int) $response->header('X-RateLimit-Reset'))->format('Y-m-d H:i:s').'UTC');
+
+    if (! $response->successful() && $throwError) {
+        $resetTime = Carbon::parse((int) $response->header('X-RateLimit-Reset'))->format('Y-m-d H:i:s');
+        $errorMessage = data_get($response->json(), 'message', 'no error message found');
+        $remainingCalls = $response->header('X-RateLimit-Remaining', '0');
+
+        throw new \Exception(
+            "GitHub API call failed:\n".
+                "Error: {$errorMessage}\n".
+                "Rate Limit Status:\n".
+                "- Remaining Calls: {$remainingCalls}\n".
+                "- Reset Time: {$resetTime} UTC"
+        );
     }
 
     return [
         'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),
         'rate_limit_reset' => $response->header('X-RateLimit-Reset'),
-        'data' => collect($json),
+        'data' => collect($response->json()),
     ];
 }
 
-function get_installation_path(GithubApp $source)
+function getInstallationPath(GithubApp $source)
 {
     $github = GithubApp::where('uuid', $source->uuid)->first();
     $name = str(Str::kebab($github->name));
@@ -90,7 +104,8 @@ function get_installation_path(GithubApp $source)
 
     return "$github->html_url/$installation_path/$name/installations/new";
 }
-function get_permissions_path(GithubApp $source)
+
+function getPermissionsPath(GithubApp $source)
 {
     $github = GithubApp::where('uuid', $source->uuid)->first();
     $name = str(Str::kebab($github->name));
