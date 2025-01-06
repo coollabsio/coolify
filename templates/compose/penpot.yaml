@@ -49,7 +49,7 @@ services:
       - PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS:-false}
       - PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL:-false}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:6060"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:6060/readyz"]
       interval: 2s
       timeout: 10s
       retries: 15
@@ -58,6 +58,11 @@ services:
     environment:
       - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND
       - PENPOT_REDIS_URI=redis://redis/0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:6061/readyz"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
   mailpit:
     image: "axllent/mailpit:latest"
     environment:
