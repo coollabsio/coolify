@@ -11,7 +11,7 @@
         "server"
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "3sidedcube/laravel-redoc": "^1.0",
         "danharrin/livewire-rate-limiting": "2.0.0",
         "doctrine/dbal": "^4.2",
@@ -55,6 +55,7 @@
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^3.13",
+        "driftingly/rector-laravel": "^1.2",
         "fakerphp/faker": "^1.21.0",
         "laravel/dusk": "^8.0",
         "laravel/pint": "^1.16",
@@ -64,6 +65,7 @@
         "pestphp/pest": "^3.5",
         "phpstan/phpstan": "^1.12.10",
         "phpunit/phpunit": "^11.4",
+        "rector/rector": "^1.2",
         "serversideup/spin": "^2.3",
         "spatie/laravel-ignition": "^2.1.0",
         "symfony/http-client": "^7.1"
