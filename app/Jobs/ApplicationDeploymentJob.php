@@ -39,6 +39,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 1;
+
     public $timeout = 3600;
 
     public static int $batch_counter = 0;
@@ -165,8 +167,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private ?string $coolify_variables = null;
 
     private bool $preserveRepository = false;
-
-    public $tries = 1;
 
     public function __construct(int $application_deployment_queue_id)
     {
