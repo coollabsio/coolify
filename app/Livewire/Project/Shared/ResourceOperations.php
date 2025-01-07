@@ -30,7 +30,9 @@ class ResourceOperations extends Component
         $this->servers = currentTeam()->servers;
     }
 
-    public function cloneTo($destination_id)
+    public function cloneTo($destination_id) // issues is applications table stuff is replciated but not the application_settings table stuff and also application_preveiws is not replicated, Also only volumes but not files an directory mounts are cloned
+
+    // Also the next issue is that the thing is not coloned to the correct server
     {
         $new_destination = StandaloneDocker::find($destination_id);
         if (! $new_destination) {
@@ -41,6 +43,7 @@ class ResourceOperations extends Component
         }
         $uuid = (string) new Cuid2;
         $server = $new_destination->server;
+
         if ($this->resource->getMorphClass() === \App\Models\Application::class) {
             $name = 'clone-of-'.str($this->resource->name)->limit(20).'-'.$uuid;
 
@@ -69,7 +72,7 @@ class ResourceOperations extends Component
                     'id',
                     'created_at',
                     'updated_at',
-                    'additional_servers_count',
+                    'additional_servers_count', // not needed because it only is computed for the application
                     'additional_networks_count',
                 ])->fill([
                     'resourceable_id' => $new_resource->id,
@@ -169,7 +172,10 @@ class ResourceOperations extends Component
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
                 'destination_id' => $new_destination->id,
+                'destination_type' => $new_destination->getMorphClass(),
+                'server_id' => $new_destination->server_id, // server_id is probably not needed anymore because of the new polymorphic relationships (here it is needed for clone to work - but maybe we can drop the column)
             ]);
+
             $new_resource->save();
             foreach ($new_resource->applications() as $application) {
                 $application->update([
