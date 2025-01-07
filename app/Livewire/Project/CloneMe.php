@@ -117,49 +117,102 @@ class CloneMe extends Component
                     'additional_networks_count',
                 ])->fill([
                     'uuid' => $uuid,
-                    'fqdn' => generateFqdn($this->server, $uuid),
+                    // 'fqdn' => generateFqdn($this->server, $uuid), - Proxy labels are also duplicated, so can we duplicate the domain as well?
                     'status' => 'exited',
                     'environment_id' => $environment->id,
-                    // This is not correct, but we need to set it to something
                     'destination_id' => $this->selectedDestination,
                 ]);
                 $newApplication->save();
-                $environmentVaribles = $application->environment_variables()->get();
-                foreach ($environmentVaribles as $environmentVarible) {
-                    $newEnvironmentVariable = $environmentVarible->replicate([
+
+                $newApplication->settings()->delete(); // first delete the automatically created settings and fill in the old ones (to properly clone and avoid duplicates)
+                $applicationSettings = $application->settings;
+                if ($applicationSettings) {
+                    $newApplicationSettings = $applicationSettings->replicate([
                         'id',
                         'created_at',
                         'updated_at',
-                        'additional_servers_count',
-                        'additional_networks_count',
                     ])->fill([
-                        'resourceable_id' => $newApplication->id,
+                        'application_id' => $newApplication->id,
                     ]);
-                    $newEnvironmentVariable->save();
+                    $newApplicationSettings->save();
                 }
+
+                $tags = $application->tags;
+                foreach ($tags as $tag) {
+                    $newApplication->tags()->attach($tag->id);
+                }
+
+                $scheduledTasks = $application->scheduled_tasks()->get();
+                foreach ($scheduledTasks as $task) {
+                    $newTask = $task->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'uuid' => (string) new Cuid2,
+                        'application_id' => $newApplication->id,
+                        'team_id' => currentTeam()->id,
+                    ]);
+                    $newTask->save();
+                }
+
+                $applicationPreviews = $application->previews()->get();
+                foreach ($applicationPreviews as $preview) {
+                    $newPreview = $preview->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'application_id' => $newApplication->id,
+                        'status' => 'exited',
+                    ]);
+                    $newPreview->save();
+                }
+
                 $persistentVolumes = $application->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
                     $newPersistentVolume = $volume->replicate([
                         'id',
                         'created_at',
                         'updated_at',
-                        'additional_servers_count',
-                        'additional_networks_count',
                     ])->fill([
                         'name' => $newApplication->uuid.'-'.str($volume->name)->afterLast('-'),
                         'resource_id' => $newApplication->id,
                     ]);
                     $newPersistentVolume->save();
                 }
+
+                $fileStorages = $application->fileStorages()->get();
+                foreach ($fileStorages as $storage) {
+                    $newStorage = $storage->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'resource_id' => $newApplication->id,
+                    ]);
+                    $newStorage->save();
+                }
+
+                $environmentVaribles = $application->environment_variables()->get();
+                foreach ($environmentVaribles as $environmentVarible) {
+                    $newEnvironmentVariable = $environmentVarible->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'resourceable_id' => $newApplication->id,
+                    ]);
+                    $newEnvironmentVariable->save();
+                }
             }
+
             foreach ($databases as $database) {
                 $uuid = (string) new Cuid2;
                 $newDatabase = $database->replicate([
                     'id',
                     'created_at',
                     'updated_at',
-                    'additional_servers_count',
-                    'additional_networks_count',
                 ])->fill([
                     'uuid' => $uuid,
                     'status' => 'exited',
@@ -177,8 +230,6 @@ class CloneMe extends Component
                         'id',
                         'created_at',
                         'updated_at',
-                        'additional_servers_count',
-                        'additional_networks_count',
                     ])->fill($payload);
                     $newEnvironmentVariable->save();
                 }
@@ -189,8 +240,6 @@ class CloneMe extends Component
                     'id',
                     'created_at',
                     'updated_at',
-                    'additional_servers_count',
-                    'additional_networks_count',
                 ])->fill([
                     'uuid' => $uuid,
                     'environment_id' => $environment->id,
