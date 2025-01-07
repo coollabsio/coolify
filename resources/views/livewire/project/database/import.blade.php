@@ -1,7 +1,7 @@
 <div x-data="{ error: $wire.entangle('error'), filesize: $wire.entangle('filesize'), filename: $wire.entangle('filename'), isUploading: $wire.entangle('isUploading'), progress: $wire.entangle('progress') }">
     <script type="text/javascript" src="{{ URL::asset('js/dropzone.js') }}"></script>
     @script
-        <script>
+        <script data-navigate-once>
             Dropzone.options.myDropzone = {
                 chunking: true,
                 method: "POST",
@@ -50,16 +50,40 @@
         </div>
         @if (str(data_get($resource, 'status'))->startsWith('running'))
             @if ($resource->type() === 'standalone-postgresql')
-                <x-forms.input class="mb-2" label="Custom Import Command"
-                    wire:model='postgresqlRestoreCommand'></x-forms.input>
+                @if ($dumpAll)
+                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
+                        wire:model='restoreCommandText'></x-forms.textarea>
+                @else
+                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand'></x-forms.input>
+                @endif
+                <div class="w-48 pt-2">
+                    <x-forms.checkbox label="Includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                </div>
             @elseif ($resource->type() === 'standalone-mysql')
-                <x-forms.input class="mb-2" label="Custom Import Command"
-                    wire:model='mysqlRestoreCommand'></x-forms.input>
+                @if ($dumpAll)
+                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
+                        wire:model='restoreCommandText'></x-forms.textarea>
+                @else
+                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand'></x-forms.input>
+                @endif
+                <div class="w-48 pt-2">
+                    <x-forms.checkbox label="Includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                </div>
             @elseif ($resource->type() === 'standalone-mariadb')
-                <x-forms.input class="mb-2" label="Custom Import Command"
-                    wire:model='mariadbRestoreCommand'></x-forms.input>
+                @if ($dumpAll)
+                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
+                        wire:model='restoreCommandText'></x-forms.textarea>
+                @else
+                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand'></x-forms.input>
+                @endif
+                <div class="w-48 pt-2">
+                    <x-forms.checkbox label="Includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
+                </div>
             @endif
 
+            <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone" wire:ignore>
+                @csrf
+            </form>
             <div x-show="isUploading">
                 <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
             </div>
@@ -67,11 +91,6 @@
                 <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
-
-            <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
-                @csrf
-            </form>
-
             <div class="container w-full mx-auto">
                 <livewire:activity-monitor header="Database Restore Output" />
             </div>
