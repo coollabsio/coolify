@@ -44,7 +44,13 @@ class ResourceOperations extends Component
         if ($this->resource->getMorphClass() === \App\Models\Application::class) {
             $name = 'clone-of-'.str($this->resource->name)->limit(20).'-'.$uuid;
 
-            $new_resource = $this->resource->replicate()->fill([
+            $new_resource = $this->resource->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+                'additional_servers_count',
+                'additional_networks_count',
+            ])->fill([
                 'uuid' => $uuid,
                 'name' => $name,
                 'fqdn' => generateFqdn($server, $uuid),
@@ -59,7 +65,13 @@ class ResourceOperations extends Component
             }
             $environmentVaribles = $this->resource->environment_variables()->get();
             foreach ($environmentVaribles as $environmentVarible) {
-                $newEnvironmentVariable = $environmentVarible->replicate()->fill([
+                $newEnvironmentVariable = $environmentVarible->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'additional_servers_count',
+                    'additional_networks_count',
+                ])->fill([
                     'resourceable_id' => $new_resource->id,
                     'resourceable_type' => $new_resource->getMorphClass(),
                 ]);
@@ -71,7 +83,13 @@ class ResourceOperations extends Component
                 if ($volumeName === $volume->name) {
                     $volumeName = $new_resource->uuid.'-'.str($volume->name)->afterLast('-');
                 }
-                $newPersistentVolume = $volume->replicate()->fill([
+                $newPersistentVolume = $volume->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'additional_servers_count',
+                    'additional_networks_count',
+                ])->fill([
                     'name' => $volumeName,
                     'resource_id' => $new_resource->id,
                 ]);
@@ -95,7 +113,13 @@ class ResourceOperations extends Component
             $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             $uuid = (string) new Cuid2;
-            $new_resource = $this->resource->replicate()->fill([
+            $new_resource = $this->resource->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+                'additional_servers_count',
+                'additional_networks_count',
+            ])->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
                 'status' => 'exited',
@@ -117,7 +141,13 @@ class ResourceOperations extends Component
                 } elseif ($this->resource->type() === 'standalone-mariadb') {
                     $payload['standalone_mariadb_id'] = $new_resource->id;
                 }
-                $newEnvironmentVariable = $environmentVarible->replicate()->fill($payload);
+                $newEnvironmentVariable = $environmentVarible->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'additional_servers_count',
+                    'additional_networks_count',
+                ])->fill($payload);
                 $newEnvironmentVariable->save();
             }
             $route = route('project.database.configuration', [
@@ -129,7 +159,13 @@ class ResourceOperations extends Component
             return redirect()->to($route);
         } elseif ($this->resource->type() === 'service') {
             $uuid = (string) new Cuid2;
-            $new_resource = $this->resource->replicate()->fill([
+            $new_resource = $this->resource->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+                'additional_servers_count',
+                'additional_networks_count',
+            ])->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
                 'destination_id' => $new_destination->id,

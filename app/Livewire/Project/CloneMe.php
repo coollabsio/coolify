@@ -109,7 +109,13 @@ class CloneMe extends Component
             $services = $this->environment->services;
             foreach ($applications as $application) {
                 $uuid = (string) new Cuid2;
-                $newApplication = $application->replicate()->fill([
+                $newApplication = $application->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'additional_servers_count',
+                    'additional_networks_count',
+                ])->fill([
                     'uuid' => $uuid,
                     'fqdn' => generateFqdn($this->server, $uuid),
                     'status' => 'exited',
@@ -120,14 +126,26 @@ class CloneMe extends Component
                 $newApplication->save();
                 $environmentVaribles = $application->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
-                    $newEnvironmentVariable = $environmentVarible->replicate()->fill([
+                    $newEnvironmentVariable = $environmentVarible->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                        'additional_servers_count',
+                        'additional_networks_count',
+                    ])->fill([
                         'resourceable_id' => $newApplication->id,
                     ]);
                     $newEnvironmentVariable->save();
                 }
                 $persistentVolumes = $application->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
-                    $newPersistentVolume = $volume->replicate()->fill([
+                    $newPersistentVolume = $volume->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                        'additional_servers_count',
+                        'additional_networks_count',
+                    ])->fill([
                         'name' => $newApplication->uuid.'-'.str($volume->name)->afterLast('-'),
                         'resource_id' => $newApplication->id,
                     ]);
@@ -136,7 +154,13 @@ class CloneMe extends Component
             }
             foreach ($databases as $database) {
                 $uuid = (string) new Cuid2;
-                $newDatabase = $database->replicate()->fill([
+                $newDatabase = $database->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'additional_servers_count',
+                    'additional_networks_count',
+                ])->fill([
                     'uuid' => $uuid,
                     'status' => 'exited',
                     'started_at' => null,
@@ -149,13 +173,25 @@ class CloneMe extends Component
                     $payload = [];
                     $payload['resourceable_id'] = $newDatabase->id;
                     $payload['resourceable_type'] = $newDatabase->getMorphClass();
-                    $newEnvironmentVariable = $environmentVarible->replicate()->fill($payload);
+                    $newEnvironmentVariable = $environmentVarible->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                        'additional_servers_count',
+                        'additional_networks_count',
+                    ])->fill($payload);
                     $newEnvironmentVariable->save();
                 }
             }
             foreach ($services as $service) {
                 $uuid = (string) new Cuid2;
-                $newService = $service->replicate()->fill([
+                $newService = $service->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'additional_servers_count',
+                    'additional_networks_count',
+                ])->fill([
                     'uuid' => $uuid,
                     'environment_id' => $environment->id,
                     'destination_id' => $this->selectedDestination,
