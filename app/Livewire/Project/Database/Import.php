@@ -41,6 +41,8 @@ class Import extends Component
 
     public string $restoreCommandText = '';
 
+    public string $customLocation = '';
+
     public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB';
 
     public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
@@ -60,6 +62,9 @@ class Import extends Component
 
     public function mount()
     {
+        if (isDev()) {
+            $this->customLocation = '/data/coolify/pg-dump-all-1736245863.gz';
+        }
         $this->parameters = get_route_parameters();
         $this->getContainers();
     }
@@ -140,6 +145,24 @@ EOD;
         }
     }
 
+    public function checkFile()
+    {
+        if (filled($this->customLocation)) {
+            try {
+                $result = instant_remote_process(["ls -l {$this->customLocation}"], $this->server, throwError: false);
+                if (blank($result)) {
+                    $this->dispatch('error', 'The file does not exist or has been deleted.');
+
+                    return;
+                }
+                $this->filename = $this->customLocation;
+                $this->dispatch('success', 'The file exists.');
+            } catch (\Throwable $e) {
+                return handleError($e, $this);
+            }
+        }
+    }
+
     public function runImport()
     {
         if ($this->filename === '') {
@@ -148,17 +171,24 @@ EOD;
             return;
         }
         try {
-            $uploadedFilename = "upload/{$this->resource->uuid}/restore";
-            $path = Storage::path($uploadedFilename);
-            if (! Storage::exists($uploadedFilename)) {
-                $this->dispatch('error', 'The file does not exist or has been deleted.');
+            $this->importCommands = [];
+            if (filled($this->customLocation)) {
+                $backupFileName = '/tmp/restore_'.$this->resource->uuid;
+                $this->importCommands[] = "docker cp {$this->customLocation} {$this->container}:{$backupFileName}";
+                $tmpPath = $backupFileName;
+            } else {
+                $backupFileName = "upload/{$this->resource->uuid}/restore";
+                $path = Storage::path($backupFileName);
+                if (! Storage::exists($backupFileName)) {
+                    $this->dispatch('error', 'The file does not exist or has been deleted.');
 
-                return;
+                    return;
+                }
+                $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resource->uuid;
+                instant_scp($path, $tmpPath, $this->server);
+                Storage::delete($backupFileName);
+                $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
             }
-            $tmpPath = '/tmp/'.basename($uploadedFilename);
-            instant_scp($path, $tmpPath, $this->server);
-            Storage::delete($uploadedFilename);
-            $this->importCommands[] = "docker cp {$tmpPath} {$this->container}:{$tmpPath}";
 
             // Copy the restore command to a script file
             $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
@@ -202,18 +232,22 @@ EOD;
             $this->importCommands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
 
             $this->importCommands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
-            $this->importCommands[] = "docker exec {$this->container} sh -c 'rm {$scriptPath} && rm {$tmpPath}'";
-
             $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
 
             if (! empty($this->importCommands)) {
-                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true);
+                $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'RestoreJobFinished', callEventData: [
+                    'scriptPath' => $scriptPath,
+                    'tmpPath' => $tmpPath,
+                    'container' => $this->container,
+                    'serverId' => $this->server->id,
+                ]);
                 $this->dispatch('activityMonitor', $activity->id);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->filename = null;
+            $this->importCommands = [];
         }
     }
 }

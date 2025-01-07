@@ -12,7 +12,7 @@
                 parallelChunkUploads: false,
                 init: function() {
                     let button = this.element.querySelector('button');
-                    button.innerText = 'Select or Drop a backup file here'
+                    button.innerText = 'Select or drop a backup file here.'
                     this.on('sending', function(file, xhr, formData) {
                         const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                         formData.append("_token", token);
@@ -80,15 +80,24 @@
                     <x-forms.checkbox label="Includes all databases" wire:model.live='dumpAll'></x-forms.checkbox>
                 </div>
             @endif
-
+            <h3 class="pt-6">Backup File</h3>
+            <form class="flex gap-2 items-end">
+                <x-forms.input label="Location of the backup file on the server"
+                    placeholder="e.g. /home/user/backup.sql.gz" wire:model='customLocation'></x-forms.input>
+                <x-forms.button class="w-full" wire:click='checkFile'>Check File</x-forms.button>
+            </form>
+            <div class="pt-2 text-center text-xl font-bold">
+                Or
+            </div>
             <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone" wire:ignore>
                 @csrf
             </form>
             <div x-show="isUploading">
                 <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
             </div>
+            <h3 class="pt-6" x-show="filename && !error">File Information</h3>
             <div x-show="filename && !error">
-                <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
+                <div>Location: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
             <div class="container w-full mx-auto">
