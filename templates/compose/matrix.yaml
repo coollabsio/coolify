@@ -8,14 +8,14 @@ services:
 
   synapse:
     image: "docker.io/matrixdotorg/synapse:v1.84.1"
-    container_name: synapse
     environment:
-      - SERVICE_FQDN_MATRIX=${SERVICE_FQDN_MATRIX}
+      - SERVICE_FQDN_MATRIX
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
     volumes:
       - synapse_data:/data
     depends_on:
       - synapse_db
+          condition: service_healthy
     healthcheck:
       test:
         - CMD
