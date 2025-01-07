@@ -186,7 +186,7 @@ class Kernel extends ConsoleKernel
             }
             $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
             $this->schedule->job(new DatabaseBackupJob(
-                backup: $scheduled_backup
+                scheduledDatabaseBackup: $scheduled_backup
             ))->cron($scheduled_backup->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
