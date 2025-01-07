@@ -32,13 +32,13 @@ class Reachable extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject("Coolify: Server ({$this->server->name}) revived.");
-        $mail->view('emails.server-revived', [
+        $mailMessage = new MailMessage;
+        $mailMessage->subject("Coolify: Server ({$this->server->name}) revived.");
+        $mailMessage->view('emails.server-revived', [
             'name' => $this->server->name,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage

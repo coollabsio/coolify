@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartSentinel
@@ -27,7 +28,7 @@ class StartSentinel
         $mountDir = '/data/coolify/sentinel';
         $image = "ghcr.io/coollabsio/sentinel:$version";
         if (! $endpoint) {
-            throw new \Exception('You should set FQDN in Instance Settings.');
+            throw new Exception('You should set FQDN in Instance Settings.');
         }
         $environments = [
             'TOKEN' => $token,

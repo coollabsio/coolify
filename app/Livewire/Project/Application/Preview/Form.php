@@ -6,6 +6,7 @@ use App\Models\Application;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Throwable;
 
 class Form extends Component
 {
@@ -19,9 +20,11 @@ class Form extends Component
         try {
             $this->previewUrlTemplate = $this->application->preview_url_template;
             $this->generateRealUrl();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function submit()
@@ -33,9 +36,11 @@ class Form extends Component
             $this->application->save();
             $this->dispatch('success', 'Preview url template updated.');
             $this->generateRealUrl();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function resetToDefault()
@@ -46,9 +51,11 @@ class Form extends Component
             $this->application->save();
             $this->generateRealUrl();
             $this->dispatch('success', 'Preview url template updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function generateRealUrl()

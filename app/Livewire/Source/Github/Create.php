@@ -4,6 +4,7 @@ namespace App\Livewire\Source\Github;
 
 use App\Models\GithubApp;
 use Livewire\Component;
+use Throwable;
 
 class Create extends Component
 {
@@ -50,13 +51,13 @@ class Create extends Component
             if (isCloud()) {
                 $payload['is_system_wide'] = $this->is_system_wide;
             }
-            $github_app = GithubApp::create($payload);
+            $github_app = GithubApp::query()->create($payload);
             if (session('from')) {
                 session(['from' => session('from') + ['source_id' => $github_app->id]]);
             }
 
             return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

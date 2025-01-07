@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class ByIp extends Component
 {
@@ -52,7 +53,7 @@ class ByIp extends Component
     public bool $is_swarm_worker = false;
 
     #[Validate('nullable|integer', as: 'Swarm Cluster')]
-    public $selected_swarm_cluster = null;
+    public $selected_swarm_cluster;
 
     #[Validate('required|boolean', as: 'Build Server')]
     public bool $is_build_server = false;
@@ -84,7 +85,7 @@ class ByIp extends Component
     {
         $this->validate();
         try {
-            if (Server::where('team_id', currentTeam()->id)
+            if (Server::query()->where('team_id', currentTeam()->id)
                 ->where('ip', $this->ip)
                 ->exists()) {
                 return $this->dispatch('error', 'This IP/Domain is already in use by another server in your team.');
@@ -111,7 +112,7 @@ class ByIp extends Component
             if ($this->is_build_server) {
                 data_forget($payload, 'proxy');
             }
-            $server = Server::create($payload);
+            $server = Server::query()->create($payload);
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
@@ -126,7 +127,7 @@ class ByIp extends Component
             $server->settings->save();
 
             return redirect()->route('server.show', $server->uuid);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

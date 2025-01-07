@@ -7,6 +7,7 @@ use App\Models\Project;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class EnvironmentEdit extends Component
 {
@@ -29,9 +30,11 @@ class EnvironmentEdit extends Component
             $this->project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
             $this->environment = $this->project->environments()->where('uuid', $environment_uuid)->firstOrFail();
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -56,9 +59,11 @@ class EnvironmentEdit extends Component
                 'environment_uuid' => $this->environment->uuid,
                 'project_uuid' => $this->project->uuid,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

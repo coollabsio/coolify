@@ -16,9 +16,8 @@ class Migration extends Command
             $this->info('Migration is enabled on this server.');
             $this->call('migrate', ['--force' => true, '--isolated' => true]);
             exit(0);
-        } else {
-            $this->info('Migration is disabled on this server.');
-            exit(0);
         }
+        $this->info('Migration is disabled on this server.');
+        exit(0);
     }
 }

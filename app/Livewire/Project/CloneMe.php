@@ -5,6 +5,7 @@ namespace App\Livewire\Project;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use Exception;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -43,11 +44,11 @@ class CloneMe extends Component
     public function mount($project_uuid)
     {
         $this->project_uuid = $project_uuid;
-        $this->project = Project::where('uuid', $project_uuid)->firstOrFail();
+        $this->project = Project::query()->where('uuid', $project_uuid)->firstOrFail();
         $this->environment = $this->project->environments->where('uuid', $this->environment_uuid)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()->servers;
-        $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
+        $this->newName = str($this->project->name.'-clone-'.new Cuid2)->slug();
     }
 
     public function render()
@@ -77,11 +78,11 @@ class CloneMe extends Component
                 'newName' => 'required',
             ]);
             if ($type === 'project') {
-                $foundProject = Project::where('name', $this->newName)->first();
+                $foundProject = Project::query()->where('name', $this->newName)->first();
                 if ($foundProject) {
-                    throw new \Exception('Project with the same name already exists.');
+                    throw new Exception('Project with the same name already exists.');
                 }
-                $project = Project::create([
+                $project = Project::query()->create([
                     'name' => $this->newName,
                     'team_id' => currentTeam()->id,
                     'description' => $this->project->description.' (clone)',
@@ -96,7 +97,7 @@ class CloneMe extends Component
             } else {
                 $foundEnv = $this->project->environments()->where('name', $this->newName)->first();
                 if ($foundEnv) {
-                    throw new \Exception('Environment with the same name already exists.');
+                    throw new Exception('Environment with the same name already exists.');
                 }
                 $project = $this->project;
                 $environment = $this->project->environments()->create([
@@ -126,9 +127,9 @@ class CloneMe extends Component
                     $newEnvironmentVariable->save();
                 }
                 $persistentVolumes = $application->persistentStorages()->get();
-                foreach ($persistentVolumes as $volume) {
-                    $newPersistentVolume = $volume->replicate()->fill([
-                        'name' => $newApplication->uuid.'-'.str($volume->name)->afterLast('-'),
+                foreach ($persistentVolumes as $persistentVolume) {
+                    $newPersistentVolume = $persistentVolume->replicate()->fill([
+                        'name' => $newApplication->uuid.'-'.str($persistentVolume->name)->afterLast('-'),
                         'resource_id' => $newApplication->id,
                     ]);
                     $newPersistentVolume->save();
@@ -178,7 +179,7 @@ class CloneMe extends Component
                 'project_uuid' => $project->uuid,
                 'environment_uuid' => $environment->uuid,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
     }

@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\StandaloneMariadb;
 use Exception;
 use Livewire\Component;
+use Throwable;
 
 class General extends Component
 {
@@ -66,7 +67,7 @@ class General extends Component
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
-                return;
+                return null;
             }
             $this->database->save();
             $this->dispatch('success', 'Database updated.');
@@ -74,6 +75,8 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function submit()
@@ -94,6 +97,8 @@ class General extends Component
                 $this->dispatch('configurationChanged');
             }
         }
+
+        return null;
     }
 
     public function instantSave()
@@ -103,14 +108,14 @@ class General extends Component
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
 
-                return;
+                return null;
             }
             if ($this->database->is_public) {
                 if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->database->is_public = false;
 
-                    return;
+                    return null;
                 }
                 StartDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is now publicly accessible.');
@@ -120,11 +125,13 @@ class General extends Component
             }
             $this->db_url_public = $this->database->external_db_url;
             $this->database->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->database->is_public = ! $this->database->is_public;
 
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function refresh(): void

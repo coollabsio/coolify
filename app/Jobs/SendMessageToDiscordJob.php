@@ -30,7 +30,7 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
     public int $maxExceptions = 5;
 
     public function __construct(
-        public DiscordMessage $message,
+        public DiscordMessage $discordMessage,
         public string $webhookUrl
     ) {
         $this->onQueue('high');
@@ -41,6 +41,6 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        Http::post($this->webhookUrl, $this->message->toPayload());
+        Http::post($this->webhookUrl, $this->discordMessage->toPayload());
     }
 }

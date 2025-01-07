@@ -10,6 +10,7 @@ use App\Models\ServiceDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
+use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
@@ -43,10 +44,10 @@ class Danger extends Component
 
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
-                $this->resource = Service::where('uuid', $parameters['service_uuid'])->first();
+                $this->resource = Service::query()->where('uuid', $parameters['service_uuid'])->first();
             } elseif (isset($parameters['stack_service_uuid'])) {
-                $this->resource = ServiceApplication::where('uuid', $parameters['stack_service_uuid'])->first()
-                    ?? ServiceDatabase::where('uuid', $parameters['stack_service_uuid'])->first();
+                $this->resource = ServiceApplication::query()->where('uuid', $parameters['stack_service_uuid'])->first()
+                    ?? ServiceDatabase::query()->where('uuid', $parameters['stack_service_uuid'])->first();
             }
         }
 
@@ -81,18 +82,16 @@ class Danger extends Component
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
 
-                return;
-            }
+            return null;
         }
 
         if (! $this->resource) {
             $this->addError('resource', 'Resource not found.');
 
-            return;
+            return null;
         }
 
         try {
@@ -109,7 +108,7 @@ class Danger extends Component
                 'project_uuid' => $this->projectUuid,
                 'environment_uuid' => $this->environmentUuid,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

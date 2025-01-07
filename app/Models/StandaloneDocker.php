@@ -74,6 +74,10 @@ class StandaloneDocker extends BaseModel
 
     public function attachedTo()
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        if ($this->applications?->count() > 0) {
+            return true;
+        }
+
+        return $this->databases()->count() > 0;
     }
 }

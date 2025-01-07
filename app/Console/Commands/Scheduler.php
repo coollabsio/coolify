@@ -16,8 +16,7 @@ class Scheduler extends Command
             $this->info('Scheduler is enabled on this server.');
             $this->call('schedule:work');
             exit(0);
-        } else {
-            exit(0);
         }
+        exit(0);
     }
 }

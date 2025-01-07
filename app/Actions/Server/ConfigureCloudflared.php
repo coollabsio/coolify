@@ -6,6 +6,7 @@ use App\Events\CloudflareTunnelConfigured;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 class ConfigureCloudflared
 {
@@ -39,7 +40,7 @@ class ConfigureCloudflared
                 'docker compose up -d --remove-orphans',
             ]);
             instant_remote_process($commands, $server);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $server->settings->is_cloudflare_tunnel = false;
             $server->settings->save();
             throw $e;

@@ -3,7 +3,9 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Throwable;
 
 class StartLogDrain
 {
@@ -31,9 +33,10 @@ class StartLogDrain
         try {
             if ($type === 'none') {
                 return 'No log drain is enabled.';
-            } elseif ($type === 'newrelic') {
+            }
+            if ($type === 'newrelic') {
                 if (! $server->settings->is_logdrain_newrelic_enabled) {
-                    throw new \Exception('New Relic log drain is not enabled.');
+                    throw new Exception('New Relic log drain is not enabled.');
                 }
                 $config = base64_encode("
 [SERVICE]
@@ -68,7 +71,7 @@ class StartLogDrain
 ");
             } elseif ($type === 'highlight') {
                 if (! $server->settings->is_logdrain_highlight_enabled) {
-                    throw new \Exception('Highlight log drain is not enabled.');
+                    throw new Exception('Highlight log drain is not enabled.');
                 }
                 $config = base64_encode('
 [SERVICE]
@@ -89,7 +92,7 @@ class StartLogDrain
 ');
             } elseif ($type === 'axiom') {
                 if (! $server->settings->is_logdrain_axiom_enabled) {
-                    throw new \Exception('Axiom log drain is not enabled.');
+                    throw new Exception('Axiom log drain is not enabled.');
                 }
                 $config = base64_encode("
 [SERVICE]
@@ -129,12 +132,12 @@ class StartLogDrain
 ");
             } elseif ($type === 'custom') {
                 if (! $server->settings->is_logdrain_custom_enabled) {
-                    throw new \Exception('Custom log drain is not enabled.');
+                    throw new Exception('Custom log drain is not enabled.');
                 }
                 $config = base64_encode($server->settings->logdrain_custom_config);
                 $parsers = base64_encode($server->settings->logdrain_custom_config_parser);
             } else {
-                throw new \Exception('Unknown log drain type.');
+                throw new Exception('Unknown log drain type.');
             }
             if ($type !== 'custom') {
                 $parsers = base64_encode("
@@ -207,7 +210,7 @@ Files:
                     "touch $config_path/.env",
                 ];
             } else {
-                throw new \Exception('Unknown log drain type.');
+                throw new Exception('Unknown log drain type.');
             }
             $restart_command = [
                 "echo 'Starting Fluent Bit'",
@@ -216,7 +219,7 @@ Files:
             $command = array_merge($command, $add_envs_command, $restart_command);
 
             return instant_remote_process($command, $server);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e);
         }
     }

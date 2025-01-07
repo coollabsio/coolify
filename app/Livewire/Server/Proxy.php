@@ -6,6 +6,7 @@ use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Server;
 use Livewire\Component;
+use Throwable;
 
 class Proxy extends Component
 {
@@ -13,7 +14,7 @@ class Proxy extends Component
 
     public ?string $selectedProxy = null;
 
-    public $proxy_settings = null;
+    public $proxy_settings;
 
     public bool $redirect_enabled = true;
 
@@ -50,9 +51,11 @@ class Proxy extends Component
             $this->server->changeProxy($proxy_type, async: false);
             $this->selectedProxy = $this->server->proxy->type;
             $this->dispatch('reloadWindow');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()
@@ -61,9 +64,11 @@ class Proxy extends Component
             $this->validate();
             $this->server->settings->save();
             $this->dispatch('success', 'Settings saved.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSaveRedirect()
@@ -73,9 +78,11 @@ class Proxy extends Component
             $this->server->save();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function submit()
@@ -86,9 +93,11 @@ class Proxy extends Component
             $this->server->save();
             $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function reset_proxy_configuration()
@@ -98,9 +107,11 @@ class Proxy extends Component
             SaveConfiguration::run($this->server, $this->proxy_settings);
             $this->server->save();
             $this->dispatch('success', 'Proxy configuration saved.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function loadProxyConfiguration()
@@ -112,8 +123,10 @@ class Proxy extends Component
             } else {
                 $this->dispatch('traefikDashboardAvailable', false);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 }

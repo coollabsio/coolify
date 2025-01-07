@@ -19,7 +19,7 @@ class Subscription extends Model
             if (! $this->stripe_plan_id) {
                 return 'zero';
             }
-            $subscription = Subscription::where('id', $this->id)->first();
+            $subscription = \App\Models\Subscription::query()->where('id', $this->id)->first();
             if (! $subscription) {
                 return null;
             }

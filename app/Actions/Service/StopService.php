@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
 use App\Models\Service;
+use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopService
@@ -29,8 +30,10 @@ class StopService
                     CleanupDocker::dispatch($server, true);
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $e->getMessage();
         }
+
+        return null;
     }
 }

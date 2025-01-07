@@ -16,9 +16,9 @@ class StartMariadb
 
     public string $configuration_dir;
 
-    public function handle(StandaloneMariadb $database)
+    public function handle(StandaloneMariadb $standaloneMariadb)
     {
-        $this->database = $database;
+        $this->database = $standaloneMariadb;
 
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
@@ -87,7 +87,7 @@ class StartMariadb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->mariadb_conf) || ! empty($this->database->mariadb_conf)) {
+        if (! is_null($this->database->mariadb_conf) || $this->database->mariadb_conf !== null) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/custom-config.cnf',
@@ -105,12 +105,12 @@ class StartMariadb
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "echo 'Pulling {$standaloneMariadb->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return remote_process($this->commands, $standaloneMariadb->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
     private function generate_local_persistent_volumes()

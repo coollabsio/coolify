@@ -62,8 +62,8 @@ class ServicesDelete extends Command
             options: $servers->pluck('name', 'id')->sortKeys(),
         );
 
-        foreach ($serversToDelete as $server) {
-            $toDelete = $servers->where('id', $server)->first();
+        foreach ($serversToDelete as $serverToDelete) {
+            $toDelete = $servers->where('id', $serverToDelete)->first();
             if ($toDelete) {
                 $this->info($toDelete);
                 $confirmed = confirm('Are you sure you want to delete all selected resources?');
@@ -88,8 +88,8 @@ class ServicesDelete extends Command
             $applications->pluck('name', 'id')->sortKeys(),
         );
 
-        foreach ($applicationsToDelete as $application) {
-            $toDelete = $applications->where('id', $application)->first();
+        foreach ($applicationsToDelete as $applicationToDelete) {
+            $toDelete = $applications->where('id', $applicationToDelete)->first();
             if ($toDelete) {
                 $this->info($toDelete);
                 $confirmed = confirm('Are you sure you want to delete all selected resources? ');
@@ -114,8 +114,8 @@ class ServicesDelete extends Command
             $databases->pluck('name', 'id')->sortKeys(),
         );
 
-        foreach ($databasesToDelete as $database) {
-            $toDelete = $databases->where('id', $database)->first();
+        foreach ($databasesToDelete as $databaseToDelete) {
+            $toDelete = $databases->where('id', $databaseToDelete)->first();
             if ($toDelete) {
                 $this->info($toDelete);
                 $confirmed = confirm('Are you sure you want to delete all selected resources?');
@@ -140,8 +140,8 @@ class ServicesDelete extends Command
             $services->pluck('name', 'id')->sortKeys(),
         );
 
-        foreach ($servicesToDelete as $service) {
-            $toDelete = $services->where('id', $service)->first();
+        foreach ($servicesToDelete as $serviceToDelete) {
+            $toDelete = $services->where('id', $serviceToDelete)->first();
             if ($toDelete) {
                 $this->info($toDelete);
                 $confirmed = confirm('Are you sure you want to delete all selected resources?');

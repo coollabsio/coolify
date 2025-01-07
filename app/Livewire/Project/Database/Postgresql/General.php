@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Exception;
 use Livewire\Component;
+use Throwable;
 
 class General extends Component
 {
@@ -81,7 +82,7 @@ class General extends Component
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
-                return;
+                return null;
             }
             $this->database->save();
             $this->dispatch('success', 'Database updated.');
@@ -89,6 +90,8 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()
@@ -98,14 +101,14 @@ class General extends Component
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
 
-                return;
+                return null;
             }
             if ($this->database->is_public) {
                 if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->database->is_public = false;
 
-                    return;
+                    return null;
                 }
                 StartDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is now publicly accessible.');
@@ -115,11 +118,13 @@ class General extends Component
             }
             $this->db_url_public = $this->database->external_db_url;
             $this->database->save();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->database->is_public = ! $this->database->is_public;
 
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function save_init_script($script)
@@ -143,7 +148,7 @@ class General extends Component
             $delete_command = "rm -f $old_file_path";
             try {
                 instant_remote_process([$delete_command], $this->server);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
 
                 return;
@@ -184,7 +189,7 @@ class General extends Component
             $command = "rm -f $file_path";
             try {
                 instant_remote_process([$command], $this->server);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
 
                 return;
@@ -223,7 +228,7 @@ class General extends Component
 
             return;
         }
-        if (! isset($this->database->init_scripts)) {
+        if (! property_exists($this->database, 'init_scripts') || $this->database->init_scripts === null) {
             $this->database->init_scripts = [];
         }
         $this->database->init_scripts = array_merge($this->database->init_scripts, [
@@ -257,5 +262,7 @@ class General extends Component
                 $this->dispatch('configurationChanged');
             }
         }
+
+        return null;
     }
 }

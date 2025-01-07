@@ -7,6 +7,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Throwable;
 
 class Index extends Component
 {
@@ -45,9 +46,11 @@ class Index extends Component
                 $this->serviceDatabase->getFilesFromServer();
             }
             $this->s3s = currentTeam()->s3s;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function generateDockerCompose()

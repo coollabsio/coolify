@@ -8,6 +8,7 @@ use App\Models\SwarmDocker;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Show extends Component
 {
@@ -40,9 +41,11 @@ class Show extends Component
             }
             $this->destination = $destination;
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -65,15 +68,17 @@ class Show extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Destination saved.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function delete()
     {
         try {
-            if ($this->destination->getMorphClass() === \App\Models\StandaloneDocker::class) {
+            if ($this->destination->getMorphClass() === StandaloneDocker::class) {
                 if ($this->destination->attachedTo()) {
                     return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
                 }
@@ -83,7 +88,7 @@ class Show extends Component
             $this->destination->delete();
 
             return redirect()->route('destination.index');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

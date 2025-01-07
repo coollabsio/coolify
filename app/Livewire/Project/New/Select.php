@@ -205,12 +205,10 @@ class Select extends Component
     {
         if ($this->includeSwarm) {
             $this->servers = $this->allServers;
+        } elseif ($this->allServers instanceof Collection) {
+            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
         } else {
-            if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
-            } else {
-                $this->servers = $this->allServers;
-            }
+            $this->servers = $this->allServers;
         }
     }
 
@@ -218,7 +216,7 @@ class Select extends Component
     {
         $type = str($type)->lower()->slug()->value();
         if ($this->loading) {
-            return;
+            return null;
         }
         $this->loading = true;
         $this->type = $type;
@@ -252,7 +250,7 @@ class Select extends Component
         if ($type === 'existing-postgresql') {
             $this->current_step = $type;
 
-            return;
+            return null;
         }
         if (count($this->servers) === 1) {
             $server = $this->servers->first();
@@ -267,6 +265,8 @@ class Select extends Component
             }
         }
         $this->current_step = 'servers';
+
+        return null;
     }
 
     public function setServer(Server $server)
@@ -285,6 +285,8 @@ class Select extends Component
             }
         }
         $this->current_step = 'destinations';
+
+        return null;
     }
 
     public function setDestination(string $destination_uuid)
@@ -321,6 +323,8 @@ class Select extends Component
                 'server_id' => $this->server_id,
             ]);
         }
+
+        return null;
     }
 
     public function loadServers()

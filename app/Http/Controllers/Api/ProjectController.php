@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -96,6 +97,7 @@ class ProjectController extends Controller
         }
 
         $project->load(['environments']);
+
         return response()->json(
             serializeApiResponse($project),
         );
@@ -223,7 +225,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -232,12 +234,10 @@ class ProjectController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -246,7 +246,7 @@ class ProjectController extends Controller
             ], 422);
         }
 
-        $project = Project::create([
+        $project = Project::query()->create([
             'name' => $request->name,
             'description' => $request->description,
             'team_id' => $teamId,
@@ -321,7 +321,7 @@ class ProjectController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -330,12 +330,10 @@ class ProjectController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([

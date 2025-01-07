@@ -22,11 +22,11 @@ class SwitchTeam extends Component
     public function switch_to($team_id)
     {
         if (! auth()->user()->teams->contains($team_id)) {
-            return;
+            return null;
         }
-        $team_to_switch_to = Team::find($team_id);
+        $team_to_switch_to = Team::query()->find($team_id);
         if (! $team_to_switch_to) {
-            return;
+            return null;
         }
         refreshSession($team_to_switch_to);
 

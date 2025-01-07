@@ -15,6 +15,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class Init extends Command
 {
@@ -22,7 +23,7 @@ class Init extends Command
 
     protected $description = 'Cleanup instance related stuffs';
 
-    public $servers = null;
+    public $servers;
 
     public function handle()
     {
@@ -35,8 +36,7 @@ class Init extends Command
         }
 
         $this->servers = Server::all();
-        if (isCloud()) {
-        } else {
+        if (! isCloud()) {
             $this->send_alive_signal();
             get_public_ips();
         }
@@ -61,14 +61,14 @@ class Init extends Command
 
         try {
             $this->pullHelperImage();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             //
         }
 
         if (isCloud()) {
             try {
                 $this->pullTemplatesFromCDN();
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 echo "Could not pull templates from CDN: {$e->getMessage()}\n";
             }
         }
@@ -76,13 +76,13 @@ class Init extends Command
         if (! isCloud()) {
             try {
                 $this->pullTemplatesFromCDN();
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 echo "Could not pull templates from CDN: {$e->getMessage()}\n";
             }
             try {
                 $localhost = $this->servers->where('id', 0)->first();
                 $localhost->setupDynamicProxyConfiguration();
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }
             $settings = instanceSettings();
@@ -119,8 +119,8 @@ class Init extends Command
     private function update_user_emails()
     {
         try {
-            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
-        } catch (\Throwable $e) {
+            User::query()->whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+        } catch (Throwable $e) {
             echo "Error in updating user emails: {$e->getMessage()}\n";
         }
     }
@@ -128,8 +128,8 @@ class Init extends Command
     private function update_traefik_labels()
     {
         try {
-            Server::where('proxy->type', 'TRAEFIK_V2')->update(['proxy->type' => 'TRAEFIK']);
-        } catch (\Throwable $e) {
+            Server::query()->where('proxy->type', 'TRAEFIK_V2')->update(['proxy->type' => 'TRAEFIK']);
+        } catch (Throwable $e) {
             echo "Error in updating traefik labels: {$e->getMessage()}\n";
         }
     }
@@ -149,10 +149,12 @@ class Init extends Command
                 return instant_remote_process([
                     "rm -f $file",
                 ], $server, false);
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
             }
         }
+
+        return null;
     }
 
     private function cleanup_unused_network_from_coolify_proxy()
@@ -168,19 +170,19 @@ class Init extends Command
                 ['networks' => $networks, 'allNetworks' => $allNetworks] = collectDockerNetworksByServer($server);
                 $removeNetworks = $allNetworks->diff($networks);
                 $commands = collect();
-                foreach ($removeNetworks as $network) {
-                    $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
-                    if (empty($out)) {
-                        $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                        $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                foreach ($removeNetworks as $removeNetwork) {
+                    $out = instant_remote_process(["docker network inspect -f json {$removeNetwork} | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
+                    if ($out === null || $out === '' || $out === '0') {
+                        $commands->push("docker network disconnect {$removeNetwork} coolify-proxy >/dev/null 2>&1 || true");
+                        $commands->push("docker network rm {$removeNetwork} >/dev/null 2>&1 || true");
                     } else {
                         $data = collect(json_decode($out, true));
                         if ($data->count() === 1) {
                             // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
                             $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
                             if ($isCoolifyProxyItself) {
-                                $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                                $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                                $commands->push("docker network disconnect {$removeNetwork} coolify-proxy >/dev/null 2>&1 || true");
+                                $commands->push("docker network rm {$removeNetwork} >/dev/null 2>&1 || true");
                             }
                         }
                     }
@@ -188,7 +190,7 @@ class Init extends Command
                 if ($commands->isNotEmpty()) {
                     remote_process(command: $commands, type: ActivityTypes::INLINE->value, server: $server, ignore_errors: false);
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 echo "Error in cleaning up unused networks from coolify proxy: {$e->getMessage()}\n";
             }
         }
@@ -202,20 +204,20 @@ class Init extends Command
                 if ($database && $database->trashed()) {
                     echo "Restoring coolify db backup\n";
                     $database->restore();
-                    $scheduledBackup = ScheduledDatabaseBackup::find(0);
+                    $scheduledBackup = ScheduledDatabaseBackup::query()->find(0);
                     if (! $scheduledBackup) {
-                        ScheduledDatabaseBackup::create([
+                        ScheduledDatabaseBackup::query()->create([
                             'id' => 0,
                             'enabled' => true,
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',
                             'database_id' => $database->id,
-                            'database_type' => \App\Models\StandalonePostgresql::class,
+                            'database_type' => StandalonePostgresql::class,
                             'team_id' => 0,
                         ]);
                     }
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 echo "Error in restoring coolify db backup: {$e->getMessage()}\n";
             }
         }
@@ -234,7 +236,7 @@ class Init extends Command
         }
         try {
             Http::get("https://undead.coolify.io/v4/alive?appId=$id&version=$version");
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             echo "Error in sending live signal: {$e->getMessage()}\n";
         }
     }
@@ -246,12 +248,12 @@ class Init extends Command
             if (isCloud()) {
                 return;
             }
-            $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
-            foreach ($queued_inprogress_deployments as $deployment) {
-                $deployment->status = ApplicationDeploymentStatus::FAILED->value;
-                $deployment->save();
+            $queued_inprogress_deployments = ApplicationDeploymentQueue::query()->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
+            foreach ($queued_inprogress_deployments as $queued_inprogress_deployment) {
+                $queued_inprogress_deployment->status = ApplicationDeploymentStatus::FAILED->value;
+                $queued_inprogress_deployment->save();
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
         }
     }

@@ -16,9 +16,8 @@ class Seeder extends Command
             $this->info('Seeder is enabled on this server.');
             $this->call('db:seed', ['--class' => 'ProductionSeeder', '--force' => true]);
             exit(0);
-        } else {
-            $this->info('Seeder is disabled on this server.');
-            exit(0);
         }
+        $this->info('Seeder is disabled on this server.');
+        exit(0);
     }
 }

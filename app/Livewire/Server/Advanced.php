@@ -4,8 +4,10 @@ namespace App\Livewire\Server;
 
 use App\Jobs\DockerCleanupJob;
 use App\Models\Server;
+use Exception;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Advanced extends Component
 {
@@ -46,9 +48,11 @@ class Advanced extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->parameters = get_route_parameters();
             $this->syncData();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return redirect()->route('server.show');
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -83,9 +87,11 @@ class Advanced extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function manualCleanup()
@@ -93,9 +99,11 @@ class Advanced extends Component
         try {
             DockerCleanupJob::dispatch($this->server, true);
             $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function submit()
@@ -103,17 +111,19 @@ class Advanced extends Component
         try {
             if (! validate_cron_expression($this->dockerCleanupFrequency)) {
                 $this->dockerCleanupFrequency = $this->server->settings->getOriginal('docker_cleanup_frequency');
-                throw new \Exception('Invalid Cron / Human expression for Docker Cleanup Frequency.');
+                throw new Exception('Invalid Cron / Human expression for Docker Cleanup Frequency.');
             }
             if (! validate_cron_expression($this->serverDiskUsageCheckFrequency)) {
                 $this->serverDiskUsageCheckFrequency = $this->server->settings->getOriginal('server_disk_usage_check_frequency');
-                throw new \Exception('Invalid Cron / Human expression for Disk Usage Check Frequency.');
+                throw new Exception('Invalid Cron / Human expression for Disk Usage Check Frequency.');
             }
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

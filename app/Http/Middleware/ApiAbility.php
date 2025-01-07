@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use Exception;
+use Illuminate\Auth\AuthenticationException;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
 class ApiAbility extends CheckForAnyAbility
@@ -14,11 +16,11 @@ class ApiAbility extends CheckForAnyAbility
             }
 
             return parent::handle($request, $next, ...$abilities);
-        } catch (\Illuminate\Auth\AuthenticationException $e) {
+        } catch (AuthenticationException $e) {
             return response()->json([
                 'message' => 'Unauthenticated.',
             ], 401);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'message' => 'Missing required permissions: '.implode(', ', $abilities),
             ], 403);

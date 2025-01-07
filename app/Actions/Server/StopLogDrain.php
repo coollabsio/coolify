@@ -4,6 +4,7 @@ namespace App\Actions\Server;
 
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Throwable;
 
 class StopLogDrain
 {
@@ -13,7 +14,7 @@ class StopLogDrain
     {
         try {
             return instant_remote_process(['docker rm -f coolify-log-drain'], $server, false);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e);
         }
     }

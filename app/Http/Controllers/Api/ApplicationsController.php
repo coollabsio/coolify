@@ -15,6 +15,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
@@ -89,7 +90,7 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
+        $projects = Project::query()->where('team_id', $teamId)->get();
         $applications = collect();
         $applications->push($projects->pluck('applications')->flatten());
         $applications = $applications->flatten();
@@ -717,7 +718,7 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -731,12 +732,10 @@ class ApplicationsController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -825,15 +824,12 @@ class ApplicationsController extends Controller
             if ($request->build_pack === 'dockercompose') {
                 $request->offsetSet('ports_exposes', '80');
             }
-
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
-
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
-
             $application->fill($request->all());
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
@@ -848,7 +844,6 @@ class ApplicationsController extends Controller
             if ($dockerComposeDomainsJson->count() > 0) {
                 $application->docker_compose_domains = $dockerComposeDomainsJson;
             }
-
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
@@ -868,27 +863,24 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
-
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
-
                 queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
-            } else {
-                if ($application->build_pack === 'dockercompose') {
-                    LoadComposeFile::dispatch($application);
-                }
+            } elseif ($application->build_pack === 'dockercompose') {
+                LoadComposeFile::dispatch($application);
             }
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'private-gh-app') {
+        }
+        if ($type === 'private-gh-app') {
             $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
@@ -900,7 +892,6 @@ class ApplicationsController extends Controller
                 'docker_compose_raw' => 'string|nullable',
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
-
             $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
                 return response()->json([
@@ -908,16 +899,14 @@ class ApplicationsController extends Controller
                     'errors' => $validator->errors(),
                 ], 422);
             }
-
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
             if ($request->build_pack === 'dockercompose') {
                 $request->offsetSet('ports_exposes', '80');
             }
-
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             $githubApp = GithubApp::whereTeamId($teamId)->where('uuid', $githubAppUuid)->first();
@@ -930,9 +919,7 @@ class ApplicationsController extends Controller
             }
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
-
             $application->fill($request->all());
-
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
                 $yaml = Yaml::parse($application->docker_compose_raw);
@@ -969,28 +956,24 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
-
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
-
                 queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
-            } else {
-                if ($application->build_pack === 'dockercompose') {
-                    LoadComposeFile::dispatch($application);
-                }
+            } elseif ($application->build_pack === 'dockercompose') {
+                LoadComposeFile::dispatch($application);
             }
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'private-deploy-key') {
-
+        }
+        if ($type === 'private-deploy-key') {
             $validationRules = [
                 'git_repository' => 'string|required',
                 'git_branch' => 'string|required',
@@ -1001,10 +984,8 @@ class ApplicationsController extends Controller
                 'docker_compose_location' => 'string',
                 'docker_compose_raw' => 'string|nullable',
             ];
-
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
-
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1017,21 +998,17 @@ class ApplicationsController extends Controller
             if ($request->build_pack === 'dockercompose') {
                 $request->offsetSet('ports_exposes', '80');
             }
-
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             $privateKey = PrivateKey::whereTeamId($teamId)->where('uuid', $request->private_key_uuid)->first();
             if (! $privateKey) {
                 return response()->json(['message' => 'Private Key not found.'], 404);
             }
-
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
-
             $application->fill($request->all());
-
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
                 $yaml = Yaml::parse($application->docker_compose_raw);
@@ -1066,33 +1043,29 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
-
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
-
                 queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
-            } else {
-                if ($application->build_pack === 'dockercompose') {
-                    LoadComposeFile::dispatch($application);
-                }
+            } elseif ($application->build_pack === 'dockercompose') {
+                LoadComposeFile::dispatch($application);
             }
 
             return response()->json(serializeApiResponse([
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'dockerfile') {
+        }
+        if ($type === 'dockerfile') {
             $validationRules = [
                 'dockerfile' => 'string|required',
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
-
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1102,9 +1075,8 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', 'dockerfile-'.new Cuid2);
             }
-
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             if (! isBase64Encoded($request->dockerfile)) {
@@ -1126,12 +1098,10 @@ class ApplicationsController extends Controller
             }
             $dockerFile = base64_decode($request->dockerfile);
             removeUnnecessaryFieldsFromRequest($request);
-
             $port = get_port_from_dockerfile($request->dockerfile);
             if (! $port) {
                 $port = 80;
             }
-
             $application = new Application;
             $application->fill($request->all());
             $application->fqdn = $fqdn;
@@ -1141,8 +1111,6 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-
-            
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
@@ -1156,7 +1124,6 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
-
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
@@ -1172,7 +1139,8 @@ class ApplicationsController extends Controller
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'dockerimage') {
+        }
+        if ($type === 'dockerimage') {
             $validationRules = [
                 'docker_registry_image_name' => 'string|required',
                 'docker_registry_image_tag' => 'string',
@@ -1180,7 +1148,6 @@ class ApplicationsController extends Controller
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
-
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1191,7 +1158,7 @@ class ApplicationsController extends Controller
                 $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             if (! $request->docker_registry_image_tag) {
@@ -1199,14 +1166,12 @@ class ApplicationsController extends Controller
             }
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
-
             $application->fill($request->all());
             $application->fqdn = $fqdn;
             $application->build_pack = 'dockerimage';
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
@@ -1220,7 +1185,6 @@ class ApplicationsController extends Controller
                 $application->save();
             }
             $application->isConfigurationChanged(true);
-
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
@@ -1236,16 +1200,14 @@ class ApplicationsController extends Controller
                 'uuid' => data_get($application, 'uuid'),
                 'domains' => data_get($application, 'domains'),
             ]))->setStatusCode(201);
-        } elseif ($type === 'dockercompose') {
+        }
+        if ($type === 'dockercompose') {
             $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
-
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1261,7 +1223,6 @@ class ApplicationsController extends Controller
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
-
             if ($validator->fails()) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1269,7 +1230,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $return = $this->validateDataApplications($request, $server);
-            if ($return instanceof \Illuminate\Http\JsonResponse) {
+            if ($return instanceof JsonResponse) {
                 return $return;
             }
             if (! isBase64Encoded($request->docker_compose_raw)) {
@@ -1291,23 +1252,19 @@ class ApplicationsController extends Controller
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-
             // $isValid = validateComposeFile($dockerComposeRaw, $server_id);
             // if ($isValid !== 'OK') {
             //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             // }
-
             $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());
-
             $service->docker_compose_raw = $dockerComposeRaw;
             $service->environment_id = $environment->id;
             $service->server_id = $server->id;
             $service->destination_id = $destination->id;
             $service->destination_type = $destination->getMorphClass();
             $service->save();
-
             $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
             if ($instantDeploy) {
@@ -1447,7 +1404,7 @@ class ApplicationsController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
+        filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
@@ -1602,7 +1559,7 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -1664,16 +1621,14 @@ class ApplicationsController extends Controller
             }
         }
         $return = $this->validateDataApplications($request, $server);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -1696,7 +1651,7 @@ class ApplicationsController extends Controller
 
                 return $domain;
             });
-            if (count($errors) > 0) {
+            if ($errors !== []) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $errors,
@@ -1755,11 +1710,11 @@ class ApplicationsController extends Controller
         $application->save();
 
         if ($instantDeploy) {
-            $deployment_uuid = new Cuid2;
+            $cuid2 = new Cuid2;
 
             queue_application_deployment(
                 application: $application,
-                deployment_uuid: $deployment_uuid,
+                deployment_uuid: $cuid2,
                 is_api: true,
             );
         }
@@ -1935,7 +1890,7 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -1956,12 +1911,10 @@ class ApplicationsController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -1995,43 +1948,38 @@ class ApplicationsController extends Controller
                 $env->save();
 
                 return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
-            } else {
-                return response()->json([
-                    'message' => 'Environment variable not found.',
-                ], 404);
             }
-        } else {
-            $env = $application->environment_variables->where('key', $key)->first();
-            if ($env) {
-                $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
-                if ($env->is_literal != $is_literal) {
-                    $env->is_literal = $is_literal;
-                }
-                if ($env->is_preview != $is_preview) {
-                    $env->is_preview = $is_preview;
-                }
-                if ($env->is_multiline != $request->is_multiline) {
-                    $env->is_multiline = $request->is_multiline;
-                }
-                if ($env->is_shown_once != $request->is_shown_once) {
-                    $env->is_shown_once = $request->is_shown_once;
-                }
-                $env->save();
 
-                return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
-            } else {
-                return response()->json([
-                    'message' => 'Environment variable not found.',
-                ], 404);
+            return response()->json([
+                'message' => 'Environment variable not found.',
+            ], 404);
+        }
+        $env = $application->environment_variables->where('key', $key)->first();
+        if ($env) {
+            $env->value = $request->value;
+            if ($env->is_build_time != $is_build_time) {
+                $env->is_build_time = $is_build_time;
             }
+            if ($env->is_literal != $is_literal) {
+                $env->is_literal = $is_literal;
+            }
+            if ($env->is_preview != $is_preview) {
+                $env->is_preview = $is_preview;
+            }
+            if ($env->is_multiline != $request->is_multiline) {
+                $env->is_multiline = $request->is_multiline;
+            }
+            if ($env->is_shown_once != $request->is_shown_once) {
+                $env->is_shown_once = $request->is_shown_once;
+            }
+            $env->save();
+
+            return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
         }
 
         return response()->json([
-            'message' => 'Something is not okay. Are you okay?',
-        ], 500);
+            'message' => 'Environment variable not found.',
+        ], 404);
     }
 
     #[OA\Patch(
@@ -2124,7 +2072,7 @@ class ApplicationsController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -2330,12 +2278,10 @@ class ApplicationsController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -2352,51 +2298,44 @@ class ApplicationsController extends Controller
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
                 ], 409);
-            } else {
-                $env = $application->environment_variables()->create([
-                    'key' => $request->key,
-                    'value' => $request->value,
-                    'is_preview' => $request->is_preview ?? false,
-                    'is_build_time' => $request->is_build_time ?? false,
-                    'is_literal' => $request->is_literal ?? false,
-                    'is_multiline' => $request->is_multiline ?? false,
-                    'is_shown_once' => $request->is_shown_once ?? false,
-                    'resourceable_type' => get_class($application),
-                    'resourceable_id' => $application->id,
-                ]);
-
-                return response()->json([
-                    'uuid' => $env->uuid,
-                ])->setStatusCode(201);
             }
-        } else {
-            $env = $application->environment_variables->where('key', $key)->first();
-            if ($env) {
-                return response()->json([
-                    'message' => 'Environment variable already exists. Use PATCH request to update it.',
-                ], 409);
-            } else {
-                $env = $application->environment_variables()->create([
-                    'key' => $request->key,
-                    'value' => $request->value,
-                    'is_preview' => $request->is_preview ?? false,
-                    'is_build_time' => $request->is_build_time ?? false,
-                    'is_literal' => $request->is_literal ?? false,
-                    'is_multiline' => $request->is_multiline ?? false,
-                    'is_shown_once' => $request->is_shown_once ?? false,
-                    'resourceable_type' => get_class($application),
-                    'resourceable_id' => $application->id,
-                ]);
+            $env = $application->environment_variables()->create([
+                'key' => $request->key,
+                'value' => $request->value,
+                'is_preview' => $request->is_preview ?? false,
+                'is_build_time' => $request->is_build_time ?? false,
+                'is_literal' => $request->is_literal ?? false,
+                'is_multiline' => $request->is_multiline ?? false,
+                'is_shown_once' => $request->is_shown_once ?? false,
+                'resourceable_type' => get_class($application),
+                'resourceable_id' => $application->id,
+            ]);
 
-                return response()->json([
-                    'uuid' => $env->uuid,
-                ])->setStatusCode(201);
-            }
+            return response()->json([
+                'uuid' => $env->uuid,
+            ])->setStatusCode(201);
         }
+        $env = $application->environment_variables->where('key', $key)->first();
+        if ($env) {
+            return response()->json([
+                'message' => 'Environment variable already exists. Use PATCH request to update it.',
+            ], 409);
+        }
+        $env = $application->environment_variables()->create([
+            'key' => $request->key,
+            'value' => $request->value,
+            'is_preview' => $request->is_preview ?? false,
+            'is_build_time' => $request->is_build_time ?? false,
+            'is_literal' => $request->is_literal ?? false,
+            'is_multiline' => $request->is_multiline ?? false,
+            'is_shown_once' => $request->is_shown_once ?? false,
+            'resourceable_type' => get_class($application),
+            'resourceable_id' => $application->id,
+        ]);
 
         return response()->json([
-            'message' => 'Something went wrong.',
-        ], 500);
+            'uuid' => $env->uuid,
+        ])->setStatusCode(201);
     }
 
     #[OA\Delete(
@@ -2473,7 +2412,7 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
-        $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
+        $found_env = EnvironmentVariable::query()->where('uuid', $request->env_uuid)
             ->where('resourceable_type', Application::class)
             ->where('resourceable_id', $application->id)
             ->first();
@@ -2576,11 +2515,11 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2;
+        $cuid2 = new Cuid2;
 
         queue_application_deployment(
             application: $application,
-            deployment_uuid: $deployment_uuid,
+            deployment_uuid: $cuid2,
             force_rebuild: $force,
             is_api: true,
             no_questions_asked: $instant_deploy
@@ -2589,7 +2528,7 @@ class ApplicationsController extends Controller
         return response()->json(
             [
                 'message' => 'Deployment request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_uuid' => $cuid2->toString(),
             ],
             200
         );
@@ -2737,11 +2676,11 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $deployment_uuid = new Cuid2;
+        $cuid2 = new Cuid2;
 
         queue_application_deployment(
             application: $application,
-            deployment_uuid: $deployment_uuid,
+            deployment_uuid: $cuid2,
             restart_only: true,
             is_api: true,
         );
@@ -2749,7 +2688,7 @@ class ApplicationsController extends Controller
         return response()->json(
             [
                 'message' => 'Restart request queued.',
-                'deployment_uuid' => $deployment_uuid->toString(),
+                'deployment_uuid' => $cuid2->toString(),
             ],
         );
     }
@@ -2836,7 +2775,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -2844,12 +2783,10 @@ class ApplicationsController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -2932,7 +2869,7 @@ class ApplicationsController extends Controller
 
                 return str($domain)->trim()->lower();
             });
-            if (count($errors) > 0) {
+            if ($errors !== []) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => $errors,
@@ -2947,5 +2884,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
         }
+
+        return null;
     }
 }

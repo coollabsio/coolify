@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,14 +16,10 @@ class StandaloneClickhouse extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
-    protected $casts = [
-        'clickhouse_password' => 'encrypted',
-    ];
-
     protected static function booted()
     {
         static::created(function ($database) {
-            LocalPersistentVolume::create([
+            LocalPersistentVolume::query()->create([
                 'name' => 'clickhouse-data-'.$database->uuid,
                 'mount_path' => '/bitnami/clickhouse',
                 'host_path' => null,
@@ -69,14 +66,13 @@ class StandaloneClickhouse extends BaseModel
         }
         if ($oldConfigHash === $newConfigHash) {
             return false;
-        } else {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
-
-            return true;
         }
+        if ($save) {
+            $this->config_hash = $newConfigHash;
+            $this->save();
+        }
+
+        return true;
     }
 
     public function isRunning()
@@ -109,8 +105,8 @@ class StandaloneClickhouse extends BaseModel
             return;
         }
         $server = data_get($this, 'destination.server');
-        foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+        foreach ($persistentStorages as $persistentStorage) {
+            instant_remote_process(["docker volume rm -f $persistentStorage->name"], $server, false);
         }
     }
 
@@ -283,7 +279,7 @@ class StandaloneClickhouse extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new \Exception($error);
+            throw new Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -305,7 +301,7 @@ class StandaloneClickhouse extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new \Exception($error);
+            throw new Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -318,5 +314,12 @@ class StandaloneClickhouse extends BaseModel
     public function isBackupSolutionAvailable()
     {
         return false;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'clickhouse_password' => 'encrypted',
+        ];
     }
 }

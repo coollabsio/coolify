@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use Exception;
 use Illuminate\Console\Command;
 
 class RootChangeEmail extends Command
@@ -31,9 +32,9 @@ class RootChangeEmail extends Command
         $email = $this->ask('Give me a new email for root user');
         $this->info('Updating root email...');
         try {
-            User::find(0)->update(['email' => $email]);
+            User::query()->find(0)->update(['email' => $email]);
             $this->info('Root user\'s email updated successfully.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to update root user\'s email.');
 
             return;

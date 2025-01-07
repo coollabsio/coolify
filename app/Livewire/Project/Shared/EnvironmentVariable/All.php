@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use Livewire\Component;
+use Throwable;
 
 class All extends Component
 {
@@ -31,7 +33,7 @@ class All extends Component
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
         $this->resourceClass = get_class($this->resource);
-        $resourceWithPreviews = [\App\Models\Application::class];
+        $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
         if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
             $this->showPreview = true;
@@ -101,11 +103,13 @@ class All extends Component
 
             $this->updateOrder();
             $this->sortEnvironmentVariables();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->refreshEnvs();
         }
+
+        return null;
     }
 
     private function updateOrder()
@@ -167,17 +171,17 @@ class All extends Component
 
     private function createEnvironmentVariable($data)
     {
-        $environment = new EnvironmentVariable;
-        $environment->key = $data['key'];
-        $environment->value = $data['value'];
-        $environment->is_build_time = $data['is_build_time'] ?? false;
-        $environment->is_multiline = $data['is_multiline'] ?? false;
-        $environment->is_literal = $data['is_literal'] ?? false;
-        $environment->is_preview = $data['is_preview'] ?? false;
-        $environment->resourceable_id = $this->resource->id;
-        $environment->resourceable_type = $this->resource->getMorphClass();
+        $environmentVariable = new EnvironmentVariable;
+        $environmentVariable->key = $data['key'];
+        $environmentVariable->value = $data['value'];
+        $environmentVariable->is_build_time = $data['is_build_time'] ?? false;
+        $environmentVariable->is_multiline = $data['is_multiline'] ?? false;
+        $environmentVariable->is_literal = $data['is_literal'] ?? false;
+        $environmentVariable->is_preview = $data['is_preview'] ?? false;
+        $environmentVariable->resourceable_id = $this->resource->id;
+        $environmentVariable->resourceable_type = $this->resource->getMorphClass();
 
-        return $environment;
+        return $environmentVariable;
     }
 
     private function deleteRemovedVariables($isPreview, $variables)

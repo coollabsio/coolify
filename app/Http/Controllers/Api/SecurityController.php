@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PrivateKey;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -58,7 +59,7 @@ class SecurityController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $keys = PrivateKey::where('team_id', $teamId)->get();
+        $keys = PrivateKey::query()->where('team_id', $teamId)->get();
 
         return response()->json($this->removeSensitiveData($keys));
     }
@@ -102,7 +103,7 @@ class SecurityController extends Controller
             return invalidTokenResponse();
         }
 
-        $key = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
+        $key = PrivateKey::query()->where('team_id', $teamId)->where('uuid', $request->uuid)->first();
 
         if (is_null($key)) {
             return response()->json([
@@ -172,7 +173,7 @@ class SecurityController extends Controller
             return invalidTokenResponse();
         }
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -195,7 +196,7 @@ class SecurityController extends Controller
         if (! $request->description) {
             $request->offsetSet('description', 'Created by Coolify via API');
         }
-        $key = PrivateKey::create([
+        $privateKey = PrivateKey::query()->create([
             'team_id' => $teamId,
             'name' => $request->name,
             'description' => $request->description,
@@ -203,7 +204,7 @@ class SecurityController extends Controller
         ]);
 
         return response()->json(serializeApiResponse([
-            'uuid' => $key->uuid,
+            'uuid' => $privateKey->uuid,
         ]))->setStatusCode(201);
     }
 
@@ -267,7 +268,7 @@ class SecurityController extends Controller
             return invalidTokenResponse();
         }
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
@@ -278,12 +279,10 @@ class SecurityController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -291,7 +290,7 @@ class SecurityController extends Controller
                 'errors' => $errors,
             ], 422);
         }
-        $foundKey = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
+        $foundKey = PrivateKey::query()->where('team_id', $teamId)->where('uuid', $request->uuid)->first();
         if (is_null($foundKey)) {
             return response()->json([
                 'message' => 'Private Key not found.',
@@ -355,7 +354,7 @@ class SecurityController extends Controller
             return response()->json(['message' => 'UUID is required.'], 422);
         }
 
-        $key = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
+        $key = PrivateKey::query()->where('team_id', $teamId)->where('uuid', $request->uuid)->first();
         if (is_null($key)) {
             return response()->json(['message' => 'Private Key not found.'], 404);
         }

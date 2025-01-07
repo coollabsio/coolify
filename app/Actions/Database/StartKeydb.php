@@ -17,9 +17,9 @@ class StartKeydb
 
     public string $configuration_dir;
 
-    public function handle(StandaloneKeydb $database)
+    public function handle(StandaloneKeydb $standaloneKeydb)
     {
-        $this->database = $database;
+        $this->database = $standaloneKeydb;
 
         $startCommand = "keydb-server --requirepass {$this->database->keydb_password} --appendonly yes";
 
@@ -92,7 +92,7 @@ class StartKeydb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->keydb_conf) || ! empty($this->database->keydb_conf)) {
+        if (! is_null($this->database->keydb_conf) || $this->database->keydb_conf !== null) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/keydb.conf',
@@ -110,12 +110,12 @@ class StartKeydb
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "echo 'Pulling {$standaloneKeydb->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return remote_process($this->commands, $standaloneKeydb->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
     private function generate_local_persistent_volumes()

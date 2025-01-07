@@ -30,7 +30,7 @@ class Bitbucket extends Controller
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Bitbicket::manual_bitbucket", $json);
 
-                return;
+                return null;
             }
             $return_payloads = collect([]);
             $payload = $request->collect();
@@ -63,7 +63,7 @@ class Bitbucket extends Controller
                 $pull_request_html_url = data_get($payload, 'pullrequest.links.html.href');
                 $commit = data_get($payload, 'pullrequest.source.commit.hash');
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
+            $applications = Application::query()->where('git_repository', 'like', "%$full_name%");
             $applications = $applications->where('git_branch', $branch)->get();
             if ($applications->isEmpty()) {
                 return response([
@@ -122,10 +122,10 @@ class Bitbucket extends Controller
                 if ($x_bitbucket_event === 'pullrequest:created') {
                     if ($application->isPRDeployable()) {
                         $deployment_uuid = new Cuid2;
-                        $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                        $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if (! $found) {
                             if ($application->build_pack === 'dockercompose') {
-                                $pr_app = ApplicationPreview::create([
+                                $pr_app = ApplicationPreview::query()->create([
                                     'git_type' => 'bitbucket',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
@@ -134,7 +134,7 @@ class Bitbucket extends Controller
                                 ]);
                                 $pr_app->generate_preview_fqdn_compose();
                             } else {
-                                ApplicationPreview::create([
+                                ApplicationPreview::query()->create([
                                     'git_type' => 'bitbucket',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
@@ -165,7 +165,7 @@ class Bitbucket extends Controller
                     }
                 }
                 if ($x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
-                    $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                    $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
                         $container_name = generateApplicationContainerName($application, $pull_request_id);

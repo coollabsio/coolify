@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -22,8 +23,8 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application $application,
-        public ApplicationPreview $preview,
-        public ProcessStatus $status,
+        public ApplicationPreview $applicationPreview,
+        public ProcessStatus $processStatus,
         public ?string $deployment_uuid = null
     ) {
         $this->onQueue('high');
@@ -33,39 +34,42 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             if ($this->application->is_public_repository()) {
-                return;
+                return null;
             }
-            if ($this->status === ProcessStatus::CLOSED) {
+            if ($this->processStatus === ProcessStatus::CLOSED) {
                 $this->delete_comment();
 
-                return;
-            } elseif ($this->status === ProcessStatus::IN_PROGRESS) {
+                return null;
+            }
+            if ($this->processStatus === ProcessStatus::IN_PROGRESS) {
                 $this->body = "The preview deployment is in progress. 🟡\n\n";
-            } elseif ($this->status === ProcessStatus::FINISHED) {
+            } elseif ($this->processStatus === ProcessStatus::FINISHED) {
                 $this->body = "The preview deployment is ready. 🟢\n\n";
-                if ($this->preview->fqdn) {
-                    $this->body .= "[Open Preview]({$this->preview->fqdn}) | ";
+                if ($this->applicationPreview->fqdn) {
+                    $this->body .= "[Open Preview]({$this->applicationPreview->fqdn}) | ";
                 }
-            } elseif ($this->status === ProcessStatus::ERROR) {
+            } elseif ($this->processStatus === ProcessStatus::ERROR) {
                 $this->body = "The preview deployment failed. 🔴\n\n";
             }
             $this->build_logs_url = base_url()."/project/{$this->application->environment->project->uuid}/{$this->application->environment->name}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
 
             $this->body .= '[Open Build Logs]('.$this->build_logs_url.")\n\n\n";
             $this->body .= 'Last updated at: '.now()->toDateTimeString().' CET';
-            if ($this->preview->pull_request_issue_comment_id) {
+            if ($this->applicationPreview->pull_request_issue_comment_id) {
                 $this->update_comment();
             } else {
                 $this->create_comment();
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return $e;
         }
+
+        return null;
     }
 
     private function update_comment()
     {
-        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'patch', data: [
+        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->applicationPreview->pull_request_issue_comment_id}", method: 'patch', data: [
             'body' => $this->body,
         ], throwError: false);
         if (data_get($data, 'message') === 'Not Found') {
@@ -75,15 +79,15 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     private function create_comment()
     {
-        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/{$this->preview->pull_request_id}/comments", method: 'post', data: [
+        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/{$this->applicationPreview->pull_request_id}/comments", method: 'post', data: [
             'body' => $this->body,
         ]);
-        $this->preview->pull_request_issue_comment_id = $data['id'];
-        $this->preview->save();
+        $this->applicationPreview->pull_request_issue_comment_id = $data['id'];
+        $this->applicationPreview->save();
     }
 
     private function delete_comment()
     {
-        githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'delete');
+        githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->applicationPreview->pull_request_issue_comment_id}", method: 'delete');
     }
 }

@@ -30,12 +30,12 @@ class DeploymentFailed extends CustomEmailNotification
 
     public ?string $fqdn = null;
 
-    public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
+    public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $applicationPreview = null)
     {
         $this->onQueue('high');
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
-        $this->preview = $preview;
+        $this->preview = $applicationPreview;
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
         $this->environment_uuid = data_get($application, 'environment.uuid');
@@ -54,28 +54,28 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
+        $mailMessage = new MailMessage;
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
         $fqdn = $this->fqdn;
         if ($pull_request_id === 0) {
-            $mail->subject('Coolify: Deployment failed of '.$this->application_name.'.');
+            $mailMessage->subject('Coolify: Deployment failed of '.$this->application_name.'.');
         } else {
             $fqdn = $this->preview->fqdn;
-            $mail->subject('Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.'.');
+            $mailMessage->subject('Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.'.');
         }
-        $mail->view('emails.application-deployment-failed', [
+        $mailMessage->view('emails.application-deployment-failed', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,
             'pull_request_id' => data_get($this->preview, 'pull_request_id', 0),
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        if ($this->preview) {
+        if ($this->preview instanceof ApplicationPreview) {
             $message = new DiscordMessage(
                 title: ':cross_mark: Deployment failed',
                 description: 'Pull request: '.$this->preview->pull_request_id,
@@ -92,22 +92,16 @@ class DeploymentFailed extends CustomEmailNotification
                 $message->addField('Domain', $this->fqdn, true);
             }
         } else {
-            if ($this->fqdn) {
-                $description = '[Open application]('.$this->fqdn.')';
-            } else {
-                $description = '';
-            }
+            $description = $this->fqdn ? '[Open application]('.$this->fqdn.')' : '';
             $message = new DiscordMessage(
                 title: ':cross_mark: Deployment failed',
                 description: $description,
                 color: DiscordMessage::errorColor(),
                 isCritical: true,
             );
-
             $message->addField('Project', data_get($this->application, 'environment.project.name'), true);
             $message->addField('Environment', $this->environment_name, true);
             $message->addField('Name', $this->application_name, true);
-
             $message->addField('Deployment Logs', '[Link]('.$this->deployment_url.')');
         }
 
@@ -116,7 +110,7 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        if ($this->preview) {
+        if ($this->preview instanceof ApplicationPreview) {
             $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
         } else {
             $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
@@ -136,7 +130,7 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        if ($this->preview) {
+        if ($this->preview instanceof ApplicationPreview) {
             $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
             $message = "Pull request deployment failed for {$this->application_name}";
         } else {
@@ -161,7 +155,7 @@ class DeploymentFailed extends CustomEmailNotification
 
     public function toSlack(): SlackMessage
     {
-        if ($this->preview) {
+        if ($this->preview instanceof ApplicationPreview) {
             $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
             $description = "Pull request deployment failed for {$this->application_name}";
             if ($this->preview->fqdn) {

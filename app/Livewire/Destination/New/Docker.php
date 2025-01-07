@@ -5,9 +5,11 @@ namespace App\Livewire\Destination\New;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Exception;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class Docker extends Component
@@ -63,31 +65,31 @@ class Docker extends Component
             if ($this->isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();
                 if ($found) {
-                    throw new \Exception('Network already added to this server.');
-                } else {
-                    $docker = SwarmDocker::create([
-                        'name' => $this->name,
-                        'network' => $this->network,
-                        'server_id' => $this->selectedServer->id,
-                    ]);
+                    throw new Exception('Network already added to this server.');
                 }
+                $docker = SwarmDocker::query()->create([
+                    'name' => $this->name,
+                    'network' => $this->network,
+                    'server_id' => $this->selectedServer->id,
+                ]);
             } else {
                 $found = $this->selectedServer->standaloneDockers()->where('network', $this->network)->first();
                 if ($found) {
-                    throw new \Exception('Network already added to this server.');
-                } else {
-                    $docker = StandaloneDocker::create([
-                        'name' => $this->name,
-                        'network' => $this->network,
-                        'server_id' => $this->selectedServer->id,
-                    ]);
+                    throw new Exception('Network already added to this server.');
                 }
+                $docker = StandaloneDocker::query()->create([
+                    'name' => $this->name,
+                    'network' => $this->network,
+                    'server_id' => $this->selectedServer->id,
+                ]);
             }
             $connectProxyToDockerNetworks = connectProxyToNetworks($this->selectedServer);
             instant_remote_process($connectProxyToDockerNetworks, $this->selectedServer, false);
             $this->dispatch('reloadWindow');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 }

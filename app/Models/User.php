@@ -48,12 +48,6 @@ class User extends Authenticatable implements SendsEmail
         'two_factor_secret',
     ];
 
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'force_password_reset' => 'boolean',
-        'show_boarding' => 'boolean',
-    ];
-
     protected static function boot()
     {
         parent::boot();
@@ -67,7 +61,7 @@ class User extends Authenticatable implements SendsEmail
                 $team['id'] = 0;
                 $team['name'] = 'Root Team';
             }
-            $new_team = Team::create($team);
+            $new_team = Team::query()->create($team);
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
@@ -83,7 +77,7 @@ class User extends Authenticatable implements SendsEmail
             $team['id'] = 0;
             $team['name'] = 'Root Team';
         }
-        $new_team = Team::create($team);
+        $new_team = Team::query()->create($team);
         $this->teams()->attach($new_team, ['role' => 'owner']);
 
         return $new_team;
@@ -98,7 +92,7 @@ class User extends Authenticatable implements SendsEmail
             hash('crc32b', $tokenEntropy)
         );
 
-        $token = $this->tokens()->create([
+        $personalAccessToken = $this->tokens()->create([
             'name' => $name,
             'token' => hash('sha256', $plainTextToken),
             'abilities' => $abilities,
@@ -106,7 +100,7 @@ class User extends Authenticatable implements SendsEmail
             'team_id' => session('currentTeam')->id,
         ]);
 
-        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
+        return new NewAccessToken($personalAccessToken, $personalAccessToken->getKey().'|'.$plainTextToken);
     }
 
     public function teams()
@@ -121,7 +115,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function sendVerificationEmail()
     {
-        $mail = new MailMessage;
+        $mailMessage = new MailMessage;
         $url = Url::temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
@@ -130,11 +124,11 @@ class User extends Authenticatable implements SendsEmail
                 'hash' => sha1($this->getEmailForVerification()),
             ]
         );
-        $mail->view('emails.email-verification', [
+        $mailMessage->view('emails.email-verification', [
             'url' => $url,
         ]);
-        $mail->subject('Coolify: Verify your email.');
-        send_user_an_email($mail, $this->email);
+        $mailMessage->subject('Coolify: Verify your email.');
+        send_user_an_email($mailMessage, $this->email);
     }
 
     public function sendPasswordResetNotification($token): void
@@ -144,7 +138,11 @@ class User extends Authenticatable implements SendsEmail
 
     public function isAdmin()
     {
-        return $this->role() === 'admin' || $this->role() === 'owner';
+        if ($this->role() === 'admin') {
+            return true;
+        }
+
+        return $this->role() === 'owner';
     }
 
     public function isOwner()
@@ -181,11 +179,7 @@ class User extends Authenticatable implements SendsEmail
     {
         $found_root_team = Auth::user()->teams->filter(function ($team) {
             if ($team->id == 0) {
-                if (! Auth::user()->isAdmin()) {
-                    return false;
-                }
-
-                return true;
+                return (bool) Auth::user()->isAdmin();
             }
 
             return false;
@@ -201,7 +195,7 @@ class User extends Authenticatable implements SendsEmail
                 return Auth::user()->teams[0];
             }
 
-            return Team::find(session('currentTeam')->id);
+            return Team::query()->find(session('currentTeam')->id);
         });
     }
 
@@ -220,5 +214,14 @@ class User extends Authenticatable implements SendsEmail
         $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
         return data_get($user, 'pivot.role');
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'force_password_reset' => 'boolean',
+            'show_boarding' => 'boolean',
+        ];
     }
 }

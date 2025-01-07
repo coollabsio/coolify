@@ -37,32 +37,6 @@ class EmailNotificationSettings extends Model
         'server_disk_usage_email_notifications',
     ];
 
-    protected $casts = [
-        'smtp_enabled' => 'boolean',
-        'smtp_from_address' => 'encrypted',
-        'smtp_from_name' => 'encrypted',
-        'smtp_recipients' => 'encrypted',
-        'smtp_host' => 'encrypted',
-        'smtp_port' => 'integer',
-        'smtp_username' => 'encrypted',
-        'smtp_password' => 'encrypted',
-        'smtp_timeout' => 'integer',
-
-        'resend_enabled' => 'boolean',
-        'resend_api_key' => 'encrypted',
-
-        'use_instance_email_settings' => 'boolean',
-
-        'deployment_success_email_notifications' => 'boolean',
-        'deployment_failure_email_notifications' => 'boolean',
-        'status_change_email_notifications' => 'boolean',
-        'backup_success_email_notifications' => 'boolean',
-        'backup_failure_email_notifications' => 'boolean',
-        'scheduled_task_success_email_notifications' => 'boolean',
-        'scheduled_task_failure_email_notifications' => 'boolean',
-        'server_disk_usage_email_notifications' => 'boolean',
-    ];
-
     public function team()
     {
         return $this->belongsTo(Team::class);
@@ -75,5 +49,34 @@ class EmailNotificationSettings extends Model
         }
 
         return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'smtp_enabled' => 'boolean',
+            'smtp_from_address' => 'encrypted',
+            'smtp_from_name' => 'encrypted',
+            'smtp_recipients' => 'encrypted',
+            'smtp_host' => 'encrypted',
+            'smtp_port' => 'integer',
+            'smtp_username' => 'encrypted',
+            'smtp_password' => 'encrypted',
+            'smtp_timeout' => 'integer',
+
+            'resend_enabled' => 'boolean',
+            'resend_api_key' => 'encrypted',
+
+            'use_instance_email_settings' => 'boolean',
+
+            'deployment_success_email_notifications' => 'boolean',
+            'deployment_failure_email_notifications' => 'boolean',
+            'status_change_email_notifications' => 'boolean',
+            'backup_success_email_notifications' => 'boolean',
+            'backup_failure_email_notifications' => 'boolean',
+            'scheduled_task_success_email_notifications' => 'boolean',
+            'scheduled_task_failure_email_notifications' => 'boolean',
+            'server_disk_usage_email_notifications' => 'boolean',
+        ];
     }
 }

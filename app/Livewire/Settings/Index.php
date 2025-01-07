@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Jobs\CheckForUpdatesJob;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Computed;
@@ -77,26 +78,27 @@ class Index extends Component
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
-        } else {
-            $this->settings = instanceSettings();
-            $this->fqdn = $this->settings->fqdn;
-            $this->public_port_min = $this->settings->public_port_min;
-            $this->public_port_max = $this->settings->public_port_max;
-            $this->custom_dns_servers = $this->settings->custom_dns_servers;
-            $this->instance_name = $this->settings->instance_name;
-            $this->allowed_ips = $this->settings->allowed_ips;
-            $this->public_ipv4 = $this->settings->public_ipv4;
-            $this->public_ipv6 = $this->settings->public_ipv6;
-            $this->do_not_track = $this->settings->do_not_track;
-            $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
-            $this->is_registration_enabled = $this->settings->is_registration_enabled;
-            $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
-            $this->is_api_enabled = $this->settings->is_api_enabled;
-            $this->auto_update_frequency = $this->settings->auto_update_frequency;
-            $this->update_check_frequency = $this->settings->update_check_frequency;
-            $this->instance_timezone = $this->settings->instance_timezone;
-            $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
         }
+        $this->settings = instanceSettings();
+        $this->fqdn = $this->settings->fqdn;
+        $this->public_port_min = $this->settings->public_port_min;
+        $this->public_port_max = $this->settings->public_port_max;
+        $this->custom_dns_servers = $this->settings->custom_dns_servers;
+        $this->instance_name = $this->settings->instance_name;
+        $this->allowed_ips = $this->settings->allowed_ips;
+        $this->public_ipv4 = $this->settings->public_ipv4;
+        $this->public_ipv6 = $this->settings->public_ipv6;
+        $this->do_not_track = $this->settings->do_not_track;
+        $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
+        $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
+        $this->is_api_enabled = $this->settings->is_api_enabled;
+        $this->auto_update_frequency = $this->settings->auto_update_frequency;
+        $this->update_check_frequency = $this->settings->update_check_frequency;
+        $this->instance_timezone = $this->settings->instance_timezone;
+        $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
+
+        return null;
     }
 
     #[Computed]
@@ -144,46 +146,43 @@ class Index extends Component
     {
         try {
             $error_show = false;
-            $this->server = Server::findOrFail(0);
+            $this->server = Server::query()->findOrFail(0);
             $this->resetErrorBag();
 
             if (! validate_timezone($this->instance_timezone)) {
                 $this->instance_timezone = config('app.timezone');
-                throw new \Exception('Invalid timezone.');
-            } else {
-                $this->settings->instance_timezone = $this->instance_timezone;
+                throw new Exception('Invalid timezone.');
             }
+            $this->settings->instance_timezone = $this->instance_timezone;
 
             if ($this->settings->public_port_min > $this->settings->public_port_max) {
                 $this->addError('settings.public_port_min', 'The minimum port must be lower than the maximum port.');
 
-                return;
+                return null;
             }
             $this->validate();
 
             if ($this->is_auto_update_enabled && ! validate_cron_expression($this->auto_update_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Auto Update Frequency.');
-                if (empty($this->auto_update_frequency)) {
+                if (! isset($this->auto_update_frequency) || ($this->auto_update_frequency === '' || $this->auto_update_frequency === '0')) {
                     $this->auto_update_frequency = '0 0 * * *';
                 }
 
-                return;
+                return null;
             }
 
             if (! validate_cron_expression($this->update_check_frequency)) {
                 $this->dispatch('error', 'Invalid Cron / Human expression for Update Check Frequency.');
-                if (empty($this->update_check_frequency)) {
+                if (! isset($this->update_check_frequency) || ($this->update_check_frequency === '' || $this->update_check_frequency === '0')) {
                     $this->update_check_frequency = '0 * * * *';
                 }
 
-                return;
+                return null;
             }
 
-            if ($this->settings->is_dns_validation_enabled && $this->settings->fqdn) {
-                if (! validate_dns_entry($this->settings->fqdn, $this->server)) {
-                    $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->settings->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
-                    $error_show = true;
-                }
+            if ($this->settings->is_dns_validation_enabled && $this->settings->fqdn && ! validate_dns_entry($this->settings->fqdn, $this->server)) {
+                $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->settings->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                $error_show = true;
             }
             if ($this->settings->fqdn) {
                 check_domain_usage(domain: $this->settings->fqdn);
@@ -209,9 +208,11 @@ class Index extends Component
             if (! $error_show) {
                 $this->dispatch('success', 'Instance settings updated successfully!');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function checkManually()

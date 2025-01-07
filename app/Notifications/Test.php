@@ -4,9 +4,9 @@ namespace App\Notifications;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
-use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
@@ -30,7 +30,7 @@ class Test extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         if ($this->channel) {
-            $channels = match ($this->channel) {
+            return match ($this->channel) {
                 'email' => [EmailChannel::class],
                 'discord' => [DiscordChannel::class],
                 'telegram' => [TelegramChannel::class],
@@ -38,11 +38,9 @@ class Test extends Notification implements ShouldQueue
                 'pushover' => [PushoverChannel::class],
                 default => [],
             };
-        } else {
-            $channels = $notifiable->getEnabledChannels('test');
         }
 
-        return $channels;
+        return $notifiable->getEnabledChannels('test');
     }
 
     public function middleware(object $notifiable, string $channel)
@@ -55,24 +53,24 @@ class Test extends Notification implements ShouldQueue
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject('Coolify: Test Email');
-        $mail->view('emails.test');
+        $mailMessage = new MailMessage;
+        $mailMessage->subject('Coolify: Test Email');
+        $mailMessage->view('emails.test');
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        $discordMessage = new DiscordMessage(
             title: ':white_check_mark: Test Success',
             description: 'This is a test Discord notification from Coolify. :cross_mark: :warning: :information_source:',
             color: DiscordMessage::successColor(),
         );
 
-        $message->addField(name: 'Dashboard', value: '[Link]('.base_url().')', inline: true);
+        $discordMessage->addField(name: 'Dashboard', value: '[Link]('.base_url().')', inline: true);
 
-        return $message;
+        return $discordMessage;
     }
 
     public function toTelegram(): array

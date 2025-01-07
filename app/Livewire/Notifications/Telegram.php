@@ -8,6 +8,7 @@ use App\Notifications\Test;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Telegram extends Component
 {
@@ -106,9 +107,11 @@ class Telegram extends Component
             $this->team = auth()->user()->currentTeam();
             $this->settings = $this->team->telegramNotificationSettings;
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -183,11 +186,13 @@ class Telegram extends Component
     {
         try {
             $this->syncData(true);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->dispatch('refresh');
         }
+
+        return null;
     }
 
     public function submit()
@@ -196,9 +201,11 @@ class Telegram extends Component
             $this->resetErrorBag();
             $this->syncData(true);
             $this->saveModel();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSaveTelegramEnabled()
@@ -212,13 +219,15 @@ class Telegram extends Component
                 'telegramChatId.required' => 'Telegram Chat ID is required.',
             ]);
             $this->saveModel();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->telegramEnabled = false;
 
             return handleError($e, $this);
         } finally {
             $this->dispatch('refresh');
         }
+
+        return null;
     }
 
     public function saveModel()
@@ -233,9 +242,11 @@ class Telegram extends Component
         try {
             $this->team->notify(new Test(channel: 'telegram'));
             $this->dispatch('success', 'Test notification sent.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

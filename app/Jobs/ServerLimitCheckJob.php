@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -46,10 +47,12 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 });
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             send_internal_notification('ServerLimitCheckJob failed with: '.$e->getMessage());
 
             return handleError($e);
         }
+
+        return null;
     }
 }

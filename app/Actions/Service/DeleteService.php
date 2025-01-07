@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
 use App\Models\Service;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -32,17 +33,15 @@ class DeleteService
                         $storagesToDelete->push($storage);
                     }
                 }
-                foreach ($storagesToDelete as $storage) {
-                    $commands[] = "docker volume rm -f $storage->name";
+                foreach ($storagesToDelete as $storageToDelete) {
+                    $commands[] = "docker volume rm -f $storageToDelete->name";
                 }
 
                 // Execute volume deletion first, this must be done first otherwise volumes will not be deleted.
-                if (! empty($commands)) {
-                    foreach ($commands as $command) {
-                        $result = instant_remote_process([$command], $server, false);
-                        if ($result !== null && $result !== 0) {
-                            Log::error('Error deleting volumes: '.$result);
-                        }
+                foreach ($commands as $command) {
+                    $result = instant_remote_process([$command], $server, false);
+                    if ($result !== null && $result !== 0) {
+                        Log::error('Error deleting volumes: '.$result);
                     }
                 }
             }
@@ -52,8 +51,8 @@ class DeleteService
             }
 
             instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
-        } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage(), $e->getCode(), $e);
         } finally {
             if ($deleteConfigurations) {
                 $service->delete_configurations();

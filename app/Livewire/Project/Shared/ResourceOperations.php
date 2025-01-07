@@ -2,11 +2,21 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use Livewire\Component;
+use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class ResourceOperations extends Component
@@ -32,18 +42,17 @@ class ResourceOperations extends Component
 
     public function cloneTo($destination_id)
     {
-        $new_destination = StandaloneDocker::find($destination_id);
+        $new_destination = StandaloneDocker::query()->find($destination_id);
         if (! $new_destination) {
-            $new_destination = SwarmDocker::find($destination_id);
+            $new_destination = SwarmDocker::query()->find($destination_id);
         }
         if (! $new_destination) {
             return $this->addError('destination_id', 'Destination not found.');
         }
         $uuid = (string) new Cuid2;
         $server = $new_destination->server;
-        if ($this->resource->getMorphClass() === \App\Models\Application::class) {
+        if ($this->resource->getMorphClass() === Application::class) {
             $name = 'clone-of-'.str($this->resource->name)->limit(20).'-'.$uuid;
-
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
                 'name' => $name,
@@ -66,12 +75,12 @@ class ResourceOperations extends Component
                 $newEnvironmentVariable->save();
             }
             $persistentVolumes = $this->resource->persistentStorages()->get();
-            foreach ($persistentVolumes as $volume) {
-                $volumeName = str($volume->name)->replace($this->resource->uuid, $new_resource->uuid)->value();
-                if ($volumeName === $volume->name) {
-                    $volumeName = $new_resource->uuid.'-'.str($volume->name)->afterLast('-');
+            foreach ($persistentVolumes as $persistentVolume) {
+                $volumeName = str($persistentVolume->name)->replace($this->resource->uuid, $new_resource->uuid)->value();
+                if ($volumeName === $persistentVolume->name) {
+                    $volumeName = $new_resource->uuid.'-'.str($persistentVolume->name)->afterLast('-');
                 }
-                $newPersistentVolume = $volume->replicate()->fill([
+                $newPersistentVolume = $persistentVolume->replicate()->fill([
                     'name' => $volumeName,
                     'resource_id' => $new_resource->id,
                 ]);
@@ -84,16 +93,15 @@ class ResourceOperations extends Component
             ]).'#resource-operations';
 
             return redirect()->to($route);
-        } elseif (
-            $this->resource->getMorphClass() === \App\Models\StandalonePostgresql::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneMongodb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneMysql::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneMariadb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
-        ) {
+        }
+        if ($this->resource->getMorphClass() === StandalonePostgresql::class ||
+        $this->resource->getMorphClass() === StandaloneMongodb::class ||
+        $this->resource->getMorphClass() === StandaloneMysql::class ||
+        $this->resource->getMorphClass() === StandaloneMariadb::class ||
+        $this->resource->getMorphClass() === StandaloneRedis::class ||
+        $this->resource->getMorphClass() === StandaloneKeydb::class ||
+        $this->resource->getMorphClass() === StandaloneDragonfly::class ||
+        $this->resource->getMorphClass() === StandaloneClickhouse::class) {
             $uuid = (string) new Cuid2;
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
@@ -127,7 +135,8 @@ class ResourceOperations extends Component
             ]).'#resource-operations';
 
             return redirect()->to($route);
-        } elseif ($this->resource->type() === 'service') {
+        }
+        if ($this->resource->type() === 'service') {
             $uuid = (string) new Cuid2;
             $new_resource = $this->resource->replicate()->fill([
                 'uuid' => $uuid,
@@ -154,12 +163,14 @@ class ResourceOperations extends Component
 
             return redirect()->to($route);
         }
+
+        return null;
     }
 
     public function moveTo($environment_id)
     {
         try {
-            $new_environment = Environment::findOrFail($environment_id);
+            $new_environment = Environment::query()->findOrFail($environment_id);
             $this->resource->update([
                 'environment_id' => $environment_id,
             ]);
@@ -171,7 +182,8 @@ class ResourceOperations extends Component
                 ]).'#resource-operations';
 
                 return redirect()->to($route);
-            } elseif (str($this->resource->type())->startsWith('standalone-')) {
+            }
+            if (str($this->resource->type())->startsWith('standalone-')) {
                 $route = route('project.database.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
                     'environment_uuid' => $new_environment->uuid,
@@ -179,7 +191,8 @@ class ResourceOperations extends Component
                 ]).'#resource-operations';
 
                 return redirect()->to($route);
-            } elseif ($this->resource->type() === 'service') {
+            }
+            if ($this->resource->type() === 'service') {
                 $route = route('project.service.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
                     'environment_uuid' => $new_environment->uuid,
@@ -188,9 +201,11 @@ class ResourceOperations extends Component
 
                 return redirect()->to($route);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

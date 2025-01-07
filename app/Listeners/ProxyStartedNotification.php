@@ -9,11 +9,9 @@ class ProxyStartedNotification
 {
     public Server $server;
 
-    public function __construct() {}
-
-    public function handle(ProxyStarted $event): void
+    public function handle(ProxyStarted $proxyStarted): void
     {
-        $this->server = data_get($event, 'data');
+        $this->server = data_get($proxyStarted, 'data');
         $this->server->setupDefaultRedirect();
         $this->server->setupDynamicProxyConfiguration();
         $this->server->proxy->force_stop = false;

@@ -33,13 +33,13 @@ class CoolifyTask implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        $remote_process = resolve(RunRemoteProcess::class, [
+        $runRemoteProcess = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'ignore_errors' => $this->ignore_errors,
             'call_event_on_finish' => $this->call_event_on_finish,
             'call_event_data' => $this->call_event_data,
         ]);
 
-        $remote_process();
+        $runRemoteProcess();
     }
 }

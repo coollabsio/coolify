@@ -4,6 +4,7 @@ namespace App\Actions\Application;
 
 use App\Models\Application;
 use App\Models\Server;
+use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplicationOneServer
@@ -13,7 +14,7 @@ class StopApplicationOneServer
     public function handle(Application $application, Server $server)
     {
         if ($application->destination->server->isSwarm()) {
-            return;
+            return null;
         }
         if (! $server->isFunctional()) {
             return 'Server is not functional';
@@ -31,8 +32,10 @@ class StopApplicationOneServer
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $e->getMessage();
         }
+
+        return null;
     }
 }

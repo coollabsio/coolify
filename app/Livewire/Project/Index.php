@@ -34,7 +34,7 @@ class Index extends Component
 
     public function navigateToProject($projectUuid)
     {
-        $project = Project::where('uuid', $projectUuid)->first();
+        $project = Project::query()->where('uuid', $projectUuid)->first();
 
         if ($project && $project->environments->count() === 1) {
             return Redirect::route('project.resource.index', [

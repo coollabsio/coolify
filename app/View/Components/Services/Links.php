@@ -33,11 +33,7 @@ class Links extends Component
                 if ($application->ports) {
                     $portsCollection = collect(str($application->ports)->explode(','));
                     $portsCollection->map(function ($port) {
-                        if (str($port)->contains(':')) {
-                            $hostPort = str($port)->before(':');
-                        } else {
-                            $hostPort = $port;
-                        }
+                        $hostPort = str($port)->contains(':') ? str($port)->before(':') : $port;
                         $this->links->push(base_url(withPort: false).":{$hostPort}");
                     });
                 }

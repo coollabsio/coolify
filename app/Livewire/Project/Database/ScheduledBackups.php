@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
 use Livewire\Component;
 
 class ScheduledBackups extends Component
@@ -29,11 +30,7 @@ class ScheduledBackups extends Component
             $this->setSelectedBackup($this->selectedBackupId, true);
         }
         $this->parameters = get_route_parameters();
-        if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $this->type = 'service-database';
-        } else {
-            $this->type = 'database';
-        }
+        $this->type = $this->database->getMorphClass() === ServiceDatabase::class ? 'service-database' : 'database';
         $this->s3s = currentTeam()->s3s;
     }
 

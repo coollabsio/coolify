@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 use function Laravel\Prompts\confirm;
 
@@ -114,7 +115,8 @@ class SyncBunny extends Command
                 $this->info('Service template uploaded & purged...');
 
                 return;
-            } elseif ($only_version) {
+            }
+            if ($only_version) {
                 if ($nightly) {
                     $this->info('About to sync NIGHLTY versions.json to BunnyCDN.');
                 } else {
@@ -123,7 +125,6 @@ class SyncBunny extends Command
                 $file = file_get_contents($versions_location);
                 $json = json_decode($file, true);
                 $actual_version = data_get($json, 'coolify.v4.version');
-
                 $confirmed = confirm("Are you sure you want to sync to {$actual_version}?");
                 if (! $confirmed) {
                     return;
@@ -152,7 +153,7 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
             ]);
             $this->info('All files uploaded & purged...');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->error('Error: '.$e->getMessage());
         }
     }

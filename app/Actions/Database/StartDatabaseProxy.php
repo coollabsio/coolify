@@ -28,7 +28,7 @@ class StartDatabaseProxy
         $server = data_get($database, 'destination.server');
         $containerName = data_get($database, 'uuid');
         $proxyContainerName = "{$database->uuid}-proxy";
-        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        if ($database->getMorphClass() === ServiceDatabase::class) {
             $databaseType = $database->databaseType();
             // $connectPredefined = data_get($database, 'service.connect_to_docker_network');
             $network = $database->service->uuid;
@@ -36,54 +36,54 @@ class StartDatabaseProxy
             $proxyContainerName = "{$database->service->uuid}-proxy";
             switch ($databaseType) {
                 case 'standalone-mariadb':
-                    $type = \App\Models\StandaloneMariadb::class;
+                    $type = StandaloneMariadb::class;
                     $containerName = "mariadb-{$database->service->uuid}";
                     break;
                 case 'standalone-mongodb':
-                    $type = \App\Models\StandaloneMongodb::class;
+                    $type = StandaloneMongodb::class;
                     $containerName = "mongodb-{$database->service->uuid}";
                     break;
                 case 'standalone-mysql':
-                    $type = \App\Models\StandaloneMysql::class;
+                    $type = StandaloneMysql::class;
                     $containerName = "mysql-{$database->service->uuid}";
                     break;
                 case 'standalone-postgresql':
-                    $type = \App\Models\StandalonePostgresql::class;
+                    $type = StandalonePostgresql::class;
                     $containerName = "postgresql-{$database->service->uuid}";
                     break;
                 case 'standalone-redis':
-                    $type = \App\Models\StandaloneRedis::class;
+                    $type = StandaloneRedis::class;
                     $containerName = "redis-{$database->service->uuid}";
                     break;
                 case 'standalone-keydb':
-                    $type = \App\Models\StandaloneKeydb::class;
+                    $type = StandaloneKeydb::class;
                     $containerName = "keydb-{$database->service->uuid}";
                     break;
                 case 'standalone-dragonfly':
-                    $type = \App\Models\StandaloneDragonfly::class;
+                    $type = StandaloneDragonfly::class;
                     $containerName = "dragonfly-{$database->service->uuid}";
                     break;
                 case 'standalone-clickhouse':
-                    $type = \App\Models\StandaloneClickhouse::class;
+                    $type = StandaloneClickhouse::class;
                     $containerName = "clickhouse-{$database->service->uuid}";
                     break;
             }
         }
-        if ($type === \App\Models\StandaloneRedis::class) {
+        if ($type === StandaloneRedis::class) {
             $internalPort = 6379;
-        } elseif ($type === \App\Models\StandalonePostgresql::class) {
+        } elseif ($type === StandalonePostgresql::class) {
             $internalPort = 5432;
-        } elseif ($type === \App\Models\StandaloneMongodb::class) {
+        } elseif ($type === StandaloneMongodb::class) {
             $internalPort = 27017;
-        } elseif ($type === \App\Models\StandaloneMysql::class) {
+        } elseif ($type === StandaloneMysql::class) {
             $internalPort = 3306;
-        } elseif ($type === \App\Models\StandaloneMariadb::class) {
+        } elseif ($type === StandaloneMariadb::class) {
             $internalPort = 3306;
-        } elseif ($type === \App\Models\StandaloneKeydb::class) {
+        } elseif ($type === StandaloneKeydb::class) {
             $internalPort = 6379;
-        } elseif ($type === \App\Models\StandaloneDragonfly::class) {
+        } elseif ($type === StandaloneDragonfly::class) {
             $internalPort = 6379;
-        } elseif ($type === \App\Models\StandaloneClickhouse::class) {
+        } elseif ($type === StandaloneClickhouse::class) {
             $internalPort = 9000;
         }
         $configuration_dir = database_proxy_dir($database->uuid);

@@ -3,6 +3,7 @@
 namespace App\Livewire\Team;
 
 use App\Models\TeamInvitation;
+use Exception;
 use Livewire\Component;
 
 class Invitations extends Component
@@ -18,9 +19,11 @@ class Invitations extends Component
             $initiation_found->delete();
             $this->refreshInvitations();
             $this->dispatch('success', 'Invitation revoked.');
-        } catch (\Exception) {
+        } catch (Exception) {
             return $this->dispatch('error', 'Invitation not found.');
         }
+
+        return null;
     }
 
     public function refreshInvitations()

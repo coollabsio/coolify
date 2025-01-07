@@ -5,6 +5,7 @@ namespace App\Livewire\Server;
 use App\Models\Server;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class CloudflareTunnels extends Component
 {
@@ -21,9 +22,11 @@ class CloudflareTunnels extends Component
                 return redirect()->route('server.show', ['server_uuid' => $server_uuid]);
             }
             $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()
@@ -33,9 +36,11 @@ class CloudflareTunnels extends Component
             $this->server->settings->is_cloudflare_tunnel = $this->isCloudflareTunnelsEnabled;
             $this->server->settings->save();
             $this->dispatch('success', 'Server updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function manualCloudflareConfig()

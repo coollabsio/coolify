@@ -4,6 +4,7 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use Livewire\Component;
+use Throwable;
 
 class Create extends Component
 {
@@ -68,19 +69,17 @@ class Create extends Component
             $this->storage->key = $this->key;
             $this->storage->secret = $this->secret;
             $this->storage->bucket = $this->bucket;
-            if (empty($this->endpoint)) {
-                $this->storage->endpoint = "https://s3.{$this->region}.amazonaws.com";
-            } else {
-                $this->storage->endpoint = $this->endpoint;
-            }
+            $this->storage->endpoint = ! isset($this->endpoint) || ($this->endpoint === '' || $this->endpoint === '0') ? "https://s3.{$this->region}.amazonaws.com" : $this->endpoint;
             $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
             $this->storage->save();
 
             return redirect()->route('storage.show', $this->storage->uuid);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
             // return handleError($e, $this);
         }
+
+        return null;
     }
 }

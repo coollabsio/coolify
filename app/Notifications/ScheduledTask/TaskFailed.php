@@ -13,13 +13,13 @@ class TaskFailed extends CustomEmailNotification
 {
     public ?string $url = null;
 
-    public function __construct(public ScheduledTask $task, public string $output)
+    public function __construct(public ScheduledTask $scheduledTask, public string $output)
     {
         $this->onQueue('high');
-        if ($task->application) {
-            $this->url = $task->application->taskLink($task->uuid);
-        } elseif ($task->service) {
-            $this->url = $task->service->taskLink($task->uuid);
+        if ($scheduledTask->application) {
+            $this->url = $scheduledTask->application->taskLink($scheduledTask->uuid);
+        } elseif ($scheduledTask->service) {
+            $this->url = $scheduledTask->service->taskLink($scheduledTask->uuid);
         }
     }
 
@@ -30,39 +30,39 @@ class TaskFailed extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Scheduled task ({$this->task->name}) failed.");
-        $mail->view('emails.scheduled-task-failed', [
-            'task' => $this->task,
+        $mailMessage = new MailMessage;
+        $mailMessage->subject("Coolify: [ACTION REQUIRED] Scheduled task ({$this->scheduledTask->name}) failed.");
+        $mailMessage->view('emails.scheduled-task-failed', [
+            'task' => $this->scheduledTask,
             'url' => $this->url,
             'output' => $this->output,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        $discordMessage = new DiscordMessage(
             title: ':cross_mark: Scheduled task failed',
-            description: "Scheduled task ({$this->task->name}) failed.",
+            description: "Scheduled task ({$this->scheduledTask->name}) failed.",
             color: DiscordMessage::errorColor(),
         );
 
         if ($this->url) {
-            $message->addField('Scheduled task', '[Link]('.$this->url.')');
+            $discordMessage->addField('Scheduled task', '[Link]('.$this->url.')');
         }
 
-        return $message;
+        return $discordMessage;
     }
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Scheduled task ({$this->task->name}) failed with output: {$this->output}";
+        $message = "Coolify: Scheduled task ({$this->scheduledTask->name}) failed with output: {$this->output}";
         if ($this->url) {
             $buttons[] = [
                 'text' => 'Open task in Coolify',
-                'url' => (string) $this->url,
+                'url' => $this->url,
             ];
         }
 
@@ -73,9 +73,9 @@ class TaskFailed extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        $message = "Scheduled task ({$this->task->name}) failed<br/>";
+        $message = "Scheduled task ({$this->scheduledTask->name}) failed<br/>";
 
-        if ($this->output) {
+        if ($this->output !== '' && $this->output !== '0') {
             $message .= "<br/><b>Error Output:</b>{$this->output}";
         }
 
@@ -83,7 +83,7 @@ class TaskFailed extends CustomEmailNotification
         if ($this->url) {
             $buttons[] = [
                 'text' => 'Open task in Coolify',
-                'url' => (string) $this->url,
+                'url' => $this->url,
             ];
         }
 
@@ -98,9 +98,9 @@ class TaskFailed extends CustomEmailNotification
     public function toSlack(): SlackMessage
     {
         $title = 'Scheduled task failed';
-        $description = "Scheduled task ({$this->task->name}) failed.";
+        $description = "Scheduled task ({$this->scheduledTask->name}) failed.";
 
-        if ($this->output) {
+        if ($this->output !== '' && $this->output !== '0') {
             $description .= "\n\n**Error Output:**\n{$this->output}";
         }
 

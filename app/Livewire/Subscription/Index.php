@@ -25,13 +25,15 @@ class Index extends Component
         }
         $this->settings = instanceSettings();
         $this->alreadySubscribed = currentTeam()->subscription()->exists();
+
+        return null;
     }
 
     public function stripeCustomerPortal()
     {
         $session = getStripeCustomerPortalSession(currentTeam());
         if (is_null($session)) {
-            return;
+            return null;
         }
 
         return redirect($session->url);

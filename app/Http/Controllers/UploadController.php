@@ -17,13 +17,13 @@ class UploadController extends BaseController
         if (is_null($resource)) {
             return response()->json(['error' => 'You do not have permission for this database'], 500);
         }
-        $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
+        $fileReceiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
-        if ($receiver->isUploaded() === false) {
+        if ($fileReceiver->isUploaded() === false) {
             throw new UploadMissingFileException;
         }
 
-        $save = $receiver->receive();
+        $save = $fileReceiver->receive();
 
         if ($save->isFinished()) {
             return $this->saveFile($save->getFile(), $resource);
@@ -57,22 +57,22 @@ class UploadController extends BaseController
     //         'mime_type' => $mime
     //     ]);
     // }
-    protected function saveFile(UploadedFile $file, $resource)
+    protected function saveFile(UploadedFile $uploadedFile, $resource)
     {
-        $mime = str_replace('/', '-', $file->getMimeType());
+        $mime = str_replace('/', '-', $uploadedFile->getMimeType());
         $filePath = "upload/{$resource->uuid}";
         $finalPath = storage_path('app/'.$filePath);
-        $file->move($finalPath, 'restore');
+        $uploadedFile->move($finalPath, 'restore');
 
         return response()->json([
             'mime_type' => $mime,
         ]);
     }
 
-    protected function createFilename(UploadedFile $file)
+    protected function createFilename(UploadedFile $uploadedFile)
     {
-        $extension = $file->getClientOriginalExtension();
-        $filename = str_replace('.'.$extension, '', $file->getClientOriginalName()); // Filename without extension
+        $extension = $uploadedFile->getClientOriginalExtension();
+        $filename = str_replace('.'.$extension, '', $uploadedFile->getClientOriginalName()); // Filename without extension
 
         $filename .= '_'.md5(time()).'.'.$extension;
 

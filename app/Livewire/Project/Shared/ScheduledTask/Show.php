@@ -6,6 +6,7 @@ use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
+use Exception;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -68,9 +69,11 @@ class Show extends Component
 
             $this->task = $this->resource->scheduled_tasks()->where('uuid', $task_uuid)->firstOrFail();
             $this->syncData();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -98,9 +101,11 @@ class Show extends Component
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
             $this->refreshTasks();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function submit()
@@ -108,18 +113,22 @@ class Show extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function refreshTasks()
     {
         try {
             $this->task->refresh();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function delete()
@@ -129,10 +138,10 @@ class Show extends Component
 
             if ($this->type === 'application') {
                 return redirect()->route('project.application.configuration', $this->parameters, $this->task->name);
-            } else {
-                return redirect()->route('project.service.configuration', $this->parameters, $this->task->name);
             }
-        } catch (\Exception $e) {
+
+            return redirect()->route('project.service.configuration', $this->parameters, $this->task->name);
+        } catch (Exception $e) {
             return handleError($e);
         }
     }
@@ -142,8 +151,10 @@ class Show extends Component
         try {
             ScheduledTaskJob::dispatch($this->task);
             $this->dispatch('success', 'Scheduled task executed.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 }

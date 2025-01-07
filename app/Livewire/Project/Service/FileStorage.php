@@ -18,6 +18,7 @@ use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
+use Throwable;
 
 class FileStorage extends Component
 {
@@ -61,11 +62,13 @@ class FileStorage extends Component
             $this->fileStorage->is_based_on_git = false;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->dispatch('refreshStorages');
         }
+
+        return null;
     }
 
     public function convertToFile()
@@ -79,21 +82,21 @@ class FileStorage extends Component
             }
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->dispatch('refreshStorages');
         }
+
+        return null;
     }
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
+            $this->addError('password', 'The provided password is incorrect.');
 
-                return;
-            }
+            return null;
         }
 
         try {
@@ -107,11 +110,13 @@ class FileStorage extends Component
             }
             $this->fileStorage->delete();
             $this->dispatch('success', $message);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->dispatch('refreshStorages');
         }
+
+        return null;
     }
 
     public function submit()
@@ -125,12 +130,14 @@ class FileStorage extends Component
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
 
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()

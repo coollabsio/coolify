@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Models\ServiceApplication;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Throwable;
 
 class EditDomain extends Component
 {
@@ -19,7 +20,7 @@ class EditDomain extends Component
 
     public function mount()
     {
-        $this->application = ServiceApplication::find($this->applicationId);
+        $this->application = ServiceApplication::query()->find($this->applicationId);
     }
 
     public function submit()
@@ -43,13 +44,13 @@ class EditDomain extends Component
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
-            } else {
-                ! $warning && $this->dispatch('success', 'Service saved.');
+            } elseif (! $warning) {
+                $this->dispatch('success', 'Service saved.');
             }
             $this->application->service->parse();
             $this->dispatch('refresh');
             $this->dispatch('configurationChanged');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
@@ -57,6 +58,8 @@ class EditDomain extends Component
 
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

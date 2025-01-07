@@ -5,6 +5,7 @@ namespace App\Livewire\Team;
 use App\Models\Team;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Create extends Component
 {
@@ -18,7 +19,7 @@ class Create extends Component
     {
         try {
             $this->validate();
-            $team = Team::create([
+            $team = Team::query()->create([
                 'name' => $this->name,
                 'description' => $this->description,
                 'personal_team' => false,
@@ -27,7 +28,7 @@ class Create extends Component
             refreshSession();
 
             return redirect()->route('team.index');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

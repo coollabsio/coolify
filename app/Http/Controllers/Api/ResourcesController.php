@@ -43,7 +43,7 @@ class ResourcesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
+        $projects = Project::query()->where('team_id', $teamId)->get();
         $resources = collect();
         $resources->push($projects->pluck('applications')->flatten());
         $resources->push($projects->pluck('services')->flatten());

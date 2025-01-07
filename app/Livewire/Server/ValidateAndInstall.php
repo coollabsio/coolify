@@ -5,7 +5,9 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
+use Exception;
 use Livewire\Component;
+use Throwable;
 
 class ValidateAndInstall extends Component
 {
@@ -17,19 +19,19 @@ class ValidateAndInstall extends Component
 
     public bool $install = true;
 
-    public $uptime = null;
+    public $uptime;
 
-    public $supported_os_type = null;
+    public $supported_os_type;
 
-    public $docker_installed = null;
+    public $docker_installed;
 
-    public $docker_compose_installed = null;
+    public $docker_compose_installed;
 
-    public $docker_version = null;
+    public $docker_version;
 
     public $proxy_started = false;
 
-    public $error = null;
+    public $error;
 
     public bool $ask = false;
 
@@ -73,14 +75,16 @@ class ValidateAndInstall extends Component
                 if ($proxy === 'OK') {
                     $this->proxy_started = true;
                 } else {
-                    throw new \Exception('Proxy could not be started.');
+                    throw new Exception('Proxy could not be started.');
                 }
             } else {
                 $this->proxy_started = true;
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function validateConnection()
@@ -117,30 +121,28 @@ class ValidateAndInstall extends Component
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
             if ($this->install) {
-                if ($this->number_of_tries == $this->max_tries) {
+                if ($this->number_of_tries === $this->max_tries) {
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                     $this->server->update([
                         'validation_logs' => $this->error,
                     ]);
 
                     return;
-                } else {
-                    if ($this->number_of_tries <= $this->max_tries) {
-                        $activity = $this->server->installDocker();
-                        $this->number_of_tries++;
-                        $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
-                    }
-
-                    return;
                 }
-            } else {
-                $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
-                $this->server->update([
-                    'validation_logs' => $this->error,
-                ]);
+                if ($this->number_of_tries <= $this->max_tries) {
+                    $activity = $this->server->installDocker();
+                    $this->number_of_tries++;
+                    $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
+                }
 
                 return;
             }
+            $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->server->update([
+                'validation_logs' => $this->error,
+            ]);
+
+            return;
         }
         $this->dispatch('validateDockerVersion');
     }

@@ -7,10 +7,10 @@ use Illuminate\Notifications\Notification;
 
 class PushoverChannel
 {
-    public function send(SendsPushover $notifiable, Notification $notification): void
+    public function send(SendsPushover $sendsPushover, Notification $notification): void
     {
         $message = $notification->toPushover();
-        $pushoverSettings = $notifiable->pushoverNotificationSettings;
+        $pushoverSettings = $sendsPushover->pushoverNotificationSettings;
 
         if (! $pushoverSettings || ! $pushoverSettings->isEnabled() || ! $pushoverSettings->pushover_user_key || ! $pushoverSettings->pushover_api_token) {
             return;

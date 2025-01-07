@@ -8,8 +8,11 @@ class SharedEnvironmentVariable extends Model
 {
     protected $guarded = [];
 
-    protected $casts = [
-        'key' => 'string',
-        'value' => 'encrypted',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'key' => 'string',
+            'value' => 'encrypted',
+        ];
+    }
 }

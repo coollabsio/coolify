@@ -8,6 +8,7 @@ use App\Notifications\Test;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Slack extends Component
 {
@@ -67,9 +68,11 @@ class Slack extends Component
             $this->team = auth()->user()->currentTeam();
             $this->settings = $this->team->slackNotificationSettings;
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -122,24 +125,28 @@ class Slack extends Component
                 'slackWebhookUrl.required' => 'Slack Webhook URL is required.',
             ]);
             $this->saveModel();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->slackEnabled = false;
 
             return handleError($e, $this);
         } finally {
             $this->dispatch('refresh');
         }
+
+        return null;
     }
 
     public function instantSave()
     {
         try {
             $this->syncData(true);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->dispatch('refresh');
         }
+
+        return null;
     }
 
     public function submit()
@@ -148,9 +155,11 @@ class Slack extends Component
             $this->resetErrorBag();
             $this->syncData(true);
             $this->saveModel();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function saveModel()
@@ -165,9 +174,11 @@ class Slack extends Component
         try {
             $this->team->notify(new Test(channel: 'slack'));
             $this->dispatch('success', 'Test notification sent.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

@@ -25,11 +25,11 @@ class EnvironmentSelect extends Component
             return redirect()->route('project.show', [
                 'project_uuid' => $this->project_uuid,
             ]);
-        } else {
-            return redirect()->route('project.resource.index', [
-                'project_uuid' => $this->project_uuid,
-                'environment_uuid' => $value,
-            ]);
         }
+
+        return redirect()->route('project.resource.index', [
+            'project_uuid' => $this->project_uuid,
+            'environment_uuid' => $value,
+        ]);
     }
 }

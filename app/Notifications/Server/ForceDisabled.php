@@ -23,26 +23,26 @@ class ForceDisabled extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject("Coolify: Server ({$this->server->name}) disabled because it is not paid!");
-        $mail->view('emails.server-force-disabled', [
+        $mailMessage = new MailMessage;
+        $mailMessage->subject("Coolify: Server ({$this->server->name}) disabled because it is not paid!");
+        $mailMessage->view('emails.server-force-disabled', [
             'name' => $this->server->name,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        $discordMessage = new DiscordMessage(
             title: ':cross_mark: Server disabled',
             description: "Server ({$this->server->name}) disabled because it is not paid!",
             color: DiscordMessage::errorColor(),
         );
 
-        $message->addField('Please update your subscription to enable the server again!', '[Link](https://app.coolify.io/subscriptions)');
+        $discordMessage->addField('Please update your subscription to enable the server again!', '[Link](https://app.coolify.io/subscriptions)');
 
-        return $message;
+        return $discordMessage;
     }
 
     public function toTelegram(): array

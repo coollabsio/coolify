@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class ServerCleanupMux implements ShouldBeEncrypted, ShouldQueue
 {
@@ -33,8 +34,10 @@ class ServerCleanupMux implements ShouldBeEncrypted, ShouldQueue
                 return 'Server is not reachable or not ready.';
             }
             SshMultiplexingHelper::removeMuxFile($this->server);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e);
         }
+
+        return null;
     }
 }

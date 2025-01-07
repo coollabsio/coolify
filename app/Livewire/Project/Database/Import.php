@@ -3,9 +3,18 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\Server;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Throwable;
 
 class Import extends Component
 {
@@ -72,7 +81,7 @@ class Import extends Component
     public function updatedDumpAll($value)
     {
         switch ($this->resource->getMorphClass()) {
-            case \App\Models\StandaloneMariadb::class:
+            case StandaloneMariadb::class:
                 if ($value === true) {
                     $this->mariadbRestoreCommand = <<<'EOD'
 for pid in $(mariadb -u root -p$MARIADB_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
@@ -87,7 +96,7 @@ EOD;
                     $this->mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
                 }
                 break;
-            case \App\Models\StandaloneMysql::class:
+            case StandaloneMysql::class:
                 if ($value === true) {
                     $this->mysqlRestoreCommand = <<<'EOD'
 for pid in $(mysql -u root -p$MYSQL_ROOT_PASSWORD -N -e "SELECT id FROM information_schema.processlist WHERE user != 'root';"); do
@@ -102,7 +111,7 @@ EOD;
                     $this->mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
                 }
                 break;
-            case \App\Models\StandalonePostgresql::class:
+            case StandalonePostgresql::class:
                 if ($value === true) {
                     $this->postgresqlRestoreCommand = <<<'EOD'
 psql -U $POSTGRES_USER -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IS NOT NULL AND pid <> pg_backend_pid()" && \
@@ -136,10 +145,10 @@ EOD;
         }
 
         if (
-            $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $this->resource->getMorphClass() === StandaloneRedis::class ||
+            $this->resource->getMorphClass() === StandaloneKeydb::class ||
+            $this->resource->getMorphClass() === StandaloneDragonfly::class ||
+            $this->resource->getMorphClass() === StandaloneClickhouse::class
         ) {
             $this->unsupported = true;
         }
@@ -153,14 +162,16 @@ EOD;
                 if (blank($result)) {
                     $this->dispatch('error', 'The file does not exist or has been deleted.');
 
-                    return;
+                    return null;
                 }
                 $this->filename = $this->customLocation;
                 $this->dispatch('success', 'The file exists.');
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 return handleError($e, $this);
             }
         }
+
+        return null;
     }
 
     public function runImport()
@@ -168,7 +179,7 @@ EOD;
         if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 
-            return;
+            return null;
         }
         try {
             $this->importCommands = [];
@@ -182,7 +193,7 @@ EOD;
                 if (! Storage::exists($backupFileName)) {
                     $this->dispatch('error', 'The file does not exist or has been deleted.');
 
-                    return;
+                    return null;
                 }
                 $tmpPath = '/tmp/'.basename($backupFileName).'_'.$this->resource->uuid;
                 instant_scp($path, $tmpPath, $this->server);
@@ -194,7 +205,7 @@ EOD;
             $scriptPath = "/tmp/restore_{$this->resource->uuid}.sh";
 
             switch ($this->resource->getMorphClass()) {
-                case \App\Models\StandaloneMariadb::class:
+                case StandaloneMariadb::class:
                     $restoreCommand = $this->mariadbRestoreCommand;
                     if ($this->dumpAll) {
                         $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
@@ -202,7 +213,7 @@ EOD;
                         $restoreCommand .= " < {$tmpPath}";
                     }
                     break;
-                case \App\Models\StandaloneMysql::class:
+                case StandaloneMysql::class:
                     $restoreCommand = $this->mysqlRestoreCommand;
                     if ($this->dumpAll) {
                         $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
@@ -210,7 +221,7 @@ EOD;
                         $restoreCommand .= " < {$tmpPath}";
                     }
                     break;
-                case \App\Models\StandalonePostgresql::class:
+                case StandalonePostgresql::class:
                     $restoreCommand = $this->postgresqlRestoreCommand;
                     if ($this->dumpAll) {
                         $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | psql -U \$POSTGRES_USER postgres";
@@ -218,7 +229,7 @@ EOD;
                         $restoreCommand .= " {$tmpPath}";
                     }
                     break;
-                case \App\Models\StandaloneMongodb::class:
+                case StandaloneMongodb::class:
                     $restoreCommand = $this->mongodbRestoreCommand;
                     if ($this->dumpAll === false) {
                         $restoreCommand .= " {$tmpPath}";
@@ -234,7 +245,7 @@ EOD;
             $this->importCommands[] = "docker exec {$this->container} sh -c '{$scriptPath}'";
             $this->importCommands[] = "docker exec {$this->container} sh -c 'echo \"Import finished with exit code $?\"'";
 
-            if (! empty($this->importCommands)) {
+            if ($this->importCommands !== []) {
                 $activity = remote_process($this->importCommands, $this->server, ignore_errors: true, callEventOnFinish: 'RestoreJobFinished', callEventData: [
                     'scriptPath' => $scriptPath,
                     'tmpPath' => $tmpPath,
@@ -243,11 +254,13 @@ EOD;
                 ]);
                 $this->dispatch('activityMonitor', $activity->id);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->filename = null;
             $this->importCommands = [];
         }
+
+        return null;
     }
 }

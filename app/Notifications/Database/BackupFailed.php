@@ -15,11 +15,11 @@ class BackupFailed extends CustomEmailNotification
 
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
+    public function __construct(ScheduledDatabaseBackup $scheduledDatabaseBackup, public $database, public $output, public $database_name)
     {
         $this->onQueue('high');
         $this->name = $database->name;
-        $this->frequency = $backup->frequency;
+        $this->frequency = $scheduledDatabaseBackup->frequency;
     }
 
     public function via(object $notifiable): array
@@ -29,31 +29,31 @@ class BackupFailed extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject("Coolify: [ACTION REQUIRED] Database Backup FAILED for {$this->database->name}");
-        $mail->view('emails.backup-failed', [
+        $mailMessage = new MailMessage;
+        $mailMessage->subject("Coolify: [ACTION REQUIRED] Database Backup FAILED for {$this->database->name}");
+        $mailMessage->view('emails.backup-failed', [
             'name' => $this->name,
             'database_name' => $this->database_name,
             'frequency' => $this->frequency,
             'output' => $this->output,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        $discordMessage = new DiscordMessage(
             title: ':cross_mark: Database backup failed',
             description: "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.",
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
 
-        $message->addField('Frequency', $this->frequency, true);
-        $message->addField('Output', $this->output);
+        $discordMessage->addField('Frequency', $this->frequency, true);
+        $discordMessage->addField('Output', $this->output);
 
-        return $message;
+        return $discordMessage;
     }
 
     public function toTelegram(): array

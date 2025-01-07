@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Exception;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -28,32 +29,28 @@ class DockerImage extends Component
         $this->validate([
             'dockerImage' => 'required',
         ]);
-        $image = str($this->dockerImage)->before(':');
-        if (str($this->dockerImage)->contains(':')) {
-            $tag = str($this->dockerImage)->after(':');
-        } else {
-            $tag = 'latest';
-        }
+        $stringable = str($this->dockerImage)->before(':');
+        $tag = str($this->dockerImage)->contains(':') ? str($this->dockerImage)->after(':') : 'latest';
         $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+        $destination = StandaloneDocker::query()->where('uuid', $destination_uuid)->first();
         if (! $destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+            $destination = SwarmDocker::query()->where('uuid', $destination_uuid)->first();
         }
         if (! $destination) {
-            throw new \Exception('Destination not found. What?!');
+            throw new Exception('Destination not found. What?!');
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+        $project = Project::query()->where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
-        $application = Application::create([
+        $application = Application::query()->create([
             'name' => 'docker-image-'.new Cuid2,
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',
             'build_pack' => 'dockerimage',
             'ports_exposes' => 80,
-            'docker_registry_image_name' => $image,
+            'docker_registry_image_name' => $stringable,
             'docker_registry_image_tag' => $tag,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,

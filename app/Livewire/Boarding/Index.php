@@ -7,8 +7,10 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
+use Exception;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class Index extends Component
@@ -90,6 +92,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
+
+        return null;
     }
 
     public function explanation()
@@ -98,6 +102,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             return $this->setServerType('remote');
         }
         $this->currentState = 'select-server-type';
+
+        return null;
     }
 
     public function restartBoarding()
@@ -107,7 +113,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function skipBoarding()
     {
-        Team::find(currentTeam()->id)->update([
+        Team::query()->find(currentTeam()->id)->update([
             'show_boarding' => false,
         ]);
         refreshSession();
@@ -119,15 +125,16 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->selectedServerType = $type;
         if ($this->selectedServerType === 'localhost') {
-            $this->createdServer = Server::find(0);
+            $this->createdServer = Server::query()->find(0);
             $this->selectedExistingServer = 0;
             if (! $this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
             $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
 
-            return $this->validateServer('localhost');
-        } elseif ($this->selectedServerType === 'remote') {
+            return $this->validateServer();
+        }
+        if ($this->selectedServerType === 'remote') {
             if (isDev()) {
                 $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
             } else {
@@ -142,15 +149,17 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 $this->updateServerDetails();
                 $this->currentState = 'select-existing-server';
 
-                return;
+                return null;
             }
             $this->currentState = 'private-key';
         }
+
+        return null;
     }
 
     public function selectExistingServer()
     {
-        $this->createdServer = Server::find($this->selectedExistingServer);
+        $this->createdServer = Server::query()->find($this->selectedExistingServer);
         if (! $this->createdServer) {
             $this->dispatch('error', 'Server is not found.');
             $this->currentState = 'private-key';
@@ -165,7 +174,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     private function updateServerDetails()
     {
-        if ($this->createdServer) {
+        if ($this->createdServer instanceof Server) {
             $this->remoteServerPort = $this->createdServer->port;
             $this->remoteServerUser = $this->createdServer->user;
         }
@@ -184,7 +193,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
             return;
         }
-        $this->createdPrivateKey = PrivateKey::where('team_id', currentTeam()->id)->where('id', $this->selectedExistingPrivateKey)->first();
+        $this->createdPrivateKey = PrivateKey::query()->where('team_id', currentTeam()->id)->where('id', $this->selectedExistingPrivateKey)->first();
         $this->privateKey = $this->createdPrivateKey->private_key;
         $this->currentState = 'create-server';
     }
@@ -223,7 +232,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
             $this->createdPrivateKey = $privateKey;
             $this->currentState = 'create-server';
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->addError('privateKey', 'Failed to save private key: '.$e->getMessage());
         }
     }
@@ -242,7 +251,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if ($foundServer) {
             return $this->dispatch('error', 'IP address is already in use by another team.');
         }
-        $this->createdServer = Server::create([
+        $this->createdServer = Server::query()->create([
             'name' => $this->remoteServerName,
             'ip' => $this->remoteServerHost,
             'port' => $this->remoteServerPort,
@@ -256,6 +265,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->settings->save();
         $this->selectedExistingServer = $this->createdServer->id;
         $this->currentState = 'validate-server';
+
+        return null;
     }
 
     public function installServer()
@@ -275,7 +286,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 'is_reachable' => true,
             ]);
             $this->serverReachable = true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->serverReachable = false;
             $this->createdServer->settings()->update([
                 'is_reachable' => false,
@@ -289,19 +300,21 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
                 $this->currentState = 'validate-server';
-                throw new \Exception('Docker not found or old version is installed.');
+                throw new Exception('Docker not found or old version is installed.');
             }
             $this->createdServer->settings()->update([
                 'is_usable' => true,
             ]);
             $this->getProxyType();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->createdServer->settings()->update([
                 'is_usable' => false,
             ]);
 
             return handleError(error: $e, livewire: $this);
         }
+
+        return null;
     }
 
     public function selectProxy(?string $proxyType = null)
@@ -313,11 +326,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->proxy->status = 'exited';
         $this->createdServer->save();
         $this->getProjects();
+
+        return null;
     }
 
     public function getProjects()
     {
-        $this->projects = Project::ownedByCurrentTeam(['name'])->get();
+        $this->projects = Project::ownedByCurrentTeam()->get();
         if ($this->projects->count() > 0) {
             $this->selectedProject = $this->projects->first()->id;
         }
@@ -326,13 +341,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function selectExistingProject()
     {
-        $this->createdProject = Project::find($this->selectedProject);
+        $this->createdProject = Project::query()->find($this->selectedProject);
         $this->currentState = 'create-resource';
     }
 
     public function createNewProject()
     {
-        $this->createdProject = Project::create([
+        $this->createdProject = Project::query()->create([
             'name' => 'My first project',
             'team_id' => currentTeam()->id,
             'uuid' => (string) new Cuid2,

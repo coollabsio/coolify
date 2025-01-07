@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Notifications\Test;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Discord extends Component
 {
@@ -62,9 +63,11 @@ class Discord extends Component
             $this->team = auth()->user()->currentTeam();
             $this->settings = $this->team->discordNotificationSettings;
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -117,20 +120,24 @@ class Discord extends Component
                 'discordWebhookUrl.required' => 'Discord Webhook URL is required.',
             ]);
             $this->saveModel();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->discordEnabled = false;
 
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()
     {
         try {
             $this->syncData(true);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function submit()
@@ -139,9 +146,11 @@ class Discord extends Component
             $this->resetErrorBag();
             $this->syncData(true);
             $this->saveModel();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function saveModel()
@@ -156,9 +165,11 @@ class Discord extends Component
         try {
             $this->team->notify(new Test(channel: 'discord'));
             $this->dispatch('success', 'Test notification sent.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

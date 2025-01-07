@@ -25,7 +25,7 @@ class UpdateCoolify
             return;
         }
         $settings = instanceSettings();
-        $this->server = Server::find(0);
+        $this->server = Server::query()->find(0);
         if (! $this->server) {
             return;
         }

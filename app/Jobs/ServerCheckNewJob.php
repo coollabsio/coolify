@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class ServerCheckNewJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -27,8 +28,10 @@ class ServerCheckNewJob implements ShouldBeEncrypted, ShouldQueue
         try {
             ServerCheck::run($this->server);
             ResourcesCheck::dispatch($this->server);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e);
         }
+
+        return null;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +19,7 @@ class StandaloneRedis extends BaseModel
     protected static function booted()
     {
         static::created(function ($database) {
-            LocalPersistentVolume::create([
+            LocalPersistentVolume::query()->create([
                 'name' => 'redis-data-'.$database->uuid,
                 'mount_path' => '/data',
                 'host_path' => null,
@@ -65,14 +66,13 @@ class StandaloneRedis extends BaseModel
         }
         if ($oldConfigHash === $newConfigHash) {
             return false;
-        } else {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
-
-            return true;
         }
+        if ($save) {
+            $this->config_hash = $newConfigHash;
+            $this->save();
+        }
+
+        return true;
     }
 
     public function isRunning()
@@ -105,8 +105,8 @@ class StandaloneRedis extends BaseModel
             return;
         }
         $server = data_get($this, 'destination.server');
-        foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+        foreach ($persistentStorages as $persistentStorage) {
+            instant_remote_process(["docker volume rm -f $persistentStorage->name"], $server, false);
         }
     }
 
@@ -288,7 +288,7 @@ class StandaloneRedis extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new \Exception($error);
+            throw new Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -310,7 +310,7 @@ class StandaloneRedis extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new \Exception($error);
+            throw new Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {

@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use Livewire\Component;
+use Throwable;
 
 class Charts extends Component
 {
@@ -23,9 +24,11 @@ class Charts extends Component
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function pollData()
@@ -49,9 +52,11 @@ class Charts extends Component
             $this->dispatch("refreshChartData-{$this->chartId}-memory", [
                 'seriesData' => $memoryMetrics,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function setInterval()

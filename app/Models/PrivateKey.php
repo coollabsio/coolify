@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
+use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 use phpseclib3\Crypt\PublicKeyLoader;
+use Throwable;
 
 #[OA\Schema(
     description: 'Private Key model',
@@ -34,10 +36,6 @@ class PrivateKey extends BaseModel
         'is_git_related',
         'team_id',
         'fingerprint',
-    ];
-
-    protected $casts = [
-        'private_key' => 'encrypted',
     ];
 
     protected static function booted()
@@ -82,7 +80,7 @@ class PrivateKey extends BaseModel
             PublicKeyLoader::load($privateKey);
 
             return true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return false;
         }
     }
@@ -111,8 +109,8 @@ class PrivateKey extends BaseModel
                 'private_key' => $keyPair['private'],
                 'public_key' => $keyPair['public'],
             ];
-        } catch (\Throwable $e) {
-            throw new \Exception("Failed to generate new {$type} key: ".$e->getMessage());
+        } catch (Throwable $e) {
+            throw new Exception("Failed to generate new {$type} key: ".$e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -122,7 +120,7 @@ class PrivateKey extends BaseModel
             $key = PublicKeyLoader::load($privateKey);
 
             return $key->getPublicKey()->toString('OpenSSH', ['comment' => '']);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return null;
         }
     }
@@ -187,10 +185,17 @@ class PrivateKey extends BaseModel
 
     public function isInUse()
     {
-        return $this->servers()->exists()
-            || $this->applications()->exists()
-            || $this->githubApps()->exists()
-            || $this->gitlabApps()->exists();
+        if ($this->servers()->exists()) {
+            return true;
+        }
+        if ($this->applications()->exists()) {
+            return true;
+        }
+        if ($this->githubApps()->exists()) {
+            return true;
+        }
+
+        return (bool) $this->gitlabApps()->exists();
     }
 
     public function safeDelete()
@@ -211,22 +216,22 @@ class PrivateKey extends BaseModel
             $publicKey = $key->getPublicKey();
 
             return $publicKey->getFingerprint('sha256');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return null;
         }
     }
 
     private static function fingerprintExists($fingerprint, $excludeId = null)
     {
-        $query = self::query()
+        $builder = self::query()
             ->where('fingerprint', $fingerprint)
             ->where('id', '!=', $excludeId);
 
         if (currentTeam()) {
-            $query->where('team_id', currentTeam()->id);
+            $builder->where('team_id', currentTeam()->id);
         }
 
-        return $query->exists();
+        return $builder->exists();
     }
 
     public static function cleanupUnusedKeys()
@@ -234,5 +239,12 @@ class PrivateKey extends BaseModel
         self::ownedByCurrentTeam()->each(function ($privateKey) {
             $privateKey->safeDelete();
         });
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'private_key' => 'encrypted',
+        ];
     }
 }

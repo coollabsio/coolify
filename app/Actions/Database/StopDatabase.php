@@ -26,10 +26,8 @@ class StopDatabase
         }
 
         $this->stopContainer($database, $database->uuid, 300);
-        if (! $isDeleteOperation) {
-            if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, true);
-            }
+        if (! $isDeleteOperation && $dockerCleanup) {
+            CleanupDocker::dispatch($server, true);
         }
 
         if ($database->is_public) {
@@ -43,10 +41,10 @@ class StopDatabase
     {
         $server = $database->destination->server;
 
-        $process = Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
+        $invokedProcess = Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
 
         $startTime = time();
-        while ($process->running()) {
+        while ($invokedProcess->running()) {
             if (time() - $startTime >= $timeout) {
                 $this->forceStopContainer($containerName, $server);
                 break;
@@ -65,11 +63,5 @@ class StopDatabase
     private function removeContainer(string $containerName, $server): void
     {
         instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
-    }
-
-    private function deleteConnectedNetworks($uuid, $server)
-    {
-        instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
-        instant_remote_process(["docker network rm {$uuid}"], $server, false);
     }
 }

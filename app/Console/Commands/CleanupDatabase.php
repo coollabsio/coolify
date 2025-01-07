@@ -18,19 +18,14 @@ class CleanupDatabase extends Command
         } else {
             echo "Running database cleanup in dry-run mode...\n";
         }
-        if (isCloud()) {
-            // Later on we can increase this to 180 days or dynamically set
-            $keep_days = $this->option('keep-days') ?? 60;
-        } else {
-            $keep_days = $this->option('keep-days') ?? 60;
-        }
+        $keep_days = isCloud() ? $this->option('keep-days') ?? 60 : $this->option('keep-days') ?? 60;
         echo "Keep days: $keep_days\n";
         // Cleanup failed jobs table
-        $failed_jobs = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(1));
-        $count = $failed_jobs->count();
+        $builder = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(1));
+        $count = $builder->count();
         echo "Delete $count entries from failed_jobs.\n";
         if ($this->option('yes')) {
-            $failed_jobs->delete();
+            $builder->delete();
         }
 
         // Cleanup sessions table

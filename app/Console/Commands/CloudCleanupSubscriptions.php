@@ -4,7 +4,9 @@ namespace App\Console\Commands;
 
 use App\Events\ServerReachabilityChanged;
 use App\Models\Team;
+use Exception;
 use Illuminate\Console\Command;
+use Stripe\StripeClient;
 
 class CloudCleanupSubscriptions extends Command
 {
@@ -21,7 +23,7 @@ class CloudCleanupSubscriptions extends Command
                 return;
             }
             $this->info('Cleaning up subcriptions teams');
-            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+            $stripeClient = new StripeClient(config('subscription.stripe_api_key'));
 
             $teams = Team::all()->filter(function ($team) {
                 return $team->id !== 0;
@@ -47,34 +49,33 @@ class CloudCleanupSubscriptions extends Command
                     $this->disableServers($team);
 
                     continue;
-                } else {
-                    $subscription = $stripe->subscriptions->retrieve(data_get($team, 'subscription.stripe_subscription_id'), []);
-                    $status = data_get($subscription, 'status');
-                    if ($status === 'active' || $status === 'past_due') {
-                        $team->subscription->update([
-                            'stripe_invoice_paid' => true,
-                            'stripe_trial_already_ended' => false,
-                        ]);
+                }
+                $subscription = $stripeClient->subscriptions->retrieve(data_get($team, 'subscription.stripe_subscription_id'), []);
+                $status = data_get($subscription, 'status');
+                if ($status === 'active' || $status === 'past_due') {
+                    $team->subscription->update([
+                        'stripe_invoice_paid' => true,
+                        'stripe_trial_already_ended' => false,
+                    ]);
 
-                        continue;
-                    }
-                    $this->info('Subscription status: '.$status);
-                    $this->info('Subscription id: '.data_get($team, 'subscription.stripe_subscription_id'));
-                    $confirm = $this->confirm('Do you want to cancel the subscription?', true);
-                    if (! $confirm) {
-                        $this->info("Skipping team {$team->id}");
-                    } else {
-                        $this->info("Cancelling subscription for team {$team->id}");
-                        $team->subscription->update([
-                            'stripe_invoice_paid' => false,
-                            'stripe_trial_already_ended' => false,
-                            'stripe_subscription_id' => null,
-                        ]);
-                        $this->disableServers($team);
-                    }
+                    continue;
+                }
+                $this->info('Subscription status: '.$status);
+                $this->info('Subscription id: '.data_get($team, 'subscription.stripe_subscription_id'));
+                $confirm = $this->confirm('Do you want to cancel the subscription?', true);
+                if (! $confirm) {
+                    $this->info("Skipping team {$team->id}");
+                } else {
+                    $this->info("Cancelling subscription for team {$team->id}");
+                    $team->subscription->update([
+                        'stripe_invoice_paid' => false,
+                        'stripe_trial_already_ended' => false,
+                        'stripe_subscription_id' => null,
+                    ]);
+                    $this->disableServers($team);
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error($e->getMessage());
 
             return;

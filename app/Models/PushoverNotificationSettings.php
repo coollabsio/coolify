@@ -31,24 +31,6 @@ class PushoverNotificationSettings extends Model
         'server_unreachable_pushover_notifications',
     ];
 
-    protected $casts = [
-        'pushover_enabled' => 'boolean',
-        'pushover_user_key' => 'encrypted',
-        'pushover_api_token' => 'encrypted',
-
-        'deployment_success_pushover_notifications' => 'boolean',
-        'deployment_failure_pushover_notifications' => 'boolean',
-        'status_change_pushover_notifications' => 'boolean',
-        'backup_success_pushover_notifications' => 'boolean',
-        'backup_failure_pushover_notifications' => 'boolean',
-        'scheduled_task_success_pushover_notifications' => 'boolean',
-        'scheduled_task_failure_pushover_notifications' => 'boolean',
-        'docker_cleanup_pushover_notifications' => 'boolean',
-        'server_disk_usage_pushover_notifications' => 'boolean',
-        'server_reachable_pushover_notifications' => 'boolean',
-        'server_unreachable_pushover_notifications' => 'boolean',
-    ];
-
     public function team()
     {
         return $this->belongsTo(Team::class);
@@ -57,5 +39,26 @@ class PushoverNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->pushover_enabled;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'pushover_enabled' => 'boolean',
+            'pushover_user_key' => 'encrypted',
+            'pushover_api_token' => 'encrypted',
+
+            'deployment_success_pushover_notifications' => 'boolean',
+            'deployment_failure_pushover_notifications' => 'boolean',
+            'status_change_pushover_notifications' => 'boolean',
+            'backup_success_pushover_notifications' => 'boolean',
+            'backup_failure_pushover_notifications' => 'boolean',
+            'scheduled_task_success_pushover_notifications' => 'boolean',
+            'scheduled_task_failure_pushover_notifications' => 'boolean',
+            'docker_cleanup_pushover_notifications' => 'boolean',
+            'server_disk_usage_pushover_notifications' => 'boolean',
+            'server_reachable_pushover_notifications' => 'boolean',
+            'server_unreachable_pushover_notifications' => 'boolean',
+        ];
     }
 }

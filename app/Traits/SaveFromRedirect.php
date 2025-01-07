@@ -6,19 +6,19 @@ use Illuminate\Support\Collection;
 
 trait SaveFromRedirect
 {
-    public function saveFromRedirect(string $route, ?Collection $parameters = null)
+    public function saveFromRedirect(string $route, ?Collection $collection = null)
     {
         session()->forget('from');
-        if (! $parameters || $parameters->count() === 0) {
-            $parameters = $this->parameters;
+        if (! $collection || $collection->count() === 0) {
+            $collection = $this->parameters;
         }
-        $parameters = collect($parameters) ?? collect([]);
+        $collection = collect($collection) ?? collect([]);
         $queries = collect($this->query) ?? collect([]);
-        $parameters = $parameters->merge($queries);
+        $collection = $collection->merge($queries);
         session(['from' => [
             'back' => $this->currentRoute,
             'route' => $route,
-            'parameters' => $parameters,
+            'parameters' => $collection,
         ]]);
 
         return redirect()->route($route);

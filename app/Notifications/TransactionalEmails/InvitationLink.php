@@ -24,16 +24,16 @@ class InvitationLink extends CustomEmailNotification
     public function toMail(): MailMessage
     {
         $invitation = TeamInvitation::whereEmail($this->user->email)->first();
-        $invitation_team = Team::find($invitation->team->id);
+        $invitation_team = Team::query()->find($invitation->team->id);
 
-        $mail = new MailMessage;
-        $mail->subject('Coolify: Invitation for '.$invitation_team->name);
-        $mail->view('emails.invitation-link', [
+        $mailMessage = new MailMessage;
+        $mailMessage->subject('Coolify: Invitation for '.$invitation_team->name);
+        $mailMessage->view('emails.invitation-link', [
             'team' => $invitation_team->name,
             'email' => $this->user->email,
             'invitation_link' => $invitation->link,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 }

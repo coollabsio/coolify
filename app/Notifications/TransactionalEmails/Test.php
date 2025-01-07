@@ -20,10 +20,10 @@ class Test extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject('Coolify: Test Email');
-        $mail->view('emails.test');
+        $mailMessage = new MailMessage;
+        $mailMessage->subject('Coolify: Test Email');
+        $mailMessage->view('emails.test');
 
-        return $mail;
+        return $mailMessage;
     }
 }

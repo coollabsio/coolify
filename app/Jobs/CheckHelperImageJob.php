@@ -9,14 +9,13 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class CheckHelperImageJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 1000;
-
-    public function __construct() {}
 
     public function handle(): void
     {
@@ -31,7 +30,7 @@ class CheckHelperImageJob implements ShouldBeEncrypted, ShouldQueue
                     $settings->update(['helper_version' => $latest_version]);
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             send_internal_notification('CheckHelperImageJob failed with: '.$e->getMessage());
             throw $e;
         }

@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -73,7 +74,7 @@ class DatabasesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
+        $projects = Project::query()->where('team_id', $teamId)->get();
         $databases = collect();
         foreach ($projects as $project) {
             $databases = $databases->merge($project->databases());
@@ -246,7 +247,7 @@ class DatabasesController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -276,10 +277,8 @@ class DatabasesController extends Controller
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
-        if ($request->is_public && $request->public_port) {
-            if (isPublicPortAlreadyUsed($database->destination->server, $request->public_port, $database->id)) {
-                return response()->json(['message' => 'Public port already used by another database.'], 400);
-            }
+        if ($request->is_public && $request->public_port && isPublicPortAlreadyUsed($database->destination->server, $request->public_port, $database->id)) {
+            return response()->json(['message' => 'Public port already used by another database.'], 400);
         }
         switch ($database->type()) {
             case 'standalone-postgresql':
@@ -472,12 +471,10 @@ class DatabasesController extends Controller
                 break;
         }
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
             }
 
             return response()->json([
@@ -1019,7 +1016,7 @@ class DatabasesController extends Controller
         return $this->create_database($request, NewDatabaseTypes::MONGODB);
     }
 
-    public function create_database(Request $request, NewDatabaseTypes $type)
+    public function create_database(Request $request, NewDatabaseTypes $newDatabaseTypes)
     {
         $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
 
@@ -1029,17 +1026,15 @@ class DatabasesController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
+        if ($return instanceof JsonResponse) {
             return $return;
         }
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if (! empty($extraFields)) {
+        if ($extraFields !== []) {
             $errors = collect([]);
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField);
             }
 
             return response()->json([
@@ -1080,10 +1075,8 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
-        if ($request->has('public_port') && $request->is_public) {
-            if (isPublicPortAlreadyUsed($server, $request->public_port)) {
-                return response()->json(['message' => 'Public port already used by another database.'], 400);
-            }
+        if ($request->has('public_port') && $request->is_public && isPublicPortAlreadyUsed($server, $request->public_port)) {
+            return response()->json(['message' => 'Public port already used by another database.'], 400);
         }
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -1111,17 +1104,15 @@ class DatabasesController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
-        if ($request->public_port) {
-            if ($request->public_port < 1024 || $request->public_port > 65535) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'public_port' => 'The public port should be between 1024 and 65535.',
-                    ],
-                ], 422);
-            }
+        if ($request->public_port && ($request->public_port < 1024 || $request->public_port > 65535)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'public_port' => 'The public port should be between 1024 and 65535.',
+                ],
+            ], 422);
         }
-        if ($type === NewDatabaseTypes::POSTGRESQL) {
+        if ($newDatabaseTypes === NewDatabaseTypes::POSTGRESQL) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
             $validator = customApiValidator($request->all(), [
                 'postgres_user' => 'string',
@@ -1132,12 +1123,10 @@ class DatabasesController extends Controller
                 'postgres_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1180,19 +1169,18 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::MARIADB) {
+        }
+        if ($newDatabaseTypes === NewDatabaseTypes::MARIADB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database'];
             $validator = customApiValidator($request->all(), [
                 'clickhouse_admin_user' => 'string',
                 'clickhouse_admin_password' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1225,7 +1213,6 @@ class DatabasesController extends Controller
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
-
             $database->refresh();
             $payload = [
                 'uuid' => $database->uuid,
@@ -1236,7 +1223,8 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::MYSQL) {
+        }
+        if ($newDatabaseTypes === NewDatabaseTypes::MYSQL) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
             $validator = customApiValidator($request->all(), [
                 'mysql_root_password' => 'string',
@@ -1246,12 +1234,10 @@ class DatabasesController extends Controller
                 'mysql_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1284,7 +1270,6 @@ class DatabasesController extends Controller
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
-
             $database->refresh();
             $payload = [
                 'uuid' => $database->uuid,
@@ -1295,19 +1280,18 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::REDIS) {
+        }
+        if ($newDatabaseTypes === NewDatabaseTypes::REDIS) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'redis_password', 'redis_conf'];
             $validator = customApiValidator($request->all(), [
                 'redis_password' => 'string',
                 'redis_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1340,7 +1324,6 @@ class DatabasesController extends Controller
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
-
             $database->refresh();
             $payload = [
                 'uuid' => $database->uuid,
@@ -1351,19 +1334,17 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::DRAGONFLY) {
+        }
+        if ($newDatabaseTypes === NewDatabaseTypes::DRAGONFLY) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'dragonfly_password'];
             $validator = customApiValidator($request->all(), [
                 'dragonfly_password' => 'string',
             ]);
-
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1371,7 +1352,6 @@ class DatabasesController extends Controller
                     'errors' => $errors,
                 ], 422);
             }
-
             removeUnnecessaryFieldsFromRequest($request);
             $database = create_standalone_dragonfly($environment->id, $destination->uuid, $request->all());
             if ($instantDeploy) {
@@ -1381,19 +1361,18 @@ class DatabasesController extends Controller
             return response()->json(serializeApiResponse([
                 'uuid' => $database->uuid,
             ]))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::KEYDB) {
+        }
+        if ($newDatabaseTypes === NewDatabaseTypes::KEYDB) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'keydb_password', 'keydb_conf'];
             $validator = customApiValidator($request->all(), [
                 'keydb_password' => 'string',
                 'keydb_conf' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1426,7 +1405,6 @@ class DatabasesController extends Controller
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
-
             $database->refresh();
             $payload = [
                 'uuid' => $database->uuid,
@@ -1437,19 +1415,18 @@ class DatabasesController extends Controller
             }
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::CLICKHOUSE) {
+        }
+        if ($newDatabaseTypes === NewDatabaseTypes::CLICKHOUSE) {
             $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares',  'clickhouse_admin_user', 'clickhouse_admin_password'];
             $validator = customApiValidator($request->all(), [
                 'clickhouse_admin_user' => 'string',
                 'clickhouse_admin_password' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
+            if ($validator->fails() || $extraFields !== []) {
                 $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
+                foreach ($extraFields as $extraField) {
+                    $errors->add($extraField, 'This field is not allowed.');
                 }
 
                 return response()->json([
@@ -1462,65 +1439,6 @@ class DatabasesController extends Controller
             if ($instantDeploy) {
                 StartDatabase::dispatch($database);
             }
-
-            $database->refresh();
-            $payload = [
-                'uuid' => $database->uuid,
-                'internal_db_url' => $database->internal_db_url,
-            ];
-            if ($database->is_public && $database->public_port) {
-                $payload['external_db_url'] = $database->external_db_url;
-            }
-
-            return response()->json(serializeApiResponse($payload))->setStatusCode(201);
-        } elseif ($type === NewDatabaseTypes::MONGODB) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
-            $validator = customApiValidator($request->all(), [
-                'mongo_conf' => 'string',
-                'mongo_initdb_root_username' => 'string',
-                'mongo_initdb_root_password' => 'string',
-                'mongo_initdb_database' => 'string',
-            ]);
-            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-            if ($validator->fails() || ! empty($extraFields)) {
-                $errors = $validator->errors();
-                if (! empty($extraFields)) {
-                    foreach ($extraFields as $field) {
-                        $errors->add($field, 'This field is not allowed.');
-                    }
-                }
-
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            removeUnnecessaryFieldsFromRequest($request);
-            if ($request->has('mongo_conf')) {
-                if (! isBase64Encoded($request->mongo_conf)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mongo_conf' => 'The mongo_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $mongoConf = base64_decode($request->mongo_conf);
-                if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'mongo_conf' => 'The mongo_conf should be base64 encoded.',
-                        ],
-                    ], 422);
-                }
-                $request->offsetSet('mongo_conf', $mongoConf);
-            }
-            $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->all());
-            if ($instantDeploy) {
-                StartDatabase::dispatch($database);
-            }
-
             $database->refresh();
             $payload = [
                 'uuid' => $database->uuid,
@@ -1532,8 +1450,60 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         }
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database'];
+        $validator = customApiValidator($request->all(), [
+            'mongo_conf' => 'string',
+            'mongo_initdb_root_username' => 'string',
+            'mongo_initdb_root_password' => 'string',
+            'mongo_initdb_database' => 'string',
+        ]);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || $extraFields !== []) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $extraField) {
+                $errors->add($extraField, 'This field is not allowed.');
+            }
 
-        return response()->json(['message' => 'Invalid database type requested.'], 400);
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        removeUnnecessaryFieldsFromRequest($request);
+        if ($request->has('mongo_conf')) {
+            if (! isBase64Encoded($request->mongo_conf)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mongo_conf' => 'The mongo_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $mongoConf = base64_decode($request->mongo_conf);
+            if (mb_detect_encoding($mongoConf, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'mongo_conf' => 'The mongo_conf should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $request->offsetSet('mongo_conf', $mongoConf);
+        }
+        $database = create_standalone_mongodb($environment->id, $destination->uuid, $request->all());
+        if ($instantDeploy) {
+            StartDatabase::dispatch($database);
+        }
+        $database->refresh();
+        $payload = [
+            'uuid' => $database->uuid,
+            'internal_db_url' => $database->internal_db_url,
+        ];
+        if ($database->is_public && $database->public_port) {
+            $payload['external_db_url'] = $database->external_db_url;
+        }
+
+        return response()->json(serializeApiResponse($payload))->setStatusCode(201);
     }
 
     #[OA\Delete(
@@ -1594,7 +1564,7 @@ class DatabasesController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
+        filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }

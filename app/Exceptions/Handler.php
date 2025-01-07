@@ -16,7 +16,7 @@ class Handler extends ExceptionHandler
     /**
      * A list of exception types with their corresponding custom log levels.
      *
-     * @var array<class-string<\Throwable>, \Psr\Log\LogLevel::*>
+     * @var array<class-string<Throwable>, \Psr\Log\LogLevel::*>
      */
     protected $levels = [
         //
@@ -25,7 +25,7 @@ class Handler extends ExceptionHandler
     /**
      * A list of the exception types that are not reported.
      *
-     * @var array<int, class-string<\Throwable>>
+     * @var array<int, class-string<Throwable>>
      */
     protected $dontReport = [
         ProcessException::class,
@@ -42,15 +42,15 @@ class Handler extends ExceptionHandler
         'password_confirmation',
     ];
 
-    private InstanceSettings $settings;
+    private InstanceSettings $instanceSettings;
 
-    protected function unauthenticated($request, AuthenticationException $exception)
+    protected function unauthenticated($request, AuthenticationException $authenticationException)
     {
-        if ($request->is('api/*') || $request->expectsJson() || $this->shouldReturnJson($request, $exception)) {
-            return response()->json(['message' => $exception->getMessage()], 401);
+        if ($request->is('api/*') || $request->expectsJson() || $this->shouldReturnJson($request, $authenticationException)) {
+            return response()->json(['message' => $authenticationException->getMessage()], 401);
         }
 
-        return redirect()->guest($exception->redirectTo($request) ?? route('login'));
+        return redirect()->guest($authenticationException->redirectTo($request) ?? route('login'));
     }
 
     /**
@@ -58,21 +58,21 @@ class Handler extends ExceptionHandler
      */
     public function register(): void
     {
-        $this->reportable(function (Throwable $e) {
+        $this->reportable(function (Throwable $throwable) {
             if (isDev()) {
                 return;
             }
-            if ($e instanceof RuntimeException) {
+            if ($throwable instanceof RuntimeException) {
                 return;
             }
-            $this->settings = instanceSettings();
-            if ($this->settings->do_not_track) {
+            $this->instanceSettings = instanceSettings();
+            if ($this->instanceSettings->do_not_track) {
                 return;
             }
             app('sentry')->configureScope(
                 function (Scope $scope) {
                     $email = auth()?->user() ? auth()->user()->email : 'guest';
-                    $instanceAdmin = User::find(0)->email ?? 'admin@localhost';
+                    $instanceAdmin = User::query()->find(0)->email ?? 'admin@localhost';
                     $scope->setUser(
                         [
                             'email' => $email,
@@ -81,10 +81,10 @@ class Handler extends ExceptionHandler
                     );
                 }
             );
-            if (str($e->getMessage())->contains('No space left on device')) {
+            if (str($throwable->getMessage())->contains('No space left on device')) {
                 return;
             }
-            Integration::captureUnhandledException($e);
+            Integration::captureUnhandledException($throwable);
         });
     }
 }

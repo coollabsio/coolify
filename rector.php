@@ -11,7 +11,6 @@ return RectorConfig::configure()
         __DIR__.'/app',
         __DIR__.'/routes',
         __DIR__.'/config',
-
     ])
     ->withSets([
         LaravelLevelSetList::UP_TO_LARAVEL_110,
@@ -24,11 +23,13 @@ return RectorConfig::configure()
     ->withRules([
         TypedPropertyFromStrictConstructorRector::class,
     ])
+    ->withImportNames(
+        removeUnusedImports: true,
+    )
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,
         naming: true,
         privatization: true,
         earlyReturn: true,
-
     );

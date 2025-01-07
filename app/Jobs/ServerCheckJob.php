@@ -15,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -60,9 +61,9 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     $foundProxyContainer = $this->containers->filter(function ($value, $key) {
                         if ($this->server->isSwarm()) {
                             return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
-                        } else {
-                            return data_get($value, 'Name') === '/coolify-proxy';
                         }
+
+                        return data_get($value, 'Name') === '/coolify-proxy';
                     })->first();
                     if (! $foundProxyContainer) {
                         try {
@@ -71,7 +72,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                                 StartProxy::run($this->server, false);
                                 $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                             }
-                        } catch (\Throwable $e) {
+                        } catch (Throwable $e) {
                         }
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
@@ -81,9 +82,11 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     private function checkLogDrainContainer()

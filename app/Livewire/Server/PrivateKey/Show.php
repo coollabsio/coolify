@@ -4,7 +4,9 @@ namespace App\Livewire\Server\PrivateKey;
 
 use App\Models\PrivateKey;
 use App\Models\Server;
+use Exception;
 use Livewire\Component;
+use Throwable;
 
 class Show extends Component
 {
@@ -19,9 +21,11 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->privateKeys = PrivateKey::ownedByCurrentTeam()->get()->where('is_git_related', false);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function setPrivateKey($privateKeyId)
@@ -40,9 +44,9 @@ class Show extends Component
             if ($uptime) {
                 $this->dispatch('success', 'Private key updated successfully.');
             } else {
-                throw new \Exception($error);
+                throw new Exception($error);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->server->update(['private_key_id' => $originalPrivateKeyId]);
             $this->server->validateConnection();
             $this->dispatch('error', $e->getMessage());
@@ -58,11 +62,13 @@ class Show extends Component
             } else {
                 $this->dispatch('error', 'Server is not reachable.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help.<br><br>Error: '.$error);
 
-                return;
+                return null;
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

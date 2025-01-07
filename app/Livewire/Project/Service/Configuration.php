@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Service;
+use Exception;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -71,9 +72,11 @@ class Configuration extends Component
                 $application->restart();
                 $this->dispatch('success', 'Service application restarted successfully.');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function restartDatabase($id)
@@ -84,9 +87,11 @@ class Configuration extends Component
                 $database->restart();
                 $this->dispatch('success', 'Service database restarted successfully.');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function check_status()
@@ -100,8 +105,10 @@ class Configuration extends Component
                 $database->refresh();
             });
             $this->dispatch('$refresh');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 }

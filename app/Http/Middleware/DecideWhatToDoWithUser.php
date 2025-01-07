@@ -33,14 +33,12 @@ class DecideWhatToDoWithUser
 
             return redirect()->route('verify.email');
         }
-        if (! isSubscriptionActive() && ! isSubscriptionOnGracePeriod()) {
-            if (! in_array($request->path(), allowedPathsForUnsubscribedAccounts())) {
-                if (Str::startsWith($request->path(), 'invitations')) {
-                    return $next($request);
-                }
-
-                return redirect()->route('subscription.index');
+        if (! isSubscriptionActive() && ! isSubscriptionOnGracePeriod() && ! in_array($request->path(), allowedPathsForUnsubscribedAccounts())) {
+            if (Str::startsWith($request->path(), 'invitations')) {
+                return $next($request);
             }
+
+            return redirect()->route('subscription.index');
         }
         if (showBoarding() && ! in_array($request->path(), allowedPathsForBoardingAccounts())) {
             if (Str::startsWith($request->path(), 'invitations')) {

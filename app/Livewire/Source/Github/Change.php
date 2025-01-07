@@ -5,11 +5,13 @@ namespace App\Livewire\Source\Github;
 use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
+use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Livewire\Component;
+use Throwable;
 
 class Change extends Component
 {
@@ -58,7 +60,7 @@ class Change extends Component
 
     public function boot()
     {
-        if ($this->github_app) {
+        if ($this->github_app instanceof GithubApp) {
             $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
         }
     }
@@ -151,9 +153,11 @@ class Change extends Component
                 $this->webhook_endpoint = $this->ipv4;
                 $this->is_system_wide = $this->github_app->is_system_wide;
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function getGithubAppNameUpdatePath()
@@ -179,8 +183,8 @@ class Change extends Component
             ->issuedBy((string) $app_id)
             ->permittedFor('https://api.github.com')
             ->identifiedBy((string) $now)
-            ->issuedAt(new \DateTimeImmutable("@{$now}"))
-            ->expiresAt(new \DateTimeImmutable('@'.($now + 600)))
+            ->issuedAt(new DateTimeImmutable("@{$now}"))
+            ->expiresAt(new DateTimeImmutable('@'.($now + 600)))
             ->getToken($configuration->signer(), $configuration->signingKey())
             ->toString();
     }
@@ -193,7 +197,7 @@ class Change extends Component
             if (! $privateKey) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
-                return;
+                return null;
             }
 
             $jwt = $this->generateGithubJwt($privateKey->private_key, $this->github_app->app_id);
@@ -222,9 +226,11 @@ class Change extends Component
                 $error_message = $response->json()['message'] ?? 'Unknown error';
                 $this->dispatch('error', "Failed to fetch GitHub App information: {$error_message}");
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function submit()
@@ -247,9 +253,11 @@ class Change extends Component
             ]);
             $this->github_app->save();
             $this->dispatch('success', 'Github App updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()
@@ -258,9 +266,11 @@ class Change extends Component
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->github_app->save();
             $this->dispatch('success', 'Github App updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function delete()
@@ -270,12 +280,12 @@ class Change extends Component
                 $this->dispatch('error', 'This source is being used by an application. Please delete all applications first.');
                 $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
-                return;
+                return null;
             }
             $this->github_app->delete();
 
             return redirect()->route('source.all');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\ScheduledTask;
 use App\Models\ScheduledTask;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Throwable;
 
 class All extends Component
 {
@@ -43,29 +44,31 @@ class All extends Component
     public function submit($data)
     {
         try {
-            $task = new ScheduledTask;
-            $task->name = $data['name'];
-            $task->command = $data['command'];
-            $task->frequency = $data['frequency'];
-            $task->container = $data['container'];
-            $task->team_id = currentTeam()->id;
+            $scheduledTask = new ScheduledTask;
+            $scheduledTask->name = $data['name'];
+            $scheduledTask->command = $data['command'];
+            $scheduledTask->frequency = $data['frequency'];
+            $scheduledTask->container = $data['container'];
+            $scheduledTask->team_id = currentTeam()->id;
 
             switch ($this->resource->type()) {
                 case 'application':
-                    $task->application_id = $this->resource->id;
+                    $scheduledTask->application_id = $this->resource->id;
                     break;
                 case 'standalone-postgresql':
-                    $task->standalone_postgresql_id = $this->resource->id;
+                    $scheduledTask->standalone_postgresql_id = $this->resource->id;
                     break;
                 case 'service':
-                    $task->service_id = $this->resource->id;
+                    $scheduledTask->service_id = $this->resource->id;
                     break;
             }
-            $task->save();
+            $scheduledTask->save();
             $this->refreshTasks();
             $this->dispatch('success', 'Scheduled task added.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 }

@@ -55,30 +55,30 @@ class EnvironmentVariable extends Model
             }
         });
 
-        static::created(function (EnvironmentVariable $environment_variable) {
-            if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
-                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
+        static::created(function (EnvironmentVariable $environmentVariable) {
+            if ($environmentVariable->resourceable_type === Application::class && ! $environmentVariable->is_preview) {
+                $found = ModelsEnvironmentVariable::where('key', $environmentVariable->key)
                     ->where('resourceable_type', Application::class)
-                    ->where('resourceable_id', $environment_variable->resourceable_id)
+                    ->where('resourceable_id', $environmentVariable->resourceable_id)
                     ->where('is_preview', true)
                     ->first();
 
                 if (! $found) {
-                    $application = Application::find($environment_variable->resourceable_id);
+                    $application = Application::query()->find($environmentVariable->resourceable_id);
                     if ($application && $application->build_pack !== 'dockerfile') {
                         ModelsEnvironmentVariable::create([
-                            'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
-                            'is_build_time' => $environment_variable->is_build_time,
-                            'is_multiline' => $environment_variable->is_multiline ?? false,
+                            'key' => $environmentVariable->key,
+                            'value' => $environmentVariable->value,
+                            'is_build_time' => $environmentVariable->is_build_time,
+                            'is_multiline' => $environmentVariable->is_multiline ?? false,
                             'resourceable_type' => Application::class,
-                            'resourceable_id' => $environment_variable->resourceable_id,
+                            'resourceable_id' => $environmentVariable->resourceable_id,
                             'is_preview' => true,
                         ]);
                     }
                 }
             }
-            $environment_variable->update([
+            $environmentVariable->update([
                 'version' => config('constants.coolify.version'),
             ]);
         });
@@ -143,18 +143,15 @@ class EnvironmentVariable extends Model
         return Attribute::make(
             get: function () {
                 $type = str($this->value)->after('{{')->before('.')->value;
-                if (str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}')) {
-                    return true;
-                }
 
-                return false;
+                return str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
             }
         );
     }
 
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        if ((is_null($environment_variable) && $environment_variable === '') || is_null($resource)) {
+        if (is_null($resource)) {
             return null;
         }
         $environment_variable = trim($environment_variable);
@@ -162,12 +159,12 @@ class EnvironmentVariable extends Model
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
         }
-        foreach ($sharedEnvsFound as $sharedEnv) {
-            $type = str($sharedEnv)->match('/(.*?)\./');
+        foreach ($sharedEnvsFound as $sharedEnvFound) {
+            $type = str($sharedEnvFound)->match('/(.*?)\./');
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 continue;
             }
-            $variable = str($sharedEnv)->match('/\.(.*)/');
+            $variable = str($sharedEnvFound)->match('/\.(.*)/');
             if ($type->value() === 'environment') {
                 $id = $resource->environment->id;
             } elseif ($type->value() === 'project') {
@@ -178,9 +175,9 @@ class EnvironmentVariable extends Model
             if (is_null($id)) {
                 continue;
             }
-            $environment_variable_found = SharedEnvironmentVariable::where('type', $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
+            $environment_variable_found = SharedEnvironmentVariable::query()->where('type', $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
             if ($environment_variable_found) {
-                $environment_variable = str($environment_variable)->replace("{{{$sharedEnv}}}", $environment_variable_found->value);
+                $environment_variable = str($environment_variable)->replace("{{{$sharedEnvFound}}}", $environment_variable_found->value);
             }
         }
 

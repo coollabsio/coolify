@@ -3,7 +3,9 @@
 namespace App\Livewire\Security\PrivateKey;
 
 use App\Models\PrivateKey;
+use Exception;
 use Livewire\Component;
+use Throwable;
 
 class Show extends Component
 {
@@ -28,7 +30,7 @@ class Show extends Component
     {
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             abort(404);
         }
     }
@@ -45,14 +47,16 @@ class Show extends Component
     {
         try {
             $this->private_key->safeDelete();
-            currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
+            currentTeam()->privateKeys = PrivateKey::query()->where('team_id', currentTeam()->id)->get();
 
             return redirect()->route('security.private-key.index');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->dispatch('error', $e->getMessage());
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function changePrivateKey()
@@ -63,8 +67,10 @@ class Show extends Component
             ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 }

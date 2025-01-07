@@ -30,23 +30,6 @@ class SlackNotificationSettings extends Model
         'server_unreachable_slack_notifications',
     ];
 
-    protected $casts = [
-        'slack_enabled' => 'boolean',
-        'slack_webhook_url' => 'encrypted',
-
-        'deployment_success_slack_notifications' => 'boolean',
-        'deployment_failure_slack_notifications' => 'boolean',
-        'status_change_slack_notifications' => 'boolean',
-        'backup_success_slack_notifications' => 'boolean',
-        'backup_failure_slack_notifications' => 'boolean',
-        'scheduled_task_success_slack_notifications' => 'boolean',
-        'scheduled_task_failure_slack_notifications' => 'boolean',
-        'docker_cleanup_slack_notifications' => 'boolean',
-        'server_disk_usage_slack_notifications' => 'boolean',
-        'server_reachable_slack_notifications' => 'boolean',
-        'server_unreachable_slack_notifications' => 'boolean',
-    ];
-
     public function team()
     {
         return $this->belongsTo(Team::class);
@@ -55,5 +38,25 @@ class SlackNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->slack_enabled;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'slack_enabled' => 'boolean',
+            'slack_webhook_url' => 'encrypted',
+
+            'deployment_success_slack_notifications' => 'boolean',
+            'deployment_failure_slack_notifications' => 'boolean',
+            'status_change_slack_notifications' => 'boolean',
+            'backup_success_slack_notifications' => 'boolean',
+            'backup_failure_slack_notifications' => 'boolean',
+            'scheduled_task_success_slack_notifications' => 'boolean',
+            'scheduled_task_failure_slack_notifications' => 'boolean',
+            'docker_cleanup_slack_notifications' => 'boolean',
+            'server_disk_usage_slack_notifications' => 'boolean',
+            'server_reachable_slack_notifications' => 'boolean',
+            'server_unreachable_slack_notifications' => 'boolean',
+        ];
     }
 }

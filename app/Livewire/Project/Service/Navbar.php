@@ -10,6 +10,7 @@ use App\Models\Service;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
+use Throwable;
 
 class Navbar extends Component
 {
@@ -70,14 +71,10 @@ class Navbar extends Component
         try {
             // TODO: This is a temporary solution. We need to refactor this.
             // We need to delete null bytes somehow.
-            $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
+            $activity = Activity::query()->where('properties->type_uuid', $this->service->uuid)->latest()->first();
             $status = data_get($activity, 'properties.status');
-            if ($status === 'queued' || $status === 'in_progress') {
-                $this->isDeploymentProgress = true;
-            } else {
-                $this->isDeploymentProgress = false;
-            }
-        } catch (\Throwable) {
+            $this->isDeploymentProgress = $status === 'queued' || $status === 'in_progress';
+        } catch (Throwable) {
             $this->isDeploymentProgress = false;
         }
     }

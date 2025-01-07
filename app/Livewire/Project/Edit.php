@@ -5,6 +5,7 @@ namespace App\Livewire\Project;
 use App\Models\Project;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class Edit extends Component
 {
@@ -19,11 +20,13 @@ class Edit extends Component
     public function mount(string $project_uuid)
     {
         try {
-            $this->project = Project::where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
+            $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
             $this->syncData();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -45,8 +48,10 @@ class Edit extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Project updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 }

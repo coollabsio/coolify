@@ -10,6 +10,7 @@ use Exception;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Throwable;
 
 class General extends Component
 {
@@ -67,9 +68,11 @@ class General extends Component
         try {
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -113,7 +116,7 @@ class General extends Component
                 $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
-                return;
+                return null;
             }
             $this->syncData(true);
 
@@ -122,6 +125,8 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function instantSave()
@@ -131,14 +136,14 @@ class General extends Component
                 $this->dispatch('error', 'Public port is required.');
                 $this->isPublic = false;
 
-                return;
+                return null;
             }
             if ($this->isPublic) {
                 if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->isPublic = false;
 
-                    return;
+                    return null;
                 }
                 StartDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is now publicly accessible.');
@@ -148,12 +153,14 @@ class General extends Component
             }
             $this->dbUrlPublic = $this->database->external_db_url;
             $this->syncData(true);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function databaseProxyStopped()
@@ -178,5 +185,7 @@ class General extends Component
                 $this->dispatch('configurationChanged');
             }
         }
+
+        return null;
     }
 }

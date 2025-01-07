@@ -141,7 +141,7 @@ Route::group([
         $decrypted = decrypt($naked_token);
         $decrypted_token = json_decode($decrypted, true);
         $server_uuid = data_get($decrypted_token, 'server_uuid');
-        $server = Server::where('uuid', $server_uuid)->first();
+        $server = Server::query()->where('uuid', $server_uuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found'], 404);
         }

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use Livewire\Component;
+use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class Rollback extends Component
@@ -23,11 +24,11 @@ class Rollback extends Component
 
     public function rollbackImage($commit)
     {
-        $deployment_uuid = new Cuid2;
+        $cuid2 = new Cuid2;
 
         queue_application_deployment(
             application: $this->application,
-            deployment_uuid: $deployment_uuid,
+            deployment_uuid: $cuid2,
             commit: $commit,
             rollback: true,
             force_rebuild: false,
@@ -36,7 +37,7 @@ class Rollback extends Component
         return redirect()->route('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
-            'deployment_uuid' => $deployment_uuid,
+            'deployment_uuid' => $cuid2,
             'environment_uuid' => $this->parameters['environment_uuid'],
         ]);
     }
@@ -73,7 +74,7 @@ class Rollback extends Component
             $showToast && $this->dispatch('success', 'Images loaded.');
 
             return [];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

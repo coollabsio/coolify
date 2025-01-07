@@ -3,8 +3,10 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use Exception;
 use Illuminate\Support\Collection;
 use Livewire\Component;
+use Throwable;
 
 class StackForm extends Component
 {
@@ -78,7 +80,7 @@ class StackForm extends Component
             $this->validate();
             $isValid = validateComposeFile($this->service->docker_compose_raw, $this->service->server->id);
             if ($isValid !== 'OK') {
-                throw new \Exception("Invalid docker-compose file.\n$isValid");
+                throw new Exception("Invalid docker-compose file.\n$isValid");
             }
             $this->service->save();
             $this->service->saveExtraFields($this->fields);
@@ -87,7 +89,7 @@ class StackForm extends Component
             $this->service->saveComposeConfigs();
             $this->dispatch('refreshEnvs');
             $notify && $this->dispatch('success', 'Service saved.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         } finally {
             if (is_null($this->service->config_hash)) {
@@ -96,6 +98,8 @@ class StackForm extends Component
                 $this->dispatch('configurationChanged');
             }
         }
+
+        return null;
     }
 
     public function render()

@@ -8,6 +8,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
 use App\Models\User;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -44,7 +45,7 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            $isFirstUser = User::count() === 0;
+            $isFirstUser = User::query()->count() === 0;
 
             $settings = instanceSettings();
             if (! $settings->is_registration_enabled) {
@@ -58,14 +59,14 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::loginView(function () {
             $settings = instanceSettings();
-            $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
-            $users = User::count();
+            $enabled_oauth_providers = OauthSetting::query()->where('enabled', true)->get();
+            $users = User::query()->count();
             if ($users == 0) {
                 // If there are no users, redirect to registration
                 return redirect()->route('register');
             }
 
-            return view('auth.login', [
+            return view(Login::class, [
                 'is_registration_enabled' => $settings->is_registration_enabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
@@ -73,7 +74,7 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::authenticateUsing(function (Request $request) {
             $email = strtolower($request->email);
-            $user = User::where('email', $email)->with('teams')->first();
+            $user = User::query()->where('email', $email)->with('teams')->first();
             if (
                 $user &&
                 Hash::check($request->password, $user->password)

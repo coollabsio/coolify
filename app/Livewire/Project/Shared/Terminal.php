@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared;
 
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -31,7 +32,7 @@ class Terminal extends Component
         if ($isContainer) {
             // Validate container identifier format (alphanumeric, dashes, and underscores only)
             if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $identifier)) {
-                throw new \InvalidArgumentException('Invalid container identifier format');
+                throw new InvalidArgumentException('Invalid container identifier format');
             }
 
             // Verify container exists and belongs to the user's team

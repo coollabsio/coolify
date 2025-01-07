@@ -44,8 +44,8 @@ class PreviewsCompose extends Component
             $template = $this->preview->application->preview_url_template;
             $host = $url->getHost();
             $schema = $url->getScheme();
-            $random = new Cuid2;
-            $preview_fqdn = str_replace('{{random}}', $random, $template);
+            $cuid2 = new Cuid2;
+            $preview_fqdn = str_replace('{{random}}', $cuid2, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $this->preview->pull_request_id, $preview_fqdn);
             $preview_fqdn = "$schema://$preview_fqdn";

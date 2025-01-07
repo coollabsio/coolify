@@ -4,6 +4,7 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Models\Server;
 use Livewire\Component;
+use Throwable;
 
 class Logs extends Component
 {
@@ -19,9 +20,11 @@ class Logs extends Component
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function render()

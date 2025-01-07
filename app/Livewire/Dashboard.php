@@ -38,7 +38,7 @@ class Dashboard extends Component
 
     public function loadDeployments()
     {
-        $this->deploymentsPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $this->servers->pluck('id'))->get([
+        $this->deploymentsPerServer = ApplicationDeploymentQueue::query()->whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $this->servers->pluck('id'))->get([
             'id',
             'application_id',
             'application_name',
@@ -52,7 +52,7 @@ class Dashboard extends Component
 
     public function navigateToProject($projectUuid)
     {
-        $project = Project::where('uuid', $projectUuid)->first();
+        $project = Project::query()->where('uuid', $projectUuid)->first();
 
         if ($project && $project->environments->count() === 1) {
             return Redirect::route('project.resource.index', [

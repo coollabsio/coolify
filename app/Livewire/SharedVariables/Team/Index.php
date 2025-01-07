@@ -3,7 +3,9 @@
 namespace App\Livewire\SharedVariables\Team;
 
 use App\Models\Team;
+use Exception;
 use Livewire\Component;
+use Throwable;
 
 class Index extends Component
 {
@@ -16,7 +18,7 @@ class Index extends Component
         try {
             $found = $this->team->environment_variables()->where('key', $data['key'])->first();
             if ($found) {
-                throw new \Exception('Variable already exists.');
+                throw new Exception('Variable already exists.');
             }
             $this->team->environment_variables()->create([
                 'key' => $data['key'],
@@ -27,9 +29,11 @@ class Index extends Component
                 'team_id' => currentTeam()->id,
             ]);
             $this->team->refresh();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function mount()

@@ -16,17 +16,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('team.{teamId}', function (User $user, int $teamId) {
-    if ($user->teams->pluck('id')->contains($teamId)) {
-        return true;
-    }
-
-    return false;
+    return (bool) $user->teams->pluck('id')->contains($teamId);
 });
 
 Broadcast::channel('user.{userId}', function (User $user) {
-    if ($user->id === Auth::id()) {
-        return true;
-    }
-
-    return false;
+    return $user->id === Auth::id();
 });

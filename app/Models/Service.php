@@ -84,14 +84,13 @@ class Service extends BaseModel
         }
         if ($oldConfigHash === $newConfigHash) {
             return false;
-        } else {
-            if ($save) {
-                $this->config_hash = $newConfigHash;
-                $this->save();
-            }
-
-            return true;
         }
+        if ($save) {
+            $this->config_hash = $newConfigHash;
+            $this->save();
+        }
+
+        return true;
     }
 
     protected function serverStatus(): Attribute
@@ -135,7 +134,7 @@ class Service extends BaseModel
 
     public static function ownedByCurrentTeam()
     {
-        return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return \App\Models\Service::query()->whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
     public function getContainersToStop(): array
@@ -161,7 +160,7 @@ class Service extends BaseModel
         }
 
         $startTime = time();
-        while (count($processes) > 0) {
+        while ($processes !== []) {
             $finishedProcesses = array_filter($processes, function ($process) {
                 return ! $process->running();
             });
@@ -231,11 +230,7 @@ class Service extends BaseModel
                 continue;
             }
             if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
+                $complexStatus = $complexStatus === 'exited' ? 'degraded' : 'running';
             } elseif ($status->startsWith('restarting')) {
                 $complexStatus = 'degraded';
             } elseif ($status->startsWith('exited')) {
@@ -260,11 +255,7 @@ class Service extends BaseModel
                 continue;
             }
             if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
+                $complexStatus = $complexStatus === 'exited' ? 'degraded' : 'running';
             } elseif ($status->startsWith('restarting')) {
                 $complexStatus = 'degraded';
             } elseif ($status->startsWith('exited')) {
@@ -1287,12 +1278,10 @@ class Service extends BaseModel
                 $real_value = $env->real_value;
                 if ($env->version === '4.0.0-beta.239') {
                     $real_value = $env->real_value;
+                } elseif ($env->is_literal || $env->is_multiline) {
+                    $real_value = '\''.$real_value.'\'';
                 } else {
-                    if ($env->is_literal || $env->is_multiline) {
-                        $real_value = '\''.$real_value.'\'';
-                    } else {
-                        $real_value = escapeEnvVariables($env->real_value);
-                    }
+                    $real_value = escapeEnvVariables($env->real_value);
                 }
                 $commands[] = "echo \"{$env->key}={$real_value}\" >> .env";
             }
@@ -1307,11 +1296,12 @@ class Service extends BaseModel
     {
         if ((int) $this->compose_parsing_version >= 3) {
             return newParser($this);
-        } elseif ($this->docker_compose_raw) {
-            return parseDockerComposeFile($this, $isNew);
-        } else {
-            return collect([]);
         }
+        if ($this->docker_compose_raw) {
+            return parseDockerComposeFile($this, $isNew);
+        }
+
+        return collect([]);
     }
 
     public function networks()

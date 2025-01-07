@@ -3,6 +3,9 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use DateTime;
+use DateTimeZone;
+use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
@@ -28,7 +31,7 @@ class Executions extends Component
 
     public $logsPerPage = 100;
 
-    public $selectedExecution = null;
+    public $selectedExecution;
 
     public $isPollingActive = false;
 
@@ -45,7 +48,7 @@ class Executions extends Component
     {
         try {
             $this->taskId = $taskId;
-            $this->task = ScheduledTask::findOrFail($taskId);
+            $this->task = ScheduledTask::query()->findOrFail($taskId);
             $this->executions = $this->task->executions()->take(20)->get();
             $this->serverTimezone = data_get($this->task, 'application.destination.server.settings.server_timezone');
             if (! $this->serverTimezone) {
@@ -54,9 +57,11 @@ class Executions extends Component
             if (! $this->serverTimezone) {
                 $this->serverTimezone = 'UTC';
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function refreshExecutions(): void
@@ -124,7 +129,7 @@ class Executions extends Component
     {
         $execution = $this->executions->firstWhere('id', $executionId);
         if (! $execution) {
-            return;
+            return null;
         }
 
         return response()->streamDownload(function () use ($execution) {
@@ -145,11 +150,11 @@ class Executions extends Component
     public function formatDateInServerTimezone($date)
     {
         $serverTimezone = $this->serverTimezone;
-        $dateObj = new \DateTime($date);
+        $dateObj = new DateTime($date);
         try {
-            $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
-        } catch (\Exception) {
-            $dateObj->setTimezone(new \DateTimeZone('UTC'));
+            $dateObj->setTimezone(new DateTimeZone($serverTimezone));
+        } catch (Exception) {
+            $dateObj->setTimezone(new DateTimeZone('UTC'));
         }
 
         return $dateObj->format('Y-m-d H:i:s T');

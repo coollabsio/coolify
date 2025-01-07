@@ -17,5 +17,5 @@ class MaintenanceModeEnabledNotification
     /**
      * Handle the event.
      */
-    public function handle(EventsMaintenanceModeEnabled $event): void {}
+    public function handle(EventsMaintenanceModeEnabled $eventsMaintenanceModeEnabled): void {}
 }

@@ -26,12 +26,12 @@ class ServiceDatabase extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return \App\Models\ServiceDatabase::query()->whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
     public static function ownedByCurrentTeam()
     {
-        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return \App\Models\ServiceDatabase::query()->whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
     public function restart()
@@ -133,10 +133,19 @@ class ServiceDatabase extends BaseModel
 
     public function isBackupSolutionAvailable()
     {
-        return str($this->databaseType())->contains('mysql') ||
-            str($this->databaseType())->contains('postgres') ||
-            str($this->databaseType())->contains('postgis') ||
-            str($this->databaseType())->contains('mariadb') ||
-            str($this->databaseType())->contains('mongodb');
+        if (str($this->databaseType())->contains('mysql')) {
+            return true;
+        }
+        if (str($this->databaseType())->contains('postgres')) {
+            return true;
+        }
+        if (str($this->databaseType())->contains('postgis')) {
+            return true;
+        }
+        if (str($this->databaseType())->contains('mariadb')) {
+            return true;
+        }
+
+        return (bool) str($this->databaseType())->contains('mongodb');
     }
 }

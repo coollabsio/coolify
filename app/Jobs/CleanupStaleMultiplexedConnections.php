@@ -28,7 +28,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
         foreach ($muxFiles as $muxFile) {
             $serverUuid = $this->extractServerUuidFromMuxFile($muxFile);
-            $server = Server::where('uuid', $serverUuid)->first();
+            $server = Server::query()->where('uuid', $serverUuid)->first();
 
             if (! $server) {
                 $this->removeMultiplexFile($muxFile);
@@ -57,7 +57,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
     private function cleanupNonExistentServerConnections()
     {
         $muxFiles = Storage::disk('ssh-mux')->files();
-        $existingServerUuids = Server::pluck('uuid')->toArray();
+        $existingServerUuids = Server::query()->pluck('uuid')->toArray();
 
         foreach ($muxFiles as $muxFile) {
             $serverUuid = $this->extractServerUuidFromMuxFile($muxFile);

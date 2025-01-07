@@ -6,6 +6,7 @@ use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Component;
+use Throwable;
 
 class ForcePasswordReset extends Component
 {
@@ -31,6 +32,8 @@ class ForcePasswordReset extends Component
             return redirect()->route('dashboard');
         }
         $this->email = auth()->user()->email;
+
+        return null;
     }
 
     public function render()
@@ -57,7 +60,7 @@ class ForcePasswordReset extends Component
             }
 
             return redirect()->route('dashboard');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

@@ -6,12 +6,11 @@ use Illuminate\Foundation\Events\MaintenanceModeDisabled as EventsMaintenanceMod
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
+use Throwable;
 
 class MaintenanceModeDisabledNotification
 {
-    public function __construct() {}
-
-    public function handle(EventsMaintenanceModeDisabled $event): void
+    public function handle(EventsMaintenanceModeDisabled $eventsMaintenanceModeDisabled): void
     {
         $files = Storage::disk('webhooks-during-maintenance')->files();
         $files = collect($files);
@@ -39,7 +38,7 @@ class MaintenanceModeDisabledNotification
             try {
                 $instance = new $class;
                 $instance->$method($request);
-            } catch (\Throwable $th) {
+            } catch (Throwable $th) {
             } finally {
                 Storage::disk('webhooks-during-maintenance')->delete($file);
             }

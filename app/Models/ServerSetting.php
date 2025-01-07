@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 #[OA\Schema(
     description: 'Server Settings model',
@@ -53,14 +54,6 @@ class ServerSetting extends Model
 {
     protected $guarded = [];
 
-    protected $casts = [
-        'force_docker_cleanup' => 'boolean',
-        'docker_cleanup_threshold' => 'integer',
-        'sentinel_token' => 'encrypted',
-        'is_reachable' => 'boolean',
-        'is_usable' => 'boolean',
-    ];
-
     protected static function booted()
     {
         static::creating(function ($setting) {
@@ -71,7 +64,7 @@ class ServerSetting extends Model
                 if (str($setting->sentinel_custom_url)->isEmpty()) {
                     $setting->generateSentinelUrl(save: false, ignoreEvent: true);
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('Error creating server setting: '.$e->getMessage());
             }
         });
@@ -147,5 +140,16 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'force_docker_cleanup' => 'boolean',
+            'docker_cleanup_threshold' => 'integer',
+            'sentinel_token' => 'encrypted',
+            'is_reachable' => 'boolean',
+            'is_usable' => 'boolean',
+        ];
     }
 }

@@ -6,12 +6,13 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Process;
+use RuntimeException;
 
 class SshMultiplexingHelper
 {
     public static function serverSshConfiguration(Server $server)
     {
-        $privateKey = PrivateKey::findOrFail($server->private_key_id);
+        $privateKey = PrivateKey::query()->findOrFail($server->private_key_id);
         $sshKeyLocation = $privateKey->getKeyLocation();
         $muxFilename = '/var/www/html/storage/app/ssh/mux/mux_'.$server->uuid;
 
@@ -35,9 +36,9 @@ class SshMultiplexingHelper
             $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
         }
         $checkCommand .= "{$server->user}@{$server->ip}";
-        $process = Process::run($checkCommand);
+        $processResult = Process::run($checkCommand);
 
-        if ($process->exitCode() !== 0) {
+        if ($processResult->exitCode() !== 0) {
             return self::establishNewMultiplexedConnection($server);
         }
 
@@ -60,12 +61,9 @@ class SshMultiplexingHelper
         }
         $establishCommand .= self::getCommonSshOptions($server, $sshKeyLocation, $connectionTimeout, $serverInterval);
         $establishCommand .= "{$server->user}@{$server->ip}";
-        $establishProcess = Process::run($establishCommand);
-        if ($establishProcess->exitCode() !== 0) {
-            return false;
-        }
+        $processResult = Process::run($establishCommand);
 
-        return true;
+        return $processResult->exitCode() === 0;
     }
 
     public static function removeMuxFile(Server $server)
@@ -103,15 +101,14 @@ class SshMultiplexingHelper
         }
 
         $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
-        $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
 
-        return $scp_command;
+        return $scp_command."{$source} {$server->user}@{$server->ip}:{$dest}";
     }
 
     public static function generateSshCommand(Server $server, string $command)
     {
         if ($server->settings->force_disabled) {
-            throw new \RuntimeException('Server is disabled.');
+            throw new RuntimeException('Server is disabled.');
         }
 
         $sshConfig = self::serverSshConfiguration($server);
@@ -140,11 +137,9 @@ class SshMultiplexingHelper
         $delimiter = base64_encode($delimiter);
         $command = str_replace($delimiter, '', $command);
 
-        $ssh_command .= "{$server->user}@{$server->ip} 'bash -se' << \\$delimiter".PHP_EOL
+        return $ssh_command.("{$server->user}@{$server->ip} 'bash -se' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
-            .$delimiter;
-
-        return $ssh_command;
+            .$delimiter);
     }
 
     private static function isMultiplexingEnabled(): bool
@@ -156,9 +151,9 @@ class SshMultiplexingHelper
     {
         $keyLocation = $privateKey->getKeyLocation();
         $checkKeyCommand = "ls $keyLocation 2>/dev/null";
-        $keyCheckProcess = Process::run($checkKeyCommand);
+        $processResult = Process::run($checkKeyCommand);
 
-        if ($keyCheckProcess->exitCode() !== 0) {
+        if ($processResult->exitCode() !== 0) {
             $privateKey->storeInFileSystem();
         }
     }

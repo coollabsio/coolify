@@ -67,7 +67,7 @@ class Create extends Component
                 $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
                 if ($oneClickDotEnvs) {
                     $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
-                        return ! empty($value);
+                        return $value !== '' && $value !== '0';
                     });
                 }
                 if ($oneClickService) {
@@ -84,7 +84,7 @@ class Create extends Component
                     if ($oneClickServiceName === 'cloudflared') {
                         data_set($service_payload, 'connect_to_docker_network', true);
                     }
-                    $service = Service::create($service_payload);
+                    $service = Service::query()->create($service_payload);
                     $service->name = "$oneClickServiceName-".$service->uuid;
                     $service->save();
                     if ($oneClickDotEnvs?->count() > 0) {
@@ -92,7 +92,7 @@ class Create extends Component
                             $key = str()->before($value, '=');
                             $value = str(str()->after($value, '='));
                             if ($value) {
-                                EnvironmentVariable::create([
+                                EnvironmentVariable::query()->create([
                                     'key' => $key,
                                     'value' => $value,
                                     'resourceable_id' => $service->id,
@@ -114,6 +114,8 @@ class Create extends Component
             }
             $this->type = $type->value();
         }
+
+        return null;
     }
 
     public function render()

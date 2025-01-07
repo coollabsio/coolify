@@ -25,7 +25,7 @@ class Gitea extends Controller
                     return Str::contains($file, $x_gitea_delivery);
                 })->first();
                 if ($gitea_delivery_found) {
-                    return;
+                    return null;
                 }
                 $data = [
                     'attributes' => $request->attributes->all(),
@@ -40,7 +40,7 @@ class Gitea extends Controller
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitea::manual_{$x_gitea_delivery}", $json);
 
-                return;
+                return null;
             }
             $x_gitea_event = Str::lower($request->header('X-Gitea-Event'));
             $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
@@ -76,7 +76,7 @@ class Gitea extends Controller
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
-            $applications = Application::where('git_repository', 'like', "%$full_name%");
+            $applications = Application::query()->where('git_repository', 'like', "%$full_name%");
             if ($x_gitea_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
@@ -155,10 +155,10 @@ class Gitea extends Controller
                     if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2;
-                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                            $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {
-                                    $pr_app = ApplicationPreview::create([
+                                    $pr_app = ApplicationPreview::query()->create([
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -167,7 +167,7 @@ class Gitea extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    ApplicationPreview::create([
+                                    ApplicationPreview::query()->create([
                                         'git_type' => 'gitea',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -198,7 +198,7 @@ class Gitea extends Controller
                         }
                     }
                     if ($action === 'closed') {
-                        $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                        $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
                             $found->delete();
                             $container_name = generateApplicationContainerName($application, $pull_request_id);

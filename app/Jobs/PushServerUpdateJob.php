@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,6 +22,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Throwable;
 
 class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -92,7 +94,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
     {
         // TODO: Swarm is not supported yet
         if (! $this->data) {
-            throw new \Exception('No data provided');
+            throw new Exception('No data provided');
         }
         $data = collect($this->data);
 
@@ -154,7 +156,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                             }
                             $this->updateApplicationPreviewStatus($applicationId, $containerStatus);
                         }
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                     }
                 } elseif ($labels->has('coolify.serviceId')) {
                     $serviceId = $labels->get('coolify.serviceId');
@@ -173,14 +175,12 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                     if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
                         $this->foundProxy = true;
                     } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
-                    } else {
-                        if ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                            $this->foundDatabaseUuids->push($uuid);
-                            if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
-                            } else {
-                                $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
-                            }
+                    } elseif ($this->allDatabaseUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                        $this->foundDatabaseUuids->push($uuid);
+                        if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
+                            $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
+                        } else {
+                            $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
                         }
                     }
                 }
@@ -224,7 +224,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         $notFoundApplicationIds = $this->allApplicationIds->diff($this->foundApplicationIds);
         if ($notFoundApplicationIds->isNotEmpty()) {
             $notFoundApplicationIds->each(function ($applicationId) {
-                $application = Application::find($applicationId);
+                $application = Application::query()->find($applicationId);
                 if ($application) {
                     $application->status = 'exited';
                     $application->save();
@@ -238,7 +238,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         $notFoundApplicationPreviewsIds = $this->allApplicationPreviewsIds->diff($this->foundApplicationPreviewsIds);
         if ($notFoundApplicationPreviewsIds->isNotEmpty()) {
             $notFoundApplicationPreviewsIds->each(function ($applicationPreviewId) {
-                $applicationPreview = ApplicationPreview::find($applicationPreviewId);
+                $applicationPreview = ApplicationPreview::query()->find($applicationPreviewId);
                 if ($applicationPreview) {
                     $applicationPreview->status = 'exited';
                     $applicationPreview->save();
@@ -257,7 +257,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                         StartProxy::run($this->server, false);
                         $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                 }
             } else {
                 $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
@@ -327,7 +327,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         $notFoundServiceDatabaseIds = $this->allServiceDatabaseIds->diff($this->foundServiceDatabaseIds);
         if ($notFoundServiceApplicationIds->isNotEmpty()) {
             $notFoundServiceApplicationIds->each(function ($serviceApplicationId) {
-                $application = ServiceApplication::find($serviceApplicationId);
+                $application = ServiceApplication::query()->find($serviceApplicationId);
                 if ($application) {
                     $application->status = 'exited';
                     $application->save();
@@ -336,7 +336,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         }
         if ($notFoundServiceDatabaseIds->isNotEmpty()) {
             $notFoundServiceDatabaseIds->each(function ($serviceDatabaseId) {
-                $database = ServiceDatabase::find($serviceDatabaseId);
+                $database = ServiceDatabase::query()->find($serviceDatabaseId);
                 if ($database) {
                     $database->status = 'exited';
                     $database->save();

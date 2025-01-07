@@ -24,6 +24,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Artisan;
+use Throwable;
 
 class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -80,7 +81,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 || $this->resource instanceof StandaloneKeydb
                 || $this->resource instanceof StandaloneDragonfly
                 || $this->resource instanceof StandaloneClickhouse;
-            $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+            $server = data_get($this->resource, 'server', data_get($this->resource, 'destination.server'));
             if (($this->dockerCleanup || $isDatabase) && $server) {
                 CleanupDocker::dispatch($server, true);
             }
@@ -88,7 +89,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->deleteConnectedNetworks && ! $isDatabase) {
                 $this->resource?->delete_connected_networks($this->resource->uuid);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw $e;
         } finally {
             $this->resource->forceDelete();

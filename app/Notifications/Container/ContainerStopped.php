@@ -23,30 +23,30 @@ class ContainerStopped extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject("Coolify: A resource  has been stopped unexpectedly on {$this->server->name}");
-        $mail->view('emails.container-stopped', [
+        $mailMessage = new MailMessage;
+        $mailMessage->subject("Coolify: A resource  has been stopped unexpectedly on {$this->server->name}");
+        $mailMessage->view('emails.container-stopped', [
             'containerName' => $this->name,
             'serverName' => $this->server->name,
             'url' => $this->url,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        $discordMessage = new DiscordMessage(
             title: ':cross_mark: Resource stopped',
             description: "{$this->name} has been stopped unexpectedly on {$this->server->name}.",
             color: DiscordMessage::errorColor(),
         );
 
         if ($this->url) {
-            $message->addField('Resource', '[Link]('.$this->url.')');
+            $discordMessage->addField('Resource', '[Link]('.$this->url.')');
         }
 
-        return $message;
+        return $discordMessage;
     }
 
     public function toTelegram(): array
@@ -86,7 +86,6 @@ class ContainerStopped extends CustomEmailNotification
             buttons: $buttons,
         );
     }
-
 
     public function toSlack(): SlackMessage
     {

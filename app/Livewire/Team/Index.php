@@ -7,6 +7,7 @@ use App\Models\TeamInvitation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
+use Throwable;
 
 class Index extends Component
 {
@@ -45,9 +46,11 @@ class Index extends Component
             $this->team->save();
             refreshSession();
             $this->dispatch('success', 'Team updated.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function delete()

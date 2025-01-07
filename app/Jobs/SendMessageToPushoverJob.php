@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -30,7 +31,7 @@ class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
     public int $maxExceptions = 5;
 
     public function __construct(
-        public PushoverMessage $message,
+        public PushoverMessage $pushoverMessage,
         public string $token,
         public string $user,
     ) {
@@ -42,9 +43,9 @@ class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        $response = Http::post('https://api.pushover.net/1/messages.json', $this->message->toPayload($this->token, $this->user));
+        $response = Http::post('https://api.pushover.net/1/messages.json', $this->pushoverMessage->toPayload($this->token, $this->user));
         if ($response->failed()) {
-            throw new \RuntimeException('Pushover notification failed with ' . $response->status() . ' status code.' . $response->body());
+            throw new RuntimeException('Pushover notification failed with '.$response->status().' status code.'.$response->body());
         }
     }
 }

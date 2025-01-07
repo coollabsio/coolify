@@ -43,14 +43,14 @@ class ApplicationDeploymentQueue extends Model
     public function application(): Attribute
     {
         return Attribute::make(
-            get: fn () => Application::find($this->application_id),
+            get: fn () => Application::query()->find($this->application_id),
         );
     }
 
     public function server(): Attribute
     {
         return Attribute::make(
-            get: fn () => Server::find($this->server_id),
+            get: fn () => Server::query()->find($this->server_id),
         );
     }
 

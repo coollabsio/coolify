@@ -23,32 +23,32 @@ class HighDiskUsage extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage;
-        $mail->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
-        $mail->view('emails.high-disk-usage', [
+        $mailMessage = new MailMessage;
+        $mailMessage->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
+        $mailMessage->view('emails.high-disk-usage', [
             'name' => $this->server->name,
             'disk_usage' => $this->disk_usage,
             'threshold' => $this->server_disk_usage_notification_threshold,
         ]);
 
-        return $mail;
+        return $mailMessage;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $message = new DiscordMessage(
+        $discordMessage = new DiscordMessage(
             title: ':cross_mark: High disk usage detected',
             description: "Server '{$this->server->name}' high disk usage detected!",
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
 
-        $message->addField('Disk usage', "{$this->disk_usage}%", true);
-        $message->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%", true);
-        $message->addField('What to do?', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)', true);
-        $message->addField('Change Settings', '[Threshold]('.base_url().'/server/'.$this->server->uuid.'#advanced) | [Notification]('.base_url().'/notifications/discord)');
+        $discordMessage->addField('Disk usage', "{$this->disk_usage}%", true);
+        $discordMessage->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%", true);
+        $discordMessage->addField('What to do?', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)', true);
+        $discordMessage->addField('Change Settings', '[Threshold]('.base_url().'/server/'.$this->server->uuid.'#advanced) | [Notification]('.base_url().'/notifications/discord)');
 
-        return $message;
+        return $discordMessage;
     }
 
     public function toTelegram(): array
@@ -65,8 +65,8 @@ class HighDiskUsage extends CustomEmailNotification
             level: 'warning',
             message: "Server '{$this->server->name}' high disk usage detected!<br/><br/><b>Disk usage:</b> {$this->disk_usage}%.<br/><b>Threshold:</b> {$this->server_disk_usage_notification_threshold}%.<br/>Please cleanup your disk to prevent data-loss.",
             buttons: [
-                'Change settings' => base_url().'/server/'.$this->server->uuid."#advanced",
-                'Tips for cleanup' => "https://coolify.io/docs/knowledge-base/server/automated-cleanup",
+                'Change settings' => base_url().'/server/'.$this->server->uuid.'#advanced',
+                'Tips for cleanup' => 'https://coolify.io/docs/knowledge-base/server/automated-cleanup',
             ],
         );
     }

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project;
 
 use App\Models\Environment;
+use Exception;
 use Livewire\Component;
 
 class DeleteEnvironment extends Component
@@ -18,11 +19,13 @@ class DeleteEnvironment extends Component
     public function mount()
     {
         try {
-            $this->environmentName = Environment::findOrFail($this->environment_id)->name;
+            $this->environmentName = Environment::query()->findOrFail($this->environment_id)->name;
             $this->parameters = get_route_parameters();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        return null;
     }
 
     public function delete()
@@ -30,7 +33,7 @@ class DeleteEnvironment extends Component
         $this->validate([
             'environment_id' => 'required|int',
         ]);
-        $environment = Environment::findOrFail($this->environment_id);
+        $environment = Environment::query()->findOrFail($this->environment_id);
         if ($environment->isEmpty()) {
             $environment->delete();
 

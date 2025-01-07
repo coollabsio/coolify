@@ -40,7 +40,7 @@ class Stripe extends Controller
 
                 return response('Webhook received. Cool cool cool cool cool.', 200);
             }
-            $this->webhook = Webhook::create([
+            $this->webhook = Webhook::query()->create([
                 'type' => 'stripe',
                 'payload' => $request->getContent(),
             ]);

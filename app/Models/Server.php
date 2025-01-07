@@ -10,6 +10,7 @@ use App\Events\ServerReachabilityChanged;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
+use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,11 +20,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
+use Log;
 use OpenApi\Attributes as OA;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 #[OA\Schema(
     description: 'Server model',
@@ -72,39 +75,37 @@ class Server extends BaseModel
             }
         });
         static::created(function ($server) {
-            ServerSetting::create([
+            ServerSetting::query()->create([
                 'server_id' => $server->id,
             ]);
             if ($server->id === 0) {
                 if ($server->isSwarm()) {
-                    SwarmDocker::create([
+                    SwarmDocker::query()->create([
                         'id' => 0,
                         'name' => 'coolify',
                         'network' => 'coolify-overlay',
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    StandaloneDocker::create([
+                    StandaloneDocker::query()->create([
                         'id' => 0,
                         'name' => 'coolify',
                         'network' => 'coolify',
                         'server_id' => $server->id,
                     ]);
                 }
+            } elseif ($server->isSwarm()) {
+                SwarmDocker::query()->create([
+                    'name' => 'coolify-overlay',
+                    'network' => 'coolify-overlay',
+                    'server_id' => $server->id,
+                ]);
             } else {
-                if ($server->isSwarm()) {
-                    SwarmDocker::create([
-                        'name' => 'coolify-overlay',
-                        'network' => 'coolify-overlay',
-                        'server_id' => $server->id,
-                    ]);
-                } else {
-                    StandaloneDocker::create([
-                        'name' => 'coolify',
-                        'network' => 'coolify',
-                        'server_id' => $server->id,
-                    ]);
-                }
+                StandaloneDocker::query()->create([
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $server->id,
+                ]);
             }
             if (! isset($server->proxy->redirect_enabled)) {
                 $server->proxy->redirect_enabled = true;
@@ -123,17 +124,6 @@ class Server extends BaseModel
             $server->settings()->delete();
         });
     }
-
-    protected $casts = [
-        'proxy' => SchemalessAttributes::class,
-        'logdrain_axiom_api_key' => 'encrypted',
-        'logdrain_newrelic_license_key' => 'encrypted',
-        'delete_unused_volumes' => 'boolean',
-        'delete_unused_networks' => 'boolean',
-        'unreachable_notification_sent' => 'boolean',
-        'is_build_server' => 'boolean',
-        'force_disabled' => 'boolean',
-    ];
 
     protected $schemalessAttributes = [
         'proxy',
@@ -202,10 +192,8 @@ class Server extends BaseModel
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
         $redirect_url = $this->proxy->redirect_url;
-        if (isDev()) {
-            if ($proxy_type === ProxyTypes::CADDY->value) {
-                $dynamic_conf_path = '/data/coolify/proxy/caddy/dynamic';
-            }
+        if (isDev() && $proxy_type === ProxyTypes::CADDY->value) {
+            $dynamic_conf_path = '/data/coolify/proxy/caddy/dynamic';
         }
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_503.yaml";
@@ -223,15 +211,11 @@ class Server extends BaseModel
             instant_remote_process(["rm -f $default_redirect_file"], $this);
         } else {
             if ($proxy_type === ProxyTypes::CADDY->value) {
-                if (filled($redirect_url)) {
-                    $conf = ":80, :443 {
+                $conf = filled($redirect_url) ? ":80, :443 {
    redir $redirect_url
-}";
-                } else {
-                    $conf = ':80, :443 {
+}" : ':80, :443 {
     respond 503
 }';
-                }
             } elseif ($proxy_type === ProxyTypes::TRAEFIK->value) {
                 $dynamic_conf = [
                     'http' => [
@@ -474,17 +458,9 @@ $schema://$host {
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
             // Do nothing
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
-            } else {
-                $proxy_path = $proxy_path.'/caddy';
-            }
+            $proxy_path = isDev() ? '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy' : $proxy_path.'/caddy';
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
-            } else {
-                $proxy_path = $proxy_path.'/nginx';
-            }
+            $proxy_path = isDev() ? '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx' : $proxy_path.'/nginx';
         }
 
         return $proxy_path;
@@ -545,7 +521,7 @@ $schema://$host {
     {
         $wait = $this->settings->sentinel_push_interval_seconds * 3;
         if ($wait < 120) {
-            $wait = 120;
+            return 120;
         }
 
         return $wait;
@@ -587,7 +563,7 @@ $schema://$host {
                 if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
-                throw new \Exception($error);
+                throw new Exception($error);
             }
             $cpu = json_decode($cpu, true);
 
@@ -595,6 +571,8 @@ $schema://$host {
                 return [(int) $metric['time'], (float) $metric['percent']];
             });
         }
+
+        return null;
     }
 
     public function getMemoryMetrics(int $mins = 5)
@@ -608,7 +586,7 @@ $schema://$host {
                 if ($error === 'Unauthorized') {
                     $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
                 }
-                throw new \Exception($error);
+                throw new Exception($error);
             }
             $memory = json_decode($memory, true);
             $parsedCollection = collect($memory)->map(function ($metric) {
@@ -619,6 +597,8 @@ $schema://$host {
 
             return $parsedCollection->toArray();
         }
+
+        return null;
     }
 
     public function getDiskUsage(): ?string
@@ -661,11 +641,11 @@ $schema://$host {
             $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this, false);
             if ($containerReplicates) {
                 $containerReplicates = format_docker_command_output_to_json($containerReplicates);
-                foreach ($containerReplicates as $containerReplica) {
-                    $name = data_get($containerReplica, 'Name');
-                    $containers = $containers->map(function ($container) use ($name, $containerReplica) {
+                foreach ($containerReplicates as $containerReplicate) {
+                    $name = data_get($containerReplicate, 'Name');
+                    $containers = $containers->map(function ($container) use ($name, $containerReplicate) {
                         if (data_get($container, 'Spec.Name') === $name) {
-                            $replicas = data_get($containerReplica, 'Replicas');
+                            $replicas = data_get($containerReplicate, 'Replicas');
                             $running = str($replicas)->explode('/')[0];
                             $total = str($replicas)->explode('/')[1];
                             if ($running === $total) {
@@ -737,9 +717,9 @@ $schema://$host {
             $containers = $containers->filter();
 
             return collect($containers);
-        } else {
-            return collect([]);
         }
+
+        return collect([]);
     }
 
     public function hasDefinedResources()
@@ -747,11 +727,8 @@ $schema://$host {
         $applications = $this->applications()->count() > 0;
         $databases = $this->databases()->count() > 0;
         $services = $this->services()->count() > 0;
-        if ($applications || $databases || $services) {
-            return true;
-        }
 
-        return false;
+        return $applications || $databases || $services;
     }
 
     public function databases()
@@ -781,7 +758,7 @@ $schema://$host {
         $additionalApplicationIds = collect($additionalApplicationIds)->map(function ($item) {
             return $item->application_id;
         });
-        Application::whereIn('id', $additionalApplicationIds)->get()->each(function ($application) use ($applications) {
+        Application::query()->whereIn('id', $additionalApplicationIds)->get()->each(function ($application) use ($applications) {
             $applications->push($application);
         });
 
@@ -799,7 +776,7 @@ $schema://$host {
     {
         return $this->previews()->filter(function ($preview) {
             $applicationId = data_get($preview, 'application_id');
-            $application = Application::find($applicationId);
+            $application = Application::query()->find($applicationId);
             if (! $application) {
                 return false;
             }
@@ -901,11 +878,7 @@ $schema://$host {
     public function isProxyShouldRun()
     {
         // TODO: Do we need "|| $this->proxy->force_stop" here?
-        if ($this->proxyType() === ProxyTypes::NONE->value || $this->isBuildServer()) {
-            return false;
-        }
-
-        return true;
+        return $this->proxyType() !== ProxyTypes::NONE->value && ! $this->isBuildServer();
     }
 
     public function skipServer()
@@ -913,11 +886,8 @@ $schema://$host {
         if ($this->ip === '1.2.3.4') {
             return true;
         }
-        if ($this->settings->force_disabled === true) {
-            return true;
-        }
 
-        return false;
+        return $this->settings->force_disabled === true;
     }
 
     public function isFunctional()
@@ -941,8 +911,8 @@ $schema://$host {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
         $releaseLines = collect(explode("\n", $os_release));
         $collectedData = collect([]);
-        foreach ($releaseLines as $line) {
-            $item = str($line)->trim();
+        foreach ($releaseLines as $releaseLine) {
+            $item = str($releaseLine)->trim();
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');
@@ -956,10 +926,10 @@ $schema://$host {
         if ($supported->count() === 1) {
             // ray('supported');
             return str($supported->first());
-        } else {
-            // ray('not supported');
-            return false;
         }
+
+        // ray('not supported');
+        return false;
     }
 
     public function isSwarm()
@@ -982,11 +952,8 @@ $schema://$host {
         if ($this->status() === false) {
             return false;
         }
-        if ($this->isFunctional() === false) {
-            return false;
-        }
 
-        return true;
+        return $this->isFunctional() !== false;
     }
 
     public function status(): bool
@@ -1026,19 +993,19 @@ $schema://$host {
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
 
-        \Log::debug('Server reachability check', [
+        Log::debug('Server reachability check', [
             'server_id' => $this->id,
             'is_reachable' => $isReachable,
             'notification_sent' => $unreachableNotificationSent,
             'unreachable_count' => $this->unreachable_count,
         ]);
 
-        if ($isReachable === true) {
+        if ($isReachable) {
             $this->unreachable_count = 0;
             $this->save();
 
-            if ($unreachableNotificationSent === true) {
-                \Log::debug('Server is now reachable, sending notification', [
+            if ($unreachableNotificationSent) {
+                Log::debug('Server is now reachable, sending notification', [
                     'server_id' => $this->id,
                 ]);
                 $this->sendReachableNotification();
@@ -1048,7 +1015,7 @@ $schema://$host {
         }
 
         $this->increment('unreachable_count');
-        \Log::debug('Incremented unreachable count', [
+        Log::debug('Incremented unreachable count', [
             'server_id' => $this->id,
             'new_count' => $this->unreachable_count,
         ]);
@@ -1056,7 +1023,7 @@ $schema://$host {
         if ($this->unreachable_count === 1) {
             $this->settings->is_reachable = true;
             $this->settings->save();
-            \Log::debug('First unreachable attempt, marking as reachable', [
+            Log::debug('First unreachable attempt, marking as reachable', [
                 'server_id' => $this->id,
             ]);
 
@@ -1067,7 +1034,7 @@ $schema://$host {
             $failedChecks = 0;
             for ($i = 0; $i < 3; $i++) {
                 $status = $this->serverStatus();
-                \Log::debug('Additional reachability check', [
+                Log::debug('Additional reachability check', [
                     'server_id' => $this->id,
                     'attempt' => $i + 1,
                     'status' => $status,
@@ -1079,7 +1046,7 @@ $schema://$host {
             }
 
             if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                \Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
+                Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
                     'server_id' => $this->id,
                 ]);
                 $this->sendUnreachableNotification();
@@ -1119,7 +1086,7 @@ $schema://$host {
             }
 
             return ['uptime' => true, 'error' => null];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             if ($justCheckingNewKey) {
                 return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
             }
@@ -1145,18 +1112,18 @@ $schema://$host {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
-                throw new \Exception('Server is not usable. Docker Engine is not installed.');
+                throw new Exception('Server is not usable. Docker Engine is not installed.');
             }
 
             return false;
         }
         try {
             instant_remote_process(['docker version'], $this);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
-                throw new \Exception('Server is not usable. Docker Engine is not running.');
+                throw new Exception('Server is not usable. Docker Engine is not running.', $e->getCode(), $e);
             }
 
             return false;
@@ -1175,7 +1142,7 @@ $schema://$host {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
-                throw new \Exception('Server is not usable. Docker Compose is not installed.');
+                throw new Exception('Server is not usable. Docker Compose is not installed.');
             }
 
             return false;
@@ -1191,9 +1158,7 @@ $schema://$host {
         $swarmStatus = instant_remote_process(['docker info|grep -i swarm'], $this, false);
         $swarmStatus = str($swarmStatus)->trim()->after(':')->trim();
         if ($swarmStatus === 'inactive') {
-            throw new \Exception('Docker Swarm is not initiated. Please join the server to a swarm before continuing.');
-
-            return false;
+            throw new Exception('Docker Swarm is not initiated. Please join the server to a swarm before continuing.');
         }
         $this->settings->is_usable = true;
         $this->settings->save();
@@ -1225,13 +1190,13 @@ $schema://$host {
     public function validateCoolifyNetwork($isSwarm = false, $isBuildServer = false)
     {
         if ($isBuildServer) {
-            return;
+            return null;
         }
         if ($isSwarm) {
             return instant_remote_process(['docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true'], $this, false);
-        } else {
-            return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
         }
+
+        return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
     }
 
     public function isNonRoot()
@@ -1260,7 +1225,7 @@ $schema://$host {
     public function updateWithPrivateKey(array $data, ?PrivateKey $privateKey = null)
     {
         $this->update($data);
-        if ($privateKey) {
+        if ($privateKey instanceof PrivateKey) {
             $this->privateKey()->associate($privateKey);
             $this->save();
         }
@@ -1290,9 +1255,11 @@ $schema://$host {
             } else {
                 StartSentinel::run($this, true);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function url()
@@ -1322,7 +1289,21 @@ $schema://$host {
                 }
             }
         } else {
-            throw new \Exception('Invalid proxy type.');
+            throw new Exception('Invalid proxy type.');
         }
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'proxy' => SchemalessAttributes::class,
+            'logdrain_axiom_api_key' => 'encrypted',
+            'logdrain_newrelic_license_key' => 'encrypted',
+            'delete_unused_volumes' => 'boolean',
+            'delete_unused_networks' => 'boolean',
+            'unreachable_notification_sent' => 'boolean',
+            'is_build_server' => 'boolean',
+            'force_disabled' => 'boolean',
+        ];
     }
 }

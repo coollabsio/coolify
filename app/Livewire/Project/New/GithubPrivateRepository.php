@@ -7,9 +7,11 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
+use Throwable;
 
 class GithubPrivateRepository extends Component
 {
@@ -104,7 +106,7 @@ class GithubPrivateRepository extends Component
         $this->repositories = collect();
         $this->page = 1;
         $this->selected_github_app_id = $github_app_id;
-        $this->github_app = GithubApp::where('id', $github_app_id)->first();
+        $this->github_app = GithubApp::query()->where('id', $github_app_id)->first();
         $this->token = generate_github_installation_token($this->github_app);
         $this->loadRepositoryByPage();
         if ($this->repositories->count() < $this->total_repositories_count) {
@@ -129,10 +131,12 @@ class GithubPrivateRepository extends Component
         }
 
         if ($json['total_count'] === 0) {
-            return;
+            return null;
         }
         $this->total_repositories_count = $json['total_count'];
         $this->repositories = $this->repositories->concat(collect($json['repositories']));
+
+        return null;
     }
 
     public function loadBranches()
@@ -161,25 +165,27 @@ class GithubPrivateRepository extends Component
 
         $this->total_branches_count = count($json);
         $this->branches = $this->branches->concat(collect($json));
+
+        return null;
     }
 
     public function submit()
     {
         try {
             $destination_uuid = $this->query['destination'];
-            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            $destination = StandaloneDocker::query()->where('uuid', $destination_uuid)->first();
             if (! $destination) {
-                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+                $destination = SwarmDocker::query()->where('uuid', $destination_uuid)->first();
             }
             if (! $destination) {
-                throw new \Exception('Destination not found. What?!');
+                throw new Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
 
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+            $project = Project::query()->where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
-            $application = Application::create([
+            $application = Application::query()->create([
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
@@ -214,7 +220,7 @@ class GithubPrivateRepository extends Component
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return handleError($e, $this);
         }
     }

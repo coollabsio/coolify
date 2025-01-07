@@ -34,10 +34,10 @@ class CreateNewUser implements CreatesNewUsers
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
 
-        if (User::count() == 0) {
+        if (User::query()->count() == 0) {
             // If this is the first user, make them the root user
             // Team is already created in the database/seeders/ProductionSeeder.php
-            $user = User::create([
+            $user = User::query()->create([
                 'id' => 0,
                 'name' => $input['name'],
                 'email' => strtolower($input['email']),
@@ -50,7 +50,7 @@ class CreateNewUser implements CreatesNewUsers
             $settings->is_registration_enabled = false;
             $settings->save();
         } else {
-            $user = User::create([
+            $user = User::query()->create([
                 'name' => $input['name'],
                 'email' => strtolower($input['email']),
                 'password' => Hash::make($input['password']),

@@ -15,7 +15,7 @@ class SendMessageToSlackJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        private SlackMessage $message,
+        private SlackMessage $slackMessage,
         private string $webhookUrl
     ) {
         $this->onQueue('high');
@@ -35,20 +35,20 @@ class SendMessageToSlackJob implements ShouldQueue
             ],
             'attachments' => [
                 [
-                    'color' => $this->message->color,
+                    'color' => $this->slackMessage->color,
                     'blocks' => [
                         [
                             'type' => 'header',
                             'text' => [
                                 'type' => 'plain_text',
-                                'text' => $this->message->title,
+                                'text' => $this->slackMessage->title,
                             ],
                         ],
                         [
                             'type' => 'section',
                             'text' => [
                                 'type' => 'mrkdwn',
-                                'text' => $this->message->description,
+                                'text' => $this->slackMessage->description,
                             ],
                         ],
                     ],

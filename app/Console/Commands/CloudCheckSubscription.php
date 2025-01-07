@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Team;
 use Illuminate\Console\Command;
+use Stripe\StripeClient;
 
 class CloudCheckSubscription extends Command
 {
@@ -26,19 +27,19 @@ class CloudCheckSubscription extends Command
      */
     public function handle()
     {
-        $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
-        $activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->get();
-        foreach ($activeSubscribers as $team) {
-            $stripeSubscriptionId = $team->subscription->stripe_subscription_id;
-            $stripeInvoicePaid = $team->subscription->stripe_invoice_paid;
-            $stripeCustomerId = $team->subscription->stripe_customer_id;
+        $stripeClient = new StripeClient(config('subscription.stripe_api_key'));
+        $activeSubscribers = Team::query()->whereRelation('subscription', 'stripe_invoice_paid', true)->get();
+        foreach ($activeSubscribers as $activeSubscriber) {
+            $stripeSubscriptionId = $activeSubscriber->subscription->stripe_subscription_id;
+            $stripeInvoicePaid = $activeSubscriber->subscription->stripe_invoice_paid;
+            $stripeCustomerId = $activeSubscriber->subscription->stripe_customer_id;
             if (! $stripeSubscriptionId) {
-                echo "Team {$team->id} has no subscription, but invoice status is: {$stripeInvoicePaid}\n";
+                echo "Team {$activeSubscriber->id} has no subscription, but invoice status is: {$stripeInvoicePaid}\n";
                 echo "Link on Stripe: https://dashboard.stripe.com/customers/{$stripeCustomerId}\n";
 
                 continue;
             }
-            $subscription = $stripe->subscriptions->retrieve($stripeSubscriptionId);
+            $subscription = $stripeClient->subscriptions->retrieve($stripeSubscriptionId);
             if ($subscription->status === 'active') {
                 continue;
             }

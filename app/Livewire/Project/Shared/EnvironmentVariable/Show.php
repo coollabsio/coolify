@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
+use Exception;
 use Livewire\Component;
 
 class Show extends Component
@@ -60,7 +61,7 @@ class Show extends Component
     public function mount()
     {
         $this->syncData();
-        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
+        if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
         $this->parameters = get_route_parameters();
@@ -116,7 +117,7 @@ class Show extends Component
     public function serialize()
     {
         data_forget($this->env, 'real_value');
-        if ($this->env->getMorphClass() === \App\Models\SharedEnvironmentVariable::class) {
+        if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             data_forget($this->env, 'is_build_time');
         }
     }
@@ -156,7 +157,7 @@ class Show extends Component
                 $this->value = $oldValue;
                 $this->dispatch('error', 'Required environment variable cannot be empty.');
 
-                return;
+                return null;
             }
 
             $this->serialize();
@@ -168,9 +169,11 @@ class Show extends Component
             $this->syncData(true);
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 
     public function delete()
@@ -179,8 +182,10 @@ class Show extends Component
             $this->env->delete();
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return handleError($e);
         }
+
+        return null;
     }
 }
