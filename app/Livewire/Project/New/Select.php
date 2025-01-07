@@ -23,6 +23,8 @@ class Select extends Component
 
     public Collection|null|Server $servers;
 
+    public bool $onlyBuildServerAvailable = false;
+
     public ?Collection $standaloneDockers;
 
     public ?Collection $swarmDockers;
@@ -325,5 +327,11 @@ class Select extends Component
     {
         $this->servers = Server::isUsable()->get()->sortBy('name');
         $this->allServers = $this->servers;
+
+        if ($this->allServers && $this->allServers->isNotEmpty()) {
+            $this->onlyBuildServerAvailable = $this->allServers->every(function ($server) {
+                return $server->isBuildServer();
+            });
+        }
     }
 }
