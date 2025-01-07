@@ -8,7 +8,6 @@ use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use RuntimeException;
 
 trait ExecuteRemoteCommand
 {
@@ -19,14 +18,18 @@ trait ExecuteRemoteCommand
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
-        $commandsText = $commands instanceof Collection ? $commands : collect($commands);
+        if ($commands instanceof Collection) {
+            $commandsText = $commands;
+        } else {
+            $commandsText = collect($commands);
+        }
         if ($this->server instanceof Server === false) {
-            throw new RuntimeException('Server is not set or is not an instance of Server model');
+            throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
         $commandsText->each(function ($single_command) {
-            $command = data_get($single_command, 'command', $single_command[0] ?? null);
+            $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {
-                throw new RuntimeException('Command is not set');
+                throw new \RuntimeException('Command is not set');
             }
             $hidden = data_get($single_command, 'hidden', false);
             $customType = data_get($single_command, 'type');
@@ -41,7 +44,7 @@ trait ExecuteRemoteCommand
                 }
             }
             $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-            $invokedProcess = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = str($output)->trim();
                 if ($output->startsWith('╔')) {
                     $output = "\n".$output;
@@ -77,14 +80,16 @@ trait ExecuteRemoteCommand
                 }
             });
             $this->application_deployment_queue->update([
-                'current_process_id' => $invokedProcess->id(),
+                'current_process_id' => $process->id(),
             ]);
 
-            $processResult = $invokedProcess->wait();
-            if ($processResult->exitCode() !== 0 && ! $ignore_errors) {
-                $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
-                $this->application_deployment_queue->save();
-                throw new RuntimeException($processResult->errorOutput());
+            $process_result = $process->wait();
+            if ($process_result->exitCode() !== 0) {
+                if (! $ignore_errors) {
+                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
+                    $this->application_deployment_queue->save();
+                    throw new \RuntimeException($process_result->errorOutput());
+                }
             }
         });
     }

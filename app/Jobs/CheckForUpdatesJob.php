@@ -10,7 +10,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Throwable;
 
 class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -38,7 +37,7 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
                     $settings->update(['new_version_available' => false]);
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // Consider implementing a notification to administrators
         }
     }

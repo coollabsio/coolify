@@ -31,7 +31,7 @@ class Gitlab extends Controller
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Gitlab::manual_gitlab", $json);
 
-                return null;
+                return;
             }
 
             $return_payloads = collect([]);
@@ -93,7 +93,7 @@ class Gitlab extends Controller
                     return response($return_payloads);
                 }
             }
-            $applications = Application::query()->where('git_repository', 'like', "%$full_name%");
+            $applications = Application::where('git_repository', 'like', "%$full_name%");
             if ($x_gitlab_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
@@ -181,10 +181,10 @@ class Gitlab extends Controller
                     if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2;
-                            $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {
-                                    $pr_app = ApplicationPreview::query()->create([
+                                    $pr_app = ApplicationPreview::create([
                                         'git_type' => 'gitlab',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -193,7 +193,7 @@ class Gitlab extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    ApplicationPreview::query()->create([
+                                    ApplicationPreview::create([
                                         'git_type' => 'gitlab',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -223,7 +223,7 @@ class Gitlab extends Controller
                             ]);
                         }
                     } elseif ($action === 'closed' || $action === 'close' || $action === 'merge') {
-                        $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                        $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
                             $found->delete();
                             $container_name = generateApplicationContainerName($application, $pull_request_id);

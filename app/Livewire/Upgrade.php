@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use Livewire\Component;
-use Throwable;
 
 class Upgrade extends Component
 {
@@ -27,25 +26,21 @@ class Upgrade extends Component
             if (isDev()) {
                 $this->isUpgradeAvailable = true;
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function upgrade()
     {
         try {
             if ($this->updateInProgress) {
-                return null;
+                return;
             }
             $this->updateInProgress = true;
             UpdateCoolify::run(manual_update: true);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

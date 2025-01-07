@@ -5,12 +5,10 @@ namespace App\Livewire;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\Test;
-use Exception;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class SettingsEmail extends Component
 {
@@ -67,8 +65,6 @@ class SettingsEmail extends Component
         $this->syncData();
         $this->team = auth()->user()->currentTeam();
         $this->testEmailAddress = auth()->user()->email;
-
-        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -110,11 +106,9 @@ class SettingsEmail extends Component
             $this->resetErrorBag();
             $this->syncData(true);
             $this->dispatch('success', 'Transactional email settings updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function instantSave(string $type)
@@ -128,7 +122,7 @@ class SettingsEmail extends Component
                 $this->submitResend();
             }
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($type === 'SMTP') {
                 $this->smtpEnabled = false;
             } elseif ($type === 'Resend') {
@@ -137,8 +131,6 @@ class SettingsEmail extends Component
 
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submitSmtp()
@@ -180,13 +172,11 @@ class SettingsEmail extends Component
             $this->settings->save();
 
             $this->dispatch('success', 'SMTP settings updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->smtpEnabled = false;
 
             return handleError($e);
         }
-
-        return null;
     }
 
     public function submitResend()
@@ -215,13 +205,11 @@ class SettingsEmail extends Component
             $this->settings->save();
 
             $this->dispatch('success', 'Resend settings updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->resendEnabled = false;
 
             return handleError($e);
         }
-
-        return null;
     }
 
     public function sendTestEmail()
@@ -245,12 +233,10 @@ class SettingsEmail extends Component
             );
 
             if (! $executed) {
-                throw new Exception('Too many messages sent!');
+                throw new \Exception('Too many messages sent!');
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e);
         }
-
-        return null;
     }
 }

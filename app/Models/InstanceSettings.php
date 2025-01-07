@@ -15,11 +15,32 @@ class InstanceSettings extends Model implements SendsEmail
 
     protected $guarded = [];
 
+    protected $casts = [
+        'smtp_enabled' => 'boolean',
+        'smtp_from_address' => 'encrypted',
+        'smtp_from_name' => 'encrypted',
+        'smtp_recipients' => 'encrypted',
+        'smtp_host' => 'encrypted',
+        'smtp_port' => 'integer',
+        'smtp_username' => 'encrypted',
+        'smtp_password' => 'encrypted',
+        'smtp_timeout' => 'integer',
+
+        'resend_enabled' => 'boolean',
+        'resend_api_key' => 'encrypted',
+
+        'allowed_ip_ranges' => 'array',
+        'is_auto_update_enabled' => 'boolean',
+        'auto_update_frequency' => 'string',
+        'update_check_frequency' => 'string',
+        'sentinel_token' => 'encrypted',
+    ];
+
     protected static function booted(): void
     {
         static::updated(function ($settings) {
             if ($settings->isDirty('helper_version')) {
-                Server::query()->chunkById(100, function ($servers) {
+                Server::chunkById(100, function ($servers) {
                     foreach ($servers as $server) {
                         PullHelperImageJob::dispatch($server);
                     }
@@ -68,7 +89,7 @@ class InstanceSettings extends Model implements SendsEmail
 
     public static function get()
     {
-        return \App\Models\InstanceSettings::query()->findOrFail(0);
+        return InstanceSettings::findOrFail(0);
     }
 
     public function getRecipients($notification)
@@ -103,27 +124,4 @@ class InstanceSettings extends Model implements SendsEmail
     //         }
     //     );
     // }
-    protected function casts(): array
-    {
-        return [
-            'smtp_enabled' => 'boolean',
-            'smtp_from_address' => 'encrypted',
-            'smtp_from_name' => 'encrypted',
-            'smtp_recipients' => 'encrypted',
-            'smtp_host' => 'encrypted',
-            'smtp_port' => 'integer',
-            'smtp_username' => 'encrypted',
-            'smtp_password' => 'encrypted',
-            'smtp_timeout' => 'integer',
-
-            'resend_enabled' => 'boolean',
-            'resend_api_key' => 'encrypted',
-
-            'allowed_ip_ranges' => 'array',
-            'is_auto_update_enabled' => 'boolean',
-            'auto_update_frequency' => 'string',
-            'update_check_frequency' => 'string',
-            'sentinel_token' => 'encrypted',
-        ];
-    }
 }

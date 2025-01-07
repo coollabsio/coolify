@@ -5,13 +5,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
-use Throwable;
 
 class S3Storage extends BaseModel
 {
     use HasFactory;
 
     protected $guarded = [];
+
+    protected $casts = [
+        'is_usable' => 'boolean',
+        'key' => 'encrypted',
+        'secret' => 'encrypted',
+    ];
 
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
@@ -52,12 +57,12 @@ class S3Storage extends BaseModel
             Storage::disk('custom-s3')->files();
             $this->unusable_email_sent = false;
             $this->is_usable = true;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->is_usable = false;
             if ($this->unusable_email_sent === false && is_transactional_emails_enabled()) {
-                $mailMessage = new MailMessage;
-                $mailMessage->subject('Coolify: S3 Storage Connection Error');
-                $mailMessage->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
+                $mail = new MailMessage;
+                $mail->subject('Coolify: S3 Storage Connection Error');
+                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
                 $users = collect([]);
                 $members = $this->team->members()->get();
                 foreach ($members as $user) {
@@ -66,7 +71,7 @@ class S3Storage extends BaseModel
                     }
                 }
                 foreach ($users as $user) {
-                    send_user_an_email($mailMessage, $user->email);
+                    send_user_an_email($mail, $user->email);
                 }
                 $this->unusable_email_sent = true;
             }
@@ -77,14 +82,5 @@ class S3Storage extends BaseModel
                 $this->save();
             }
         }
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'is_usable' => 'boolean',
-            'key' => 'encrypted',
-            'secret' => 'encrypted',
-        ];
     }
 }

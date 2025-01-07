@@ -33,10 +33,10 @@ class Project extends BaseModel
     protected static function booted()
     {
         static::created(function ($project) {
-            ProjectSetting::query()->create([
+            ProjectSetting::create([
                 'project_id' => $project->id,
             ]);
-            Environment::query()->create([
+            Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
                 'uuid' => (string) new Cuid2,

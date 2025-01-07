@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use App\Events\FileStorageChanged;
-use App\Jobs\ServerStorageSaveJob;
-use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LocalFileVolume extends BaseModel
@@ -15,9 +13,9 @@ class LocalFileVolume extends BaseModel
 
     protected static function booted()
     {
-        static::created(function (LocalFileVolume $localFileVolume) {
-            $localFileVolume->load(['service']);
-            dispatch(new ServerStorageSaveJob($localFileVolume));
+        static::created(function (LocalFileVolume $fileVolume) {
+            $fileVolume->load(['service']);
+            dispatch(new \App\Jobs\ServerStorageSaveJob($fileVolume));
         });
     }
 
@@ -37,7 +35,7 @@ class LocalFileVolume extends BaseModel
             $workdir = $this->resource->workdir();
             $server = $this->resource->destination->server;
         }
-        collect([]);
+        $commands = collect([]);
         $path = data_get_str($this, 'fs_path');
         if ($path->startsWith('.')) {
             $path = $path->after('.');
@@ -82,8 +80,6 @@ class LocalFileVolume extends BaseModel
         if ($commands->count() > 0) {
             return instant_remote_process($commands, $server);
         }
-
-        return null;
     }
 
     public function saveStorageOnServer()
@@ -122,13 +118,12 @@ class LocalFileVolume extends BaseModel
             $this->content = $content;
             $this->save();
             FileStorageChanged::dispatch(data_get($server, 'team_id'));
-            throw new Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
-        }
-        if ($isDir === 'OK' && ! $this->is_directory) {
+            throw new \Exception('The following file is a file on the server, but you are trying to mark it as a directory. Please delete the file on the server or mark it as directory.');
+        } elseif ($isDir === 'OK' && ! $this->is_directory) {
             if ($path === '/' || $path === '.' || $path === '..' || $path === '' || str($path)->isEmpty() || is_null($path)) {
                 $this->is_directory = true;
                 $this->save();
-                throw new Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');
+                throw new \Exception('The following file is a directory on the server, but you are trying to mark it as a file. <br><br>Please delete the directory on the server or mark it as directory.');
             }
             instant_remote_process([
                 "rm -fr $path",

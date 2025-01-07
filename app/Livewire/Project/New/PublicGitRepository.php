@@ -10,10 +10,8 @@ use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Carbon\Carbon;
-use Exception;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Throwable;
 
 class PublicGitRepository extends Component
 {
@@ -95,7 +93,7 @@ class PublicGitRepository extends Component
 
     public function updatedBaseDirectory()
     {
-        if ($this->base_directory !== '' && $this->base_directory !== '0') {
+        if ($this->base_directory) {
             $this->base_directory = rtrim($this->base_directory, '/');
             if (! str($this->base_directory)->startsWith('/')) {
                 $this->base_directory = '/'.$this->base_directory;
@@ -155,12 +153,12 @@ class PublicGitRepository extends Component
                 (! str($this->repository_url)->contains('github.com') ||
                     ! str($this->repository_url)->contains('git.sr.ht'))
             ) {
-                $this->repository_url .= '.git';
+                $this->repository_url = $this->repository_url.'.git';
             }
             if (str($this->repository_url)->contains('github.com') && str($this->repository_url)->endsWith('.git')) {
                 $this->repository_url = str($this->repository_url)->beforeLast('.git')->value();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
         try {
@@ -168,26 +166,24 @@ class PublicGitRepository extends Component
             $this->getGitSource();
             $this->getBranch();
             $this->selectedBranch = $this->git_branch;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->rate_limit_remaining == 0) {
                 $this->selectedBranch = $this->git_branch;
                 $this->branchFound = true;
 
-                return null;
+                return;
             }
             if (! $this->branchFound && $this->git_branch === 'main') {
                 try {
                     $this->git_branch = 'master';
                     $this->getBranch();
-                } catch (Throwable $e) {
+                } catch (\Throwable $e) {
                     return handleError($e, $this);
                 }
             } else {
                 return handleError($e, $this);
             }
         }
-
-        return null;
     }
 
     private function getGitSource()
@@ -201,7 +197,7 @@ class PublicGitRepository extends Component
             $this->git_branch = 'main';
         }
         if ($this->git_host === 'github.com') {
-            $this->git_source = GithubApp::query()->where('name', 'Public GitHub')->first();
+            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
 
             return;
         }
@@ -216,7 +212,7 @@ class PublicGitRepository extends Component
 
             return;
         }
-        if ($this->git_source->getMorphClass() === GithubApp::class) {
+        if ($this->git_source->getMorphClass() === \App\Models\GithubApp::class) {
             ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = githubApi(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
             $this->rate_limit_reset = Carbon::parse((int) $this->rate_limit_reset)->format('Y-M-d H:i:s');
             $this->branchFound = true;
@@ -231,16 +227,16 @@ class PublicGitRepository extends Component
             $project_uuid = $this->parameters['project_uuid'];
             $environment_uuid = $this->parameters['environment_uuid'];
 
-            $destination = StandaloneDocker::query()->where('uuid', $destination_uuid)->first();
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (! $destination) {
-                $destination = SwarmDocker::query()->where('uuid', $destination_uuid)->first();
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
             if (! $destination) {
-                throw new Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
 
-            $project = Project::query()->where('uuid', $project_uuid)->first();
+            $project = Project::where('uuid', $project_uuid)->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
 
             if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
@@ -260,13 +256,15 @@ class PublicGitRepository extends Component
                     $new_service['source_id'] = $this->git_source->id;
                     $new_service['source_type'] = $this->git_source->getMorphClass();
                 }
-                $service = Service::query()->create($new_service);
+                $service = Service::create($new_service);
 
                 return redirect()->route('project.service.configuration', [
                     'service_uuid' => $service->uuid,
                     'environment_uuid' => $environment->uuid,
                     'project_uuid' => $project->uuid,
                 ]);
+
+                return;
             }
             if ($this->git_source === 'other') {
                 $application_init = [
@@ -305,7 +303,7 @@ class PublicGitRepository extends Component
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
-            $application = Application::query()->create($application_init);
+            $application = Application::create($application_init);
 
             $application->settings->is_static = $this->isStatic;
             $application->settings->save();
@@ -324,7 +322,7 @@ class PublicGitRepository extends Component
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

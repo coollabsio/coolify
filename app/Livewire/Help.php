@@ -7,7 +7,6 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class Help extends Component
 {
@@ -26,14 +25,14 @@ class Help extends Component
             $this->rateLimit(3, 30);
 
             $settings = instanceSettings();
-            $mailMessage = new MailMessage;
-            $mailMessage->view(
+            $mail = new MailMessage;
+            $mail->view(
                 'emails.help',
                 [
                     'description' => $this->description,
                 ]
             );
-            $mailMessage->subject("[HELP]: {$this->subject}");
+            $mail->subject("[HELP]: {$this->subject}");
             $type = set_transanctional_email_settings($settings);
 
             // Sending feedback through Cloud API
@@ -43,15 +42,13 @@ class Help extends Component
                     'content' => 'User: `'.auth()->user()?->email.'` with subject: `'.$this->subject.'` has the following problem: `'.$this->description.'`',
                 ]);
             } else {
-                send_user_an_email($mailMessage, auth()->user()?->email, 'hi@coollabs.io');
+                send_user_an_email($mail, auth()->user()?->email, 'hi@coollabs.io');
             }
             $this->dispatch('success', 'Feedback sent.', 'We will get in touch with you as soon as possible.');
             $this->reset('description', 'subject');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

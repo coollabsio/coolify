@@ -4,7 +4,6 @@ namespace App\Actions\Application;
 
 use App\Actions\Server\CleanupDocker;
 use App\Models\Application;
-use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
@@ -24,7 +23,7 @@ class StopApplication
             if ($server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$application->uuid}"], $server);
 
-                return null;
+                return;
             }
 
             $containersToStop = $application->getContainersToStop($previewDeployments);
@@ -37,10 +36,8 @@ class StopApplication
             if ($dockerCleanup) {
                 CleanupDocker::dispatch($server, true);
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return $e->getMessage();
         }
-
-        return null;
     }
 }

@@ -45,7 +45,7 @@ class ServicesGenerate extends Command
         $data = collect(explode(PHP_EOL, $content))->mapWithKeys(function ($line): array {
             preg_match('/^#(?<key>.*):(?<value>.*)$/U', $line, $m);
 
-            return $m !== [] ? [trim($m['key']) => trim($m['value'])] : [];
+            return $m ? [trim($m['key']) => trim($m['value'])] : [];
         });
 
         if (str($data->get('ignore'))->toBoolean()) {

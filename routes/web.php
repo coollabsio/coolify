@@ -72,7 +72,6 @@ use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
-use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -296,7 +295,7 @@ Route::middleware(['auth'])->group(function () {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
             $exeuctionId = request()->route('executionId');
-            $execution = ScheduledDatabaseBackupExecution::query()->where('id', $exeuctionId)->firstOrFail();
+            $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
             $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
             if ($team->id !== 0) {
                 if (is_null($execution_team_id)) {
@@ -310,7 +309,7 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
             $filename = data_get($execution, 'filename');
-            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
             } else {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
@@ -330,7 +329,7 @@ Route::middleware(['auth'])->group(function () {
             }
 
             return new StreamedResponse(function () use ($disk, $filename) {
-                if (ob_get_level() !== 0) {
+                if (ob_get_level()) {
                     ob_end_clean();
                 }
                 $stream = $disk->readStream($filename);
@@ -347,7 +346,7 @@ Route::middleware(['auth'])->group(function () {
                 'Content-Type' => 'application/octet-stream',
                 'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }
     })->name('download.backup');

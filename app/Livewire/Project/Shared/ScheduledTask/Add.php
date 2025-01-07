@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
-use Exception;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -54,10 +53,12 @@ class Add extends Component
             if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
 
-                return null;
+                return;
             }
-            if (($this->container === null || $this->container === '' || $this->container === '0' || $this->container === 'null') && $this->type === 'service') {
-                $this->container = $this->subServiceName;
+            if (empty($this->container) || $this->container === 'null') {
+                if ($this->type === 'service') {
+                    $this->container = $this->subServiceName;
+                }
             }
             $this->dispatch('saveScheduledTask', [
                 'name' => $this->name,
@@ -66,11 +67,9 @@ class Add extends Component
                 'container' => $this->container,
             ]);
             $this->clear();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function clear()

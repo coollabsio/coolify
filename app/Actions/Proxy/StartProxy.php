@@ -5,7 +5,6 @@ namespace App\Actions\Proxy;
 use App\Enums\ProxyTypes;
 use App\Events\ProxyStarted;
 use App\Models\Server;
-use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
 
@@ -23,7 +22,7 @@ class StartProxy
         $proxy_path = $server->proxyPath();
         $configuration = CheckConfiguration::run($server);
         if (! $configuration) {
-            throw new Exception('Configuration is not synced');
+            throw new \Exception('Configuration is not synced');
         }
         SaveConfiguration::run($server, $configuration);
         $docker_compose_yml_base64 = base64_encode($configuration);
@@ -39,8 +38,10 @@ class StartProxy
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            if (isDev() && $proxyType === ProxyTypes::CADDY->value) {
-                $proxy_path = '/data/coolify/proxy/caddy';
+            if (isDev()) {
+                if ($proxyType === ProxyTypes::CADDY->value) {
+                    $proxy_path = '/data/coolify/proxy/caddy';
+                }
             }
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
@@ -64,13 +65,14 @@ class StartProxy
 
         if ($async) {
             return remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
-        }
-        instant_remote_process($commands, $server);
-        $server->proxy->set('status', 'running');
-        $server->proxy->set('type', $proxyType);
-        $server->save();
-        ProxyStarted::dispatch($server);
+        } else {
+            instant_remote_process($commands, $server);
+            $server->proxy->set('status', 'running');
+            $server->proxy->set('type', $proxyType);
+            $server->save();
+            ProxyStarted::dispatch($server);
 
-        return 'OK';
+            return 'OK';
+        }
     }
 }

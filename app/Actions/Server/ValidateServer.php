@@ -3,7 +3,6 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
-use Exception;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ValidateServer
@@ -35,7 +34,7 @@ class ValidateServer
             $server->update([
                 'validation_logs' => $this->error,
             ]);
-            throw new Exception($this->error);
+            throw new \Exception($this->error);
         }
         $this->supported_os_type = $server->validateOS();
         if (! $this->supported_os_type) {
@@ -43,7 +42,7 @@ class ValidateServer
             $server->update([
                 'validation_logs' => $this->error,
             ]);
-            throw new Exception($this->error);
+            throw new \Exception($this->error);
         }
 
         $this->docker_installed = $server->validateDockerEngine();
@@ -53,17 +52,18 @@ class ValidateServer
             $server->update([
                 'validation_logs' => $this->error,
             ]);
-            throw new Exception($this->error);
+            throw new \Exception($this->error);
         }
         $this->docker_version = $server->validateDockerEngineVersion();
 
         if ($this->docker_version) {
             return 'OK';
+        } else {
+            $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="text-black underline dark:text-white" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $server->update([
+                'validation_logs' => $this->error,
+            ]);
+            throw new \Exception($this->error);
         }
-        $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="text-black underline dark:text-white" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
-        $server->update([
-            'validation_logs' => $this->error,
-        ]);
-        throw new Exception($this->error);
     }
 }

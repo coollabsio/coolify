@@ -7,7 +7,6 @@ use App\Models\PrivateKey;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class Source extends Component
 {
@@ -36,7 +35,7 @@ class Source extends Component
         try {
             $this->syncData();
             $this->getPrivateKeys();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             handleError($e, $this);
         }
     }
@@ -76,11 +75,9 @@ class Source extends Component
             $this->application->refresh();
             $this->privateKeyName = $this->application->private_key->name;
             $this->dispatch('success', 'Private key updated!');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
@@ -91,10 +88,8 @@ class Source extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

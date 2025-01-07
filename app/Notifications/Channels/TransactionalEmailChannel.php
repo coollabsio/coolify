@@ -10,18 +10,18 @@ use Illuminate\Support\Facades\Mail;
 
 class TransactionalEmailChannel
 {
-    public function send(User $user, Notification $notification): void
+    public function send(User $notifiable, Notification $notification): void
     {
         $settings = instanceSettings();
         if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
             return;
         }
-        $email = $user->email;
+        $email = $notifiable->email;
         if (! $email) {
             return;
         }
         $this->bootConfigs();
-        $mailMessage = $notification->toMail($user);
+        $mailMessage = $notification->toMail($notifiable);
         Mail::send(
             [],
             [],

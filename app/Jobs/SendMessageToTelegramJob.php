@@ -10,7 +10,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -45,16 +44,18 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
     {
         $url = 'https://api.telegram.org/bot'.$this->token.'/sendMessage';
         $inlineButtons = [];
-        foreach ($this->buttons as $button) {
-            $buttonUrl = data_get($button, 'url');
-            $text = data_get($button, 'text', 'Click here');
-            if ($buttonUrl && Str::contains($buttonUrl, 'http://localhost')) {
-                $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
+        if (! empty($this->buttons)) {
+            foreach ($this->buttons as $button) {
+                $buttonUrl = data_get($button, 'url');
+                $text = data_get($button, 'text', 'Click here');
+                if ($buttonUrl && Str::contains($buttonUrl, 'http://localhost')) {
+                    $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
+                }
+                $inlineButtons[] = [
+                    'text' => $text,
+                    'url' => $buttonUrl,
+                ];
             }
-            $inlineButtons[] = [
-                'text' => $text,
-                'url' => $buttonUrl,
-            ];
         }
         $payload = [
             // 'parse_mode' => 'markdown',
@@ -71,7 +72,7 @@ class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
         }
         $response = Http::post($url, $payload);
         if ($response->failed()) {
-            throw new RuntimeException('Telegram notification failed with '.$response->status().' status code.'.$response->body());
+            throw new \RuntimeException('Telegram notification failed with '.$response->status().' status code.'.$response->body());
         }
     }
 }

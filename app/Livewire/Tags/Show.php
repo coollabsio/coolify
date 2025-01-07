@@ -5,7 +5,6 @@ namespace App\Livewire\Tags;
 use App\Http\Controllers\Api\DeployController;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
-use Exception;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -47,18 +46,16 @@ class Show extends Component
                 $this->tag = $tag;
                 $this->getDeployments();
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function getDeployments()
     {
         try {
             $resource_ids = $this->applications->pluck('id');
-            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::query()->whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $resource_ids)->get([
+            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $resource_ids)->get([
                 'id',
                 'application_id',
                 'application_name',
@@ -68,11 +65,9 @@ class Show extends Component
                 'server_id',
                 'status',
             ])->sortBy('id')->groupBy('server_name')->toArray();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function redeployAll()
@@ -88,11 +83,9 @@ class Show extends Component
                 $message->push($deploy->deploy_resource($resource));
             });
             $this->dispatch('success', 'Mass deployment started.');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

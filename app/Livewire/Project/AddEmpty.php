@@ -5,7 +5,6 @@ namespace App\Livewire\Project;
 use App\Models\Project;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class AddEmpty extends Component
@@ -20,7 +19,7 @@ class AddEmpty extends Component
     {
         try {
             $this->validate();
-            $project = Project::query()->create([
+            $project = Project::create([
                 'name' => $this->name,
                 'description' => $this->description,
                 'team_id' => currentTeam()->id,
@@ -28,7 +27,7 @@ class AddEmpty extends Component
             ]);
 
             return redirect()->route('project.show', $project->uuid);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

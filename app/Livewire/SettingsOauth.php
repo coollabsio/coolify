@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Models\OauthSetting;
-use Exception;
 use Livewire\Component;
 
 class SettingsOauth extends Component
@@ -34,8 +33,6 @@ class SettingsOauth extends Component
 
             return $carry;
         }, []);
-
-        return null;
     }
 
     private function updateOauthSettings(?string $provider = null)
@@ -44,7 +41,7 @@ class SettingsOauth extends Component
             $oauth = $this->oauth_settings_map[$provider];
             if (! $oauth->couldBeEnabled()) {
                 $oauth->update(['enabled' => false]);
-                throw new Exception('OAuth settings are not complete for '.$oauth->provider.'.<br/>Please fill in all required fields.');
+                throw new \Exception('OAuth settings are not complete for '.$oauth->provider.'.<br/>Please fill in all required fields.');
             }
             $oauth->save();
             $this->dispatch('success', 'OAuth settings for '.$oauth->provider.' updated successfully!');
@@ -59,11 +56,9 @@ class SettingsOauth extends Component
     {
         try {
             $this->updateOauthSettings($provider);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()

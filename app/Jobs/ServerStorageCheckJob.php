@@ -11,7 +11,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\RateLimiter;
-use Throwable;
 
 class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -59,10 +58,8 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 RateLimiter::hit('high-disk-usage:'.$this->server->id, 600);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e);
         }
-
-        return null;
     }
 }

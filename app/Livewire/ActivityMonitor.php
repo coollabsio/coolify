@@ -36,7 +36,7 @@ class ActivityMonitor extends Component
 
     public function hydrateActivity()
     {
-        $this->activity = Activity::query()->find($this->activityId);
+        $this->activity = Activity::find($this->activityId);
     }
 
     public function polling()
@@ -51,20 +51,22 @@ class ActivityMonitor extends Component
             //     // $this->setStatus(ProcessStatus::ERROR);
             // }
             $this->isPollingActive = false;
-            if ($exit_code === 0 && $this->eventToDispatch !== null) {
-                if (str($this->eventToDispatch)->startsWith('App\\Events\\')) {
-                    $causer_id = data_get($this->activity, 'causer_id');
-                    $user = User::query()->find($causer_id);
-                    if ($user) {
-                        foreach ($user->teams as $team) {
-                            $teamId = $team->id;
-                            $this->eventToDispatch::dispatch($teamId);
+            if ($exit_code === 0) {
+                if ($this->eventToDispatch !== null) {
+                    if (str($this->eventToDispatch)->startsWith('App\\Events\\')) {
+                        $causer_id = data_get($this->activity, 'causer_id');
+                        $user = User::find($causer_id);
+                        if ($user) {
+                            foreach ($user->teams as $team) {
+                                $teamId = $team->id;
+                                $this->eventToDispatch::dispatch($teamId);
+                            }
                         }
-                    }
 
-                    return;
+                        return;
+                    }
+                    $this->dispatch($this->eventToDispatch);
                 }
-                $this->dispatch($this->eventToDispatch);
             }
         }
     }

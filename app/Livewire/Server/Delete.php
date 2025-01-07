@@ -9,7 +9,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
-use Throwable;
 
 class Delete extends Component
 {
@@ -21,32 +20,32 @@ class Delete extends Component
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return null;
+                return;
+            }
         }
         try {
             $this->authorize('delete', $this->server);
             if ($this->server->hasDefinedResources()) {
                 $this->dispatch('error', 'Server has defined resources. Please delete them first.');
 
-                return null;
+                return;
             }
             $this->server->delete();
             DeleteServer::dispatch($this->server);
 
             return redirect()->route('server.index');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

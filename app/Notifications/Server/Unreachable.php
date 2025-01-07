@@ -32,26 +32,26 @@ class Unreachable extends CustomEmailNotification
 
     public function toMail(): ?MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: Your server ({$this->server->name}) is unreachable.");
-        $mailMessage->view('emails.server-lost-connection', [
+        $mail = new MailMessage;
+        $mail->subject("Coolify: Your server ({$this->server->name}) is unreachable.");
+        $mail->view('emails.server-lost-connection', [
             'name' => $this->server->name,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): ?DiscordMessage
     {
-        $discordMessage = new DiscordMessage(
+        $message = new DiscordMessage(
             title: ':cross_mark: Server unreachable',
             description: "Your server '{$this->server->name}' is unreachable.",
             color: DiscordMessage::errorColor(),
         );
 
-        $discordMessage->addField('IMPORTANT', 'We automatically try to revive your server and turn on all automations & integrations.');
+        $message->addField('IMPORTANT', 'We automatically try to revive your server and turn on all automations & integrations.');
 
-        return $discordMessage;
+        return $message;
     }
 
     public function toTelegram(): ?array

@@ -3,7 +3,6 @@
 namespace App\Livewire\Security;
 
 use App\Models\InstanceSettings;
-use Exception;
 use Livewire\Component;
 
 class ApiTokens extends Component
@@ -40,8 +39,10 @@ class ApiTokens extends Component
             $this->permissions[] = 'read';
         } elseif ($permissionToUpdate == 'deploy') {
             $this->permissions = ['deploy'];
-        } elseif (count($this->permissions) == 0) {
-            $this->permissions = ['read'];
+        } else {
+            if (count($this->permissions) == 0) {
+                $this->permissions = ['read'];
+            }
         }
         sort($this->permissions);
     }
@@ -55,11 +56,9 @@ class ApiTokens extends Component
             $token = auth()->user()->createToken($this->description, array_values($this->permissions));
             $this->getTokens();
             session()->flash('token', $token->plainTextToken);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function revoke(int $id)
@@ -68,10 +67,8 @@ class ApiTokens extends Component
             $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
             $token->delete();
             $this->getTokens();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

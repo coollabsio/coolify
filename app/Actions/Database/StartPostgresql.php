@@ -18,9 +18,9 @@ class StartPostgresql
 
     public string $configuration_dir;
 
-    public function handle(StandalonePostgresql $standalonePostgresql)
+    public function handle(StandalonePostgresql $database)
     {
-        $this->database = $standalonePostgresql;
+        $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
         if (isDev()) {
@@ -97,13 +97,15 @@ class StartPostgresql
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        foreach ($this->init_scripts as $init_script) {
-            $docker_compose['services'][$container_name]['volumes'][] = [
-                'type' => 'bind',
-                'source' => $init_script,
-                'target' => '/docker-entrypoint-initdb.d/'.basename($init_script),
-                'read_only' => true,
-            ];
+        if (count($this->init_scripts) > 0) {
+            foreach ($this->init_scripts as $init_script) {
+                $docker_compose['services'][$container_name]['volumes'][] = [
+                    'type' => 'bind',
+                    'source' => $init_script,
+                    'target' => '/docker-entrypoint-initdb.d/'.basename($init_script),
+                    'read_only' => true,
+                ];
+            }
         }
         if (filled($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
@@ -127,12 +129,12 @@ class StartPostgresql
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$standalonePostgresql->image} image.'";
+        $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $standalonePostgresql->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
     private function generate_local_persistent_volumes()

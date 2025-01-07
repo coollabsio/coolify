@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
-use Exception;
 use Illuminate\Console\Command;
 
 class AdminRemoveUser extends Command
@@ -47,7 +46,7 @@ class AdminRemoveUser extends Command
                 $team->delete();
             }
             $user->delete();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->error('Failed to remove user.');
             $this->error($e->getMessage());
 

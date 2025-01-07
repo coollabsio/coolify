@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
 
 class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -28,7 +27,7 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                     instant_remote_process(['docker container rm -f '.$containerId], $this->server, false);
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             send_internal_notification('CleanupHelperContainersJob failed with error: '.$e->getMessage());
         }
     }

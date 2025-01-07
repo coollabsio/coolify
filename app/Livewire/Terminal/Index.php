@@ -3,7 +3,6 @@
 namespace App\Livewire\Terminal;
 
 use App\Models\Server;
-use Exception;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -29,13 +28,11 @@ class Index extends Component
     {
         try {
             $this->containers = $this->getAllActiveContainers();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         } finally {
             $this->isLoadingContainers = false;
         }
-
-        return null;
     }
 
     private function getAllActiveContainers()
@@ -46,8 +43,8 @@ class Index extends Component
             }
 
             return $server->loadAllContainers()->map(function ($container) use ($server) {
-                $stringable = data_get_str($container, 'State')->lower();
-                if ($stringable->contains('running')) {
+                $state = data_get_str($container, 'State')->lower();
+                if ($state->contains('running')) {
                     return [
                         'name' => data_get($container, 'Names'),
                         'connection_name' => data_get($container, 'Names'),

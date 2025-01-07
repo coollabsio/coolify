@@ -23,30 +23,30 @@ class ContainerRestarted extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}");
-        $mailMessage->view('emails.container-restarted', [
+        $mail = new MailMessage;
+        $mail->subject("Coolify: A resource ({$this->name}) has been restarted automatically on {$this->server->name}");
+        $mail->view('emails.container-restarted', [
             'containerName' => $this->name,
             'serverName' => $this->server->name,
             'url' => $this->url,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $discordMessage = new DiscordMessage(
+        $message = new DiscordMessage(
             title: ':warning: Resource restarted',
             description: "{$this->name} has been restarted automatically on {$this->server->name}.",
             color: DiscordMessage::infoColor(),
         );
 
         if ($this->url) {
-            $discordMessage->addField('Resource', '[Link]('.$this->url.')');
+            $message->addField('Resource', '[Link]('.$this->url.')');
         }
 
-        return $discordMessage;
+        return $message;
     }
 
     public function toTelegram(): array

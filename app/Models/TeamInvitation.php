@@ -31,9 +31,10 @@ class TeamInvitation extends Model
         $diff = $createdAt->diffInDays(now());
         if ($diff <= config('constants.invitation.link.expiration_days')) {
             return true;
-        }
-        $this->delete();
+        } else {
+            $this->delete();
 
-        return false;
+            return false;
+        }
     }
 }

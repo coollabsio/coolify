@@ -9,11 +9,9 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Exception;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Throwable;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
@@ -83,9 +81,9 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         if (isDev()) {
-            $this->private_keys = PrivateKey::query()->where('team_id', currentTeam()->id)->get();
+            $this->private_keys = PrivateKey::where('team_id', currentTeam()->id)->get();
         } else {
-            $this->private_keys = PrivateKey::query()->where('team_id', currentTeam()->id)->where('id', '!=', 0)->get();
+            $this->private_keys = PrivateKey::where('team_id', currentTeam()->id)->where('id', '!=', 0)->get();
         }
     }
 
@@ -126,18 +124,18 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->validate();
         try {
             $destination_uuid = $this->query['destination'];
-            $destination = StandaloneDocker::query()->where('uuid', $destination_uuid)->first();
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (! $destination) {
-                $destination = SwarmDocker::query()->where('uuid', $destination_uuid)->first();
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
             if (! $destination) {
-                throw new Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
 
             $this->get_git_source();
 
-            $project = Project::query()->where('uuid', $this->parameters['project_uuid'])->first();
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
             if ($this->git_source === 'other') {
                 $application_init = [
@@ -175,7 +173,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
-            $application = Application::query()->create($application_init);
+            $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
@@ -189,7 +187,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -201,7 +199,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
 
         if ($this->git_host === 'github.com') {
-            $this->git_source = GithubApp::query()->where('name', 'Public GitHub')->first();
+            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
 
             return;
         }

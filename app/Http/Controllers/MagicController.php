@@ -46,7 +46,10 @@ class MagicController extends Controller
 
     public function newProject()
     {
-        $project = Project::query()->firstOrCreate(['name' => request()->query('name') ?? generate_random_name()], ['team_id' => currentTeam()->id]);
+        $project = Project::firstOrCreate(
+            ['name' => request()->query('name') ?? generate_random_name()],
+            ['team_id' => currentTeam()->id]
+        );
 
         return response()->json([
             'project_uuid' => $project->uuid,
@@ -55,7 +58,10 @@ class MagicController extends Controller
 
     public function newEnvironment()
     {
-        $environment = Environment::query()->firstOrCreate(['name' => request()->query('name') ?? generate_random_name()], ['project_id' => Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->firstOrFail()->id]);
+        $environment = Environment::firstOrCreate(
+            ['name' => request()->query('name') ?? generate_random_name()],
+            ['project_id' => Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->firstOrFail()->id]
+        );
 
         return response()->json([
             'environment_name' => $environment->name,
@@ -64,10 +70,12 @@ class MagicController extends Controller
 
     public function newTeam()
     {
-        $team = Team::query()->create([
-            'name' => request()->query('name') ?? generate_random_name(),
-            'personal_team' => false,
-        ]);
+        $team = Team::create(
+            [
+                'name' => request()->query('name') ?? generate_random_name(),
+                'personal_team' => false,
+            ],
+        );
         auth()->user()->teams()->attach($team, ['role' => 'admin']);
         refreshSession();
 

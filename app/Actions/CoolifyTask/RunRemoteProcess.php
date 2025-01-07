@@ -11,10 +11,7 @@ use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
-use JsonException;
-use RuntimeException;
 use Spatie\Activitylog\Models\Activity;
-use Throwable;
 
 class RunRemoteProcess
 {
@@ -24,9 +21,9 @@ class RunRemoteProcess
 
     public bool $ignore_errors;
 
-    public $call_event_on_finish;
+    public $call_event_on_finish = null;
 
-    public $call_event_data;
+    public $call_event_data = null;
 
     protected $time_start;
 
@@ -44,7 +41,7 @@ class RunRemoteProcess
     public function __construct(Activity $activity, bool $hide_from_output = false, bool $ignore_errors = false, $call_event_on_finish = null, $call_event_data = null)
     {
         if ($activity->getExtraProperty('type') !== ActivityTypes::INLINE->value && $activity->getExtraProperty('type') !== ActivityTypes::COMMAND->value) {
-            throw new RuntimeException('Incompatible Activity to run a remote command.');
+            throw new \RuntimeException('Incompatible Activity to run a remote command.');
         }
 
         $this->activity = $activity;
@@ -66,7 +63,7 @@ class RunRemoteProcess
                 associative: true,
                 flags: JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE
             );
-        } catch (JsonException $exception) {
+        } catch (\JsonException $exception) {
             return '';
         }
 
@@ -82,12 +79,12 @@ class RunRemoteProcess
 
         $status = ProcessStatus::IN_PROGRESS;
         $timeout = config('constants.ssh.command_timeout');
-        $invokedProcess = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
+        $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
         $this->activity->properties = $this->activity->properties->merge([
-            'process_id' => $invokedProcess->id(),
+            'process_id' => $process->id(),
         ]);
 
-        $processResult = $invokedProcess->wait();
+        $processResult = $process->wait();
         // $processResult = Process::timeout($timeout)->run($this->getCommand(), $this->handleOutput(...));
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
@@ -114,7 +111,7 @@ class RunRemoteProcess
         ]);
         $this->activity->save();
         if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
-            throw new RuntimeException($processResult->errorOutput(), $processResult->exitCode());
+            throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
         }
         if ($this->call_event_on_finish) {
             try {
@@ -127,7 +124,7 @@ class RunRemoteProcess
                         'userId' => $this->activity->causer_id,
                     ]));
                 }
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 Log::error('Error calling event: '.$e->getMessage());
             }
         }

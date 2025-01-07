@@ -4,7 +4,6 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use Livewire\Component;
-use Throwable;
 
 class Form extends Component
 {
@@ -38,11 +37,9 @@ class Form extends Component
             $this->storage->testConnection(shouldSave: true);
 
             return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
         }
-
-        return null;
     }
 
     public function delete()
@@ -51,7 +48,7 @@ class Form extends Component
             $this->storage->delete();
 
             return redirect()->route('storage.index');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -61,10 +58,8 @@ class Form extends Component
         $this->validate();
         try {
             $this->test_s3_connection();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

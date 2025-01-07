@@ -3,14 +3,13 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Tag;
-use Exception;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 // Refactored ✅
 class Tags extends Component
 {
-    public $resource;
+    public $resource = null;
 
     #[Validate('required|string|min:2')]
     public string $newTags;
@@ -51,7 +50,7 @@ class Tags extends Component
                 }
                 $found = Tag::ownedByCurrentTeam()->where(['name' => $tag])->exists();
                 if (! $found) {
-                    $found = Tag::query()->create([
+                    $found = Tag::create([
                         'name' => $tag,
                         'team_id' => currentTeam()->id,
                     ]);
@@ -59,11 +58,9 @@ class Tags extends Component
                 $this->resource->tags()->attach($found->id);
             }
             $this->refresh();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function addTag(string $id, string $name)
@@ -73,16 +70,14 @@ class Tags extends Component
             if ($this->resource->tags()->where('id', $id)->exists()) {
                 $this->dispatch('error', 'Duplicate tags.', "Tag <span class='dark:text-warning'>$name</span> already added.");
 
-                return null;
+                return;
             }
             $this->resource->tags()->attach($id);
             $this->refresh();
             $this->dispatch('success', 'Tag added.');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function deleteTag(string $id)
@@ -95,11 +90,9 @@ class Tags extends Component
             }
             $this->refresh();
             $this->dispatch('success', 'Tag deleted.');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function refresh()

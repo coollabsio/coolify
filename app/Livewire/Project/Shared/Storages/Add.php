@@ -5,7 +5,6 @@ namespace App\Livewire\Project\Shared\Storages;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use Livewire\Component;
-use Throwable;
 
 class Add extends Component
 {
@@ -64,7 +63,7 @@ class Add extends Component
         $this->parameters = get_route_parameters();
         if (data_get($this->parameters, 'application_uuid')) {
             $applicationUuid = $this->parameters['application_uuid'];
-            $application = Application::query()->where('uuid', $applicationUuid)->first();
+            $application = Application::where('uuid', $applicationUuid)->first();
             if (! $application) {
                 abort(404);
             }
@@ -84,23 +83,23 @@ class Add extends Component
             ]);
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
-            if ($this->resource->getMorphClass() === Application::class) {
+            if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
             }
-            LocalFileVolume::query()->create([
-                'fs_path' => $fs_path,
-                'mount_path' => $this->file_storage_path,
-                'content' => $this->file_storage_content,
-                'is_directory' => false,
-                'resource_id' => $this->resource->id,
-                'resource_type' => get_class($this->resource),
-            ]);
+            LocalFileVolume::create(
+                [
+                    'fs_path' => $fs_path,
+                    'mount_path' => $this->file_storage_path,
+                    'content' => $this->file_storage_content,
+                    'is_directory' => false,
+                    'resource_id' => $this->resource->id,
+                    'resource_type' => get_class($this->resource),
+                ],
+            );
             $this->dispatch('refreshStorages');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submitFileStorageDirectory()
@@ -114,19 +113,19 @@ class Add extends Component
             $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
             $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
             $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
-            LocalFileVolume::query()->create([
-                'fs_path' => $this->file_storage_directory_source,
-                'mount_path' => $this->file_storage_directory_destination,
-                'is_directory' => true,
-                'resource_id' => $this->resource->id,
-                'resource_type' => get_class($this->resource),
-            ]);
+            LocalFileVolume::create(
+                [
+                    'fs_path' => $this->file_storage_directory_source,
+                    'mount_path' => $this->file_storage_directory_destination,
+                    'is_directory' => true,
+                    'resource_id' => $this->resource->id,
+                    'resource_type' => get_class($this->resource),
+                ],
+            );
             $this->dispatch('refreshStorages');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submitPersistentVolume()
@@ -143,11 +142,9 @@ class Add extends Component
                 'mount_path' => $this->mount_path,
                 'host_path' => $this->host_path,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function clear()

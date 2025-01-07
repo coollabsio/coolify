@@ -31,7 +31,7 @@ class Github extends Controller
                     return Str::contains($file, $x_github_delivery);
                 })->first();
                 if ($github_delivery_found) {
-                    return null;
+                    return;
                 }
                 $data = [
                     'attributes' => $request->attributes->all(),
@@ -46,7 +46,7 @@ class Github extends Controller
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::manual_{$x_github_delivery}", $json);
 
-                return null;
+                return;
             }
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
             $x_hub_signature_256 = Str::after($request->header('X-Hub-Signature-256'), 'sha256=');
@@ -82,7 +82,7 @@ class Github extends Controller
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
-            $applications = Application::query()->where('git_repository', 'like', "%$full_name%");
+            $applications = Application::where('git_repository', 'like', "%$full_name%");
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
@@ -161,10 +161,10 @@ class Github extends Controller
                     if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2;
-                            $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
                                 if ($application->build_pack === 'dockercompose') {
-                                    $pr_app = ApplicationPreview::query()->create([
+                                    $pr_app = ApplicationPreview::create([
                                         'git_type' => 'github',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -173,7 +173,7 @@ class Github extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    ApplicationPreview::query()->create([
+                                    ApplicationPreview::create([
                                         'git_type' => 'github',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
@@ -204,7 +204,7 @@ class Github extends Controller
                         }
                     }
                     if ($action === 'closed') {
-                        $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                        $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
                             $found->delete();
                             $container_name = generateApplicationContainerName($application, $pull_request_id);
@@ -245,7 +245,7 @@ class Github extends Controller
                     return Str::contains($file, $x_github_delivery);
                 })->first();
                 if ($github_delivery_found) {
-                    return null;
+                    return;
                 }
                 $data = [
                     'attributes' => $request->attributes->all(),
@@ -260,7 +260,7 @@ class Github extends Controller
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::normal_{$x_github_delivery}", $json);
 
-                return null;
+                return;
             }
             $x_github_event = Str::lower($request->header('X-GitHub-Event'));
             $x_github_hook_installation_target_id = $request->header('X-GitHub-Hook-Installation-Target-Id');
@@ -270,14 +270,16 @@ class Github extends Controller
                 // Just pong
                 return response('pong');
             }
-            $github_app = GithubApp::query()->where('app_id', $x_github_hook_installation_target_id)->first();
+            $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
             if (is_null($github_app)) {
                 return response('Nothing to do. No GitHub App found.');
             }
             $webhook_secret = data_get($github_app, 'webhook_secret');
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-            if (config('app.env') !== 'local' && ! hash_equals($x_hub_signature_256, $hmac)) {
-                return response('Invalid signature.');
+            if (config('app.env') !== 'local') {
+                if (! hash_equals($x_hub_signature_256, $hmac)) {
+                    return response('Invalid signature.');
+                }
             }
             if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
                 // Installation handled by setup redirect url. Repositories queried on-demand.
@@ -310,7 +312,7 @@ class Github extends Controller
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
             }
-            $applications = Application::query()->where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
+            $applications = Application::where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
@@ -379,9 +381,9 @@ class Github extends Controller
                     if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2;
-                            $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                             if (! $found) {
-                                ApplicationPreview::query()->create([
+                                ApplicationPreview::create([
                                     'git_type' => 'github',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
@@ -411,7 +413,7 @@ class Github extends Controller
                         }
                     }
                     if ($action === 'closed' || $action === 'close') {
-                        $found = ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                        $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                         if ($found) {
                             $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id, $pull_request_id);
                             if ($containers->isNotEmpty()) {
@@ -451,7 +453,7 @@ class Github extends Controller
         try {
             $code = $request->get('code');
             $state = $request->get('state');
-            $github_app = GithubApp::query()->where('uuid', $state)->firstOrFail();
+            $github_app = GithubApp::where('uuid', $state)->firstOrFail();
             $api_url = data_get($github_app, 'api_url');
             $data = Http::withBody(null)->accept('application/vnd.github+json')->post("$api_url/app-manifests/$code/conversions")->throw()->json();
             $id = data_get($data, 'id');
@@ -460,7 +462,7 @@ class Github extends Controller
             $client_secret = data_get($data, 'client_secret');
             $private_key = data_get($data, 'pem');
             $webhook_secret = data_get($data, 'webhook_secret');
-            $private_key = PrivateKey::query()->create([
+            $private_key = PrivateKey::create([
                 'name' => "github-app-{$slug}",
                 'private_key' => $private_key,
                 'team_id' => $github_app->team_id,
@@ -499,11 +501,11 @@ class Github extends Controller
                 $json = json_encode($data);
                 Storage::disk('webhooks-during-maintenance')->put("{$epoch}_Github::install_{$installation_id}", $json);
 
-                return null;
+                return;
             }
             $source = $request->get('source');
             $setup_action = $request->get('setup_action');
-            $github_app = GithubApp::query()->where('uuid', $source)->firstOrFail();
+            $github_app = GithubApp::where('uuid', $source)->firstOrFail();
             if ($setup_action === 'install') {
                 $github_app->installation_id = $installation_id;
                 $github_app->save();

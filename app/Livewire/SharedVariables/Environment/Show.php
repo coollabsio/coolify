@@ -4,9 +4,7 @@ namespace App\Livewire\SharedVariables\Environment;
 
 use App\Models\Application;
 use App\Models\Project;
-use Exception;
 use Livewire\Component;
-use Throwable;
 
 class Show extends Component
 {
@@ -25,7 +23,7 @@ class Show extends Component
         try {
             $found = $this->environment->environment_variables()->where('key', $data['key'])->first();
             if ($found) {
-                throw new Exception('Variable already exists.');
+                throw new \Exception('Variable already exists.');
             }
             $this->environment->environment_variables()->create([
                 'key' => $data['key'],
@@ -36,11 +34,9 @@ class Show extends Component
                 'team_id' => currentTeam()->id,
             ]);
             $this->environment->refresh();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function mount()

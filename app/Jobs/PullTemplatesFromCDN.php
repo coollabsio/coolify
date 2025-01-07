@@ -10,7 +10,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Throwable;
 
 class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
 {
@@ -36,7 +35,7 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
             } else {
                 send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             send_internal_notification('PullTemplatesAndVersions failed with: '.$e->getMessage());
         }
     }

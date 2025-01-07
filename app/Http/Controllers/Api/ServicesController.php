@@ -11,7 +11,6 @@ use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -76,7 +75,7 @@ class ServicesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::query()->where('team_id', $teamId)->get();
+        $projects = Project::where('team_id', $teamId)->get();
         $services = collect();
         foreach ($projects as $project) {
             $services->push($project->services()->get());
@@ -246,7 +245,7 @@ class ServicesController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof JsonResponse) {
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -262,10 +261,12 @@ class ServicesController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || $extraFields !== []) {
+        if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
-            foreach ($extraFields as $extraField) {
-                $errors->add($extraField, 'This field is not allowed.');
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
             }
 
             return response()->json([
@@ -314,7 +315,7 @@ class ServicesController extends Controller
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
-                    return $value !== '' && $value !== '0';
+                    return ! empty($value);
                 });
             }
             if ($oneClickService) {
@@ -330,7 +331,7 @@ class ServicesController extends Controller
                 if ($oneClickServiceName === 'cloudflared') {
                     data_set($service_payload, 'connect_to_docker_network', true);
                 }
-                $service = Service::query()->create($service_payload);
+                $service = Service::create($service_payload);
                 $service->name = "$oneClickServiceName-".$service->uuid;
                 $service->save();
                 if ($oneClickDotEnvs?->count() > 0) {
@@ -342,7 +343,7 @@ class ServicesController extends Controller
                             $command = $value->after('SERVICE_')->beforeLast('_');
                             $generatedValue = generateEnvValue($command->value(), $service);
                         }
-                        EnvironmentVariable::query()->create([
+                        EnvironmentVariable::create([
                             'key' => $key,
                             'value' => $generatedValue,
                             'resourceable_id' => $service->id,
@@ -372,9 +373,11 @@ class ServicesController extends Controller
             }
 
             return response()->json(['message' => 'Service not found.'], 404);
+        } else {
+            return response()->json(['message' => 'Invalid service type.', 'valid_service_types' => $serviceKeys], 400);
         }
 
-        return response()->json(['message' => 'Invalid service type.', 'valid_service_types' => $serviceKeys], 400);
+        return response()->json(['message' => 'Invalid service type.'], 400);
     }
 
     #[OA\Get(
@@ -425,7 +428,7 @@ class ServicesController extends Controller
         if (! $request->uuid) {
             return response()->json(['message' => 'UUID is required.'], 404);
         }
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -490,7 +493,7 @@ class ServicesController extends Controller
         if (! $request->uuid) {
             return response()->json(['message' => 'UUID is required.'], 404);
         }
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -563,7 +566,7 @@ class ServicesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -667,7 +670,7 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -788,7 +791,7 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -904,7 +907,7 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -1006,12 +1009,12 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $env = EnvironmentVariable::query()->where('uuid', $request->env_uuid)
+        $env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Service::class)
             ->where('resourceable_id', $service->id)
             ->first();
@@ -1086,7 +1089,7 @@ class ServicesController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -1164,7 +1167,7 @@ class ServicesController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
@@ -1242,7 +1245,7 @@ class ServicesController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $service = Service::query()->whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }

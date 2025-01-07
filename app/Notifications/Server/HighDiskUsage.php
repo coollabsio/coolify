@@ -23,32 +23,32 @@ class HighDiskUsage extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
-        $mailMessage->view('emails.high-disk-usage', [
+        $mail = new MailMessage;
+        $mail->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
+        $mail->view('emails.high-disk-usage', [
             'name' => $this->server->name,
             'disk_usage' => $this->disk_usage,
             'threshold' => $this->server_disk_usage_notification_threshold,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $discordMessage = new DiscordMessage(
+        $message = new DiscordMessage(
             title: ':cross_mark: High disk usage detected',
             description: "Server '{$this->server->name}' high disk usage detected!",
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
 
-        $discordMessage->addField('Disk usage', "{$this->disk_usage}%", true);
-        $discordMessage->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%", true);
-        $discordMessage->addField('What to do?', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)', true);
-        $discordMessage->addField('Change Settings', '[Threshold]('.base_url().'/server/'.$this->server->uuid.'#advanced) | [Notification]('.base_url().'/notifications/discord)');
+        $message->addField('Disk usage', "{$this->disk_usage}%", true);
+        $message->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%", true);
+        $message->addField('What to do?', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)', true);
+        $message->addField('Change Settings', '[Threshold]('.base_url().'/server/'.$this->server->uuid.'#advanced) | [Notification]('.base_url().'/notifications/discord)');
 
-        return $discordMessage;
+        return $message;
     }
 
     public function toTelegram(): array

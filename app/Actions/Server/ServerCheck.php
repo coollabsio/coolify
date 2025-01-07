@@ -16,7 +16,6 @@ use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
 use Illuminate\Support\Arr;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Throwable;
 
 class ServerCheck
 {
@@ -62,11 +61,11 @@ class ServerCheck
                 }
 
                 if (isset($containerReplicates)) {
-                    foreach ($containerReplicates as $containerReplicate) {
-                        $name = data_get($containerReplicate, 'Name');
-                        $this->containers = $this->containers->map(function ($container) use ($name, $containerReplicate) {
+                    foreach ($containerReplicates as $containerReplica) {
+                        $name = data_get($containerReplica, 'Name');
+                        $this->containers = $this->containers->map(function ($container) use ($name, $containerReplica) {
                             if (data_get($container, 'Spec.Name') === $name) {
-                                $replicas = data_get($containerReplicate, 'Replicas');
+                                $replicas = data_get($containerReplica, 'Replicas');
                                 $running = str($replicas)->explode('/')[0];
                                 $total = str($replicas)->explode('/')[1];
                                 if ($running === $total) {
@@ -96,9 +95,9 @@ class ServerCheck
                     $foundProxyContainer = $this->containers->filter(function ($value, $key) {
                         if ($this->server->isSwarm()) {
                             return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
+                        } else {
+                            return data_get($value, 'Name') === '/coolify-proxy';
                         }
-
-                        return data_get($value, 'Name') === '/coolify-proxy';
                     })->first();
                     if (! $foundProxyContainer) {
                         try {
@@ -107,7 +106,7 @@ class ServerCheck
                                 StartProxy::run($this->server, false);
                                 $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                             }
-                        } catch (Throwable $e) {
+                        } catch (\Throwable $e) {
                         }
                     } else {
                         $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
@@ -117,11 +116,9 @@ class ServerCheck
                     }
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e);
         }
-
-        return null;
     }
 
     private function checkLogDrainContainer()
@@ -144,10 +141,12 @@ class ServerCheck
         foreach ($this->containers as $container) {
             if ($this->isSentinel) {
                 $labels = Arr::undot(data_get($container, 'labels'));
-            } elseif ($this->server->isSwarm()) {
-                $labels = Arr::undot(data_get($container, 'Spec.Labels'));
             } else {
-                $labels = Arr::undot(data_get($container, 'Config.Labels'));
+                if ($this->server->isSwarm()) {
+                    $labels = Arr::undot(data_get($container, 'Spec.Labels'));
+                } else {
+                    $labels = Arr::undot(data_get($container, 'Config.Labels'));
+                }
             }
             $managed = data_get($labels, 'coolify.managed');
             if (! $managed) {
@@ -178,12 +177,12 @@ class ServerCheck
                     if (str($applicationId)->contains('-')) {
                         $applicationId = str($applicationId)->before('-');
                     }
-                    $preview = ApplicationPreview::query()->where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
+                    $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
                     if ($preview) {
                         $preview->update(['status' => $containerStatus]);
                     }
                 } else {
-                    $application = Application::query()->where('id', $applicationId)->first();
+                    $application = Application::where('id', $applicationId)->first();
                     if ($application) {
                         $application->update([
                             'status' => $containerStatus,
@@ -195,14 +194,14 @@ class ServerCheck
                 // Service
                 $subType = data_get($labels, 'coolify.service.subType');
                 $subId = data_get($labels, 'coolify.service.subId');
-                $service = Service::query()->where('id', $serviceId)->first();
+                $service = Service::where('id', $serviceId)->first();
                 if (! $service) {
                     continue;
                 }
                 if ($subType === 'application') {
-                    $service = ServiceApplication::query()->where('id', $subId)->first();
+                    $service = ServiceApplication::where('id', $subId)->first();
                 } else {
-                    $service = ServiceDatabase::query()->where('id', $subId)->first();
+                    $service = ServiceDatabase::where('id', $subId)->first();
                 }
                 if ($service) {
                     $service->update([
@@ -215,12 +214,14 @@ class ServerCheck
                             $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                 if ($this->isSentinel) {
                                     return data_get($value, 'name') === $uuid.'-proxy';
-                                }
-                                if ($this->server->isSwarm()) {
-                                    return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                }
+                                } else {
 
-                                return data_get($value, 'Name') === "/$uuid-proxy";
+                                    if ($this->server->isSwarm()) {
+                                        return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                    } else {
+                                        return data_get($value, 'Name') === "/$uuid-proxy";
+                                    }
+                                }
                             })->first();
                             if (! $foundTcpProxy) {
                                 StartDatabaseProxy::run($service);
@@ -245,12 +246,14 @@ class ServerCheck
                         $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                             if ($this->isSentinel) {
                                 return data_get($value, 'name') === $uuid.'-proxy';
-                            }
-                            if ($this->server->isSwarm()) {
-                                return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                            }
+                            } else {
+                                if ($this->server->isSwarm()) {
+                                    return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                } else {
 
-                            return data_get($value, 'Name') === "/$uuid-proxy";
+                                    return data_get($value, 'Name') === "/$uuid-proxy";
+                                }
+                            }
                         })->first();
                         if (! $foundTcpProxy) {
                             StartDatabaseProxy::run($database);

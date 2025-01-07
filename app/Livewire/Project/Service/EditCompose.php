@@ -31,12 +31,12 @@ class EditCompose extends Component
 
     public function refreshEnvs()
     {
-        $this->service = Service::query()->find($this->serviceId);
+        $this->service = Service::find($this->serviceId);
     }
 
     public function mount()
     {
-        $this->service = Service::query()->find($this->serviceId);
+        $this->service = Service::find($this->serviceId);
     }
 
     public function saveEditedCompose()

@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Throwable;
 
 class ServiceApplicationView extends Component
 {
@@ -51,10 +50,12 @@ class ServiceApplicationView extends Component
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return null;
+                return;
+            }
         }
 
         try {
@@ -62,7 +63,7 @@ class ServiceApplicationView extends Component
             $this->dispatch('success', 'Application deleted.');
 
             return redirect()->route('project.service.configuration', $this->parameters);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -93,11 +94,11 @@ class ServiceApplicationView extends Component
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
-            } elseif (! $warning) {
-                $this->dispatch('success', 'Service saved.');
+            } else {
+                ! $warning && $this->dispatch('success', 'Service saved.');
             }
             $this->dispatch('generateDockerCompose');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
@@ -105,8 +106,6 @@ class ServiceApplicationView extends Component
 
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

@@ -14,7 +14,7 @@ class NewActivityMonitor extends Component
 
     public $eventToDispatch = 'activityFinished';
 
-    public $eventData;
+    public $eventData = null;
 
     public $isPollingActive = false;
 
@@ -35,7 +35,7 @@ class NewActivityMonitor extends Component
 
     public function hydrateActivity()
     {
-        $this->activity = Activity::query()->find($this->activityId);
+        $this->activity = Activity::find($this->activityId);
     }
 
     public function polling()
@@ -53,7 +53,7 @@ class NewActivityMonitor extends Component
             if ($this->eventToDispatch !== null) {
                 if (str($this->eventToDispatch)->startsWith('App\\Events\\')) {
                     $causer_id = data_get($this->activity, 'causer_id');
-                    $user = User::query()->find($causer_id);
+                    $user = User::find($causer_id);
                     if ($user) {
                         foreach ($user->teams as $team) {
                             $teamId = $team->id;

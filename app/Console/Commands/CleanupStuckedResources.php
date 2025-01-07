@@ -21,7 +21,6 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Console\Command;
-use Throwable;
 
 class CleanupStuckedResources extends Command
 {
@@ -43,18 +42,18 @@ class CleanupStuckedResources extends Command
             foreach ($servers as $server) {
                 CleanupHelperContainersJob::dispatch($server);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
         }
         try {
-            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()->get();
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::get();
             foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
                 if (is_null($applicationDeploymentQueue->application)) {
                     echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";
                     $applicationDeploymentQueue->delete();
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck application deployment queue: {$e->getMessage()}\n";
         }
         try {
@@ -63,18 +62,18 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck application: {$application->name}\n";
                 $application->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
         }
         try {
-            $applicationsPreviews = ApplicationPreview::query()->get();
+            $applicationsPreviews = ApplicationPreview::get();
             foreach ($applicationsPreviews as $applicationPreview) {
                 if (! data_get($applicationPreview, 'application')) {
                     echo "Deleting stuck application preview: {$applicationPreview->uuid}\n";
                     $applicationPreview->delete();
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
         }
         try {
@@ -83,16 +82,16 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck postgresql: {$postgresql->name}\n";
                 $postgresql->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck postgresql: {$e->getMessage()}\n";
         }
         try {
             $redis = StandaloneRedis::withTrashed()->whereNotNull('deleted_at')->get();
-            foreach ($redis as $redi) {
-                echo "Deleting stuck redis: {$redi->name}\n";
-                $redi->forceDelete();
+            foreach ($redis as $redis) {
+                echo "Deleting stuck redis: {$redis->name}\n";
+                $redis->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck redis: {$e->getMessage()}\n";
         }
         try {
@@ -101,7 +100,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck keydb: {$keydb->name}\n";
                 $keydb->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck keydb: {$e->getMessage()}\n";
         }
         try {
@@ -110,7 +109,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck dragonfly: {$dragonfly->name}\n";
                 $dragonfly->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck dragonfly: {$e->getMessage()}\n";
         }
         try {
@@ -119,7 +118,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck clickhouse: {$clickhouse->name}\n";
                 $clickhouse->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
         }
         try {
@@ -128,7 +127,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck mongodb: {$mongodb->name}\n";
                 $mongodb->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck mongodb: {$e->getMessage()}\n";
         }
         try {
@@ -137,7 +136,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck mysql: {$mysql->name}\n";
                 $mysql->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck mysql: {$e->getMessage()}\n";
         }
         try {
@@ -146,7 +145,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck mariadb: {$mariadb->name}\n";
                 $mariadb->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck mariadb: {$e->getMessage()}\n";
         }
         try {
@@ -155,7 +154,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck service: {$service->name}\n";
                 $service->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck service: {$e->getMessage()}\n";
         }
         try {
@@ -164,7 +163,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck serviceapp: {$serviceApp->name}\n";
                 $serviceApp->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck serviceapp: {$e->getMessage()}\n";
         }
         try {
@@ -173,7 +172,7 @@ class CleanupStuckedResources extends Command
                 echo "Deleting stuck serviceapp: {$serviceDb->name}\n";
                 $serviceDb->forceDelete();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck serviceapp: {$e->getMessage()}\n";
         }
         try {
@@ -184,7 +183,7 @@ class CleanupStuckedResources extends Command
                     $scheduled_task->delete();
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck scheduledtasks: {$e->getMessage()}\n";
         }
 
@@ -196,7 +195,7 @@ class CleanupStuckedResources extends Command
                     $scheduled_backup->delete();
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in cleaning stuck scheduledbackups: {$e->getMessage()}\n";
         }
 
@@ -223,7 +222,7 @@ class CleanupStuckedResources extends Command
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in application: {$e->getMessage()}\n";
         }
         try {
@@ -248,32 +247,32 @@ class CleanupStuckedResources extends Command
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in postgresql: {$e->getMessage()}\n";
         }
         try {
             $redis = StandaloneRedis::all();
-            foreach ($redis as $redi) {
-                if (! data_get($redi, 'environment')) {
-                    echo 'Redis without environment: '.$redi->name.'\n';
-                    $redi->forceDelete();
+            foreach ($redis as $redis) {
+                if (! data_get($redis, 'environment')) {
+                    echo 'Redis without environment: '.$redis->name.'\n';
+                    $redis->forceDelete();
 
                     continue;
                 }
-                if (! $redi->destination()) {
-                    echo 'Redis without destination: '.$redi->name.'\n';
-                    $redi->forceDelete();
+                if (! $redis->destination()) {
+                    echo 'Redis without destination: '.$redis->name.'\n';
+                    $redis->forceDelete();
 
                     continue;
                 }
-                if (! data_get($redi, 'destination.server')) {
-                    echo 'Redis without server: '.$redi->name.'\n';
-                    $redi->forceDelete();
+                if (! data_get($redis, 'destination.server')) {
+                    echo 'Redis without server: '.$redis->name.'\n';
+                    $redis->forceDelete();
 
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in redis: {$e->getMessage()}\n";
         }
 
@@ -299,7 +298,7 @@ class CleanupStuckedResources extends Command
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in mongodb: {$e->getMessage()}\n";
         }
 
@@ -325,7 +324,7 @@ class CleanupStuckedResources extends Command
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in mysql: {$e->getMessage()}\n";
         }
 
@@ -351,7 +350,7 @@ class CleanupStuckedResources extends Command
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in mariadb: {$e->getMessage()}\n";
         }
 
@@ -377,33 +376,33 @@ class CleanupStuckedResources extends Command
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in service: {$e->getMessage()}\n";
         }
         try {
             $serviceApplications = ServiceApplication::all();
-            foreach ($serviceApplications as $serviceApplication) {
-                if (! data_get($serviceApplication, 'service')) {
-                    echo 'ServiceApplication without service: '.$serviceApplication->name.'\n';
-                    $serviceApplication->forceDelete();
+            foreach ($serviceApplications as $service) {
+                if (! data_get($service, 'service')) {
+                    echo 'ServiceApplication without service: '.$service->name.'\n';
+                    $service->forceDelete();
 
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in serviceApplications: {$e->getMessage()}\n";
         }
         try {
             $serviceDatabases = ServiceDatabase::all();
-            foreach ($serviceDatabases as $serviceDatabase) {
-                if (! data_get($serviceDatabase, 'service')) {
-                    echo 'ServiceDatabase without service: '.$serviceDatabase->name.'\n';
-                    $serviceDatabase->forceDelete();
+            foreach ($serviceDatabases as $service) {
+                if (! data_get($service, 'service')) {
+                    echo 'ServiceDatabase without service: '.$service->name.'\n';
+                    $service->forceDelete();
 
                     continue;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in ServiceDatabases: {$e->getMessage()}\n";
         }
     }

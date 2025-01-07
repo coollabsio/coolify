@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Shared;
 
 use Livewire\Component;
-use Throwable;
 
 class Metrics extends Component
 {
@@ -40,11 +39,9 @@ class Metrics extends Component
             $this->dispatch("refreshChartData-{$this->chartId}-memory", [
                 'seriesData' => $memoryMetrics,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function setInterval()

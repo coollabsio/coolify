@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,10 +15,15 @@ class StandalonePostgresql extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
+    protected $casts = [
+        'init_scripts' => 'array',
+        'postgres_password' => 'encrypted',
+    ];
+
     protected static function booted()
     {
         static::created(function ($database) {
-            LocalPersistentVolume::query()->create([
+            LocalPersistentVolume::create([
                 'name' => 'postgres-data-'.$database->uuid,
                 'mount_path' => '/var/lib/postgresql/data',
                 'host_path' => null,
@@ -70,8 +74,8 @@ class StandalonePostgresql extends BaseModel
             return;
         }
         $server = data_get($this, 'destination.server');
-        foreach ($persistentStorages as $persistentStorage) {
-            instant_remote_process(["docker volume rm -f $persistentStorage->name"], $server, false);
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }
 
@@ -91,13 +95,14 @@ class StandalonePostgresql extends BaseModel
         }
         if ($oldConfigHash === $newConfigHash) {
             return false;
-        }
-        if ($save) {
-            $this->config_hash = $newConfigHash;
-            $this->save();
-        }
+        } else {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
 
-        return true;
+            return true;
+        }
     }
 
     public function isRunning()
@@ -278,7 +283,7 @@ class StandalonePostgresql extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new Exception($error);
+            throw new \Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -300,7 +305,7 @@ class StandalonePostgresql extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new Exception($error);
+            throw new \Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -314,13 +319,5 @@ class StandalonePostgresql extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->orderBy('key', 'asc');
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'init_scripts' => 'array',
-            'postgres_password' => 'encrypted',
-        ];
     }
 }

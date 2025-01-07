@@ -34,18 +34,19 @@ class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldQueue
         }
         // If sentinel is running, check if it needs an update
         $runningVersion = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/version"'], $this->server, false);
-        if ($runningVersion === null || $runningVersion === '' || $runningVersion === '0') {
+        if (empty($runningVersion)) {
             $runningVersion = '0.0.0';
         }
         if ($latestVersion === '0.0.0' && $runningVersion === '0.0.0') {
             StartSentinel::run(server: $this->server, restart: true, latestVersion: 'latest');
 
             return;
-        }
-        if (version_compare($runningVersion, $latestVersion, '<')) {
-            StartSentinel::run(server: $this->server, restart: true, latestVersion: $latestVersion);
+        } else {
+            if (version_compare($runningVersion, $latestVersion, '<')) {
+                StartSentinel::run(server: $this->server, restart: true, latestVersion: $latestVersion);
 
-            return;
+                return;
+            }
         }
     }
 }

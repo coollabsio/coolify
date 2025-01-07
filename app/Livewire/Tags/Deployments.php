@@ -3,7 +3,6 @@
 namespace App\Livewire\Tags;
 
 use App\Models\ApplicationDeploymentQueue;
-use Exception;
 use Livewire\Component;
 
 class Deployments extends Component
@@ -20,7 +19,7 @@ class Deployments extends Component
     public function getDeployments()
     {
         try {
-            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::query()->whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $this->resourceIds)->get([
+            $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $this->resourceIds)->get([
                 'id',
                 'application_id',
                 'application_name',
@@ -31,10 +30,8 @@ class Deployments extends Component
                 'status',
             ])->sortBy('id')->groupBy('server_name')->toArray();
             $this->dispatch('deployments', $this->deploymentsPerTagPerServer);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

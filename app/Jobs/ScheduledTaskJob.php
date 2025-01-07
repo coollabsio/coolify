@@ -11,14 +11,11 @@ use App\Models\Service;
 use App\Models\Team;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
-use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use RuntimeException;
-use Throwable;
 
 class ScheduledTaskJob implements ShouldQueue
 {
@@ -52,9 +49,9 @@ class ScheduledTaskJob implements ShouldQueue
         } elseif ($application = $task->application()->first()) {
             $this->resource = $application;
         } else {
-            throw new RuntimeException('ScheduledTaskJob failed: No resource found.');
+            throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
-        $this->team = Team::query()->findOrFail($task->team_id);
+        $this->team = Team::findOrFail($task->team_id);
         $this->server_timezone = $this->getServerTimezone();
     }
 
@@ -62,15 +59,17 @@ class ScheduledTaskJob implements ShouldQueue
     {
         if ($this->resource instanceof Application) {
             return $this->resource->destination->server->settings->server_timezone;
+        } elseif ($this->resource instanceof Service) {
+            return $this->resource->server->settings->server_timezone;
         }
 
-        return $this->resource->server->settings->server_timezone;
+        return 'UTC';
     }
 
     public function handle(): void
     {
         try {
-            $this->task_log = ScheduledTaskExecution::query()->create([
+            $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
             ]);
 
@@ -96,17 +95,17 @@ class ScheduledTaskJob implements ShouldQueue
                 });
             }
             if (count($this->containers) == 0) {
-                throw new Exception('ScheduledTaskJob failed: No containers running.');
+                throw new \Exception('ScheduledTaskJob failed: No containers running.');
             }
 
             if (count($this->containers) > 1 && empty($this->task->container)) {
-                throw new Exception('ScheduledTaskJob failed: More than one container exists but no container name was provided.');
+                throw new \Exception('ScheduledTaskJob failed: More than one container exists but no container name was provided.');
             }
 
-            foreach ($this->containers as $container) {
-                if (count($this->containers) == 1 || str_starts_with($container, $this->task->container.'-'.$this->resource->uuid)) {
+            foreach ($this->containers as $containerName) {
+                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
-                    $exec = "docker exec {$container} {$cmd}";
+                    $exec = "docker exec {$containerName} {$cmd}";
                     $this->task_output = instant_remote_process([$exec], $this->server, true);
                     $this->task_log->update([
                         'status' => 'success',
@@ -120,9 +119,9 @@ class ScheduledTaskJob implements ShouldQueue
             }
 
             // No valid container was found.
-            throw new Exception('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
-        } catch (Throwable $e) {
-            if ($this->task_log instanceof ScheduledTaskExecution) {
+            throw new \Exception('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
+        } catch (\Throwable $e) {
+            if ($this->task_log) {
                 $this->task_log->update([
                     'status' => 'failed',
                     'message' => $this->task_output ?? $e->getMessage(),

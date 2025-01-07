@@ -39,8 +39,6 @@ class Execution extends Component
         $this->backup = $backup;
         $this->executions = $executions;
         $this->s3s = currentTeam()->s3s;
-
-        return null;
     }
 
     public function render()

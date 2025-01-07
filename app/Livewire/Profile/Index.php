@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class Index extends Component
 {
@@ -42,11 +41,9 @@ class Index extends Component
             ]);
 
             $this->dispatch('success', 'Profile updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function resetPassword()
@@ -59,12 +56,12 @@ class Index extends Component
             if (! Hash::check($this->current_password, auth()->user()->password)) {
                 $this->dispatch('error', 'Current password is incorrect.');
 
-                return null;
+                return;
             }
             if ($this->new_password !== $this->new_password_confirmation) {
                 $this->dispatch('error', 'The two new passwords does not match.');
 
-                return null;
+                return;
             }
             auth()->user()->update([
                 'password' => Hash::make($this->new_password),
@@ -73,11 +70,9 @@ class Index extends Component
             $this->current_password = '';
             $this->new_password = '';
             $this->new_password_confirmation = '';
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

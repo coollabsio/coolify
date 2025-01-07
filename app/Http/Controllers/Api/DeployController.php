@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Http\Controllers\Controller;
-use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
-use App\Models\Service;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -67,7 +65,7 @@ class DeployController extends Controller
             return invalidTokenResponse();
         }
         $servers = Server::whereTeamId($teamId)->get();
-        $deployments_per_server = ApplicationDeploymentQueue::query()->whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get()->sortBy('id');
+        $deployments_per_server = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('server_id', $servers->pluck('id'))->get()->sortBy('id');
         $deployments_per_server = $deployments_per_server->map(function ($deployment) {
             return $this->removeSensitiveData($deployment);
         });
@@ -123,7 +121,7 @@ class DeployController extends Controller
         if (! $uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
-        $deployment = ApplicationDeploymentQueue::query()->where('deployment_uuid', $uuid)->first();
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first();
         if (! $deployment) {
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
@@ -198,8 +196,7 @@ class DeployController extends Controller
         }
         if ($tags) {
             return $this->by_tags($tags, $teamId, $force);
-        }
-        if ($uuids) {
+        } elseif ($uuids) {
             return $this->by_uuids($uuids, $teamId, $force);
         }
 
@@ -248,7 +245,7 @@ class DeployController extends Controller
         $deployments = collect();
         $payload = collect();
         foreach ($tags as $tag) {
-            $found_tag = Tag::query()->where(['name' => $tag, 'team_id' => $team_id])->first();
+            $found_tag = Tag::where(['name' => $tag, 'team_id' => $team_id])->first();
             if (! $found_tag) {
                 // $message->push("Tag {$tag} not found.");
                 continue;
@@ -260,15 +257,15 @@ class DeployController extends Controller
 
                 continue;
             }
-            foreach ($applications as $application) {
-                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($application, $force);
+            foreach ($applications as $resource) {
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force);
                 if ($deployment_uuid) {
-                    $deployments->push(['resource_uuid' => $application->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
                 }
                 $message = $message->merge($return_message);
             }
-            foreach ($services as $service) {
-                ['message' => $return_message] = $this->deploy_resource($service, $force);
+            foreach ($services as $resource) {
+                ['message' => $return_message] = $this->deploy_resource($resource, $force);
                 $message = $message->merge($return_message);
             }
         }
@@ -292,7 +289,7 @@ class DeployController extends Controller
             return ['message' => "Resource ($resource) not found.", 'deployment_uuid' => $deployment_uuid];
         }
         switch ($resource?->getMorphClass()) {
-            case Application::class:
+            case \App\Models\Application::class:
                 $deployment_uuid = new Cuid2;
                 queue_application_deployment(
                     application: $resource,
@@ -301,7 +298,7 @@ class DeployController extends Controller
                 );
                 $message = "Application {$resource->name} deployment queued.";
                 break;
-            case Service::class:
+            case \App\Models\Service::class:
                 StartService::run($resource);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
                 break;

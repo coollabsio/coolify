@@ -16,9 +16,9 @@ class StartClickhouse
 
     public string $configuration_dir;
 
-    public function handle(StandaloneClickhouse $standaloneClickhouse)
+    public function handle(StandaloneClickhouse $database)
     {
-        $this->database = $standaloneClickhouse;
+        $this->database = $database;
 
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
@@ -103,12 +103,12 @@ class StartClickhouse
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$standaloneClickhouse->image} image.'";
+        $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $standaloneClickhouse->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
     private function generate_local_persistent_volumes()

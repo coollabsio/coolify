@@ -23,14 +23,14 @@ class DockerCleanupFailed extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: [ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}");
-        $mailMessage->view('emails.docker-cleanup-failed', [
+        $mail = new MailMessage;
+        $mail->subject("Coolify: [ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}");
+        $mail->view('emails.docker-cleanup-failed', [
             'name' => $this->server->name,
             'text' => $this->message,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage

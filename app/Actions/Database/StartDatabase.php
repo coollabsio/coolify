@@ -25,28 +25,28 @@ class StartDatabase
             return 'Server is not functional';
         }
         switch ($database->getMorphClass()) {
-            case StandalonePostgresql::class:
+            case \App\Models\StandalonePostgresql::class:
                 $activity = StartPostgresql::run($database);
                 break;
-            case StandaloneRedis::class:
+            case \App\Models\StandaloneRedis::class:
                 $activity = StartRedis::run($database);
                 break;
-            case StandaloneMongodb::class:
+            case \App\Models\StandaloneMongodb::class:
                 $activity = StartMongodb::run($database);
                 break;
-            case StandaloneMysql::class:
+            case \App\Models\StandaloneMysql::class:
                 $activity = StartMysql::run($database);
                 break;
-            case StandaloneMariadb::class:
+            case \App\Models\StandaloneMariadb::class:
                 $activity = StartMariadb::run($database);
                 break;
-            case StandaloneKeydb::class:
+            case \App\Models\StandaloneKeydb::class:
                 $activity = StartKeydb::run($database);
                 break;
-            case StandaloneDragonfly::class:
+            case \App\Models\StandaloneDragonfly::class:
                 $activity = StartDragonfly::run($database);
                 break;
-            case StandaloneClickhouse::class:
+            case \App\Models\StandaloneClickhouse::class:
                 $activity = StartClickhouse::run($database);
                 break;
         }

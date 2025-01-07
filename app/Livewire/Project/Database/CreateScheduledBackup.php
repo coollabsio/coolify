@@ -3,12 +3,10 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class CreateScheduledBackup extends Component
 {
@@ -35,11 +33,9 @@ class CreateScheduledBackup extends Component
             if ($this->definedS3s->count() > 0) {
                 $this->s3StorageId = $this->definedS3s->first()->id;
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
@@ -51,7 +47,7 @@ class CreateScheduledBackup extends Component
             if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
 
-                return null;
+                return;
             }
 
             $payload = [
@@ -72,19 +68,17 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $this->database->mariadb_database;
             }
 
-            $databaseBackup = ScheduledDatabaseBackup::query()->create($payload);
-            if ($this->database->getMorphClass() === ServiceDatabase::class) {
+            $databaseBackup = ScheduledDatabaseBackup::create($payload);
+            if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
             } else {
                 $this->dispatch('refreshScheduledBackups');
             }
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->frequency = '';
         }
-
-        return null;
     }
 }

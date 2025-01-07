@@ -8,7 +8,6 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
-use Throwable;
 
 class DeploymentNavbar extends Component
 {
@@ -46,11 +45,9 @@ class DeploymentNavbar extends Component
     {
         try {
             force_start_deployment($this->application_deployment_queue);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function cancel()
@@ -60,9 +57,9 @@ class DeploymentNavbar extends Component
         $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
         try {
             if ($this->application->settings->is_build_server_enabled) {
-                $server = Server::query()->find($build_server_id);
+                $server = Server::find($build_server_id);
             } else {
-                $server = Server::query()->find($server_id);
+                $server = Server::find($server_id);
             }
             if ($this->application_deployment_queue->logs) {
                 $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -81,7 +78,7 @@ class DeploymentNavbar extends Component
                 ]);
             }
             instant_remote_process([$kill_command], $server);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->application_deployment_queue->update([
@@ -90,7 +87,5 @@ class DeploymentNavbar extends Component
             ]);
             next_after_cancel($server);
         }
-
-        return null;
     }
 }

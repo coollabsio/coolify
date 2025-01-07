@@ -44,7 +44,11 @@ class ServicePolicy
      */
     public function delete(User $user, Service $service): bool
     {
-        return (bool) $user->isAdmin();
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -60,11 +64,19 @@ class ServicePolicy
      */
     public function forceDelete(User $user, Service $service): bool
     {
-        return (bool) $user->isAdmin();
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return false;
     }
 
     public function stop(User $user, Service $service): bool
     {
-        return (bool) $user->isAdmin();
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return false;
     }
 }

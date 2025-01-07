@@ -36,7 +36,7 @@ class Input extends Component
             $this->name = $this->id;
         }
         if ($this->type === 'password') {
-            $this->defaultClass .= '  pr-[2.8rem]';
+            $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
         }
 
         // $this->label = Str::title($this->label);

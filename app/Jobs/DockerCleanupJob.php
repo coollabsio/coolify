@@ -13,7 +13,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
 
 class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -67,7 +66,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->server->team?->notify(new DockerCleanupSuccess($this->server, 'No cleanup needed for '.$this->server->name));
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$e->getMessage()));
             throw $e;
         }

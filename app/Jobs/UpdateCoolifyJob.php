@@ -11,7 +11,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -35,7 +34,7 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $server = Server::query()->findOrFail(0);
+            $server = Server::findOrFail(0);
             if (! $server) {
                 Log::error('Server not found. Cannot proceed with update.');
 
@@ -47,7 +46,7 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 
             $settings->update(['new_version_available' => false]);
             Log::info('Coolify update completed successfully.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             Log::error('UpdateCoolifyJob failed: '.$e->getMessage());
             // Consider implementing a notification to administrators
         }

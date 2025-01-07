@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\Server;
 use Illuminate\Console\Command;
 
 class CleanupApplicationDeploymentQueue extends Command
@@ -15,9 +14,9 @@ class CleanupApplicationDeploymentQueue extends Command
     public function handle()
     {
         $team_id = $this->option('team-id');
-        $servers = Server::query()->where('team_id', $team_id)->get();
+        $servers = \App\Models\Server::where('team_id', $team_id)->get();
         foreach ($servers as $server) {
-            $deployments = ApplicationDeploymentQueue::query()->whereIn('status', ['in_progress', 'queued'])->where('server_id', $server->id)->get();
+            $deployments = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->where('server_id', $server->id)->get();
             foreach ($deployments as $deployment) {
                 $deployment->update(['status' => 'failed']);
                 instant_remote_process(['docker rm -f '.$deployment->deployment_uuid], $server, false);

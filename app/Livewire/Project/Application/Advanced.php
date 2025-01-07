@@ -5,7 +5,6 @@ namespace App\Livewire\Project\Application;
 use App\Models\Application;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class Advanced extends Component
 {
@@ -72,11 +71,9 @@ class Advanced extends Component
     {
         try {
             $this->syncData();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -130,12 +127,14 @@ class Advanced extends Component
     public function instantSave()
     {
         try {
-            if ($this->isLogDrainEnabled && ! $this->application->destination->server->isLogDrainEnabled()) {
-                $this->isLogDrainEnabled = false;
-                $this->syncData(true);
-                $this->dispatch('error', 'Log drain is not enabled on this server.');
+            if ($this->isLogDrainEnabled) {
+                if (! $this->application->destination->server->isLogDrainEnabled()) {
+                    $this->isLogDrainEnabled = false;
+                    $this->syncData(true);
+                    $this->dispatch('error', 'Log drain is not enabled on this server.');
 
-                return null;
+                    return;
+                }
             }
             if ($this->application->isForceHttpsEnabled() !== $this->isForceHttpsEnabled ||
                 $this->application->isGzipEnabled() !== $this->isGzipEnabled ||
@@ -152,11 +151,9 @@ class Advanced extends Component
             $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
             $this->dispatch('configurationChanged');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
@@ -168,15 +165,13 @@ class Advanced extends Component
                 $this->gpuDeviceIds = null;
                 $this->syncData(true);
 
-                return null;
+                return;
             }
             $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function saveCustomName()

@@ -22,7 +22,7 @@ class PricingPlans extends Component
         if (! $priceId) {
             $this->dispatch('error', 'Price ID not found! Please contact the administrator.');
 
-            return null;
+            return;
         }
         $payload = [
             'allow_promotion_codes' => true,

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,10 +15,14 @@ class StandaloneKeydb extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
 
+    protected $casts = [
+        'keydb_password' => 'encrypted',
+    ];
+
     protected static function booted()
     {
         static::created(function ($database) {
-            LocalPersistentVolume::query()->create([
+            LocalPersistentVolume::create([
                 'name' => 'keydb-data-'.$database->uuid,
                 'mount_path' => '/data',
                 'host_path' => null,
@@ -66,13 +69,14 @@ class StandaloneKeydb extends BaseModel
         }
         if ($oldConfigHash === $newConfigHash) {
             return false;
-        }
-        if ($save) {
-            $this->config_hash = $newConfigHash;
-            $this->save();
-        }
+        } else {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
 
-        return true;
+            return true;
+        }
     }
 
     public function isRunning()
@@ -105,8 +109,8 @@ class StandaloneKeydb extends BaseModel
             return;
         }
         $server = data_get($this, 'destination.server');
-        foreach ($persistentStorages as $persistentStorage) {
-            instant_remote_process(["docker volume rm -f $persistentStorage->name"], $server, false);
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }
 
@@ -273,7 +277,7 @@ class StandaloneKeydb extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new Exception($error);
+            throw new \Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -295,7 +299,7 @@ class StandaloneKeydb extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new Exception($error);
+            throw new \Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -314,12 +318,5 @@ class StandaloneKeydb extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->orderBy('key', 'asc');
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'keydb_password' => 'encrypted',
-        ];
     }
 }

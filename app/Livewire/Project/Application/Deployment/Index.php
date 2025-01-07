@@ -49,8 +49,6 @@ class Index extends Component
         $this->current_url = url()->current();
         $this->show_pull_request_only();
         $this->show_more();
-
-        return null;
     }
 
     private function show_pull_request_only()
@@ -80,9 +78,9 @@ class Index extends Component
     public function previous_page(?int $take = null)
     {
         if ($take) {
-            $this->skip -= $take;
+            $this->skip = $this->skip - $take;
         }
-        $this->skip -= $this->default_take;
+        $this->skip = $this->skip - $this->default_take;
         if ($this->skip < 0) {
             $this->show_prev = false;
             $this->skip = 0;
@@ -93,7 +91,7 @@ class Index extends Component
     public function next_page(?int $take = null)
     {
         if ($take) {
-            $this->skip += $take;
+            $this->skip = $this->skip + $take;
         }
         $this->show_prev = true;
         $this->load_deployments();

@@ -6,7 +6,6 @@ use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Throwable;
 
 class Resources extends Component
 {
@@ -66,11 +65,9 @@ class Resources extends Component
         try {
             $this->activeTab = 'managed';
             $this->containers = $this->server->refresh()->definedResources();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function loadUnmanagedContainers()
@@ -78,11 +75,9 @@ class Resources extends Component
         $this->activeTab = 'unmanaged';
         try {
             $this->containers = $this->server->loadUnmanagedContainers();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function mount()
@@ -95,11 +90,9 @@ class Resources extends Component
                 return redirect()->route('server.index');
             }
             $this->loadManagedContainers();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

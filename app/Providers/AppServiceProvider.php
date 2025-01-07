@@ -8,32 +8,29 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
-use Laravel\Telescope\TelescopeServiceProvider;
-use SocialiteProviders\Authentik\Provider;
-use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         if ($this->app->environment('local')) {
-            $this->app->register(TelescopeServiceProvider::class);
+            $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
         }
     }
 
     public function boot(): void
     {
-        Event::listen(function (SocialiteWasCalled $socialiteWasCalled) {
-            $socialiteWasCalled->extendSocialite('authentik', Provider::class);
+        Event::listen(function (\SocialiteProviders\Manager\SocialiteWasCalled $event) {
+            $event->extendSocialite('authentik', \SocialiteProviders\Authentik\Provider::class);
         });
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Password::defaults(function () {
-            $password = Password::min(8);
+            $rule = Password::min(8);
 
             return $this->app->isProduction()
-                ? $password->mixedCase()->letters()->numbers()->symbols()
-                : $password;
+                ? $rule->mixedCase()->letters()->numbers()->symbols()
+                : $rule;
         });
 
         Http::macro('github', function (string $api_url, ?string $github_access_token = null) {
@@ -43,11 +40,11 @@ class AppServiceProvider extends ServiceProvider
                     'Accept' => 'application/vnd.github.v3+json',
                     'Authorization' => "Bearer $github_access_token",
                 ])->baseUrl($api_url);
+            } else {
+                return Http::withHeaders([
+                    'Accept' => 'application/vnd.github.v3+json',
+                ])->baseUrl($api_url);
             }
-
-            return Http::withHeaders([
-                'Accept' => 'application/vnd.github.v3+json',
-            ])->baseUrl($api_url);
         });
     }
 }

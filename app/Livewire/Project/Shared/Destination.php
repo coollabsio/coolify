@@ -8,7 +8,6 @@ use App\Events\ApplicationStatusChanged;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
-use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -64,11 +63,9 @@ class Destination extends Component
             $server = Server::ownedByCurrentTeam()->findOrFail($serverId);
             StopApplicationOneServer::run($this->resource, $server);
             $this->refreshServers();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function redeploy(int $network_id, int $server_id)
@@ -77,13 +74,13 @@ class Destination extends Component
             if ($this->resource->additional_servers->count() > 0 && str($this->resource->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy.', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 
-                return null;
+                return;
             }
-            $cuid2 = new Cuid2;
+            $deployment_uuid = new Cuid2;
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
             queue_application_deployment(
-                deployment_uuid: $cuid2,
+                deployment_uuid: $deployment_uuid,
                 application: $this->resource,
                 server: $server,
                 destination: $destination,
@@ -94,10 +91,10 @@ class Destination extends Component
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => data_get($this->resource, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->resource, 'uuid'),
-                'deployment_uuid' => $cuid2,
+                'deployment_uuid' => $deployment_uuid,
                 'environment_uuid' => data_get($this->resource, 'environment.uuid'),
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
     }
@@ -133,26 +130,26 @@ class Destination extends Component
     public function removeServer(int $network_id, int $server_id, $password)
     {
         try {
-            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
+            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+                if (! Hash::check($password, Auth::user()->password)) {
+                    $this->addError('password', 'The provided password is incorrect.');
 
-                return null;
+                    return;
+                }
             }
 
             if ($this->resource->destination->server->id == $server_id && $this->resource->destination->id == $network_id) {
                 $this->dispatch('error', 'You cannot remove this destination server.', 'You are trying to remove the main server.');
 
-                return null;
+                return;
             }
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             StopApplicationOneServer::run($this->resource, $server);
             $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
             $this->loadData();
             ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

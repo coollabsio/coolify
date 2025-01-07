@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
-use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 
@@ -33,16 +32,16 @@ class RootResetPassword extends Command
         $this->info('You are about to reset the root password.');
         $password = password('Give me a new password for root user: ');
         $passwordAgain = password('Again');
-        if ($password !== $passwordAgain) {
+        if ($password != $passwordAgain) {
             $this->error('Passwords do not match.');
 
             return;
         }
         $this->info('Updating root password...');
         try {
-            User::query()->find(0)->update(['password' => Hash::make($password)]);
+            User::find(0)->update(['password' => Hash::make($password)]);
             $this->info('Root password updated successfully.');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->error('Failed to update root password.');
 
             return;

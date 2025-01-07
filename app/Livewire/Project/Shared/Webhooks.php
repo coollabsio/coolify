@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Shared;
 
-use Exception;
 use Livewire\Component;
 
 // Refactored ✅
@@ -58,10 +57,8 @@ class Webhooks extends Component
                 'manual_webhook_secret_gitea' => $this->giteaManualWebhookSecret,
             ]);
             $this->dispatch('success', 'Secret Saved.');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

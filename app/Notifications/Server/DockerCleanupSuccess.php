@@ -23,14 +23,14 @@ class DockerCleanupSuccess extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: Docker cleanup job succeeded on {$this->server->name}");
-        $mailMessage->view('emails.docker-cleanup-success', [
+        $mail = new MailMessage;
+        $mail->subject("Coolify: Docker cleanup job succeeded on {$this->server->name}");
+        $mail->view('emails.docker-cleanup-success', [
             'name' => $this->server->name,
             'text' => $this->message,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage

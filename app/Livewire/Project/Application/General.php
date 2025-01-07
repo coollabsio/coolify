@@ -6,9 +6,7 @@ use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Livewire\Features\SupportEvents\Event;
 use Spatie\Url\Url;
-use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class General extends Component
@@ -143,7 +141,7 @@ class General extends Component
 
                 return;
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
         if ($this->application->build_pack === 'dockercompose') {
@@ -181,11 +179,13 @@ class General extends Component
         if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
             $this->resetDefaultLabels(false);
         }
-        if ($this->is_preserve_repository_enabled !== $this->application->settings->is_preserve_repository_enabled && $this->application->settings->is_preserve_repository_enabled === false) {
-            $this->application->fileStorages->each(function ($storage) {
-                $storage->is_based_on_git = $this->application->settings->is_preserve_repository_enabled;
-                $storage->save();
-            });
+        if ($this->is_preserve_repository_enabled !== $this->application->settings->is_preserve_repository_enabled) {
+            if ($this->application->settings->is_preserve_repository_enabled === false) {
+                $this->application->fileStorages->each(function ($storage) {
+                    $storage->is_based_on_git = $this->application->settings->is_preserve_repository_enabled;
+                    $storage->save();
+                });
+            }
         }
     }
 
@@ -193,7 +193,7 @@ class General extends Component
     {
         try {
             if ($isInit && $this->application->docker_compose_raw) {
-                return null;
+                return;
             }
 
             // Must reload the application to get the latest database changes
@@ -204,14 +204,14 @@ class General extends Component
             if (is_null($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
-                return null;
+                return;
             }
             $this->application->parse();
             $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
             $this->application->save();
 
@@ -219,14 +219,12 @@ class General extends Component
         } finally {
             $this->initLoadingCompose = false;
         }
-
-        return null;
     }
 
     public function generateDomain(string $serviceName)
     {
-        $cuid2 = new Cuid2;
-        $domain = generateFqdn($this->application->destination->server, $cuid2);
+        $uuid = new Cuid2;
+        $domain = generateFqdn($this->application->destination->server, $uuid);
         $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
         $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
         $this->application->save();
@@ -297,7 +295,7 @@ class General extends Component
     {
         try {
             if ($this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
-                return null;
+                return;
             }
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->ports_exposes = $this->application->ports_exposes;
@@ -308,11 +306,9 @@ class General extends Component
                 $this->loadComposeFile();
             }
             $this->dispatch('configurationChanged');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function checkFqdns($showToaster = true)
@@ -338,16 +334,14 @@ class General extends Component
             if ($has_www === 0 && $this->application->redirect === 'www') {
                 $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
 
-                return null;
+                return;
             }
             $this->application->save();
             $this->resetDefaultLabels();
             $this->dispatch('success', 'Redirect updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit($showToaster = true)
@@ -383,8 +377,8 @@ class General extends Component
 
             if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
                 $compose_return = $this->loadComposeFile();
-                if ($compose_return instanceof Event) {
-                    return null;
+                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
+                    return;
                 }
             }
             $this->validate();
@@ -416,8 +410,8 @@ class General extends Component
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
 
-                foreach ($this->parsedServiceDomains as $parsedServiceDomain) {
-                    $domain = data_get($parsedServiceDomain, 'domain');
+                foreach ($this->parsedServiceDomains as $serviceName => $service) {
+                    $domain = data_get($service, 'domain');
                     if ($domain) {
                         if (! validate_dns_entry($domain, $this->application->destination->server)) {
                             $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
@@ -431,10 +425,8 @@ class General extends Component
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
-            if ($showToaster && ! $warning) {
-                $this->dispatch('success', 'Application settings updated!');
-            }
-        } catch (Throwable $e) {
+            $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
+        } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
@@ -444,8 +436,6 @@ class General extends Component
         } finally {
             $this->dispatch('configurationChanged');
         }
-
-        return null;
     }
 
     public function downloadConfig()

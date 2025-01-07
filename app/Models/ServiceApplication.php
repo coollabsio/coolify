@@ -34,12 +34,12 @@ class ServiceApplication extends BaseModel
 
     public static function ownedByCurrentTeamAPI(int $teamId)
     {
-        return \App\Models\ServiceApplication::query()->whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+        return ServiceApplication::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
     }
 
     public static function ownedByCurrentTeam()
     {
-        return \App\Models\ServiceApplication::query()->whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+        return ServiceApplication::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
     public function isRunning()

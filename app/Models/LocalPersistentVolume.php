@@ -49,9 +49,9 @@ class LocalPersistentVolume extends Model
             set: function (?string $value) {
                 if ($value) {
                     return str($value)->trim()->start('/')->value;
+                } else {
+                    return $value;
                 }
-
-                return $value;
             }
         );
     }

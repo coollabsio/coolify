@@ -20,10 +20,11 @@ class ComplexStatusCheck
                     $application->update(['status' => 'exited:unhealthy']);
 
                     continue;
-                }
-                $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+                } else {
+                    $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
 
-                continue;
+                    continue;
+                }
             }
             $container = instant_remote_process(["docker container inspect $(docker container ls -q --filter 'label=coolify.applicationId={$application->id}' --filter 'label=coolify.pullRequestId=0') --format '{{json .}}'"], $server, false);
             $container = format_docker_command_output_to_json($container);
@@ -43,14 +44,16 @@ class ComplexStatusCheck
                         $additional_server->updateExistingPivot($server->id, ['status' => "$containerStatus:$containerHealth"]);
                     }
                 }
-            } elseif ($is_main_server) {
-                $application->update(['status' => 'exited:unhealthy']);
-
-                continue;
             } else {
-                $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+                if ($is_main_server) {
+                    $application->update(['status' => 'exited:unhealthy']);
 
-                continue;
+                    continue;
+                } else {
+                    $application->additional_servers()->updateExistingPivot($server->id, ['status' => 'exited:unhealthy']);
+
+                    continue;
+                }
             }
         }
     }

@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use Exception;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -18,7 +17,7 @@ class FileStorageChanged implements ShouldBroadcast
     public function __construct($teamId = null)
     {
         if (is_null($teamId)) {
-            throw new Exception('Team id is null');
+            throw new \Exception('Team id is null');
         }
         $this->teamId = $teamId;
     }

@@ -4,7 +4,6 @@ namespace App\Livewire\Team;
 
 use App\Enums\Role;
 use App\Models\User;
-use Exception;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
@@ -17,11 +16,11 @@ class Member extends Component
         try {
             if (Role::from(auth()->user()->role())->lt(Role::ADMIN)
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
-                throw new Exception('You are not authorized to perform this action.');
+                throw new \Exception('You are not authorized to perform this action.');
             }
             $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => Role::ADMIN->value]);
             $this->dispatch('reloadWindow');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
@@ -31,11 +30,11 @@ class Member extends Component
         try {
             if (Role::from(auth()->user()->role())->lt(Role::OWNER)
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
-                throw new Exception('You are not authorized to perform this action.');
+                throw new \Exception('You are not authorized to perform this action.');
             }
             $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => Role::OWNER->value]);
             $this->dispatch('reloadWindow');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
@@ -45,11 +44,11 @@ class Member extends Component
         try {
             if (Role::from(auth()->user()->role())->lt(Role::ADMIN)
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
-                throw new Exception('You are not authorized to perform this action.');
+                throw new \Exception('You are not authorized to perform this action.');
             }
             $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => Role::MEMBER->value]);
             $this->dispatch('reloadWindow');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
@@ -59,7 +58,7 @@ class Member extends Component
         try {
             if (Role::from(auth()->user()->role())->lt(Role::ADMIN)
                 || Role::from($this->getMemberRole())->gt(auth()->user()->role())) {
-                throw new Exception('You are not authorized to perform this action.');
+                throw new \Exception('You are not authorized to perform this action.');
             }
             $this->member->teams()->detach(currentTeam());
             Cache::forget("team:{$this->member->id}");
@@ -67,7 +66,7 @@ class Member extends Component
                 return $this->member->teams()->first();
             });
             $this->dispatch('reloadWindow');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }

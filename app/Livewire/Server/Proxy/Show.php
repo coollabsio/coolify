@@ -4,7 +4,6 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Models\Server;
 use Livewire\Component;
-use Throwable;
 
 class Show extends Component
 {
@@ -24,11 +23,9 @@ class Show extends Component
         $this->parameters = get_route_parameters();
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

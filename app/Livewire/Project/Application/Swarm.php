@@ -5,7 +5,6 @@ namespace App\Livewire\Project\Application;
 use App\Models\Application;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class Swarm extends Component
 {
@@ -24,11 +23,9 @@ class Swarm extends Component
     {
         try {
             $this->syncData();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -56,11 +53,9 @@ class Swarm extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
@@ -68,11 +63,9 @@ class Swarm extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

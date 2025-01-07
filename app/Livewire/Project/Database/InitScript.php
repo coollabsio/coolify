@@ -30,8 +30,6 @@ class InitScript extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
@@ -45,8 +43,6 @@ class InitScript extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function delete()
@@ -56,7 +52,5 @@ class InitScript extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

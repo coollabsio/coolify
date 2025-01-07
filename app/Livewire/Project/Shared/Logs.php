@@ -12,7 +12,6 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
-use Exception;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -43,7 +42,7 @@ class Logs extends Component
         try {
             $server = $this->servers->firstWhere('id', $server_id);
             if (! $server->isFunctional()) {
-                return null;
+                return;
             }
             if ($server->isSwarm()) {
                 $containers = collect([
@@ -55,11 +54,9 @@ class Logs extends Component
                 $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
             }
             $server->containers = $containers->sort();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function mount()
@@ -71,7 +68,7 @@ class Logs extends Component
             $this->query = request()->query();
             if (data_get($this->parameters, 'application_uuid')) {
                 $this->type = 'application';
-                $this->resource = Application::query()->where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+                $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
                 $this->status = $this->resource->status;
                 if ($this->resource->destination->server->isFunctional()) {
                     $this->servers = $this->servers->push($this->resource->destination->server);
@@ -96,7 +93,7 @@ class Logs extends Component
                 $this->containers->push($this->container);
             } elseif (data_get($this->parameters, 'service_uuid')) {
                 $this->type = 'service';
-                $this->resource = Service::query()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+                $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
                 $this->resource->applications()->get()->each(function ($application) {
                     $this->containers->push(data_get($application, 'name').'-'.data_get($this->resource, 'uuid'));
                 });
@@ -113,11 +110,9 @@ class Logs extends Component
                     return str_contains($container, $this->query['pull_request_id']);
                 });
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

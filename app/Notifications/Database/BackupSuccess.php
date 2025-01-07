@@ -15,12 +15,12 @@ class BackupSuccess extends CustomEmailNotification
 
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $scheduledDatabaseBackup, public $database, public $database_name)
+    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
     {
         $this->onQueue('high');
 
         $this->name = $database->name;
-        $this->frequency = $scheduledDatabaseBackup->frequency;
+        $this->frequency = $backup->frequency;
     }
 
     public function via(object $notifiable): array
@@ -30,28 +30,28 @@ class BackupSuccess extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: Backup successfully done for {$this->database->name}");
-        $mailMessage->view('emails.backup-success', [
+        $mail = new MailMessage;
+        $mail->subject("Coolify: Backup successfully done for {$this->database->name}");
+        $mail->view('emails.backup-success', [
             'name' => $this->name,
             'database_name' => $this->database_name,
             'frequency' => $this->frequency,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $discordMessage = new DiscordMessage(
+        $message = new DiscordMessage(
             title: ':white_check_mark: Database backup successful',
             description: "Database backup for {$this->name} (db:{$this->database_name}) was successful.",
             color: DiscordMessage::successColor(),
         );
 
-        $discordMessage->addField('Frequency', $this->frequency, true);
+        $message->addField('Frequency', $this->frequency, true);
 
-        return $discordMessage;
+        return $message;
     }
 
     public function toTelegram(): array

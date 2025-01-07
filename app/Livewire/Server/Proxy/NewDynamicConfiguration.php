@@ -6,7 +6,6 @@ use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
-use Throwable;
 
 class NewDynamicConfiguration extends Component
 {
@@ -54,7 +53,7 @@ class NewDynamicConfiguration extends Component
                 if ($this->fileName === 'coolify.yaml') {
                     $this->dispatch('error', 'File name is reserved.');
 
-                    return null;
+                    return;
                 }
             } elseif ($proxy_type === 'CADDY') {
                 if (! str($this->fileName)->endsWith('.caddy')) {
@@ -68,7 +67,7 @@ class NewDynamicConfiguration extends Component
                 if ($exists == 1) {
                     $this->dispatch('error', 'File already exists');
 
-                    return null;
+                    return;
                 }
             }
             if ($proxy_type === ProxyTypes::TRAEFIK->value) {
@@ -86,11 +85,9 @@ class NewDynamicConfiguration extends Component
             $this->dispatch('loadDynamicConfigurations');
             $this->dispatch('dynamic-configuration-added');
             $this->dispatch('success', 'Dynamic configuration saved.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

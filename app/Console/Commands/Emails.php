@@ -12,6 +12,7 @@ use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Database\BackupFailed;
+use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Test;
 use Exception;
 use Illuminate\Console\Command;
@@ -42,7 +43,7 @@ class Emails extends Command
     /**
      * Execute the console command.
      */
-    private ?MailMessage $mailMessage = null;
+    private ?MailMessage $mail = null;
 
     private ?string $email = null;
 
@@ -68,13 +69,15 @@ class Emails extends Command
         $emailsGathered = ['realusers-before-trial', 'realusers-server-lost-connection'];
         if (isDev()) {
             $this->email = 'test@example.com';
-        } elseif (! in_array($type, $emailsGathered)) {
-            $this->email = text('Email Address to send to:');
+        } else {
+            if (! in_array($type, $emailsGathered)) {
+                $this->email = text('Email Address to send to:');
+            }
         }
         set_transanctional_email_settings();
 
-        $this->mailMessage = new MailMessage;
-        $this->mailMessage->subject('Test Email');
+        $this->mail = new MailMessage;
+        $this->mail->subject('Test Email');
         switch ($type) {
             case 'updates':
                 $teams = Team::all();
@@ -99,18 +102,18 @@ class Emails extends Command
                 $confirmed = confirm('Are you sure?');
                 if ($confirmed) {
                     foreach ($emails as $email) {
-                        $this->mailMessage = new MailMessage;
-                        $this->mailMessage->subject('One-click Services, Docker Compose support');
+                        $this->mail = new MailMessage;
+                        $this->mail->subject('One-click Services, Docker Compose support');
                         $unsubscribeUrl = route('unsubscribe.marketing.emails', [
                             'token' => encrypt($email),
                         ]);
-                        $this->mailMessage->view('emails.updates', ['unsubscribeUrl' => $unsubscribeUrl]);
+                        $this->mail->view('emails.updates', ['unsubscribeUrl' => $unsubscribeUrl]);
                         $this->sendEmail($email);
                     }
                 }
                 break;
             case 'emails-test':
-                $this->mailMessage = (new Test)->toMail();
+                $this->mail = (new Test)->toMail();
                 $this->sendEmail();
                 break;
             case 'application-deployment-success-daily':
@@ -120,41 +123,41 @@ class Emails extends Command
                     if ($deployments->isEmpty()) {
                         continue;
                     }
-                    $this->mailMessage = (new DeploymentSuccess($application, 'test'))->toMail();
+                    $this->mail = (new DeploymentSuccess($application, 'test'))->toMail();
                     $this->sendEmail();
                 }
                 break;
             case 'application-deployment-success':
                 $application = Application::all()->first();
-                $this->mailMessage = (new DeploymentSuccess($application, 'test'))->toMail();
+                $this->mail = (new DeploymentSuccess($application, 'test'))->toMail();
                 $this->sendEmail();
                 break;
             case 'application-deployment-failed':
                 $application = Application::all()->first();
                 $preview = ApplicationPreview::all()->first();
                 if (! $preview) {
-                    $preview = ApplicationPreview::query()->create([
+                    $preview = ApplicationPreview::create([
                         'application_id' => $application->id,
                         'pull_request_id' => 1,
                         'pull_request_html_url' => 'http://example.com',
                         'fqdn' => $application->fqdn,
                     ]);
                 }
-                $this->mailMessage = (new DeploymentFailed($application, 'test'))->toMail();
+                $this->mail = (new DeploymentFailed($application, 'test'))->toMail();
                 $this->sendEmail();
-                $this->mailMessage = (new DeploymentFailed($application, 'test', $preview))->toMail();
+                $this->mail = (new DeploymentFailed($application, 'test', $preview))->toMail();
                 $this->sendEmail();
                 break;
             case 'application-status-changed':
                 $application = Application::all()->first();
-                $this->mailMessage = (new StatusChanged($application))->toMail();
+                $this->mail = (new StatusChanged($application))->toMail();
                 $this->sendEmail();
                 break;
             case 'backup-failed':
                 $backup = ScheduledDatabaseBackup::all()->first();
                 $db = StandalonePostgresql::all()->first();
                 if (! $backup) {
-                    $backup = ScheduledDatabaseBackup::query()->create([
+                    $backup = ScheduledDatabaseBackup::create([
                         'enabled' => true,
                         'frequency' => 'daily',
                         'save_s3' => false,
@@ -164,14 +167,14 @@ class Emails extends Command
                     ]);
                 }
                 $output = 'Because of an error, the backup of the database '.$db->name.' failed.';
-                $this->mailMessage = (new BackupFailed($backup, $db, $output))->toMail();
+                $this->mail = (new BackupFailed($backup, $db, $output))->toMail();
                 $this->sendEmail();
                 break;
             case 'backup-success':
                 $backup = ScheduledDatabaseBackup::all()->first();
                 $db = StandalonePostgresql::all()->first();
                 if (! $backup) {
-                    $backup = ScheduledDatabaseBackup::query()->create([
+                    $backup = ScheduledDatabaseBackup::create([
                         'enabled' => true,
                         'frequency' => 'daily',
                         'save_s3' => false,
@@ -198,10 +201,10 @@ class Emails extends Command
                 //     $this->sendEmail();
                 //     break;
             case 'realusers-before-trial':
-                $this->mailMessage = new MailMessage;
-                $this->mailMessage->view('emails.before-trial-conversion');
-                $this->mailMessage->subject('Trial period has been added for all subscription plans.');
-                $teams = Team::query()->doesntHave('subscription')->where('id', '!=', 0)->get();
+                $this->mail = new MailMessage;
+                $this->mail->view('emails.before-trial-conversion');
+                $this->mail->subject('Trial period has been added for all subscription plans.');
+                $teams = Team::doesntHave('subscription')->where('id', '!=', 0)->get();
                 if (! $teams || $teams->isEmpty()) {
                     echo 'No teams found.'.PHP_EOL;
 
@@ -229,7 +232,7 @@ class Emails extends Command
                 break;
             case 'realusers-server-lost-connection':
                 $serverId = text('Server Id');
-                $server = Server::query()->find($serverId);
+                $server = Server::find($serverId);
                 if (! $server) {
                     throw new Exception('Server not found');
                 }
@@ -244,13 +247,13 @@ class Emails extends Command
                 foreach ($admins as $admin) {
                     $this->info($admin);
                 }
-                $this->mailMessage = new MailMessage;
-                $this->mailMessage->view('emails.server-lost-connection', [
+                $this->mail = new MailMessage;
+                $this->mail->view('emails.server-lost-connection', [
                     'name' => $server->name,
                 ]);
-                $this->mailMessage->subject('Action required: Server '.$server->name.' lost connection.');
-                foreach ($admins as $admin) {
-                    $this->sendEmail($admin);
+                $this->mail->subject('Action required: Server '.$server->name.' lost connection.');
+                foreach ($admins as $email) {
+                    $this->sendEmail($email);
                 }
                 break;
         }
@@ -266,8 +269,8 @@ class Emails extends Command
             [],
             fn (Message $message) => $message
                 ->to($this->email)
-                ->subject($this->mailMessage->subject)
-                ->html((string) $this->mailMessage->render())
+                ->subject($this->mail->subject)
+                ->html((string) $this->mail->render())
         );
         $this->info("Email sent to $this->email successfully. 📧");
     }

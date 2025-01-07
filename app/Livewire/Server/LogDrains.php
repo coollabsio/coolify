@@ -7,7 +7,6 @@ use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class LogDrains extends Component
 {
@@ -45,11 +44,9 @@ class LogDrains extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function syncDataNewRelic(bool $toModel = false)
@@ -107,16 +104,18 @@ class LogDrains extends Component
                 $this->syncDataCustom($toModel);
             }
             $this->server->settings->save();
-        } elseif ($type === 'newrelic') {
-            $this->syncDataNewRelic($toModel);
-        } elseif ($type === 'axiom') {
-            $this->syncDataAxiom($toModel);
-        } elseif ($type === 'custom') {
-            $this->syncDataCustom($toModel);
         } else {
-            $this->syncDataNewRelic($toModel);
-            $this->syncDataAxiom($toModel);
-            $this->syncDataCustom($toModel);
+            if ($type === 'newrelic') {
+                $this->syncDataNewRelic($toModel);
+            } elseif ($type === 'axiom') {
+                $this->syncDataAxiom($toModel);
+            } elseif ($type === 'custom') {
+                $this->syncDataCustom($toModel);
+            } else {
+                $this->syncDataNewRelic($toModel);
+                $this->syncDataAxiom($toModel);
+                $this->syncDataCustom($toModel);
+            }
         }
     }
 
@@ -128,7 +127,7 @@ class LogDrains extends Component
                     'logDrainNewRelicLicenseKey' => ['required'],
                     'logDrainNewRelicBaseUri' => ['required', 'url'],
                 ]);
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $this->isLogDrainNewRelicEnabled = false;
 
                 throw $e;
@@ -139,7 +138,7 @@ class LogDrains extends Component
                     'logDrainAxiomDatasetName' => ['required'],
                     'logDrainAxiomApiKey' => ['required'],
                 ]);
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $this->isLogDrainAxiomEnabled = false;
 
                 throw $e;
@@ -150,7 +149,7 @@ class LogDrains extends Component
                     'logDrainCustomConfig' => ['required'],
                     'logDrainCustomConfigParser' => ['string', 'nullable'],
                 ]);
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $this->isLogDrainCustomEnabled = false;
 
                 throw $e;
@@ -169,11 +168,9 @@ class LogDrains extends Component
                 StopLogDrain::run($this->server);
                 $this->dispatch('success', 'Log drain service stopped.');
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit(string $type)
@@ -181,11 +178,9 @@ class LogDrains extends Component
         try {
             $this->syncData(true, $type);
             $this->dispatch('success', 'Settings saved.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

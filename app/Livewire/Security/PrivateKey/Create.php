@@ -4,7 +4,6 @@ namespace App\Livewire\Security\PrivateKey;
 
 use App\Models\PrivateKey;
 use Livewire\Component;
-use Throwable;
 
 class Create extends Component
 {
@@ -59,7 +58,7 @@ class Create extends Component
             ]);
 
             return $this->redirectAfterCreation($privateKey);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

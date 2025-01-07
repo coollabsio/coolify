@@ -17,8 +17,6 @@ class Show extends Component
         if (! data_get(currentTeam(), 'subscription')) {
             return redirect()->route('subscription.index');
         }
-
-        return null;
     }
 
     public function render()

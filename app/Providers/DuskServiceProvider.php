@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Laravel\Dusk\Browser;
 
 class DuskServiceProvider extends ServiceProvider
 {
@@ -12,7 +11,7 @@ class DuskServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Browser::macro('loginWithRootUser', function () {
+        \Laravel\Dusk\Browser::macro('loginWithRootUser', function () {
             return $this->visit('/login')
                 ->type('email', 'test@example.com')
                 ->type('password', 'password')

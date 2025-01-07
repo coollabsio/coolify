@@ -12,11 +12,12 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct() {}
 
     public function middleware(): array
     {
@@ -27,7 +28,7 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
     {
         try {
             $this->cleanupInvitationLink();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             Log::error('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
         }
     }

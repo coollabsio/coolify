@@ -15,7 +15,7 @@ class CheckApplicationDeploymentQueue extends Command
     public function handle()
     {
         $seconds = $this->option('seconds');
-        $deployments = ApplicationDeploymentQueue::query()->whereIn('status', [
+        $deployments = ApplicationDeploymentQueue::whereIn('status', [
             ApplicationDeploymentStatus::IN_PROGRESS,
             ApplicationDeploymentStatus::QUEUED,
         ])->where('created_at', '<=', now()->subSeconds($seconds))->get();
@@ -40,11 +40,11 @@ class CheckApplicationDeploymentQueue extends Command
         }
     }
 
-    private function cancelDeployment(ApplicationDeploymentQueue $applicationDeploymentQueue)
+    private function cancelDeployment(ApplicationDeploymentQueue $deployment)
     {
-        $applicationDeploymentQueue->update(['status' => ApplicationDeploymentStatus::FAILED]);
-        if ($applicationDeploymentQueue->server?->isFunctional()) {
-            remote_process(['docker rm -f '.$applicationDeploymentQueue->deployment_uuid], $applicationDeploymentQueue->server, false);
+        $deployment->update(['status' => ApplicationDeploymentStatus::FAILED]);
+        if ($deployment->server?->isFunctional()) {
+            remote_process(['docker rm -f '.$deployment->deployment_uuid], $deployment->server, false);
         }
     }
 }

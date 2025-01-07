@@ -33,7 +33,7 @@ class Dev extends Command
         // Generate OpenAPI documentation
         echo "Generating OpenAPI documentation.\n";
         // https://github.com/OAI/OpenAPI-Specification/releases
-        $processResult = Process::run([
+        $process = Process::run([
             '/var/www/html/vendor/bin/openapi',
             'app',
             '-o',
@@ -41,11 +41,11 @@ class Dev extends Command
             '--version',
             '3.1.0',
         ]);
-        $error = $processResult->errorOutput();
+        $error = $process->errorOutput();
         $error = preg_replace('/^.*an object literal,.*$/m', '', $error);
         $error = preg_replace('/^\h*\v+/m', '', $error);
         echo $error;
-        echo $processResult->output();
+        echo $process->output();
         // Convert YAML to JSON
         $yaml = file_get_contents('openapi.yaml');
         $json = json_encode(Yaml::parse($yaml), JSON_PRETTY_PRINT);
@@ -69,7 +69,7 @@ class Dev extends Command
         }
 
         // Seed database if it's empty
-        $settings = InstanceSettings::query()->find(0);
+        $settings = InstanceSettings::find(0);
         if (! $settings) {
             echo "Initializing instance, seeding database.\n";
             Artisan::call('migrate --seed');

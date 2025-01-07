@@ -4,13 +4,11 @@ namespace App\Livewire\Team;
 
 use App\Models\TeamInvitation;
 use App\Models\User;
-use Exception;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Component;
-use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class InviteLink extends Component
@@ -44,19 +42,19 @@ class InviteLink extends Component
         try {
             $this->validate();
             if (auth()->user()->role() === 'admin' && $this->role === 'owner') {
-                throw new Exception('Admins cannot invite owners.');
+                throw new \Exception('Admins cannot invite owners.');
             }
             $member_emails = currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');
             }
-            $cuid2 = new Cuid2(32);
-            $link = url('/').config('constants.invitation.link.base_url').$cuid2;
+            $uuid = new Cuid2(32);
+            $link = url('/').config('constants.invitation.link.base_url').$uuid;
             $user = User::whereEmail($this->email)->first();
 
             if (is_null($user)) {
                 $password = Str::password();
-                $user = User::query()->create([
+                $user = User::create([
                     'name' => str($this->email)->before('@'),
                     'email' => $this->email,
                     'password' => Hash::make($password),
@@ -70,34 +68,36 @@ class InviteLink extends Component
                 $invitationValid = $invitation->isValid();
                 if ($invitationValid) {
                     return handleError(livewire: $this, customErrorMessage: "Pending invitation already exists for $this->email.");
+                } else {
+                    $invitation->delete();
                 }
-                $invitation->delete();
             }
 
-            $invitation = TeamInvitation::query()->firstOrCreate([
+            $invitation = TeamInvitation::firstOrCreate([
                 'team_id' => currentTeam()->id,
-                'uuid' => $cuid2,
+                'uuid' => $uuid,
                 'email' => $this->email,
                 'role' => $this->role,
                 'link' => $link,
                 'via' => $sendEmail ? 'email' : 'link',
             ]);
             if ($sendEmail) {
-                $mailMessage = new MailMessage;
-                $mailMessage->view('emails.invitation-link', [
+                $mail = new MailMessage;
+                $mail->view('emails.invitation-link', [
                     'team' => currentTeam()->name,
                     'invitation_link' => $link,
                 ]);
-                $mailMessage->subject('You have been invited to '.currentTeam()->name.' on '.config('app.name').'.');
-                send_user_an_email($mailMessage, $this->email);
+                $mail->subject('You have been invited to '.currentTeam()->name.' on '.config('app.name').'.');
+                send_user_an_email($mail, $this->email);
                 $this->dispatch('success', 'Invitation sent via email.');
                 $this->dispatch('refreshInvitations');
 
-                return null;
+                return;
+            } else {
+                $this->dispatch('success', 'Invitation link generated.');
+                $this->dispatch('refreshInvitations');
             }
-            $this->dispatch('success', 'Invitation link generated.');
-            $this->dispatch('refreshInvitations');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $error_message = $e->getMessage();
             if ($e->getCode() === '23505') {
                 $error_message = 'Invitation already sent.';
@@ -105,7 +105,5 @@ class InviteLink extends Component
 
             return handleError(error: $e, livewire: $this, customErrorMessage: $error_message);
         }
-
-        return null;
     }
 }

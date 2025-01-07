@@ -39,9 +39,9 @@ class Controller extends BaseController
         return view('auth.verify-email');
     }
 
-    public function email_verify(EmailVerificationRequest $emailVerificationRequest)
+    public function email_verify(EmailVerificationRequest $request)
     {
-        $emailVerificationRequest->fulfill();
+        $request->fulfill();
 
         return redirect(RouteServiceProvider::HOME);
     }
@@ -139,10 +139,9 @@ class Controller extends BaseController
             refreshSession($invitation->team);
 
             return redirect()->route('team.index');
+        } else {
+            abort(400, 'Invitation expired.');
         }
-        abort(400, 'Invitation expired.');
-
-        return null;
     }
 
     public function revoke_invitation()

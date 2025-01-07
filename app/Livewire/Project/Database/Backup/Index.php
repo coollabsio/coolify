@@ -2,10 +2,6 @@
 
 namespace App\Livewire\Project\Database\Backup;
 
-use App\Models\StandaloneClickhouse;
-use App\Models\StandaloneDragonfly;
-use App\Models\StandaloneKeydb;
-use App\Models\StandaloneRedis;
 use Livewire\Component;
 
 class Index extends Component
@@ -28,10 +24,10 @@ class Index extends Component
         }
         // No backups
         if (
-            $database->getMorphClass() === StandaloneRedis::class ||
-            $database->getMorphClass() === StandaloneKeydb::class ||
-            $database->getMorphClass() === StandaloneDragonfly::class ||
-            $database->getMorphClass() === StandaloneClickhouse::class
+            $database->getMorphClass() === \App\Models\StandaloneRedis::class ||
+            $database->getMorphClass() === \App\Models\StandaloneKeydb::class ||
+            $database->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
+            $database->getMorphClass() === \App\Models\StandaloneClickhouse::class
         ) {
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
@@ -40,8 +36,6 @@ class Index extends Component
             ]);
         }
         $this->database = $database;
-
-        return null;
     }
 
     public function render()

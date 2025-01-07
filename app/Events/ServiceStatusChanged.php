@@ -21,7 +21,7 @@ class ServiceStatusChanged implements ShouldBroadcast
             $userId = Auth::id() ?? null;
         }
         if (is_null($userId)) {
-            return;
+            return false;
         }
         $this->userId = $userId;
     }

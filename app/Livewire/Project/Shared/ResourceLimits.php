@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Shared;
 
 use Livewire\Component;
-use Throwable;
 
 class ResourceLimits extends Component
 {
@@ -56,10 +55,8 @@ class ResourceLimits extends Component
             $this->validate();
             $this->resource->save();
             $this->dispatch('success', 'Resource limits updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

@@ -7,7 +7,6 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
-use Throwable;
 
 class Status extends Component
 {
@@ -39,11 +38,9 @@ class Status extends Component
                 if ($this->numberOfPolls >= 10) {
                     $this->polling = false;
                     $this->numberOfPolls = 0;
-                    if ($notification) {
-                        $this->dispatch('error', 'Proxy is not running.');
-                    }
+                    $notification && $this->dispatch('error', 'Proxy is not running.');
 
-                    return null;
+                    return;
                 }
                 $this->numberOfPolls++;
             }
@@ -54,25 +51,17 @@ class Status extends Component
             $this->dispatch('proxyStatusUpdated');
             if ($this->server->proxy->status === 'running') {
                 $this->polling = false;
-                if ($notification) {
-                    $this->dispatch('success', 'Proxy is running.');
-                }
-            } elseif ($this->server->proxy->status === 'exited' && ! $this->server->proxy->force_stop) {
-                if ($notification) {
-                    $this->dispatch('error', 'Proxy has exited.');
-                }
+                $notification && $this->dispatch('success', 'Proxy is running.');
+            } elseif ($this->server->proxy->status === 'exited' and ! $this->server->proxy->force_stop) {
+                $notification && $this->dispatch('error', 'Proxy has exited.');
             } elseif ($this->server->proxy->force_stop) {
-                if ($notification) {
-                    $this->dispatch('error', 'Proxy is stopped manually.');
-                }
-            } elseif ($notification) {
-                $this->dispatch('error', 'Proxy is not running.');
+                $notification && $this->dispatch('error', 'Proxy is stopped manually.');
+            } else {
+                $notification && $this->dispatch('error', 'Proxy is not running.');
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function getProxyStatus()
@@ -81,10 +70,8 @@ class Status extends Component
             GetContainersStatus::run($this->server);
             // dispatch_sync(new ContainerStatusJob($this->server));
             $this->dispatch('proxyStatusUpdated');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 }

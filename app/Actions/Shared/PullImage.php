@@ -9,20 +9,20 @@ class PullImage
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public function handle(Service $resource)
     {
-        $service->saveComposeConfigs();
+        $resource->saveComposeConfigs();
 
-        $commands[] = 'cd '.$service->workdir();
-        $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
+        $commands[] = 'cd '.$resource->workdir();
+        $commands[] = "echo 'Saved configuration files to {$resource->workdir()}.'";
         $commands[] = 'docker compose pull';
 
-        $server = data_get($service, 'server');
+        $server = data_get($resource, 'server');
 
         if (! $server) {
             return;
         }
 
-        instant_remote_process($commands, $service->server);
+        instant_remote_process($commands, $resource->server);
     }
 }

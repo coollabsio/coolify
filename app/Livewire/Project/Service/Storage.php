@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\LocalPersistentVolume;
 use Livewire\Component;
-use Throwable;
 
 class Storage extends Component
 {
@@ -43,7 +42,7 @@ class Storage extends Component
     public function addNewVolume($data)
     {
         try {
-            LocalPersistentVolume::query()->create([
+            LocalPersistentVolume::create([
                 'name' => $data['name'],
                 'mount_path' => $data['mount_path'],
                 'host_path' => $data['host_path'],
@@ -54,11 +53,9 @@ class Storage extends Component
             $this->dispatch('success', 'Storage added successfully');
             $this->dispatch('clearAddStorage');
             $this->dispatch('refreshStorages');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

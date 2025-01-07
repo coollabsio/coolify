@@ -24,7 +24,7 @@ class StopDatabaseProxy
     {
         $server = data_get($database, 'destination.server');
         $uuid = $database->uuid;
-        if ($database->getMorphClass() === ServiceDatabase::class) {
+        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $uuid = $database->service->uuid;
             $server = data_get($database, 'service.server');
         }

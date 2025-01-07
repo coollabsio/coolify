@@ -16,7 +16,8 @@ class Horizon extends Command
             $this->info('Horizon is enabled on this server.');
             $this->call('horizon');
             exit(0);
+        } else {
+            exit(0);
         }
-        exit(0);
     }
 }

@@ -13,11 +13,11 @@ class RedirectIfAuthenticated
     /**
      * Handle an incoming request.
      *
-     * @param  Closure(Request):Response  $next
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next, string ...$guards): Response
     {
-        $guards = $guards === [] ? [null] : $guards;
+        $guards = empty($guards) ? [null] : $guards;
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {

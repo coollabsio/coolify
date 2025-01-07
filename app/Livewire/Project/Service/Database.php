@@ -6,7 +6,6 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\ServiceDatabase;
 use Livewire\Component;
-use Throwable;
 
 class Database extends Component
 {
@@ -96,7 +95,7 @@ class Database extends Component
             $this->database->save();
             updateCompose($this->database);
             $this->dispatch('success', 'Database saved.');
-        } catch (Throwable) {
+        } catch (\Throwable) {
         } finally {
             $this->dispatch('generateDockerCompose');
         }

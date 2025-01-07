@@ -9,16 +9,16 @@ use Illuminate\Support\Facades\Mail;
 
 class EmailChannel
 {
-    public function send(SendsEmail $sendsEmail, Notification $notification): void
+    public function send(SendsEmail $notifiable, Notification $notification): void
     {
         try {
-            $this->bootConfigs($sendsEmail);
-            $recipients = $sendsEmail->getRecipients($notification);
+            $this->bootConfigs($notifiable);
+            $recipients = $notifiable->getRecipients($notification);
             if (count($recipients) === 0) {
                 throw new Exception('No email recipients found');
             }
 
-            $mailMessage = $notification->toMail($sendsEmail);
+            $mailMessage = $notification->toMail($notifiable);
             Mail::send(
                 [],
                 [],

@@ -10,7 +10,6 @@ use Carbon\Carbon;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\Process;
 use Livewire\Component;
-use Throwable;
 
 class Deploy extends Component
 {
@@ -39,7 +38,11 @@ class Deploy extends Component
 
     public function mount()
     {
-        $this->serverIp = $this->server->id === 0 ? base_ip() : $this->server->ip;
+        if ($this->server->id === 0) {
+            $this->serverIp = base_ip();
+        } else {
+            $this->serverIp = $this->server->ip;
+        }
         $this->currentRoute = request()->route()->getName();
     }
 
@@ -64,11 +67,9 @@ class Deploy extends Component
         try {
             $this->stop();
             $this->dispatch('checkProxy');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function checkProxy()
@@ -77,11 +78,9 @@ class Deploy extends Component
             CheckProxy::run($this->server, true);
             $this->dispatch('startProxyPolling');
             $this->dispatch('proxyChecked');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function startProxy()
@@ -91,11 +90,9 @@ class Deploy extends Component
             $this->server->save();
             $activity = StartProxy::run($this->server, force: true);
             $this->dispatch('activityMonitor', $activity->id, ProxyStatusChanged::class);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function stop(bool $forceStop = true)
@@ -117,7 +114,7 @@ class Deploy extends Component
             }
 
             $this->removeContainer($containerName);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->server->proxy->force_stop = $forceStop;
@@ -125,8 +122,6 @@ class Deploy extends Component
             $this->server->save();
             $this->dispatch('proxyStatusUpdated');
         }
-
-        return null;
     }
 
     private function stopContainer(string $containerName, int $timeout): InvokedProcess

@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\ServiceDatabase;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -12,7 +11,6 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
-use Throwable;
 
 class BackupEdit extends Component
 {
@@ -68,8 +66,6 @@ class BackupEdit extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function syncData(bool $toModel = false)
@@ -98,10 +94,12 @@ class BackupEdit extends Component
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return null;
+                return;
+            }
         }
 
         try {
@@ -114,7 +112,7 @@ class BackupEdit extends Component
 
             $this->backup->delete();
 
-            if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
+            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $previousUrl = url()->previous();
                 $url = Url::fromString($previousUrl);
                 $url = $url->withoutQueryParameter('selectedBackupId');
@@ -122,10 +120,10 @@ class BackupEdit extends Component
                 $url = $url->getPath()."#{$url->getFragment()}";
 
                 return redirect($url);
+            } else {
+                return redirect()->route('project.database.backup.index', $this->parameters);
             }
-
-            return redirect()->route('project.database.backup.index', $this->parameters);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -135,7 +133,7 @@ class BackupEdit extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
@@ -147,7 +145,7 @@ class BackupEdit extends Component
         }
         $isValid = validate_cron_expression($this->backup->frequency);
         if (! $isValid) {
-            throw new Exception('Invalid Cron / Human expression');
+            throw new \Exception('Invalid Cron / Human expression');
         }
         $this->validate();
     }
@@ -157,7 +155,7 @@ class BackupEdit extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
@@ -168,7 +166,7 @@ class BackupEdit extends Component
         $backupFolder = null;
 
         foreach ($executions as $execution) {
-            if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
+            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $server = $this->backup->database->service->destination->server;
             } else {
                 $server = $this->backup->database->destination->server;

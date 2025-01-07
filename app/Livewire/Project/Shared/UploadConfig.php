@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
-use Exception;
 use Livewire\Component;
 
 class UploadConfig extends Component
@@ -30,10 +29,10 @@ class UploadConfig extends Component
     public function uploadConfig()
     {
         try {
-            $application = Application::query()->findOrFail($this->applicationId);
+            $application = Application::findOrFail($this->applicationId);
             $application->setConfig($this->config);
             $this->dispatch('success', 'Application settings updated');
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
 
             return;

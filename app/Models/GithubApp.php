@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class GithubApp extends BaseModel
@@ -11,6 +10,11 @@ class GithubApp extends BaseModel
 
     protected $appends = ['type'];
 
+    protected $casts = [
+        'is_public' => 'boolean',
+        'type' => 'string',
+    ];
+
     protected $hidden = [
         'client_secret',
         'webhook_secret',
@@ -18,12 +22,12 @@ class GithubApp extends BaseModel
 
     protected static function booted(): void
     {
-        static::deleting(function (GithubApp $githubApp) {
-            $applications_count = Application::query()->where('source_id', $githubApp->id)->count();
+        static::deleting(function (GithubApp $github_app) {
+            $applications_count = Application::where('source_id', $github_app->id)->count();
             if ($applications_count > 0) {
-                throw new Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
+                throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
             }
-            $githubApp->privateKey()->delete();
+            $github_app->privateKey()->delete();
         });
     }
 
@@ -66,13 +70,5 @@ class GithubApp extends BaseModel
                 }
             },
         );
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'is_public' => 'boolean',
-            'type' => 'string',
-        ];
     }
 }

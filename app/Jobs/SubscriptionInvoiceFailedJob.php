@@ -10,7 +10,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
 
 class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -25,17 +24,17 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $session = getStripeCustomerPortalSession($this->team);
-            $mailMessage = new MailMessage;
-            $mailMessage->view('emails.subscription-invoice-failed', [
+            $mail = new MailMessage;
+            $mail->view('emails.subscription-invoice-failed', [
                 'stripeCustomerPortal' => $session->url,
             ]);
-            $mailMessage->subject('Your last payment was failed for Coolify Cloud.');
-            $this->team->members()->each(function ($member) use ($mailMessage) {
+            $mail->subject('Your last payment was failed for Coolify Cloud.');
+            $this->team->members()->each(function ($member) use ($mail) {
                 if ($member->isAdmin()) {
-                    send_user_an_email($mailMessage, $member->email);
+                    send_user_an_email($mail, $member->email);
                 }
             });
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             send_internal_notification('SubscriptionInvoiceFailedJob failed with: '.$e->getMessage());
             throw $e;
         }

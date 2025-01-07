@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use Exception;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -21,7 +20,7 @@ class ProxyStatusChanged implements ShouldBroadcast
             $teamId = auth()->user()->currentTeam()->id ?? null;
         }
         if (is_null($teamId)) {
-            throw new Exception('Team id is null');
+            throw new \Exception('Team id is null');
         }
         $this->teamId = $teamId;
     }

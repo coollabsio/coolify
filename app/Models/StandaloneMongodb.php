@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Throwable;
 
 class StandaloneMongodb extends BaseModel
 {
@@ -20,7 +18,7 @@ class StandaloneMongodb extends BaseModel
     protected static function booted()
     {
         static::created(function ($database) {
-            LocalPersistentVolume::query()->create([
+            LocalPersistentVolume::create([
                 'name' => 'mongodb-configdb-'.$database->uuid,
                 'mount_path' => '/data/configdb',
                 'host_path' => null,
@@ -28,7 +26,7 @@ class StandaloneMongodb extends BaseModel
                 'resource_type' => $database->getMorphClass(),
                 'is_readonly' => true,
             ]);
-            LocalPersistentVolume::query()->create([
+            LocalPersistentVolume::create([
                 'name' => 'mongodb-db-'.$database->uuid,
                 'mount_path' => '/data/db',
                 'host_path' => null,
@@ -75,13 +73,14 @@ class StandaloneMongodb extends BaseModel
         }
         if ($oldConfigHash === $newConfigHash) {
             return false;
-        }
-        if ($save) {
-            $this->config_hash = $newConfigHash;
-            $this->save();
-        }
+        } else {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
 
-        return true;
+            return true;
+        }
     }
 
     public function isRunning()
@@ -114,8 +113,8 @@ class StandaloneMongodb extends BaseModel
             return;
         }
         $server = data_get($this, 'destination.server');
-        foreach ($persistentStorages as $persistentStorage) {
-            instant_remote_process(["docker volume rm -f $persistentStorage->name"], $server, false);
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
         }
     }
 
@@ -197,7 +196,7 @@ class StandaloneMongodb extends BaseModel
             get: function ($value) {
                 try {
                     return decrypt($value);
-                } catch (Throwable $th) {
+                } catch (\Throwable $th) {
                     $this->mongo_initdb_root_password = encrypt($value);
                     $this->save();
 
@@ -298,7 +297,7 @@ class StandaloneMongodb extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new Exception($error);
+            throw new \Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
@@ -320,7 +319,7 @@ class StandaloneMongodb extends BaseModel
             if ($error === 'Unauthorized') {
                 $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
             }
-            throw new Exception($error);
+            throw new \Exception($error);
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {

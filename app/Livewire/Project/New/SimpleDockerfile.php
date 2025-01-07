@@ -7,7 +7,6 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Exception;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -37,23 +36,23 @@ CMD ["nginx", "-g", "daemon off;"]
             'dockerfile' => 'required',
         ]);
         $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::query()->where('uuid', $destination_uuid)->first();
+        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
         if (! $destination) {
-            $destination = SwarmDocker::query()->where('uuid', $destination_uuid)->first();
+            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
         }
         if (! $destination) {
-            throw new Exception('Destination not found. What?!');
+            throw new \Exception('Destination not found. What?!');
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::query()->where('uuid', $this->parameters['project_uuid'])->first();
+        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
         $port = get_port_from_dockerfile($this->dockerfile);
         if (! $port) {
             $port = 80;
         }
-        $application = Application::query()->create([
+        $application = Application::create([
             'name' => 'dockerfile-'.new Cuid2,
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',

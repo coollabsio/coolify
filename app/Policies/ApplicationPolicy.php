@@ -44,7 +44,11 @@ class ApplicationPolicy
      */
     public function delete(User $user, Application $application): bool
     {
-        return (bool) $user->isAdmin();
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

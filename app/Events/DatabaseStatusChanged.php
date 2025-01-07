@@ -13,7 +13,7 @@ class DatabaseStatusChanged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $userId;
+    public $userId = null;
 
     public function __construct($userId = null)
     {
@@ -21,7 +21,7 @@ class DatabaseStatusChanged implements ShouldBroadcast
             $userId = Auth::id() ?? null;
         }
         if (is_null($userId)) {
-            return;
+            return false;
         }
 
         $this->userId = $userId;

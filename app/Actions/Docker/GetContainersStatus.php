@@ -47,20 +47,20 @@ class GetContainersStatus
         $this->applications = $this->applications->filter(function ($value, $key) use ($skip_these_applications) {
             return ! $skip_these_applications->pluck('id')->contains($value->id);
         });
-        if (! $this->containers instanceof Collection) {
+        if ($this->containers === null) {
             ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
         }
 
         if (is_null($this->containers)) {
-            return null;
+            return;
         }
 
         if ($this->containerReplicates) {
-            foreach ($this->containerReplicates as $containerReplicate) {
-                $name = data_get($containerReplicate, 'Name');
-                $this->containers = $this->containers->map(function ($container) use ($name, $containerReplicate) {
+            foreach ($this->containerReplicates as $containerReplica) {
+                $name = data_get($containerReplica, 'Name');
+                $this->containers = $this->containers->map(function ($container) use ($name, $containerReplica) {
                     if (data_get($container, 'Spec.Name') === $name) {
-                        $replicas = data_get($containerReplicate, 'Replicas');
+                        $replicas = data_get($containerReplica, 'Replicas');
                         $running = str($replicas)->explode('/')[0];
                         $total = str($replicas)->explode('/')[1];
                         if ($running === $total) {
@@ -102,7 +102,7 @@ class GetContainersStatus
                     if (str($applicationId)->contains('-')) {
                         $applicationId = str($applicationId)->before('-');
                     }
-                    $preview = ApplicationPreview::query()->where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
+                    $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
                     if ($preview) {
                         $foundApplicationPreviews[] = $preview->id;
                         $statusFromDb = $preview->status;
@@ -136,7 +136,7 @@ class GetContainersStatus
                     if ($type === 'service') {
                         $database_id = data_get($labels, 'coolify.service.subId');
                         if ($database_id) {
-                            $service_db = ServiceDatabase::query()->where('id', $database_id)->first();
+                            $service_db = ServiceDatabase::where('id', $database_id)->first();
                             if ($service_db) {
                                 $uuid = data_get($service_db, 'service.uuid');
                                 if ($uuid) {
@@ -145,9 +145,9 @@ class GetContainersStatus
                                         $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                             if ($this->server->isSwarm()) {
                                                 return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                            } else {
+                                                return data_get($value, 'Name') === "/$uuid-proxy";
                                             }
-
-                                            return data_get($value, 'Name') === "/$uuid-proxy";
                                         })->first();
                                         if (! $foundTcpProxy) {
                                             StartDatabaseProxy::run($service_db);
@@ -173,9 +173,9 @@ class GetContainersStatus
                                 $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                     if ($this->server->isSwarm()) {
                                         return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                    } else {
+                                        return data_get($value, 'Name') === "/$uuid-proxy";
                                     }
-
-                                    return data_get($value, 'Name') === "/$uuid-proxy";
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
@@ -223,14 +223,16 @@ class GetContainersStatus
             foreach ($apps as $app) {
                 if (in_array("$app->id-$app->name", $foundServices)) {
                     continue;
+                } else {
+                    $exitedServices->push($app);
                 }
-                $exitedServices->push($app);
             }
             foreach ($dbs as $db) {
                 if (in_array("$db->id-$db->name", $foundServices)) {
                     continue;
+                } else {
+                    $exitedServices->push($db);
                 }
-                $exitedServices->push($db);
             }
         }
         $exitedServices = $exitedServices->unique('uuid');
@@ -241,11 +243,17 @@ class GetContainersStatus
             $name = data_get($exitedService, 'name');
             $fqdn = data_get($exitedService, 'fqdn');
             if ($name) {
-                $containerName = $fqdn ? "$name, available at $fqdn" : $name;
-            } elseif ($fqdn) {
-                $containerName = $fqdn;
+                if ($fqdn) {
+                    $containerName = "$name, available at $fqdn";
+                } else {
+                    $containerName = $name;
+                }
             } else {
-                $containerName = null;
+                if ($fqdn) {
+                    $containerName = $fqdn;
+                } else {
+                    $containerName = null;
+                }
             }
             $projectUuid = data_get($service, 'environment.project.uuid');
             $serviceUuid = data_get($service, 'uuid');
@@ -261,8 +269,8 @@ class GetContainersStatus
         }
 
         $notRunningApplications = $this->applications->pluck('id')->diff($foundApplications);
-        foreach ($notRunningApplications as $notRunningApplication) {
-            $application = $this->applications->where('id', $notRunningApplication)->first();
+        foreach ($notRunningApplications as $applicationId) {
+            $application = $this->applications->where('id', $applicationId)->first();
             if (str($application->status)->startsWith('exited')) {
                 continue;
             }
@@ -286,8 +294,8 @@ class GetContainersStatus
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
         $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
-        foreach ($notRunningApplicationPreviews as $notRunningApplicationPreview) {
-            $preview = $previews->where('id', $notRunningApplicationPreview)->first();
+        foreach ($notRunningApplicationPreviews as $previewId) {
+            $preview = $previews->where('id', $previewId)->first();
             if (str($preview->status)->startsWith('exited')) {
                 continue;
             }
@@ -311,21 +319,21 @@ class GetContainersStatus
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
         $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
-        foreach ($notRunningDatabases as $notRunningDatabase) {
-            $notRunningDatabase = $databases->where('id', $notRunningDatabase)->first();
-            if (str($notRunningDatabase->status)->startsWith('exited')) {
+        foreach ($notRunningDatabases as $database) {
+            $database = $databases->where('id', $database)->first();
+            if (str($database->status)->startsWith('exited')) {
                 continue;
             }
-            $notRunningDatabase->update(['status' => 'exited']);
+            $database->update(['status' => 'exited']);
 
-            $name = data_get($notRunningDatabase, 'name');
-            $fqdn = data_get($notRunningDatabase, 'fqdn');
+            $name = data_get($database, 'name');
+            $fqdn = data_get($database, 'fqdn');
 
             $containerName = $name;
 
-            $projectUuid = data_get($notRunningDatabase, 'environment.project.uuid');
-            $environmentName = data_get($notRunningDatabase, 'environment.name');
-            $databaseUuid = data_get($notRunningDatabase, 'uuid');
+            $projectUuid = data_get($database, 'environment.project.uuid');
+            $environmentName = data_get($database, 'environment.name');
+            $databaseUuid = data_get($database, 'uuid');
 
             if ($projectUuid && $databaseUuid && $environmentName) {
                 $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/database/'.$databaseUuid;
@@ -334,7 +342,5 @@ class GetContainersStatus
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
-
-        return null;
     }
 }

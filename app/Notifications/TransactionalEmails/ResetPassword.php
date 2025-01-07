@@ -3,7 +3,6 @@
 namespace App\Notifications\TransactionalEmails;
 
 use App\Models\InstanceSettings;
-use Exception;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -37,7 +36,7 @@ class ResetPassword extends Notification
     {
         $type = set_transanctional_email_settings();
         if (! $type) {
-            throw new Exception('No email settings found.');
+            throw new \Exception('No email settings found.');
         }
 
         return ['mail'];
@@ -54,11 +53,11 @@ class ResetPassword extends Notification
 
     protected function buildMailMessage($url)
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject('Coolify: Reset Password');
-        $mailMessage->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
+        $mail = new MailMessage;
+        $mail->subject('Coolify: Reset Password');
+        $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     protected function resetUrl($notifiable)

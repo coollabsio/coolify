@@ -23,18 +23,18 @@ class StatusChanged extends CustomEmailNotification
 
     public ?string $fqdn;
 
-    public function __construct(public Application $application)
+    public function __construct(public Application $resource)
     {
         $this->onQueue('high');
-        $this->resource_name = data_get($application, 'name');
-        $this->project_uuid = data_get($application, 'environment.project.uuid');
-        $this->environment_uuid = data_get($application, 'environment.uuid');
-        $this->environment_name = data_get($application, 'environment.name');
-        $this->fqdn = data_get($application, 'fqdn', null);
+        $this->resource_name = data_get($resource, 'name');
+        $this->project_uuid = data_get($resource, 'environment.project.uuid');
+        $this->environment_uuid = data_get($resource, 'environment.uuid');
+        $this->environment_name = data_get($resource, 'environment.name');
+        $this->fqdn = data_get($resource, 'fqdn', null);
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/environments/{$this->environment_uuid}/application/{$this->application->uuid}";
+        $this->resource_url = base_url()."/project/{$this->project_uuid}/environments/{$this->environment_uuid}/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
@@ -44,16 +44,16 @@ class StatusChanged extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
+        $mail = new MailMessage;
         $fqdn = $this->fqdn;
-        $mailMessage->subject("Coolify: {$this->resource_name} has been stopped");
-        $mailMessage->view('emails.application-status-changes', [
+        $mail->subject("Coolify: {$this->resource_name} has been stopped");
+        $mail->view('emails.application-status-changes', [
             'name' => $this->resource_name,
             'fqdn' => $fqdn,
             'resource_url' => $this->resource_url,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage
@@ -103,7 +103,7 @@ class StatusChanged extends CustomEmailNotification
         $title = 'Application stopped';
         $description = "{$this->resource_name} has been stopped";
 
-        $description .= "\n\n**Project:** ".data_get($this->application, 'environment.project.name');
+        $description .= "\n\n**Project:** ".data_get($this->resource, 'environment.project.name');
         $description .= "\n**Environment:** {$this->environment_name}";
         $description .= "\n**Application URL:** {$this->resource_url}";
 

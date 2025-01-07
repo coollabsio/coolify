@@ -4,7 +4,6 @@ namespace App\Actions\CoolifyTask;
 
 use App\Data\CoolifyTaskArgs;
 use App\Jobs\CoolifyTask;
-use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\Models\Activity;
 
 /**
@@ -18,36 +17,36 @@ class PrepareCoolifyTask
 
     protected CoolifyTaskArgs $remoteProcessArgs;
 
-    public function __construct(CoolifyTaskArgs $coolifyTaskArgs)
+    public function __construct(CoolifyTaskArgs $remoteProcessArgs)
     {
-        $this->remoteProcessArgs = $coolifyTaskArgs;
+        $this->remoteProcessArgs = $remoteProcessArgs;
 
-        if ($coolifyTaskArgs->model instanceof Model) {
-            $properties = $coolifyTaskArgs->toArray();
+        if ($remoteProcessArgs->model) {
+            $properties = $remoteProcessArgs->toArray();
             unset($properties['model']);
 
             $this->activity = activity()
                 ->withProperties($properties)
-                ->performedOn($coolifyTaskArgs->model)
-                ->event($coolifyTaskArgs->type)
+                ->performedOn($remoteProcessArgs->model)
+                ->event($remoteProcessArgs->type)
                 ->log('[]');
         } else {
             $this->activity = activity()
-                ->withProperties($coolifyTaskArgs->toArray())
-                ->event($coolifyTaskArgs->type)
+                ->withProperties($remoteProcessArgs->toArray())
+                ->event($remoteProcessArgs->type)
                 ->log('[]');
         }
     }
 
     public function __invoke(): Activity
     {
-        $coolifyTask = new CoolifyTask(
+        $job = new CoolifyTask(
             activity: $this->activity,
             ignore_errors: $this->remoteProcessArgs->ignore_errors,
             call_event_on_finish: $this->remoteProcessArgs->call_event_on_finish,
             call_event_data: $this->remoteProcessArgs->call_event_data,
         );
-        dispatch($coolifyTask);
+        dispatch($job);
         $this->activity->refresh();
 
         return $this->activity;

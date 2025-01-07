@@ -5,7 +5,6 @@ namespace App\Livewire\Server\Proxy;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Throwable;
 
 class DynamicConfigurations extends Component
 {
@@ -33,7 +32,7 @@ class DynamicConfigurations extends Component
     {
         $proxy_path = $this->server->proxyPath();
         $files = instant_remote_process(["mkdir -p $proxy_path/dynamic && ls -1 {$proxy_path}/dynamic"], $this->server);
-        $files = collect(explode("\n", $files))->reject(fn ($file): bool => $file === '' || $file === '0');
+        $files = collect(explode("\n", $files))->filter(fn ($file) => ! empty($file));
         $files = $files->map(fn ($file) => trim($file));
         $files = $files->sort();
         $contents = collect([]);
@@ -53,11 +52,9 @@ class DynamicConfigurations extends Component
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

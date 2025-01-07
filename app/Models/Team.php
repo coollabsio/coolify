@@ -8,7 +8,6 @@ use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
-use Exception;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
@@ -41,6 +40,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     protected $guarded = [];
 
+    protected $casts = [
+        'personal_team' => 'boolean',
+    ];
+
     protected static function booted()
     {
         static::created(function ($team) {
@@ -53,7 +56,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
         static::saving(function ($team) {
             if (auth()->user()?->isMember()) {
-                throw new Exception('You are not allowed to update this team.');
+                throw new \Exception('You are not allowed to update this team.');
             }
         });
 
@@ -92,7 +95,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function serverOverflow()
     {
-        return $this->serverLimit() < $this->servers->count();
+        if ($this->serverLimit() < $this->servers->count()) {
+            return true;
+        }
+
+        return false;
     }
 
     public static function serverLimit()
@@ -100,7 +107,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         if (currentTeam()->id === 0 && isDev()) {
             return 9999999;
         }
-        $team = \App\Models\Team::query()->find(currentTeam()->id);
+        $team = Team::find(currentTeam()->id);
         if (! $team) {
             return 0;
         }
@@ -162,20 +169,12 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         if (isCloud()) {
             return true;
         }
-        if ($this->getNotificationSettings('email')?->isEnabled()) {
-            return true;
-        }
-        if ($this->getNotificationSettings('discord')?->isEnabled()) {
-            return true;
-        }
-        if ($this->getNotificationSettings('slack')?->isEnabled()) {
-            return true;
-        }
-        if ($this->getNotificationSettings('telegram')?->isEnabled()) {
-            return true;
-        }
 
-        return (bool) $this->getNotificationSettings('pushover')?->isEnabled();
+        return $this->getNotificationSettings('email')?->isEnabled() ||
+            $this->getNotificationSettings('discord')?->isEnabled() ||
+            $this->getNotificationSettings('slack')?->isEnabled() ||
+            $this->getNotificationSettings('telegram')?->isEnabled() ||
+            $this->getNotificationSettings('pushover')?->isEnabled();
     }
 
     public function subscriptionEnded()
@@ -223,7 +222,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function isEmpty()
     {
-        return $this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0;
+        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
+            return true;
+        }
+
+        return false;
     }
 
     public function projects()
@@ -278,12 +281,5 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function pushoverNotificationSettings()
     {
         return $this->hasOne(PushoverNotificationSettings::class);
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'personal_team' => 'boolean',
-        ];
     }
 }

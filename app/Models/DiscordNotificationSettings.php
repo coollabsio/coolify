@@ -30,6 +30,23 @@ class DiscordNotificationSettings extends Model
         'server_unreachable_discord_notifications',
     ];
 
+    protected $casts = [
+        'discord_enabled' => 'boolean',
+        'discord_webhook_url' => 'encrypted',
+
+        'deployment_success_discord_notifications' => 'boolean',
+        'deployment_failure_discord_notifications' => 'boolean',
+        'status_change_discord_notifications' => 'boolean',
+        'backup_success_discord_notifications' => 'boolean',
+        'backup_failure_discord_notifications' => 'boolean',
+        'scheduled_task_success_discord_notifications' => 'boolean',
+        'scheduled_task_failure_discord_notifications' => 'boolean',
+        'docker_cleanup_discord_notifications' => 'boolean',
+        'server_disk_usage_discord_notifications' => 'boolean',
+        'server_reachable_discord_notifications' => 'boolean',
+        'server_unreachable_discord_notifications' => 'boolean',
+    ];
+
     public function team()
     {
         return $this->belongsTo(Team::class);
@@ -38,25 +55,5 @@ class DiscordNotificationSettings extends Model
     public function isEnabled()
     {
         return $this->discord_enabled;
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'discord_enabled' => 'boolean',
-            'discord_webhook_url' => 'encrypted',
-
-            'deployment_success_discord_notifications' => 'boolean',
-            'deployment_failure_discord_notifications' => 'boolean',
-            'status_change_discord_notifications' => 'boolean',
-            'backup_success_discord_notifications' => 'boolean',
-            'backup_failure_discord_notifications' => 'boolean',
-            'scheduled_task_success_discord_notifications' => 'boolean',
-            'scheduled_task_failure_discord_notifications' => 'boolean',
-            'docker_cleanup_discord_notifications' => 'boolean',
-            'server_disk_usage_discord_notifications' => 'boolean',
-            'server_reachable_discord_notifications' => 'boolean',
-            'server_unreachable_discord_notifications' => 'boolean',
-        ];
     }
 }

@@ -8,11 +8,8 @@ class Webhook extends Model
 {
     protected $guarded = [];
 
-    protected function casts(): array
-    {
-        return [
-            'type' => 'string',
-            'payload' => 'encrypted',
-        ];
-    }
+    protected $casts = [
+        'type' => 'string',
+        'payload' => 'encrypted',
+    ];
 }

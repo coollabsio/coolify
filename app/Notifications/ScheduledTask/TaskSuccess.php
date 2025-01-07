@@ -13,13 +13,13 @@ class TaskSuccess extends CustomEmailNotification
 {
     public ?string $url = null;
 
-    public function __construct(public ScheduledTask $scheduledTask, public string $output)
+    public function __construct(public ScheduledTask $task, public string $output)
     {
         $this->onQueue('high');
-        if ($scheduledTask->application) {
-            $this->url = $scheduledTask->application->taskLink($scheduledTask->uuid);
-        } elseif ($scheduledTask->service) {
-            $this->url = $scheduledTask->service->taskLink($scheduledTask->uuid);
+        if ($task->application) {
+            $this->url = $task->application->taskLink($task->uuid);
+        } elseif ($task->service) {
+            $this->url = $task->service->taskLink($task->uuid);
         }
     }
 
@@ -30,39 +30,39 @@ class TaskSuccess extends CustomEmailNotification
 
     public function toMail(): MailMessage
     {
-        $mailMessage = new MailMessage;
-        $mailMessage->subject("Coolify: Scheduled task ({$this->scheduledTask->name}) succeeded.");
-        $mailMessage->view('emails.scheduled-task-success', [
-            'task' => $this->scheduledTask,
+        $mail = new MailMessage;
+        $mail->subject("Coolify: Scheduled task ({$this->task->name}) succeeded.");
+        $mail->view('emails.scheduled-task-success', [
+            'task' => $this->task,
             'url' => $this->url,
             'output' => $this->output,
         ]);
 
-        return $mailMessage;
+        return $mail;
     }
 
     public function toDiscord(): DiscordMessage
     {
-        $discordMessage = new DiscordMessage(
+        $message = new DiscordMessage(
             title: ':white_check_mark: Scheduled task succeeded',
-            description: "Scheduled task ({$this->scheduledTask->name}) succeeded.",
+            description: "Scheduled task ({$this->task->name}) succeeded.",
             color: DiscordMessage::successColor(),
         );
 
         if ($this->url) {
-            $discordMessage->addField('Scheduled task', '[Link]('.$this->url.')');
+            $message->addField('Scheduled task', '[Link]('.$this->url.')');
         }
 
-        return $discordMessage;
+        return $message;
     }
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Scheduled task ({$this->scheduledTask->name}) succeeded.";
+        $message = "Coolify: Scheduled task ({$this->task->name}) succeeded.";
         if ($this->url) {
             $buttons[] = [
                 'text' => 'Open task in Coolify',
-                'url' => $this->url,
+                'url' => (string) $this->url,
             ];
         }
 
@@ -73,12 +73,12 @@ class TaskSuccess extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        $message = "Coolify: Scheduled task ({$this->scheduledTask->name}) succeeded.";
+        $message = "Coolify: Scheduled task ({$this->task->name}) succeeded.";
         $buttons = [];
         if ($this->url) {
             $buttons[] = [
                 'text' => 'Open task in Coolify',
-                'url' => $this->url,
+                'url' => (string) $this->url,
             ];
         }
 
@@ -93,7 +93,7 @@ class TaskSuccess extends CustomEmailNotification
     public function toSlack(): SlackMessage
     {
         $title = 'Scheduled task succeeded';
-        $description = "Scheduled task ({$this->scheduledTask->name}) succeeded.";
+        $description = "Scheduled task ({$this->task->name}) succeeded.";
 
         if ($this->url) {
             $description .= "\n\n**Task URL:** {$this->url}";

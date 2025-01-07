@@ -6,11 +6,9 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
 use App\Models\Server;
-use Exception;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 
 class Show extends Component
 {
@@ -97,11 +95,9 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     #[Computed]
@@ -118,12 +114,12 @@ class Show extends Component
         if ($toModel) {
             $this->validate();
 
-            if (Server::query()->where('team_id', currentTeam()->id)
+            if (Server::where('team_id', currentTeam()->id)
                 ->where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
                 ->exists()) {
                 $this->ip = $this->server->ip;
-                throw new Exception('This IP/Domain is already in use by another server in your team.');
+                throw new \Exception('This IP/Domain is already in use by another server in your team.');
             }
 
             $this->server->name = $this->name;
@@ -149,9 +145,10 @@ class Show extends Component
 
             if (! validate_timezone($this->serverTimezone)) {
                 $this->serverTimezone = config('app.timezone');
-                throw new Exception('Invalid timezone.');
+                throw new \Exception('Invalid timezone.');
+            } else {
+                $this->server->settings->server_timezone = $this->serverTimezone;
             }
-            $this->server->settings->server_timezone = $this->serverTimezone;
 
             $this->server->settings->save();
         } else {
@@ -192,11 +189,9 @@ class Show extends Component
             $this->validationLogs = $this->server->validation_logs = null;
             $this->server->save();
             $this->dispatch('init', $install);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function checkLocalhostConnection()
@@ -253,11 +248,9 @@ class Show extends Component
         try {
             $this->server->settings->generateSentinelToken();
             $this->dispatch('success', 'Token regenerated & Sentinel restarted.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function instantSave()
@@ -270,11 +263,9 @@ class Show extends Component
         try {
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

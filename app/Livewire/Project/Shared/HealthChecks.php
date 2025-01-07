@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Shared;
 
 use Livewire\Component;
-use Throwable;
 
 class HealthChecks extends Component
 {
@@ -38,11 +37,9 @@ class HealthChecks extends Component
             $this->validate();
             $this->resource->save();
             $this->dispatch('success', 'Health check updated.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

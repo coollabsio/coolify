@@ -5,7 +5,6 @@ namespace App\Livewire\Server;
 use App\Actions\Server\ConfigureCloudflared;
 use App\Models\Server;
 use Livewire\Component;
-use Throwable;
 
 class ConfigureCloudflareTunnels extends Component
 {
@@ -23,11 +22,9 @@ class ConfigureCloudflareTunnels extends Component
             $server->settings->save();
             $this->dispatch('success', 'Cloudflare Tunnels configured successfully.');
             $this->dispatch('refreshServerShow');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
@@ -45,11 +42,9 @@ class ConfigureCloudflareTunnels extends Component
             $server->save();
             $server->settings->save();
             $this->dispatch('warning', 'Cloudflare Tunnels configuration started.');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

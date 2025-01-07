@@ -6,7 +6,6 @@ use App\Models\Environment;
 use App\Models\Project;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class Show extends Component
@@ -22,19 +21,17 @@ class Show extends Component
     public function mount(string $project_uuid)
     {
         try {
-            $this->project = Project::query()->where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
-        } catch (Throwable $e) {
+            $this->project = Project::where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()
     {
         try {
             $this->validate();
-            $environment = Environment::query()->create([
+            $environment = Environment::create([
                 'name' => $this->name,
                 'project_id' => $this->project->id,
                 'uuid' => (string) new Cuid2,
@@ -44,11 +41,9 @@ class Show extends Component
                 'project_uuid' => $this->project->uuid,
                 'environment_uuid' => $environment->uuid,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             handleError($e, $this);
         }
-
-        return null;
     }
 
     public function navigateToEnvironment($projectUuid, $environmentUuid)

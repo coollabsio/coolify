@@ -4,10 +4,6 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
-use App\Models\ServiceDatabase;
-use DateTime;
-use DateTimeZone;
-use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -37,7 +33,7 @@ class BackupExecutions extends Component
 
     public function cleanupFailed()
     {
-        if ($this->backup instanceof ScheduledDatabaseBackup) {
+        if ($this->backup) {
             $this->backup->executions()->where('status', 'failed')->delete();
             $this->refreshBackupExecutions();
             $this->dispatch('success', 'Failed backups cleaned up.');
@@ -46,10 +42,12 @@ class BackupExecutions extends Component
 
     public function deleteBackup($executionId, $password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation') && ! Hash::check($password, Auth::user()->password)) {
-            $this->addError('password', 'The provided password is incorrect.');
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+                return;
+            }
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -59,7 +57,7 @@ class BackupExecutions extends Component
             return;
         }
 
-        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class) {
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
         } else {
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
@@ -85,15 +83,15 @@ class BackupExecutions extends Component
 
     public function refreshBackupExecutions(): void
     {
-        if ($this->backup instanceof ScheduledDatabaseBackup) {
+        if ($this->backup) {
             $this->executions = $this->backup->executions()->get();
         }
     }
 
-    public function mount(ScheduledDatabaseBackup $scheduledDatabaseBackup)
+    public function mount(ScheduledDatabaseBackup $backup)
     {
-        $this->backup = $scheduledDatabaseBackup;
-        $this->database = $scheduledDatabaseBackup->database;
+        $this->backup = $backup;
+        $this->database = $backup->database;
         $this->refreshBackupExecutions();
     }
 
@@ -102,7 +100,7 @@ class BackupExecutions extends Component
         if ($this->database) {
             $server = null;
 
-            if ($this->database instanceof ServiceDatabase) {
+            if ($this->database instanceof \App\Models\ServiceDatabase) {
                 $server = $this->database->service->destination->server;
             } elseif ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;
@@ -128,11 +126,11 @@ class BackupExecutions extends Component
     public function formatDateInServerTimezone($date)
     {
         $serverTimezone = $this->getServerTimezone();
-        $dateObj = new DateTime($date);
+        $dateObj = new \DateTime($date);
         try {
-            $dateObj->setTimezone(new DateTimeZone($serverTimezone));
-        } catch (Exception) {
-            $dateObj->setTimezone(new DateTimeZone('UTC'));
+            $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
+        } catch (\Exception) {
+            $dateObj->setTimezone(new \DateTimeZone('UTC'));
         }
 
         return $dateObj->format('Y-m-d H:i:s T');

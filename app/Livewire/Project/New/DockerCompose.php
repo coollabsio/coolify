@@ -7,11 +7,9 @@ use App\Models\Project;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Exception;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
-use Throwable;
 
 class DockerCompose extends Component
 {
@@ -60,20 +58,20 @@ class DockerCompose extends Component
                 return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
             }
 
-            $project = Project::query()->where('uuid', $this->parameters['project_uuid'])->first();
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
             $destination_uuid = $this->query['destination'];
-            $destination = StandaloneDocker::query()->where('uuid', $destination_uuid)->first();
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (! $destination) {
-                $destination = SwarmDocker::query()->where('uuid', $destination_uuid)->first();
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
             if (! $destination) {
-                throw new Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
 
-            $service = Service::query()->create([
+            $service = Service::create([
                 'name' => 'service'.Str::random(10),
                 'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
@@ -84,7 +82,7 @@ class DockerCompose extends Component
 
             $variables = parseEnvFormatToArray($this->envFile);
             foreach ($variables as $key => $variable) {
-                EnvironmentVariable::query()->create([
+                EnvironmentVariable::create([
                     'key' => $key,
                     'value' => $variable,
                     'is_build_time' => false,
@@ -102,7 +100,7 @@ class DockerCompose extends Component
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

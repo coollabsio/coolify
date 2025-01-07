@@ -6,11 +6,8 @@ use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Support\Collection;
-use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use RuntimeException;
-use Throwable;
 
 class ExecuteContainerCommand extends Component
 {
@@ -46,7 +43,7 @@ class ExecuteContainerCommand extends Component
         $this->servers = collect();
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
-            $this->resource = Application::query()->where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+            $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
             if ($this->resource->destination->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->destination->server);
             }
@@ -69,14 +66,14 @@ class ExecuteContainerCommand extends Component
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
-            $this->resource = Service::query()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+            $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'server_uuid')) {
             $this->type = 'server';
-            $this->resource = Server::query()->where('uuid', $this->parameters['server_uuid'])->firstOrFail();
+            $this->resource = Server::where('uuid', $this->parameters['server_uuid'])->firstOrFail();
             $this->server = $this->resource;
         }
     }
@@ -149,7 +146,7 @@ class ExecuteContainerCommand extends Component
     {
         try {
             if ($this->server->isForceDisabled()) {
-                throw new RuntimeException('Server is disabled.');
+                throw new \RuntimeException('Server is disabled.');
             }
             $this->dispatch(
                 'send-terminal-command',
@@ -157,11 +154,9 @@ class ExecuteContainerCommand extends Component
                 data_get($this->server, 'name'),
                 data_get($this->server, 'uuid')
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     #[On('connectToContainer')]
@@ -170,28 +165,28 @@ class ExecuteContainerCommand extends Component
         if ($this->selected_container === 'default') {
             $this->dispatch('error', 'Please select a container.');
 
-            return null;
+            return;
         }
         try {
             // Validate container name format
             if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/', $this->selected_container)) {
-                throw new InvalidArgumentException('Invalid container name format');
+                throw new \InvalidArgumentException('Invalid container name format');
             }
 
             // Verify container exists in our allowed list
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
             if (is_null($container)) {
-                throw new RuntimeException('Container not found.');
+                throw new \RuntimeException('Container not found.');
             }
 
             // Verify server ownership and status
             $server = data_get($container, 'server');
             if (! $server || ! $server instanceof Server) {
-                throw new RuntimeException('Invalid server configuration.');
+                throw new \RuntimeException('Invalid server configuration.');
             }
 
             if ($server->isForceDisabled()) {
-                throw new RuntimeException('Server is disabled.');
+                throw new \RuntimeException('Server is disabled.');
             }
 
             // Additional ownership verification based on resource type
@@ -199,11 +194,11 @@ class ExecuteContainerCommand extends Component
                 'application' => $this->resource->destination->server,
                 'database' => $this->resource->destination->server,
                 'service' => $this->resource->server,
-                default => throw new RuntimeException('Invalid resource type.')
+                default => throw new \RuntimeException('Invalid resource type.')
             };
 
             if ($server->id !== $resourceServer->id && ! $this->resource->additional_servers->contains('id', $server->id)) {
-                throw new RuntimeException('Server ownership verification failed.');
+                throw new \RuntimeException('Server ownership verification failed.');
             }
 
             $this->dispatch(
@@ -212,11 +207,9 @@ class ExecuteContainerCommand extends Component
                 data_get($container, 'container.Names'),
                 data_get($container, 'server.uuid')
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function render()

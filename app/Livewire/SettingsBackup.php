@@ -6,9 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
-use Exception;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -46,40 +44,39 @@ class SettingsBackup extends Component
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
-        }
-        $settings = instanceSettings();
-        $this->database = StandalonePostgresql::whereName('coolify-db')->first();
-        $s3s = S3Storage::whereTeamId(0)->get() ?? [];
-        if ($this->database instanceof StandalonePostgresql) {
-            $this->uuid = $this->database->uuid;
-            $this->name = $this->database->name;
-            $this->description = $this->database->description;
-            $this->postgres_user = $this->database->postgres_user;
-            $this->postgres_password = $this->database->postgres_password;
+        } else {
+            $settings = instanceSettings();
+            $this->database = StandalonePostgresql::whereName('coolify-db')->first();
+            $s3s = S3Storage::whereTeamId(0)->get() ?? [];
+            if ($this->database) {
+                $this->uuid = $this->database->uuid;
+                $this->name = $this->database->name;
+                $this->description = $this->database->description;
+                $this->postgres_user = $this->database->postgres_user;
+                $this->postgres_password = $this->database->postgres_password;
 
-            if ($this->database->status !== 'running') {
-                $this->database->status = 'running';
-                $this->database->save();
+                if ($this->database->status !== 'running') {
+                    $this->database->status = 'running';
+                    $this->database->save();
+                }
+                $this->backup = $this->database->scheduledBackups->first();
+                $this->executions = $this->backup->executions;
             }
-            $this->backup = $this->database->scheduledBackups->first();
-            $this->executions = $this->backup->executions;
+            $this->settings = $settings;
+            $this->s3s = $s3s;
         }
-        $this->settings = $settings;
-        $this->s3s = $s3s;
-
-        return null;
     }
 
     public function addCoolifyDatabase()
     {
         try {
-            $server = Server::query()->findOrFail(0);
+            $server = Server::findOrFail(0);
             $out = instant_remote_process(['docker inspect coolify-db'], $server);
             $envs = format_docker_envs_to_json($out);
             $postgres_password = $envs['POSTGRES_PASSWORD'];
             $postgres_user = $envs['POSTGRES_USER'];
             $postgres_db = $envs['POSTGRES_DB'];
-            $this->database = StandalonePostgresql::query()->create([
+            $this->database = StandalonePostgresql::create([
                 'id' => 0,
                 'name' => 'coolify-db',
                 'description' => 'Coolify database',
@@ -87,16 +84,16 @@ class SettingsBackup extends Component
                 'postgres_password' => $postgres_password,
                 'postgres_db' => $postgres_db,
                 'status' => 'running',
-                'destination_type' => StandaloneDocker::class,
+                'destination_type' => \App\Models\StandaloneDocker::class,
                 'destination_id' => 0,
             ]);
-            $this->backup = ScheduledDatabaseBackup::query()->create([
+            $this->backup = ScheduledDatabaseBackup::create([
                 'id' => 0,
                 'enabled' => true,
                 'save_s3' => false,
                 'frequency' => '0 0 * * *',
                 'database_id' => $this->database->id,
-                'database_type' => StandalonePostgresql::class,
+                'database_type' => \App\Models\StandalonePostgresql::class,
                 'team_id' => currentTeam()->id,
             ]);
             $this->database->refresh();
@@ -110,11 +107,9 @@ class SettingsBackup extends Component
             $this->postgres_password = $this->database->postgres_password;
             $this->executions = $this->backup->executions;
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e, $this);
         }
-
-        return null;
     }
 
     public function submit()

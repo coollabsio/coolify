@@ -11,7 +11,6 @@ use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 use Stringable;
@@ -295,7 +294,7 @@ class ServersController extends Controller
 
             return response()->json(serializeApiResponse($domains));
         }
-        $projects = Project::query()->where('team_id', $teamId)->get();
+        $projects = Project::where('team_id', $teamId)->get();
         $domains = collect();
         $applications = $projects->pluck('applications')->flatten();
         $settings = instanceSettings();
@@ -306,8 +305,8 @@ class ServersController extends Controller
                     $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
 
                     return str(str($f[0])->explode(':')[0]);
-                })->filter(function (Stringable $stringable) {
-                    return $stringable->isNotEmpty();
+                })->filter(function (Stringable $fqdn) {
+                    return $fqdn->isNotEmpty();
                 });
 
                 if ($ip === 'host.docker.internal') {
@@ -342,13 +341,13 @@ class ServersController extends Controller
             foreach ($services as $service) {
                 $service_applications = $service->applications;
                 if ($service_applications->count() > 0) {
-                    foreach ($service_applications as $service_application) {
-                        $fqdn = str($service_application->fqdn)->explode(',')->map(function ($fqdn) {
+                    foreach ($service_applications as $application) {
+                        $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
                             $f = str($fqdn)->replace('http://', '')->replace('https://', '')->explode('/');
 
                             return str(str($f[0])->explode(':')[0]);
-                        })->filter(function (Stringable $stringable) {
-                            return $stringable->isNotEmpty();
+                        })->filter(function (Stringable $fqdn) {
+                            return $fqdn->isNotEmpty();
                         });
                         if ($ip === 'host.docker.internal') {
                             if ($settings->public_ipv4) {
@@ -460,7 +459,7 @@ class ServersController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof JsonResponse) {
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -476,10 +475,12 @@ class ServersController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || $extraFields !== []) {
+        if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
-            foreach ($extraFields as $extraField) {
-                $errors->add($extraField, 'This field is not allowed.');
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
             }
 
             return response()->json([
@@ -615,7 +616,7 @@ class ServersController extends Controller
         }
 
         $return = validateIncomingRequest($request);
-        if ($return instanceof JsonResponse) {
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
         $validator = customApiValidator($request->all(), [
@@ -631,10 +632,12 @@ class ServersController extends Controller
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || $extraFields !== []) {
+        if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
-            foreach ($extraFields as $extraField) {
-                $errors->add($extraField, 'This field is not allowed.');
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
             }
 
             return response()->json([
