@@ -199,7 +199,7 @@ EOD;
                     if ($this->dumpAll) {
                         $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mariadb -u root -p\$MARIADB_ROOT_PASSWORD";
                     } else {
-                        $restoreCommand = "mariadb -u \$MARIADB_USER -p\$MARIADB_PASSWORD \$MARIADB_DATABASE < {$tmpPath}";
+                        $restoreCommand .= " < {$tmpPath}";
                     }
                     break;
                 case \App\Models\StandaloneMysql::class:
@@ -207,7 +207,7 @@ EOD;
                     if ($this->dumpAll) {
                         $restoreCommand .= " && (gunzip -cf {$tmpPath} 2>/dev/null || cat {$tmpPath}) | mysql -u root -p\$MYSQL_ROOT_PASSWORD";
                     } else {
-                        $restoreCommand = "mysql -u \$MYSQL_USER -p\$MYSQL_PASSWORD \$MYSQL_DATABASE < {$tmpPath}";
+                        $restoreCommand .= " < {$tmpPath}";
                     }
                     break;
                 case \App\Models\StandalonePostgresql::class:
