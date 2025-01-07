@@ -6,7 +6,7 @@
         <p class="mt-2 text-lg leading-7 text-neutral-300">There has been an error with the following error message:</p>
         @if ($exception->getMessage() !== '')
             <div class="mt-6 text-sm text-red-500">
-                {!! Str::sanitize($exception->getMessage()) !!}
+                {!! Purify::clean($exception->getMessage()) !!}
             </div>
         @endif
         <div class="flex items-center mt-10 gap-6">
