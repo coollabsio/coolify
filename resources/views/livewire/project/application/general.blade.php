@@ -284,7 +284,7 @@
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
                     <x-forms.checkbox label="Readonly labels"
-                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can alway reset the labels to the coolify defaults manually)."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
             @endif
@@ -315,7 +315,7 @@
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
                     <x-forms.checkbox label="Readonly labels"
-                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can alway reset the labels to the coolify defaults manually)."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"

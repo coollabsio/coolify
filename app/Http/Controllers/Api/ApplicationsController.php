@@ -863,7 +863,7 @@ class ApplicationsController extends Controller
                 $application->settings->save();
             }
             $application->refresh();
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -964,7 +964,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -1061,7 +1061,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -1150,7 +1150,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -1214,7 +1214,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }

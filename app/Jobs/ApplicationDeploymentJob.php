@@ -1683,7 +1683,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
-            if (! $this->application->settings->is_container_label_readonly_enabled) {
+            if ($this->application->settings->is_container_label_readonly_enabled) {
                 $labels = collect(generateLabelsApplication($this->application, $this->preview));
             }
         }
