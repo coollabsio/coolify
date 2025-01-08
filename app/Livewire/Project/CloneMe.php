@@ -108,7 +108,14 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
+                $applicationSettings = $application->settings;
+
                 $uuid = (string) new Cuid2;
+                $url = $application->fqdn;
+                if ($this->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
+                    $url = generateFqdn($this->server, $uuid);
+                }
+
                 $newApplication = $application->replicate([
                     'id',
                     'created_at',
@@ -117,21 +124,20 @@ class CloneMe extends Component
                     'additional_networks_count',
                 ])->fill([
                     'uuid' => $uuid,
-                    'fqdn' => generateFqdn($this->server, $uuid), // this also needs a condition
+                    'fqdn' => $url,
                     'status' => 'exited',
                     'environment_id' => $environment->id,
                     'destination_id' => $this->selectedDestination,
                 ]);
                 $newApplication->save();
 
-                if ($newApplication->destination->server->proxyType() !== 'NONE' || ! $newApplication->application_settings->is_container_label_readonly_enabled) { // fix after switching this logic up
+                if ($newApplication->destination->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
                     $customLabels = str(implode('|coolify|', generateLabelsApplication($newApplication)))->replace('|coolify|', "\n");
                     $newApplication->custom_labels = base64_encode($customLabels);
                     $newApplication->save();
                 }
 
                 $newApplication->settings()->delete();
-                $applicationSettings = $application->settings;
                 if ($applicationSettings) {
                     $newApplicationSettings = $applicationSettings->replicate([
                         'id',
