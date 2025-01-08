@@ -2270,6 +2270,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             if ($this->use_build_server) {
                 $this->execute_remote_command(
+                    ["{$this->coolify_variables} docker compose pull", 'hidden' => true],
                     ["{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --build -d", 'hidden' => true],
                 );
             } else {
