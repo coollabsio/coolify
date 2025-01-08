@@ -72,8 +72,6 @@ class ResourceOperations extends Component
                     'id',
                     'created_at',
                     'updated_at',
-                    'additional_servers_count', // not needed because it only is computed for the application
-                    'additional_networks_count',
                 ])->fill([
                     'resourceable_id' => $new_resource->id,
                     'resourceable_type' => $new_resource->getMorphClass(),
@@ -90,8 +88,6 @@ class ResourceOperations extends Component
                     'id',
                     'created_at',
                     'updated_at',
-                    'additional_servers_count',
-                    'additional_networks_count',
                 ])->fill([
                     'name' => $volumeName,
                     'resource_id' => $new_resource->id,
@@ -120,8 +116,6 @@ class ResourceOperations extends Component
                 'id',
                 'created_at',
                 'updated_at',
-                'additional_servers_count',
-                'additional_networks_count',
             ])->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
@@ -148,8 +142,6 @@ class ResourceOperations extends Component
                     'id',
                     'created_at',
                     'updated_at',
-                    'additional_servers_count',
-                    'additional_networks_count',
                 ])->fill($payload);
                 $newEnvironmentVariable->save();
             }
@@ -166,8 +158,6 @@ class ResourceOperations extends Component
                 'id',
                 'created_at',
                 'updated_at',
-                'additional_servers_count',
-                'additional_networks_count',
             ])->fill([
                 'uuid' => $uuid,
                 'name' => $this->resource->name.'-clone-'.$uuid,
