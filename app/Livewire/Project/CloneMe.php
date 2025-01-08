@@ -117,14 +117,20 @@ class CloneMe extends Component
                     'additional_networks_count',
                 ])->fill([
                     'uuid' => $uuid,
-                    // 'fqdn' => generateFqdn($this->server, $uuid), - Proxy labels are also duplicated, so can we duplicate the domain as well?
+                    'fqdn' => generateFqdn($this->server, $uuid), // this also needs a condition
                     'status' => 'exited',
                     'environment_id' => $environment->id,
                     'destination_id' => $this->selectedDestination,
                 ]);
                 $newApplication->save();
 
-                $newApplication->settings()->delete(); // first delete the automatically created settings and fill in the old ones (to properly clone and avoid duplicates)
+                if ($newApplication->destination->server->proxyType() !== 'NONE' || ! $newApplication->application_settings->is_container_label_readonly_enabled) { // fix after switching this logic up
+                    $customLabels = str(implode('|coolify|', generateLabelsApplication($newApplication)))->replace('|coolify|', "\n");
+                    $newApplication->custom_labels = base64_encode($customLabels);
+                    $newApplication->save();
+                }
+
+                $newApplication->settings()->delete();
                 $applicationSettings = $application->settings;
                 if ($applicationSettings) {
                     $newApplicationSettings = $applicationSettings->replicate([
@@ -221,6 +227,65 @@ class CloneMe extends Component
                     'destination_id' => $this->selectedDestination,
                 ]);
                 $newDatabase->save();
+
+                $tags = $database->tags;
+                foreach ($tags as $tag) {
+                    $newDatabase->tags()->attach($tag->id);
+                }
+
+                $newDatabase->persistentStorages()->delete();
+                $persistentVolumes = $database->persistentStorages()->get();
+                foreach ($persistentVolumes as $volume) {
+                    $originalName = $volume->name;
+                    $newName = '';
+
+                    if (str_starts_with($originalName, 'postgres-data-')) {
+                        $newName = 'postgres-data-'.$newDatabase->uuid;
+                    } else {
+                        $newName = str($originalName)
+                            ->replaceFirst($database->uuid, $newDatabase->uuid)
+                            ->toString();
+                    }
+
+                    $newPersistentVolume = $volume->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'name' => $newName,
+                        'resource_id' => $newDatabase->id,
+                    ]);
+                    $newPersistentVolume->save();
+                }
+
+                $fileStorages = $database->fileStorages()->get();
+                foreach ($fileStorages as $storage) {
+                    $newStorage = $storage->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'resource_id' => $newDatabase->id,
+                    ]);
+                    $newStorage->save();
+                }
+
+                $scheduledBackups = $database->scheduledBackups()->get();
+                foreach ($scheduledBackups as $backup) {
+                    $uuid = (string) new Cuid2;
+                    $newBackup = $backup->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'uuid' => $uuid,
+                        'database_id' => $newDatabase->id,
+                        'database_type' => $newDatabase->getMorphClass(),
+                        'team_id' => currentTeam()->id,
+                    ]);
+                    $newBackup->save();
+                }
+
                 $environmentVaribles = $database->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
                     $payload = [];
@@ -234,6 +299,7 @@ class CloneMe extends Component
                     $newEnvironmentVariable->save();
                 }
             }
+
             foreach ($services as $service) {
                 $uuid = (string) new Cuid2;
                 $newService = $service->replicate([
@@ -246,25 +312,65 @@ class CloneMe extends Component
                     'destination_id' => $this->selectedDestination,
                 ]);
                 $newService->save();
+
+                $tags = $service->tags;
+                foreach ($tags as $tag) {
+                    $newService->tags()->attach($tag->id);
+                }
+
+                $scheduledTasks = $service->scheduled_tasks()->get();
+                foreach ($scheduledTasks as $task) {
+                    $newTask = $task->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'uuid' => (string) new Cuid2,
+                        'service_id' => $newService->id,
+                        'team_id' => currentTeam()->id,
+                    ]);
+                    $newTask->save();
+                }
+
+                $environmentVariables = $service->environment_variables()->get();
+                foreach ($environmentVariables as $environmentVariable) {
+                    $newEnvironmentVariable = $environmentVariable->replicate([
+                        'id',
+                        'created_at',
+                        'updated_at',
+                    ])->fill([
+                        'resourceable_id' => $newService->id,
+                        'resourceable_type' => $newService->getMorphClass(),
+                    ]);
+                    $newEnvironmentVariable->save();
+                }
+
                 foreach ($newService->applications() as $application) {
                     $application->update([
                         'status' => 'exited',
                     ]);
                 }
+
                 foreach ($newService->databases() as $database) {
                     $database->update([
                         'status' => 'exited',
                     ]);
                 }
+
                 $newService->parse();
             }
 
-            return redirect()->route('project.resource.index', [
-                'project_uuid' => $project->uuid,
-                'environment_uuid' => $environment->uuid,
-            ]);
         } catch (\Exception $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
+
+            return;
+        } finally {
+            if (! isset($e)) {
+                return redirect()->route('project.resource.index', [
+                    'project_uuid' => $project->uuid,
+                    'environment_uuid' => $environment->uuid,
+                ]);
+            }
         }
     }
 }
