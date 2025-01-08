@@ -247,6 +247,20 @@ class CloneMe extends Component
 
                     if (str_starts_with($originalName, 'postgres-data-')) {
                         $newName = 'postgres-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'mysql-data-')) {
+                        $newName = 'mysql-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'redis-data-')) {
+                        $newName = 'redis-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
+                        $newName = 'clickhouse-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'mariadb-data-')) {
+                        $newName = 'mariadb-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'mongodb-data-')) {
+                        $newName = 'mongodb-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'keydb-data-')) {
+                        $newName = 'keydb-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
+                        $newName = 'dragonfly-data-'.$newDatabase->uuid;
                     } else {
                         $newName = str($originalName)
                             ->replaceFirst($database->uuid, $newDatabase->uuid)
