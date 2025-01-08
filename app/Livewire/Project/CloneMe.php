@@ -2,6 +2,10 @@
 
 namespace App\Livewire\Project;
 
+use App\Actions\Application\StopApplication;
+use App\Actions\Database\StartDatabase;
+use App\Actions\Database\StopDatabase;
+use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
@@ -34,6 +38,8 @@ class CloneMe extends Component
 
     public string $newName = '';
 
+    public bool $cloneVolumeData = false;
+
     protected $messages = [
         'selectedServer' => 'Please select a server.',
         'selectedDestination' => 'Please select a server & destination.',
@@ -48,6 +54,12 @@ class CloneMe extends Component
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()->servers;
         $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
+    }
+
+    public function toggleVolumeCloning(bool $value)
+    {
+        $this->cloneVolumeData = $value;
+        $this->dispatch('refresh');
     }
 
     public function render()
@@ -192,6 +204,27 @@ class CloneMe extends Component
                         'resource_id' => $newApplication->id,
                     ]);
                     $newPersistentVolume->save();
+
+                    if ($this->cloneVolumeData) {
+                        try {
+                            StopApplication::dispatch($application, false, false);
+                            $sourceVolume = $volume->name;
+                            $targetVolume = $newPersistentVolume->name;
+                            $server = $application->destination->server;
+
+                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+
+                            queue_application_deployment(
+                                deployment_uuid: (string) new Cuid2,
+                                application: $application,
+                                server: $server,
+                                destination: $application->destination,
+                                no_questions_asked: true
+                            );
+                        } catch (\Exception $e) {
+                            logger()->error("Failed to copy volume data for {$volume->name}: ".$e->getMessage());
+                        }
+                    }
                 }
 
                 $fileStorages = $application->fileStorages()->get();
@@ -276,6 +309,22 @@ class CloneMe extends Component
                         'resource_id' => $newDatabase->id,
                     ]);
                     $newPersistentVolume->save();
+
+                    if ($this->cloneVolumeData) {
+                        try {
+                            StopDatabase::dispatch($database);
+                            $sourceVolume = $volume->name;
+                            $targetVolume = $newPersistentVolume->name;
+                            $server = $database->destination->server;
+
+                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+
+                            StartDatabase::dispatch($database);
+                        } catch (\Exception $e) {
+                            // Log error but continue with cloning
+                            logger()->error("Failed to copy volume data for {$volume->name}: ".$e->getMessage());
+                        }
+                    }
                 }
 
                 $fileStorages = $database->fileStorages()->get();
