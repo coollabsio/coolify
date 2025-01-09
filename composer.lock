@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1179b30ddfedc0d7e4d3afaf4994b90c",
+    "content-hash": "ccced2490c39e4f6f1bf9b036bfa3ef0",
     "packages": [
         {
             "name": "3sidedcube/laravel-redoc",
