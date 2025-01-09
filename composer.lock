@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "aa98760c097f486cac380aa701e4317c",
+    "content-hash": "ccced2490c39e4f6f1bf9b036bfa3ef0",
     "packages": [
         {
             "name": "3sidedcube/laravel-redoc",
@@ -928,16 +928,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.336.8",
+            "version": "3.336.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "933da0d1b9b1ac9b37d5e32e127d4581b1aabaf6"
+                "reference": "442039c766a82f06ecfecb0ac2c610d6aaba228d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/933da0d1b9b1ac9b37d5e32e127d4581b1aabaf6",
-                "reference": "933da0d1b9b1ac9b37d5e32e127d4581b1aabaf6",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/442039c766a82f06ecfecb0ac2c610d6aaba228d",
+                "reference": "442039c766a82f06ecfecb0ac2c610d6aaba228d",
                 "shasum": ""
             },
             "require": {
@@ -1020,9 +1020,9 @@
             "support": {
                 "forum": "https://forums.aws.amazon.com/forum.jspa?forumID=80",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.336.8"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.336.11"
             },
-            "time": "2025-01-03T19:06:11+00:00"
+            "time": "2025-01-08T19:06:59+00:00"
         },
         {
             "name": "bacon/bacon-qr-code",
@@ -4754,12 +4754,12 @@
             "version": "3.8.4",
             "source": {
                 "type": "git",
-                "url": "https://github.com/briannesbitt/Carbon.git",
+                "url": "https://github.com/CarbonPHP/carbon.git",
                 "reference": "129700ed449b1f02d70272d2ac802357c8c30c58"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/briannesbitt/Carbon/zipball/129700ed449b1f02d70272d2ac802357c8c30c58",
+                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/129700ed449b1f02d70272d2ac802357c8c30c58",
                 "reference": "129700ed449b1f02d70272d2ac802357c8c30c58",
                 "shasum": ""
             },
@@ -11756,36 +11756,41 @@
         },
         {
             "name": "zircote/swagger-php",
-            "version": "4.11.1",
+            "version": "5.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/zircote/swagger-php.git",
-                "reference": "7df10e8ec47db07c031db317a25bef962b4e5de1"
+                "reference": "2d365300e9bc64b935fca99a8f0bc8fe4314deb4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/zircote/swagger-php/zipball/7df10e8ec47db07c031db317a25bef962b4e5de1",
-                "reference": "7df10e8ec47db07c031db317a25bef962b4e5de1",
+                "url": "https://api.github.com/repos/zircote/swagger-php/zipball/2d365300e9bc64b935fca99a8f0bc8fe4314deb4",
+                "reference": "2d365300e9bc64b935fca99a8f0bc8fe4314deb4",
                 "shasum": ""
             },
             "require": {
                 "ext-json": "*",
-                "php": ">=7.2",
+                "nikic/php-parser": "^4.19 || ^5.0",
+                "php": ">=7.4",
                 "psr/log": "^1.1 || ^2.0 || ^3.0",
                 "symfony/deprecation-contracts": "^2 || ^3",
-                "symfony/finder": ">=2.2",
-                "symfony/yaml": ">=3.3"
+                "symfony/finder": "^5.0 || ^6.0 || ^7.0",
+                "symfony/yaml": "^5.0 || ^6.0 || ^7.0"
+            },
+            "conflict": {
+                "symfony/process": ">=6, <6.4.14"
             },
             "require-dev": {
                 "composer/package-versions-deprecated": "^1.11",
-                "doctrine/annotations": "^1.7 || ^2.0",
-                "friendsofphp/php-cs-fixer": "^2.17 || 3.62.0",
-                "phpstan/phpstan": "^1.6",
-                "phpunit/phpunit": ">=8",
-                "vimeo/psalm": "^4.23"
+                "doctrine/annotations": "^2.0",
+                "friendsofphp/php-cs-fixer": "^3.62.0",
+                "phpstan/phpstan": "^1.6 || ^2.0",
+                "phpunit/phpunit": "^9.0",
+                "rector/rector": "^1.0 || ^2.0",
+                "vimeo/psalm": "^4.30 || ^5.0"
             },
             "suggest": {
-                "doctrine/annotations": "^1.7 || ^2.0"
+                "doctrine/annotations": "^2.0"
             },
             "bin": [
                 "bin/openapi"
@@ -11793,7 +11798,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "4.x-dev"
+                    "dev-master": "5.x-dev"
                 }
             },
             "autoload": {
@@ -11831,9 +11836,9 @@
             ],
             "support": {
                 "issues": "https://github.com/zircote/swagger-php/issues",
-                "source": "https://github.com/zircote/swagger-php/tree/4.11.1"
+                "source": "https://github.com/zircote/swagger-php/tree/5.0.1"
             },
-            "time": "2024-10-15T19:20:02+00:00"
+            "time": "2025-01-09T02:31:15+00:00"
         }
     ],
     "packages-dev": [
@@ -12016,21 +12021,21 @@
         },
         {
             "name": "driftingly/rector-laravel",
-            "version": "1.2.6",
+            "version": "2.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/driftingly/rector-laravel.git",
-                "reference": "010e050488e0c1ec305736b081db04d9b834c709"
+                "reference": "973d87d51c1a0d42340758bbddaef15a14155a54"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/driftingly/rector-laravel/zipball/010e050488e0c1ec305736b081db04d9b834c709",
-                "reference": "010e050488e0c1ec305736b081db04d9b834c709",
+                "url": "https://api.github.com/repos/driftingly/rector-laravel/zipball/973d87d51c1a0d42340758bbddaef15a14155a54",
+                "reference": "973d87d51c1a0d42340758bbddaef15a14155a54",
                 "shasum": ""
             },
             "require": {
                 "php": "^7.2 || ^8.0",
-                "rector/rector": "^1.0"
+                "rector/rector": "^2.0"
             },
             "type": "rector-extension",
             "autoload": {
@@ -12045,9 +12050,9 @@
             "description": "Rector upgrades rules for Laravel Framework",
             "support": {
                 "issues": "https://github.com/driftingly/rector-laravel/issues",
-                "source": "https://github.com/driftingly/rector-laravel/tree/1.2.6"
+                "source": "https://github.com/driftingly/rector-laravel/tree/2.0.1"
             },
-            "time": "2024-12-05T17:29:03+00:00"
+            "time": "2025-01-03T16:28:38+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -13320,20 +13325,20 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.12.15",
+            "version": "2.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "c91d4e8bc056f46cf653656e6f71004b254574d1"
+                "reference": "cd6e973e04b4c2b94c86e8612b5a65f0da0e08e7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/c91d4e8bc056f46cf653656e6f71004b254574d1",
-                "reference": "c91d4e8bc056f46cf653656e6f71004b254574d1",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/cd6e973e04b4c2b94c86e8612b5a65f0da0e08e7",
+                "reference": "cd6e973e04b4c2b94c86e8612b5a65f0da0e08e7",
                 "shasum": ""
             },
             "require": {
-                "php": "^7.2|^8.0"
+                "php": "^7.4|^8.0"
             },
             "conflict": {
                 "phpstan/phpstan-shim": "*"
@@ -13374,7 +13379,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-01-05T16:40:22+00:00"
+            "time": "2025-01-05T16:43:48+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -13802,21 +13807,21 @@
         },
         {
             "name": "rector/rector",
-            "version": "1.2.10",
+            "version": "2.0.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rectorphp/rector.git",
-                "reference": "40f9cf38c05296bd32f444121336a521a293fa61"
+                "reference": "fa0cb009dc3df084bf549032ae4080a0481a2036"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/rector/zipball/40f9cf38c05296bd32f444121336a521a293fa61",
-                "reference": "40f9cf38c05296bd32f444121336a521a293fa61",
+                "url": "https://api.github.com/repos/rectorphp/rector/zipball/fa0cb009dc3df084bf549032ae4080a0481a2036",
+                "reference": "fa0cb009dc3df084bf549032ae4080a0481a2036",
                 "shasum": ""
             },
             "require": {
-                "php": "^7.2|^8.0",
-                "phpstan/phpstan": "^1.12.5"
+                "php": "^7.4|^8.0",
+                "phpstan/phpstan": "^2.1.1"
             },
             "conflict": {
                 "rector/rector-doctrine": "*",
@@ -13849,7 +13854,7 @@
             ],
             "support": {
                 "issues": "https://github.com/rectorphp/rector/issues",
-                "source": "https://github.com/rectorphp/rector/tree/1.2.10"
+                "source": "https://github.com/rectorphp/rector/tree/2.0.6"
             },
             "funding": [
                 {
@@ -13857,7 +13862,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2024-11-08T13:59:10+00:00"
+            "time": "2025-01-06T10:38:36+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -14787,16 +14792,16 @@
         },
         {
             "name": "serversideup/spin",
-            "version": "v2.3.0",
+            "version": "v3.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/serversideup/spin.git",
-                "reference": "e7f742dfe54146196da26876670f368c11852df3"
+                "reference": "ed3ee8f2b9eeaf9e2a0654438441a1eb8ccf5d3d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/serversideup/spin/zipball/e7f742dfe54146196da26876670f368c11852df3",
-                "reference": "e7f742dfe54146196da26876670f368c11852df3",
+                "url": "https://api.github.com/repos/serversideup/spin/zipball/ed3ee8f2b9eeaf9e2a0654438441a1eb8ccf5d3d",
+                "reference": "ed3ee8f2b9eeaf9e2a0654438441a1eb8ccf5d3d",
                 "shasum": ""
             },
             "bin": [
@@ -14820,7 +14825,7 @@
             "description": "Replicate your production environment locally using Docker. Just run \"spin up\". It's really that easy.",
             "support": {
                 "issues": "https://github.com/serversideup/spin/issues",
-                "source": "https://github.com/serversideup/spin/tree/v2.3.0"
+                "source": "https://github.com/serversideup/spin/tree/v3.0.1"
             },
             "funding": [
                 {
@@ -14828,7 +14833,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2024-10-15T15:12:28+00:00"
+            "time": "2024-12-20T17:23:06+00:00"
         },
         {
             "name": "spatie/error-solutions",

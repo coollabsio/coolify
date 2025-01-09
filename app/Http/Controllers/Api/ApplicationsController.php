@@ -1142,7 +1142,6 @@ class ApplicationsController extends Controller
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
 
-            
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
@@ -1206,7 +1205,7 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            
+
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();

@@ -610,7 +610,7 @@ class Application extends BaseModel
             },
             get: function ($value) {
                 if ($this->additional_servers->count() === 0) {
-                    //running (healthy)
+                    // running (healthy)
                     if (str($value)->contains('(')) {
                         $status = str($value)->before('(')->trim()->value();
                         $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';

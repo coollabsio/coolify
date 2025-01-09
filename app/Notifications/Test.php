@@ -4,9 +4,9 @@ namespace App\Notifications;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
-use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;

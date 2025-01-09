@@ -96,6 +96,7 @@ class ProjectController extends Controller
         }
 
         $project->load(['environments']);
+
         return response()->json(
             serializeApiResponse($project),
         );
