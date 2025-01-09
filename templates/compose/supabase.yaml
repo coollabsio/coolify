@@ -15,7 +15,7 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_SUPABASEKONG_8000
-      - 'KONG_PORT_MAPS=443:8000'
+      - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
