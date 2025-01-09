@@ -7,7 +7,6 @@
 services:
   gotenberg:
     image: gotenberg/gotenberg:latest
-    container_name: gotenberg
     environment:
       - SERVICE_FQDN_GOTENBERG_3000
 
