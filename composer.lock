@@ -7416,6 +7416,57 @@
             "time": "2023-11-07T22:21:16+00:00"
         },
         {
+            "name": "socialiteproviders/infomaniak",
+            "version": "4.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Infomaniak.git",
+                "reference": "9796ad686204443bfdf3ff19a6c409e8771667e1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Infomaniak/zipball/9796ad686204443bfdf3ff19a6c409e8771667e1",
+                "reference": "9796ad686204443bfdf3ff19a6c409e8771667e1",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^8.0",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Infomaniak\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Leopold Jacquot",
+                    "email": "leopold.jacquot@infomaniak.com"
+                }
+            ],
+            "description": "Infomaniak OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "infomaniak",
+                "laravel",
+                "oauth",
+                "oauth2",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "docs": "https://socialiteproviders.com/qq",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2024-11-20T05:42:36+00:00"
+        },
+        {
             "name": "socialiteproviders/manager",
             "version": "v4.8.0",
             "source": {
@@ -15315,7 +15366,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.2"
+        "php": "^8.4"
     },
     "platform-dev": {},
     "plugin-api-version": "2.6.0"

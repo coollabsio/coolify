@@ -13,7 +13,7 @@
         <div>Environment variables (secrets) for this resource. </div>
         @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
             <div class="w-64 pt-2">
-                <x-forms.checkbox id="resource.settings.is_env_sorting_enabled" label="Sort alphabetically"
+                <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
                     helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
                     instantSave></x-forms.checkbox>
             </div>
@@ -55,10 +55,10 @@
                 <h3>Preview Deployments Environment Variables</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview as $env)
+            {{-- @foreach ($resource->environment_variables_preview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
-            @endforeach
+            @endforeach --}}
         @endif
     @else
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">

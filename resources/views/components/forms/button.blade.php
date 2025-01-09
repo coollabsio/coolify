@@ -8,11 +8,13 @@
         @endisset>
 
     {{ $slot }}
-    @if ($attributes->whereStartsWith('wire:click')->first())
-        <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
-            wire:loading.delay />
-    @elseif($attributes->whereStartsWith('wire:target')->first())
-        <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:target')->first() }}"
-            wire:loading.delay />
+    @if ($showLoadingIndicator)
+        @if ($attributes->whereStartsWith('wire:click')->first())
+            <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
+                wire:loading.delay />
+        @elseif($attributes->whereStartsWith('wire:target')->first())
+            <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:target')->first() }}"
+                wire:loading.delay />
+        @endif
     @endif
 </button>

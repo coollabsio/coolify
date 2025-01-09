@@ -20,7 +20,7 @@ class Danger extends Component
 
     public $projectUuid;
 
-    public $environmentName;
+    public $environmentUuid;
 
     public bool $delete_configurations = true;
 
@@ -39,7 +39,7 @@ class Danger extends Component
         $parameters = get_route_parameters();
         $this->modalId = new Cuid2;
         $this->projectUuid = data_get($parameters, 'project_uuid');
-        $this->environmentName = data_get($parameters, 'environment_name');
+        $this->environmentUuid = data_get($parameters, 'environment_uuid');
 
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
@@ -107,7 +107,7 @@ class Danger extends Component
 
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $this->projectUuid,
-                'environment_name' => $this->environmentName,
+                'environment_uuid' => $this->environmentUuid,
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);

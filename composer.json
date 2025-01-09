@@ -11,7 +11,7 @@
         "server"
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "3sidedcube/laravel-redoc": "^1.0",
         "danharrin/livewire-rate-limiting": "2.0.0",
         "doctrine/dbal": "^4.2",
@@ -40,6 +40,7 @@
         "resend/resend-laravel": "^0.15.0",
         "sentry/sentry-laravel": "^4.6",
         "socialiteproviders/authentik": "^5.2",
+        "socialiteproviders/infomaniak": "^4.0",
         "socialiteproviders/microsoft-azure": "^5.1",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^4.11",
