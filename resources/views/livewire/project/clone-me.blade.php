@@ -19,10 +19,10 @@
             @if(!$cloneVolumeData)
                 <div wire:key="volume-disabled">
                     <x-modal-confirmation 
-                        title="Enable Volume Data Cloning" 
-                        buttonTitle="Enable Cloning" 
+                        title="Enable Volume Data Cloning?" 
+                        buttonTitle="Enable Volume Cloning" 
                         submitAction="toggleVolumeCloning(true)"
-                        :actions="['This will temporarily stop all the containers to copy volume data.', 'The process runs in the background and may take a few minutes.']" 
+                        :actions="['This will temporarily stop all the containers to copy the volume data to the new resources to ensure data consistency.', 'The process runs in the background and may take a few minutes.']" 
                         :confirmWithPassword="false"
                         :confirmWithText="false"
                     />
@@ -30,12 +30,12 @@
             @else
                 <div wire:key="volume-enabled" class="max-w-md">
                     <x-forms.checkbox 
-                        label="Copy Volume Data" 
+                        label="Clone Volume Data" 
                         id="cloneVolumeData" 
                         wire:model="cloneVolumeData"
                         wire:change="toggleVolumeCloning(false)"
                         :checked="$cloneVolumeData"
-                        helper="Containers will be temporarily stopped during the cloning process." />
+                        helper="Volume Data will be cloned to the new resources. Containers will be temporarily stopped during the cloning process." />
                 </div>
             @endif
         </div>
