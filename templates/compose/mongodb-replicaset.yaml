@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
+      - MONGO_REPLICA_SET_NAME=rs0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    command: >
+      mongod --replSet rs0 --bind_ip localhost,mongodb
+
+  mongodb_secondary:
+    image: mongo:latest
+    container_name: mongodb_secondary
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
+      - MONGO_REPLICA_SET_NAME=rs0
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_secondary_data:/data/db
+    command: >
+      mongod --replSet rs0 --bind_ip localhost,mongodb_secondary
+
+  mongodb_arbiter:
+    image: mongo:latest
+    container_name: mongodb_arbiter
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
+      - MONGO_REPLICA_SET_NAME=rs0
+    command: >
+      mongod --replSet rs0 --bind_ip localhost,mongodb_arbiter --smallfiles --noprealloc
+
+volumes:
+  mongodb_data:
+  mongodb_secondary_data: 
