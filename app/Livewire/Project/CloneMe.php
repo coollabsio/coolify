@@ -5,6 +5,8 @@ namespace App\Livewire\Project;
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
+use App\Actions\Service\StartService;
+use App\Actions\Service\StopService;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
@@ -59,7 +61,6 @@ class CloneMe extends Component
     public function toggleVolumeCloning(bool $value)
     {
         $this->cloneVolumeData = $value;
-        $this->dispatch('refresh');
     }
 
     public function render()
@@ -195,12 +196,19 @@ class CloneMe extends Component
 
                 $persistentVolumes = $application->persistentStorages()->get();
                 foreach ($persistentVolumes as $volume) {
+                    $newName = '';
+                    if (str_starts_with($volume->name, $application->uuid)) {
+                        $newName = str($volume->name)->replace($application->uuid, $newApplication->uuid);
+                    } else {
+                        $newName = $newApplication->uuid.'-'.$volume->name;
+                    }
+
                     $newPersistentVolume = $volume->replicate([
                         'id',
                         'created_at',
                         'updated_at',
                     ])->fill([
-                        'name' => $newApplication->uuid.'-'.str($volume->name)->afterLast('-'),
+                        'name' => $newName,
                         'resource_id' => $newApplication->id,
                     ]);
                     $newPersistentVolume->save();
@@ -222,7 +230,7 @@ class CloneMe extends Component
                                 no_questions_asked: true
                             );
                         } catch (\Exception $e) {
-                            logger()->error("Failed to copy volume data for {$volume->name}: ".$e->getMessage());
+                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                         }
                     }
                 }
@@ -295,9 +303,11 @@ class CloneMe extends Component
                     } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
                         $newName = 'dragonfly-data-'.$newDatabase->uuid;
                     } else {
-                        $newName = str($originalName)
-                            ->replaceFirst($database->uuid, $newDatabase->uuid)
-                            ->toString();
+                        if (str_starts_with($volume->name, $database->uuid)) {
+                            $newName = str($volume->name)->replace($database->uuid, $newDatabase->uuid);
+                        } else {
+                            $newName = $newDatabase->uuid.'-'.$volume->name;
+                        }
                     }
 
                     $newPersistentVolume = $volume->replicate([
@@ -321,8 +331,7 @@ class CloneMe extends Component
 
                             StartDatabase::dispatch($database);
                         } catch (\Exception $e) {
-                            // Log error but continue with cloning
-                            logger()->error("Failed to copy volume data for {$volume->name}: ".$e->getMessage());
+                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                         }
                     }
                 }
@@ -418,12 +427,122 @@ class CloneMe extends Component
                     $application->update([
                         'status' => 'exited',
                     ]);
+
+                    $persistentVolumes = $application->persistentStorages()->get();
+                    foreach ($persistentVolumes as $volume) {
+                        $newName = '';
+                        if (str_starts_with($volume->name, $application->uuid)) {
+                            $newName = str($volume->name)->replace($application->uuid, $application->uuid);
+                        } else {
+                            $newName = $application->uuid.'-'.$volume->name;
+                        }
+
+                        $newPersistentVolume = $volume->replicate([
+                            'id',
+                            'created_at',
+                            'updated_at',
+                        ])->fill([
+                            'name' => $newName,
+                            'resource_id' => $application->id,
+                        ]);
+                        $newPersistentVolume->save();
+
+                        if ($this->cloneVolumeData) {
+                            try {
+                                StopService::dispatch($application, false, false);
+                                $sourceVolume = $volume->name;
+                                $targetVolume = $newPersistentVolume->name;
+                                $server = $application->service->destination->server;
+
+                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+
+                                StartService::dispatch($application);
+                            } catch (\Exception $e) {
+                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            }
+                        }
+                    }
+
+                    $fileStorages = $application->fileStorages()->get();
+                    foreach ($fileStorages as $storage) {
+                        $newStorage = $storage->replicate([
+                            'id',
+                            'created_at',
+                            'updated_at',
+                        ])->fill([
+                            'resource_id' => $application->id,
+                        ]);
+                        $newStorage->save();
+                    }
                 }
 
                 foreach ($newService->databases() as $database) {
                     $database->update([
                         'status' => 'exited',
                     ]);
+
+                    $persistentVolumes = $database->persistentStorages()->get();
+                    foreach ($persistentVolumes as $volume) {
+                        $newName = '';
+                        if (str_starts_with($volume->name, $database->uuid)) {
+                            $newName = str($volume->name)->replace($database->uuid, $database->uuid);
+                        } else {
+                            $newName = $database->uuid.'-'.$volume->name;
+                        }
+
+                        $newPersistentVolume = $volume->replicate([
+                            'id',
+                            'created_at',
+                            'updated_at',
+                        ])->fill([
+                            'name' => $newName,
+                            'resource_id' => $database->id,
+                        ]);
+                        $newPersistentVolume->save();
+
+                        if ($this->cloneVolumeData) {
+                            try {
+                                StopService::dispatch($database->service, false, false);
+                                $sourceVolume = $volume->name;
+                                $targetVolume = $newPersistentVolume->name;
+                                $server = $database->service->destination->server;
+
+                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+
+                                StartService::dispatch($database->service);
+                            } catch (\Exception $e) {
+                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            }
+                        }
+                    }
+
+                    $fileStorages = $database->fileStorages()->get();
+                    foreach ($fileStorages as $storage) {
+                        $newStorage = $storage->replicate([
+                            'id',
+                            'created_at',
+                            'updated_at',
+                        ])->fill([
+                            'resource_id' => $database->id,
+                        ]);
+                        $newStorage->save();
+                    }
+
+                    $scheduledBackups = $database->scheduledBackups()->get();
+                    foreach ($scheduledBackups as $backup) {
+                        $uuid = (string) new Cuid2;
+                        $newBackup = $backup->replicate([
+                            'id',
+                            'created_at',
+                            'updated_at',
+                        ])->fill([
+                            'uuid' => $uuid,
+                            'database_id' => $database->id,
+                            'database_type' => $database->getMorphClass(),
+                            'team_id' => currentTeam()->id,
+                        ]);
+                        $newBackup->save();
+                    }
                 }
 
                 $newService->parse();
