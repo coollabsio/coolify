@@ -1258,14 +1258,23 @@ function get_public_ips()
 
 function isAnyDeploymentInprogress()
 {
-    // Only use it in the deployment script
-    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
-    if ($count > 0) {
-        echo "There are $count deployments in progress. Exiting...\n";
-        exit(1);
+
+    $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
+    $horizonJobIds = [];
+    foreach ($runningJobs as $runningJob) {
+        $horizonJobId = getJobStatus($runningJob->horizon_job_id);
+        if ($horizonJobId === 'unknown') {
+            return true;
+        }
+        $horizonJobIds[] = $runningJob->horizon_job_id;
     }
-    echo "No deployments in progress.\n";
-    exit(0);
+    if (count($horizonJobIds) === 0) {
+        echo "No deployments in progress.\n";
+        exit(0);
+    }
+    $horizonJobIds = collect($horizonJobIds)->unique()->toArray();
+    echo 'There are '.count($horizonJobIds)." deployments in progress.\n";
+    exit(1);
 }
 
 function isBase64Encoded($strValue)
