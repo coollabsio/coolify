@@ -233,11 +233,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function tags(): array
-    {
-        return ['server:'.gethostname()];
-    }
-
     public function handle(): void
     {
         $this->application_deployment_queue->update([
