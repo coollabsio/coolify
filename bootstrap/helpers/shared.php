@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
+use Laravel\Horizon\Contracts\JobRepository;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
@@ -4068,4 +4069,14 @@ function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp
         'repository' => $repository,
         'port' => $providerInfo['port'],
     ];
+}
+
+function getJobStatus(string $jobId)
+{
+    $jobFound = app(JobRepository::class)->getJobs([$jobId]);
+    if ($jobFound->isEmpty()) {
+        return 'unknown';
+    }
+
+    return $jobFound->first()->status;
 }

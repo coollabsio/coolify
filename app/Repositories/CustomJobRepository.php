@@ -21,6 +21,11 @@ class CustomJobRepository extends RedisJobRepository implements CustomJobReposit
         return $this->getJobsByStatus('reserved');
     }
 
+    public function getJobStatus(string $jobId): string
+    {
+        return $this->connection()->get('job:'.$jobId.':status');
+    }
+
     /**
      * Get all jobs with a specific status.
      */

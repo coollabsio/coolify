@@ -2395,7 +2395,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         ) {
             $this->application_deployment_queue->update([
                 'status' => $status,
-                'horizon_job_status' => $status,
             ]);
         }
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {

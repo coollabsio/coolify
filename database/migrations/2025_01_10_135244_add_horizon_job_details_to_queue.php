@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->string('horizon_job_status')->nullable();
+            $table->string('horizon_job_id')->nullable();
             $table->string('horizon_job_worker')->nullable();
         });
     }
@@ -23,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->dropColumn('horizon_job_status');
+            $table->dropColumn('horizon_job_id');
             $table->dropColumn('horizon_job_worker');
         });
     }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
 use App\Repositories\CustomJobRepository;
 use Illuminate\Console\Command;
@@ -13,24 +14,31 @@ use Laravel\Horizon\Repositories\RedisJobRepository;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\table;
+use function Laravel\Prompts\text;
 
 class HorizonManage extends Command
 {
-    protected $signature = 'horizon:manage {--can-i-restart-this-worker}';
+    protected $signature = 'horizon:manage {--can-i-restart-this-worker} {--job-status=}';
 
     protected $description = 'Manage horizon';
 
     public function handle()
     {
         if ($this->option('can-i-restart-this-worker')) {
-            return $this->canIRestartThisWorker();
+            return $this->isThereAJobInProgress();
         }
+
+        if ($this->option('job-status')) {
+            return $this->getJobStatus($this->option('job-status'));
+        }
+
         $action = select(
             label: 'What to do?',
             options: [
                 'pending' => 'Pending Jobs',
                 'running' => 'Running Jobs',
                 'can-i-restart-this-worker' => 'Can I restart this worker?',
+                'job-status' => 'Job Status',
                 'workers' => 'Workers',
                 'failed' => 'Failed Jobs',
                 'failed-delete' => 'Failed Jobs - Delete',
@@ -39,13 +47,13 @@ class HorizonManage extends Command
         );
 
         if ($action === 'can-i-restart-this-worker') {
-            $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('horizon_job_status', 'reserved')->get();
-            $count = $runningJobs->count();
-            if ($count > 0) {
-                return false;
-            }
+            $this->isThereAJobInProgress();
+        }
 
-            return true;
+        if ($action === 'job-status') {
+            $jobId = text('Which job to check?');
+            $jobStatus = $this->getJobStatus($jobId);
+            $this->info('Job Status: '.$jobStatus);
         }
 
         if ($action === 'pending') {
@@ -152,14 +160,24 @@ class HorizonManage extends Command
         }
     }
 
-    public function canIRestartThisWorker()
+    public function isThereAJobInProgress()
     {
-        $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('horizon_job_status', 'reserved')->get();
+        $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
         $count = $runningJobs->count();
-        if ($count > 0) {
+        if ($count === 0) {
             return false;
         }
 
         return true;
+    }
+
+    public function getJobStatus(string $jobId)
+    {
+        $jobFound = app(JobRepository::class)->getJobs([$jobId]);
+        if ($jobFound->isEmpty()) {
+            return 'unknown';
+        }
+
+        return $jobFound->first()->status;
     }
 }
