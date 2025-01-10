@@ -83,8 +83,10 @@ class BackupExecutions extends Component
 
     public function refreshBackupExecutions(): void
     {
-        if ($this->backup) {
-            $this->executions = $this->backup->executions()->get();
+        if ($this->backup && $this->backup->exists) {
+            $this->executions = $this->backup->executions()->get()->toArray();
+        } else {
+            $this->executions = [];
         }
     }
 
