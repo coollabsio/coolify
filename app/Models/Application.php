@@ -325,7 +325,7 @@ class Application extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.application.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'application_uuid' => data_get($this, 'uuid'),
             ]);
         }
@@ -338,7 +338,7 @@ class Application extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.application.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'application_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
@@ -610,7 +610,7 @@ class Application extends BaseModel
             },
             get: function ($value) {
                 if ($this->additional_servers->count() === 0) {
-                    //running (healthy)
+                    // running (healthy)
                     if (str($value)->contains('(')) {
                         $status = str($value)->before('(')->trim()->value();
                         $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
@@ -695,46 +695,62 @@ class Application extends BaseModel
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
     }
 
-    public function environment_variables(): HasMany
+    public function environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->orderBy('key', 'asc');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->orderBy('key', 'asc');
     }
 
-    public function runtime_environment_variables(): HasMany
+    public function runtime_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    // Preview Deployments
-
-    public function build_environment_variables(): HasMany
+    public function build_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('is_build_time', true)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    public function nixpacks_environment_variables(): HasMany
+    public function nixpacks_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', false)
+            ->where('key', 'like', 'NIXPACKS_%');
     }
 
-    public function environment_variables_preview(): HasMany
+    public function environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
-    public function runtime_environment_variables_preview(): HasMany
+    public function runtime_environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    public function build_environment_variables_preview(): HasMany
+    public function build_environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('is_build_time', true)
+            ->where('key', 'not like', 'NIXPACKS_%');
     }
 
-    public function nixpacks_environment_variables_preview(): HasMany
+    public function nixpacks_environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'like', 'NIXPACKS_%');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->where('key', 'like', 'NIXPACKS_%');
     }
 
     public function scheduled_tasks(): HasMany

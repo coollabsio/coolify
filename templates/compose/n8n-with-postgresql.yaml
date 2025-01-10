@@ -12,8 +12,8 @@ services:
       - N8N_EDITOR_BASE_URL=${SERVICE_FQDN_N8N}
       - WEBHOOK_URL=${SERVICE_FQDN_N8N}
       - N8N_HOST=${SERVICE_URL_N8N}
-      - GENERIC_TIMEZONE=Europe/Berlin
-      - TZ=Europe/Berlin
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}
+      - TZ=${TZ:-Europe/Berlin}
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-n8n}
       - DB_POSTGRESDB_HOST=postgresql

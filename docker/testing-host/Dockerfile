@@ -1,10 +1,10 @@
 # Versions
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=27.3.1
+ARG DOCKER_VERSION=27.4.1
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.30.3
+ARG DOCKER_COMPOSE_VERSION=2.32.2
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.18.0
+ARG DOCKER_BUILDX_VERSION=0.19.3
 
 
 FROM debian:12-slim

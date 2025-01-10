@@ -29,6 +29,7 @@ Route::group([
     'middleware' => ['auth:sanctum', ApiAllowed::class, 'api.sensitive'],
     'prefix' => 'v1',
 ], function () {
+
     Route::get('/version', [OtherController::class, 'version'])->middleware(['api.ability:read']);
 
     Route::get('/teams', [TeamController::class, 'teams'])->middleware(['api.ability:read']);
@@ -39,7 +40,7 @@ Route::group([
 
     Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
     Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid'])->middleware(['api.ability:read']);
-    Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
+    Route::get('/projects/{uuid}/{environment_name_or_uuid}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
 
     Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:read']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);

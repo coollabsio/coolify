@@ -21,6 +21,7 @@ class OauthSettingSeeder extends Seeder
                 'gitlab',
                 'google',
                 'authentik',
+                'infomaniak',
             ]);
 
             $isOauthSeeded = OauthSetting::count() > 0;
