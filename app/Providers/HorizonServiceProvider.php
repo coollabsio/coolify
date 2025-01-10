@@ -8,11 +8,11 @@ use App\Models\User;
 use App\Repositories\CustomJobRepository;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\ServiceProvider;
 use Laravel\Horizon\Contracts\JobRepository;
 use Laravel\Horizon\Events\JobReserved;
+use Laravel\Horizon\HorizonApplicationServiceProvider;
 
-class HorizonServiceProvider extends ServiceProvider
+class HorizonServiceProvider extends HorizonApplicationServiceProvider
 {
     /**
      * Register services.
@@ -28,6 +28,7 @@ class HorizonServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        parent::boot();
         Event::listen(function (JobReserved $event) {
             $payload = $event->payload->decoded;
             $jobName = $payload['displayName'];
