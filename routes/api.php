@@ -132,18 +132,35 @@ Route::group([
     'prefix' => 'v1',
 ], function () {
     Route::post('/sentinel/push', function () {
+        // return response()->json(['message' => 'temporary unavailable'], 503);
         $token = request()->header('Authorization');
         if (! $token) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
         $naked_token = str_replace('Bearer ', '', $token);
-        $decrypted = decrypt($naked_token);
-        $decrypted_token = json_decode($decrypted, true);
+        try {
+            $decrypted = decrypt($naked_token);
+            $decrypted_token = json_decode($decrypted, true);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Invalid token'], 401);
+        }
         $server_uuid = data_get($decrypted_token, 'server_uuid');
+        if (! $server_uuid) {
+            return response()->json(['message' => 'Invalid token'], 401);
+        }
         $server = Server::where('uuid', $server_uuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found'], 404);
         }
+
+        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        if ($server->isFunctional() === false) {
+            return response()->json(['message' => 'Server is not functional'], 401);
+        }
+
         if ($server->settings->sentinel_token !== $naked_token) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
