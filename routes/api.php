@@ -132,7 +132,7 @@ Route::group([
     'prefix' => 'v1',
 ], function () {
     Route::post('/sentinel/push', function () {
-        // return response()->json(['message' => 'temporary unavailable'], 503);
+        return response()->json(['message' => 'temporary unavailable'], 503);
         $token = request()->header('Authorization');
         if (! $token) {
             return response()->json(['message' => 'Unauthorized'], 401);
