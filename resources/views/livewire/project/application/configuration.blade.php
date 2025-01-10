@@ -85,39 +85,39 @@
                 wire:navigate>Danger Zone</a>
         </div>
         <div class="w-full">
-            @if (request()->route()->getName() === 'project.application.configuration')
+            @if ($currentRoute === 'project.application.configuration')
                 <livewire:project.application.general :application="$application" />
-            @elseif (request()->route()->getName() === 'project.application.swarm' && $application->destination->server->isSwarm())
+            @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
-            @elseif (request()->route()->getName() === 'project.application.advanced')
+            @elseif ($currentRoute === 'project.application.advanced')
                 <livewire:project.application.advanced :application="$application" />
-            @elseif (request()->route()->getName() === 'project.application.environment-variables')
+            @elseif ($currentRoute === 'project.application.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.persistent-storage')
+            @elseif ($currentRoute === 'project.application.persistent-storage')
                 <livewire:project.service.storage :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.source' && $application->git_based())
+            @elseif ($currentRoute === 'project.application.source' && $application->git_based())
                 <livewire:project.application.source :application="$application" />
-            @elseif (request()->route()->getName() === 'project.application.servers')
+            @elseif ($currentRoute === 'project.application.servers')
                 <livewire:project.shared.destination :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.scheduled-tasks.show')
+            @elseif ($currentRoute === 'project.application.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.webhooks')
+            @elseif ($currentRoute === 'project.application.webhooks')
                 <livewire:project.shared.webhooks :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.preview-deployments')
+            @elseif ($currentRoute === 'project.application.preview-deployments')
                 <livewire:project.application.previews :application="$application" />
-            @elseif (request()->route()->getName() === 'project.application.healthcheck')
+            @elseif ($currentRoute === 'project.application.healthcheck')
                 <livewire:project.shared.health-checks :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.rollback')
+            @elseif ($currentRoute === 'project.application.rollback')
                 <livewire:project.application.rollback :application="$application" />
-            @elseif (request()->route()->getName() === 'project.application.resource-limits')
+            @elseif ($currentRoute === 'project.application.resource-limits')
                 <livewire:project.shared.resource-limits :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.resource-operations')
+            @elseif ($currentRoute === 'project.application.resource-operations')
                 <livewire:project.shared.resource-operations :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.metrics')
+            @elseif ($currentRoute === 'project.application.metrics')
                 <livewire:project.shared.metrics :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.tags')
+            @elseif ($currentRoute === 'project.application.tags')
                 <livewire:project.shared.tags :resource="$application" />
-            @elseif (request()->route()->getName() === 'project.application.danger')
+            @elseif ($currentRoute === 'project.application.danger')
                 <livewire:project.shared.danger :resource="$application" />
             @endif
         </div>

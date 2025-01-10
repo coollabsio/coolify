@@ -63,7 +63,6 @@ class BackupSuccess extends CustomEmailNotification
         ];
     }
 
-
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
@@ -72,7 +71,6 @@ class BackupSuccess extends CustomEmailNotification
             message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.",
         );
     }
-
 
     public function toSlack(): SlackMessage
     {

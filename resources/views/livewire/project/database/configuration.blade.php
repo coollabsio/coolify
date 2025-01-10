@@ -20,8 +20,8 @@
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
                 wire:navigate>Persistent Storage</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
-                wire:navigate>Import Backups</a>
+                href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
+                Backups</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
                 wire:navigate>Webhooks</a>
@@ -42,7 +42,7 @@
                 wire:navigate>Danger Zone</a>
         </div>
         <div class="w-full">
-            @if (request()->route()->getName() === 'project.database.configuration')
+            @if ($currentRoute === 'project.database.configuration')
                 @if ($database->type() === 'standalone-postgresql')
                     <livewire:project.database.postgresql.general :database="$database" />
                 @elseif ($database->type() === 'standalone-redis')
@@ -60,25 +60,25 @@
                 @elseif ($database->type() === 'standalone-clickhouse')
                     <livewire:project.database.clickhouse.general :database="$database" />
                 @endif
-            @elseif (request()->route()->getName() === 'project.database.environment-variables')
+            @elseif ($currentRoute === 'project.database.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.servers')
+            @elseif ($currentRoute === 'project.database.servers')
                 <livewire:project.shared.destination :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.persistent-storage')
+            @elseif ($currentRoute === 'project.database.persistent-storage')
                 <livewire:project.service.storage :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.import-backups')
+            @elseif ($currentRoute === 'project.database.import-backups')
                 <livewire:project.database.import :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.webhooks')
+            @elseif ($currentRoute === 'project.database.webhooks')
                 <livewire:project.shared.webhooks :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.resource-limits')
+            @elseif ($currentRoute === 'project.database.resource-limits')
                 <livewire:project.shared.resource-limits :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.resource-operations')
+            @elseif ($currentRoute === 'project.database.resource-operations')
                 <livewire:project.shared.resource-operations :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.metrics')
+            @elseif ($currentRoute === 'project.database.metrics')
                 <livewire:project.shared.metrics :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.tags')
+            @elseif ($currentRoute === 'project.database.tags')
                 <livewire:project.shared.tags :resource="$database" />
-            @elseif (request()->route()->getName() === 'project.database.danger')
+            @elseif ($currentRoute === 'project.database.danger')
                 <livewire:project.shared.danger :resource="$database" />
             @endif
         </div>

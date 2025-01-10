@@ -35,7 +35,7 @@
                             </div>
                             <div class="flex items-center justify-center gap-2 text-xs font-bold">
                                 @if ($project->environments->first())
-                                    <a class="hover:underline"
+                                    <a class="hover:underline" wire:click.stop
                                         href="{{ route('project.resource.create', [
                                             'project_uuid' => $project->uuid,
                                             'environment_uuid' => $project->environments->first()->uuid,
@@ -43,7 +43,7 @@
                                         <span class="p-2 font-bold">+ Add Resource</span>
                                     </a>
                                 @endif
-                                <a class="hover:underline"
+                                <a class="hover:underline" wire:click.stop
                                     href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                     Settings
                                 </a>
