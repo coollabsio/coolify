@@ -1,0 +1,29 @@
+# documentation: https://github.com/rahulhaque/soketi-app-manager-filament
+# slogan: Manage soketi websocket server and apps with ease.
+# tags: soketi,websockets,app-manager,dashboard
+# logo: svgs/soketi-app-manager.svg
+# port: 8080
+
+services:
+  soketi-app-manager:
+    image: ghcr.io/rahulhaque/soketi-app-manager-filament-alpine:latest
+    environment:
+      - SERVICE_FQDN_SOKETIAPPMANAGER_8080
+      - APP_URL=$SERVICE_FQDN_SOKETIAPPMANAGER
+      - APP_KEY=$APP_KEY
+      - DB_CONNECTION=$DB_CONNECTION
+      - DB_HOST=$DB_HOST
+      - DB_PORT=$DB_PORT
+      - DB_DATABASE=$DB_DATABASE
+      - DB_USERNAME=$DB_USERNAME
+      - DB_PASSWORD=$DB_PASSWORD
+      - PUSHER_HOST=$PUSHER_HOST
+      - PUSHER_PORT=$PUSHER_PORT
+      - PUSHER_SCHEME=$PUSHER_SCHEME
+      - PUSHER_APP_CLUSTER=$PUSHER_APP_CLUSTER
+      - SOKETI_DB_REDIS_USERNAME=$SOKETI_DB_REDIS_USERNAME
+      - SOKETI_DB_REDIS_PASSWORD=$SOKETI_DB_REDIS_PASSWORD
+      - METRICS_HOST=$METRICS_HOST
+    healthcheck:
+      test: ["CMD", "php-fpm-healthcheck"]
+      start_period: 10s
