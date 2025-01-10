@@ -87,7 +87,6 @@ class ContainerStopped extends CustomEmailNotification
         );
     }
 
-
     public function toSlack(): SlackMessage
     {
         $title = 'Resource stopped';

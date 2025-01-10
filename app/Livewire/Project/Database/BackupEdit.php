@@ -40,6 +40,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'string'])]
     public string $frequency = '';
 
+    #[Validate(['string'])]
+    public string $timezone = '';
+
     #[Validate(['required', 'integer', 'min:1'])]
     public int $numberOfBackupsLocally = 1;
 
@@ -68,7 +71,6 @@ class BackupEdit extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
-            $this->customValidate();
             $this->backup->enabled = $this->backupEnabled;
             $this->backup->frequency = $this->frequency;
             $this->backup->number_of_backups_locally = $this->numberOfBackupsLocally;
@@ -76,10 +78,12 @@ class BackupEdit extends Component
             $this->backup->s3_storage_id = $this->s3StorageId;
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
+            $this->customValidate();
             $this->backup->save();
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
+            $this->timezone = data_get($this->backup->server(), 'settings.server_timezone', 'Instance timezone');
             $this->numberOfBackupsLocally = $this->backup->number_of_backups_locally;
             $this->saveS3 = $this->backup->save_s3;
             $this->s3StorageId = $this->backup->s3_storage_id;
@@ -183,12 +187,12 @@ class BackupEdit extends Component
 
     private function deleteAssociatedBackupsS3()
     {
-        //Add function to delete backups from S3
+        // Add function to delete backups from S3
     }
 
     private function deleteAssociatedBackupsSftp()
     {
-        //Add function to delete backups from SFTP
+        // Add function to delete backups from SFTP
     }
 
     private function deleteEmptyBackupFolder($folderPath, $server)
