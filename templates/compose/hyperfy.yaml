@@ -1,7 +1,7 @@
 # documentation: https://github.com/hyperfy-xyz/hyperfy
 # slogan: A Standalone persistent world hosted on your own domain!
 # tags: ThreeJS,NODE,Hyperfy,Metaverse,Self-Hosted
-# logo: svgs/logo-icon.svg
+# logo: svgs/hyperfy.svg
 # port: 3011
 version: '3.8'
 
