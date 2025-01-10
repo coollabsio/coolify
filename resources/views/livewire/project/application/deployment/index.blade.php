@@ -39,7 +39,7 @@
                     data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
             ])
-                x-on:click.stop="goto('{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}')">
+                wire:navigate href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
                 <div class="flex flex-col justify-start">
                     <div class="flex gap-1">
                         {{ $deployment->created_at }} UTC
@@ -59,7 +59,7 @@
                             @endif
                             @if (data_get($deployment, 'commit'))
                                 <div class="dark:hover:text-white"
-                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
+                                    wire:navigate.prevent href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}">
                                     <div class="text-xs underline">
                                         @if ($deployment->commitMessage())
                                             ({{ data_get_str($deployment, 'commit')->limit(7) }} -
@@ -84,7 +84,7 @@
                             @endif
                             @if (data_get($deployment, 'commit'))
                                 <div class="dark:hover:text-white"
-                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
+                                    wire:navigate.prevent href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}">
                                     <div class="text-xs underline">
                                         @if ($deployment->commitMessage())
                                             ({{ data_get_str($deployment, 'commit')->limit(7) }} -
@@ -125,9 +125,6 @@
             <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
             <script>
-                function goto(url) {
-                    window.location.href = url;
-                };
                 let timers = {};
 
                 dayjs.extend(window.dayjs_plugin_utc);
