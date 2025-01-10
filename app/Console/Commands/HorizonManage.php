@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ApplicationDeploymentQueue;
 use App\Repositories\CustomJobRepository;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -15,23 +16,37 @@ use function Laravel\Prompts\table;
 
 class HorizonManage extends Command
 {
-    protected $signature = 'horizon:manage';
+    protected $signature = 'horizon:manage {--can-i-restart-this-worker}';
 
     protected $description = 'Manage horizon';
 
     public function handle()
     {
+        if ($this->option('can-i-restart-this-worker')) {
+            return $this->canIRestartThisWorker();
+        }
         $action = select(
             label: 'What to do?',
             options: [
                 'pending' => 'Pending Jobs',
                 'running' => 'Running Jobs',
+                'can-i-restart-this-worker' => 'Can I restart this worker?',
                 'workers' => 'Workers',
                 'failed' => 'Failed Jobs',
                 'failed-delete' => 'Failed Jobs - Delete',
                 'purge-queues' => 'Purge Queues',
             ]
         );
+
+        if ($action === 'can-i-restart-this-worker') {
+            $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('horizon_job_status', 'reserved')->get();
+            $count = $runningJobs->count();
+            if ($count > 0) {
+                return false;
+            }
+
+            return true;
+        }
 
         if ($action === 'pending') {
             $pendingJobs = app(JobRepository::class)->getPending();
@@ -135,5 +150,16 @@ class HorizonManage extends Command
             $redisJobRepository = app(RedisJobRepository::class);
             $redisJobRepository->purge($queueName);
         }
+    }
+
+    public function canIRestartThisWorker()
+    {
+        $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('horizon_job_status', 'reserved')->get();
+        $count = $runningJobs->count();
+        if ($count > 0) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -31,7 +31,6 @@ class CustomJobRepository extends RedisJobRepository implements CustomJobReposit
         $this->getRecent()->each(function ($job) use ($jobs, $status, $worker) {
             if ($job->status === $status) {
                 if ($worker) {
-                    dump($job);
                     if ($job->worker !== $worker) {
                         return;
                     }
