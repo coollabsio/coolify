@@ -30,7 +30,7 @@
         "league/flysystem-sftp-v3": "^3.0",
         "livewire/livewire": "^3.5",
         "log1x/laravel-webfonts": "^1.0",
-        "lorisleiva/laravel-actions": "^2.7",
+        "lorisleiva/laravel-actions": "^2.8",
         "nubs/random-name-generator": "^2.2",
         "phpseclib/phpseclib": "^3.0",
         "pion/laravel-chunk-upload": "^1.5",
