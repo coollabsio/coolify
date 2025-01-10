@@ -201,9 +201,6 @@ class Kernel extends ConsoleKernel
             $finalScheduledBackups->push($scheduled_backup);
         }
 
-        $own = Team::find(0)->servers;
-        $finalScheduledBackups = $finalScheduledBackups->merge($own);
-
         foreach ($finalScheduledBackups as $scheduled_backup) {
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
@@ -263,9 +260,6 @@ class Kernel extends ConsoleKernel
 
             $finalScheduledTasks->push($scheduled_task);
         }
-
-        $own = Team::find(0)->servers;
-        $finalScheduledTasks = $finalScheduledTasks->merge($own);
 
         foreach ($finalScheduledTasks as $scheduled_task) {
             $server = $scheduled_task->server();
