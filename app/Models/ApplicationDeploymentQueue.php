@@ -72,10 +72,6 @@ class ApplicationDeploymentQueue extends Model
 
     public function getHorizonJobStatus()
     {
-        if (! $this->horizon_job_id) {
-            return 'unknown';
-        }
-
         return getJobStatus($this->horizon_job_id);
     }
 

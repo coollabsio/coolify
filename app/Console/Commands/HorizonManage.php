@@ -173,11 +173,6 @@ class HorizonManage extends Command
 
     public function getJobStatus(string $jobId)
     {
-        $jobFound = app(JobRepository::class)->getJobs([$jobId]);
-        if ($jobFound->isEmpty()) {
-            return 'unknown';
-        }
-
-        return $jobFound->first()->status;
+        return getJobStatus($jobId);
     }
 }

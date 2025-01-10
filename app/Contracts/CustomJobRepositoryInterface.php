@@ -16,9 +16,4 @@ interface CustomJobRepositoryInterface extends JobRepository
      * Get the count of jobs with a specific status.
      */
     public function countJobsByStatus(string $status): int;
-
-    /**
-     * Get jobs that have been running longer than a specified duration in seconds.
-     */
-    public function getLongRunningJobs(int $seconds): Collection;
 }

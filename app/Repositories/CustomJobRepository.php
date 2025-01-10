@@ -21,25 +21,12 @@ class CustomJobRepository extends RedisJobRepository implements CustomJobReposit
         return $this->getJobsByStatus('reserved');
     }
 
-    public function getJobStatus(string $jobId): string
-    {
-        return $this->connection()->get('job:'.$jobId.':status');
-    }
-
-    /**
-     * Get all jobs with a specific status.
-     */
-    public function getJobsByStatus(string $status, ?string $worker = null): Collection
+    public function getJobsByStatus(string $status): Collection
     {
         $jobs = new Collection;
 
-        $this->getRecent()->each(function ($job) use ($jobs, $status, $worker) {
+        $this->getRecent()->each(function ($job) use ($jobs, $status) {
             if ($job->status === $status) {
-                if ($worker) {
-                    if ($job->worker !== $worker) {
-                        return;
-                    }
-                }
                 $jobs->push($job);
             }
         });
@@ -47,30 +34,9 @@ class CustomJobRepository extends RedisJobRepository implements CustomJobReposit
         return $jobs;
     }
 
-    /**
-     * Get the count of jobs with a specific status.
-     */
     public function countJobsByStatus(string $status): int
     {
         return $this->getJobsByStatus($status)->count();
-    }
-
-    /**
-     * Get jobs that have been running longer than a specified duration in seconds.
-     */
-    public function getLongRunningJobs(int $seconds): Collection
-    {
-        $jobs = new Collection;
-
-        $this->getRecent()->each(function ($job) use ($jobs, $seconds) {
-            if ($job->status === 'reserved' &&
-                isset($job->reserved_at) &&
-                (time() - strtotime($job->reserved_at)) > $seconds) {
-                $jobs->push($job);
-            }
-        });
-
-        return $jobs;
     }
 
     public function getQueues(): array

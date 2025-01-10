@@ -1262,8 +1262,8 @@ function isAnyDeploymentInprogress()
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
     $horizonJobIds = [];
     foreach ($runningJobs as $runningJob) {
-        $horizonJobId = getJobStatus($runningJob->horizon_job_id);
-        if ($horizonJobId === 'unknown') {
+        $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
+        if ($horizonJobStatus === 'unknown') {
             return true;
         }
         $horizonJobIds[] = $runningJob->horizon_job_id;
@@ -4080,8 +4080,11 @@ function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp
     ];
 }
 
-function getJobStatus(string $jobId)
+function getJobStatus(?string $jobId = null)
 {
+    if (blank($jobId)) {
+        return 'unknown';
+    }
     $jobFound = app(JobRepository::class)->getJobs([$jobId]);
     if ($jobFound->isEmpty()) {
         return 'unknown';
