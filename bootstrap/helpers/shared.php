@@ -1258,7 +1258,6 @@ function get_public_ips()
 
 function isAnyDeploymentInprogress()
 {
-
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
     $horizonJobIds = [];
     foreach ($runningJobs as $runningJob) {

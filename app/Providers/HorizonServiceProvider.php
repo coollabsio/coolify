@@ -38,6 +38,9 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                 $deploymentQueueId = collect($tags)->first(function ($tag) {
                     return str_contains($tag, 'App\Models\ApplicationDeploymentQueue');
                 });
+                if (blank($deploymentQueueId)) {
+                    return;
+                }
                 $deploymentQueueId = explode(':', $deploymentQueueId)[1];
                 $deploymentQueue = ApplicationDeploymentQueue::find($deploymentQueueId);
                 $deploymentQueue->update([

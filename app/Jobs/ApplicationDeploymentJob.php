@@ -43,8 +43,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public static int $batch_counter = 0;
 
-    private int $application_deployment_queue_id;
-
     private bool $newVersionIsHealthy = false;
 
     private ApplicationDeploymentQueue $application_deployment_queue;
@@ -166,16 +164,21 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(int $application_deployment_queue_id)
+    public function tags()
+    {
+        // Do not remove this one, it needs to properly identify which worker is running the job
+        return ['App\Models\ApplicationDeploymentQueue:'.$this->application_deployment_queue_id];
+    }
+
+    public function __construct(public int $application_deployment_queue_id)
     {
         $this->onQueue('high');
 
-        $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
+        $this->application_deployment_queue = ApplicationDeploymentQueue::find($this->application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
         $this->build_args = collect([]);
 
-        $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
