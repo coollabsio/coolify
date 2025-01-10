@@ -237,6 +237,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+            'horizon_job_worker' => gethostname(),
         ]);
         if ($this->server->isFunctional() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
@@ -2389,10 +2390,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
         if (
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value &&
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
         ) {
             $this->application_deployment_queue->update([
                 'status' => $status,
+                'horizon_job_status' => $status,
             ]);
         }
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {

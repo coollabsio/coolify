@@ -68,4 +68,14 @@ class CustomJobRepository extends RedisJobRepository implements CustomJobReposit
 
         return $jobs;
     }
+
+    public function getQueues(): array
+    {
+        $queues = $this->connection()->keys('queue:*');
+        $queues = array_map(function ($queue) {
+            return explode(':', $queue)[2];
+        }, $queues);
+
+        return $queues;
+    }
 }

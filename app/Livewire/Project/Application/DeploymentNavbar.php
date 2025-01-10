@@ -84,6 +84,7 @@ class DeploymentNavbar extends Component
             $this->application_deployment_queue->update([
                 'current_process_id' => null,
                 'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                'horizon_job_status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
             ]);
             next_after_cancel($server);
         }

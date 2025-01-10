@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Laravel\Horizon\Contracts\JobRepository;
 use Laravel\Horizon\Contracts\MetricsRepository;
+use Laravel\Horizon\Repositories\RedisJobRepository;
 
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
@@ -14,7 +15,7 @@ use function Laravel\Prompts\table;
 
 class HorizonManage extends Command
 {
-    protected $signature = 'horizon:manage ';
+    protected $signature = 'horizon:manage';
 
     protected $description = 'Manage horizon';
 
@@ -28,6 +29,7 @@ class HorizonManage extends Command
                 'workers' => 'Workers',
                 'failed' => 'Failed Jobs',
                 'failed-delete' => 'Failed Jobs - Delete',
+                'purge-queues' => 'Purge Queues',
             ]
         );
 
@@ -102,11 +104,11 @@ class HorizonManage extends Command
 
                 return;
             }
-            dump($runningJobs);
             foreach ($runningJobs as $runningJob) {
                 $runningJobsTable[] = [
                     'id' => $runningJob->id,
                     'name' => $runningJob->name,
+                    'reserved_at' => $runningJob->reserved_at ? now()->parse($runningJob->reserved_at)->format('Y-m-d H:i:s') : null,
                 ];
             }
             table($runningJobsTable);
@@ -122,6 +124,16 @@ class HorizonManage extends Command
                 ];
             }
             table($workersTable);
+        }
+
+        if ($action === 'purge-queues') {
+            $getQueues = app(CustomJobRepository::class)->getQueues();
+            $queueName = select(
+                label: 'Which queue to purge?',
+                options: $getQueues,
+            );
+            $redisJobRepository = app(RedisJobRepository::class);
+            $redisJobRepository->purge($queueName);
         }
     }
 }
