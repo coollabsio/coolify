@@ -54,6 +54,8 @@ class Server extends BaseModel
 
     public static $batch_counter = 0;
 
+    protected $appends = ['is_coolify_host'];
+
     protected static function booted()
     {
         static::saving(function ($server) {
@@ -154,6 +156,15 @@ class Server extends BaseModel
     public function type()
     {
         return 'server';
+    }
+
+    protected function isCoolifyHost(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->id === 0;
+            }
+        );
     }
 
     public static function isReachable()
