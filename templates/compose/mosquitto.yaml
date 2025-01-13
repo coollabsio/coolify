@@ -16,6 +16,8 @@ services:
     volumes:
       - mosquitto-config:/mosquitto/config
       - mosquitto-certs:/certs
+    ports:
+      - '1883:1883'
     healthcheck:
       test: ["CMD-SHELL", "exit 0"]
       interval: 30s
