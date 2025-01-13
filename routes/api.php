@@ -176,22 +176,3 @@ Route::group([
 Route::any('/{any}', function () {
     return response()->json(['message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
 })->where('any', '.*');
-
-// Route::middleware(['throttle:5'])->group(function () {
-//     Route::get('/unsubscribe/{token}', function () {
-//         try {
-//             $token = request()->token;
-//             $email = decrypt($token);
-//             if (!User::whereEmail($email)->exists()) {
-//                 return redirect(RouteServiceProvider::HOME);
-//             }
-//             if (User::whereEmail($email)->first()->marketing_emails === false) {
-//                 return 'You have already unsubscribed from marketing emails.';
-//             }
-//             User::whereEmail($email)->update(['marketing_emails' => false]);
-//             return 'You have been unsubscribed from marketing emails.';
-//         } catch (\Throwable $e) {
-//             return 'Something went wrong. Please try again or contact support.';
-//         }
-//     })->name('unsubscribe.marketing.emails');
-// });
