@@ -459,14 +459,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function remove_old_backups(): void
     {
-        if ($this->backup->number_of_backups_locally === 0) {
-            $deletable = $this->backup->executions()->where('status', 'success');
-        } else {
-            $deletable = $this->backup->executions()->where('status', 'success')->skip($this->backup->number_of_backups_locally - 1);
-        }
-        foreach ($deletable->get() as $execution) {
-            delete_backup_locally($execution->filename, $this->server);
-            $execution->delete();
+        deleteOldBackupsLocally($this->backup);
+        if ($this->backup->save_s3) {
+            deleteOldBackupsFromS3($this->backup);
         }
     }
 
