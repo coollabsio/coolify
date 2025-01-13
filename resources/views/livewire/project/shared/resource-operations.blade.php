@@ -1,7 +1,7 @@
 <div>
     <h2>Resource Operations</h2>
     <div>You can easily make different kind of operations on this resource.</div>
-
+{{-- 
     <div class="mt-8">
         <h3 class="text-lg font-bold mb-2">Clone Volume Data</h3>
         <div class="text-sm text-gray-600 dark:text-gray-300 mb-4">
@@ -31,7 +31,7 @@
                 </div>
             @endif
         </div>
-    </div>
+    </div> --}}
 
     <h3>Clone</h3>
     <div class="pb-4">To another project / environment on a different / same server.</div>

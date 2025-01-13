@@ -9,7 +9,7 @@
     <x-forms.input required id="newName" label="New Name" />
     <x-forms.button isHighlighted wire:click="clone('project')" class="mt-4">Clone to a new Project</x-forms.button>
     <x-forms.button isHighlighted wire:click="clone('environment')" class="mt-4">Clone to a new Environment</x-forms.button>
-
+{{-- 
     <div class="mt-8">
         <h3 class="text-lg font-bold mb-2">Clone Volume Data</h3>
         <div class="text-sm text-gray-600 dark:text-gray-300 mb-4">
@@ -39,7 +39,7 @@
                 </div>
             @endif
         </div>
-    </div>
+    </div> --}}
 
     <h3 class="pt-8 pb-2">Servers</h3>
     <div>Choose the server and network to clone the resources to.</div>
