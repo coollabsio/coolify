@@ -93,6 +93,8 @@ class Kernel extends ConsoleKernel
     {
         if (isCloud()) {
             $servers = $this->allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
+            $own = Team::find(0)->servers;
+            $servers = $servers->merge($own);
         } else {
             $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
         }
@@ -191,7 +193,7 @@ class Kernel extends ConsoleKernel
             if ($server->isFunctional() === false) {
                 continue;
             }
-            if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false) {
+            if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
                 continue;
             }
             $finalScheduledBackups->push($scheduled_backup);
@@ -241,7 +243,7 @@ class Kernel extends ConsoleKernel
                 continue;
             }
 
-            if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false) {
+            if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
                 continue;
             }
 
