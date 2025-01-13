@@ -64,10 +64,10 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $saveS3 = false;
 
-    #[Validate(['required', 'integer'])]
+    #[Validate(['nullable', 'integer'])]
     public ?int $s3StorageId = 1;
 
-    #[Validate(['required', 'string'])]
+    #[Validate(['nullable', 'string'])]
     public ?string $databasesToBackup = null;
 
     #[Validate(['required', 'boolean'])]
