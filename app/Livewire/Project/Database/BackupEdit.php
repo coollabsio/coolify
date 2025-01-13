@@ -124,10 +124,12 @@ class BackupEdit extends Component
 
         try {
             if ($this->delete_associated_backups_locally) {
-                deleteOldBackupsLocally($this->backup);
+                $filenames = $this->backup->executions->pluck('filename')->filter()->all();
+                deleteBackupsLocally($filenames, $this->backup->server);
             }
             if ($this->delete_associated_backups_s3 && $this->backup->s3) {
-                deleteOldBackupsFromS3($this->backup);
+                $filenames = $this->backup->executions->pluck('filename')->filter()->all();
+                deleteBackupsS3($filenames, $this->backup->s3);
             }
 
             $this->backup->delete();

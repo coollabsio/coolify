@@ -352,7 +352,7 @@ function deleteOldBackupsFromS3($backup): void
         }
 
         if (! empty($filesToDelete)) {
-            deleteBackupsS3($filesToDelete, $backup->server, $backup->s3);
+            deleteBackupsS3($filesToDelete, $backup->s3);
             if (! empty($executionIds)) {
                 $backup->executions()
                     ->whereIn('id', $executionIds)
