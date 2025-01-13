@@ -299,7 +299,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Unsupported database type');
                     }
                     $size = $this->calculate_size();
-                    $this->remove_old_backups();
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
@@ -322,6 +321,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                     $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output, $database));
                 }
+            }
+            if ($this->backup_log && $this->backup_log->status === 'success') {
+                removeOldBackups($this->backup);
             }
         } catch (\Throwable $e) {
             throw $e;
@@ -455,14 +457,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function calculate_size()
     {
         return instant_remote_process(["du -b $this->backup_location | cut -f1"], $this->server, false);
-    }
-
-    private function remove_old_backups(): void
-    {
-        deleteOldBackupsLocally($this->backup);
-        if ($this->backup->save_s3) {
-            deleteOldBackupsFromS3($this->backup);
-        }
     }
 
     private function upload_to_s3(): void
