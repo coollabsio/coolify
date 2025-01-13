@@ -61,15 +61,19 @@ class BackupExecutions extends Component
             ? $execution->scheduledDatabaseBackup->database->service->destination->server
             : $execution->scheduledDatabaseBackup->database->destination->server;
 
-        deleteBackupsLocally($execution->filename, $server);
+        try {
+            deleteBackupsLocally($execution->filename, $server);
 
-        if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
-            deleteBackupsS3($execution->filename, $server, $execution->scheduledDatabaseBackup->s3);
+            if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
+                deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+            }
+
+            $execution->delete();
+            $this->dispatch('success', 'Backup deleted.');
+            $this->refreshBackupExecutions();
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
         }
-
-        $execution->delete();
-        $this->dispatch('success', 'Backup deleted.');
-        $this->refreshBackupExecutions();
     }
 
     public function download_file($exeuctionId)
