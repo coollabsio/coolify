@@ -99,7 +99,7 @@ class Configuration extends Component
             $this->service->databases->each(function ($database) {
                 $database->refresh();
             });
-            $this->dispatch('$refresh');
+            $this->dispatch('refresh');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
