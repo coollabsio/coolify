@@ -49,14 +49,17 @@ class BackupEdit extends Component
     #[Validate(['required', 'integer'])]
     public ?int $databaseBackupRetentionDaysLocally = 0;
 
+    #[Validate(['required', 'numeric', 'min:0'])]
+    public ?float $databaseBackupRetentionMaxStorageLocally = 0;
+
     #[Validate(['required', 'integer'])]
     public ?int $databaseBackupRetentionAmountS3 = 0;
 
     #[Validate(['required', 'integer'])]
     public ?int $databaseBackupRetentionDaysS3 = 0;
 
-    #[Validate(['required', 'integer'])]
-    public ?int $databaseBackupRetentionMaxStorageS3 = 0;
+    #[Validate(['required', 'numeric', 'min:0'])]
+    public ?float $databaseBackupRetentionMaxStorageS3 = 0;
 
     #[Validate(['required', 'boolean'])]
     public bool $saveS3 = false;
@@ -87,6 +90,7 @@ class BackupEdit extends Component
             $this->backup->frequency = $this->frequency;
             $this->backup->database_backup_retention_amount_locally = $this->databaseBackupRetentionAmountLocally;
             $this->backup->database_backup_retention_days_locally = $this->databaseBackupRetentionDaysLocally;
+            $this->backup->database_backup_retention_max_storage_locally = $this->databaseBackupRetentionMaxStorageLocally;
             $this->backup->database_backup_retention_amount_s3 = $this->databaseBackupRetentionAmountS3;
             $this->backup->database_backup_retention_days_s3 = $this->databaseBackupRetentionDaysS3;
             $this->backup->database_backup_retention_max_storage_s3 = $this->databaseBackupRetentionMaxStorageS3;
@@ -102,6 +106,7 @@ class BackupEdit extends Component
             $this->timezone = data_get($this->backup->server(), 'settings.server_timezone', 'Instance timezone');
             $this->databaseBackupRetentionAmountLocally = $this->backup->database_backup_retention_amount_locally;
             $this->databaseBackupRetentionDaysLocally = $this->backup->database_backup_retention_days_locally;
+            $this->databaseBackupRetentionMaxStorageLocally = $this->backup->database_backup_retention_max_storage_locally;
             $this->databaseBackupRetentionAmountS3 = $this->backup->database_backup_retention_amount_s3;
             $this->databaseBackupRetentionDaysS3 = $this->backup->database_backup_retention_days_s3;
             $this->databaseBackupRetentionMaxStorageS3 = $this->backup->database_backup_retention_max_storage_s3;

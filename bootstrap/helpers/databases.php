@@ -263,8 +263,9 @@ function deleteOldBackupsLocally($backup): Collection
 
     $retentionAmount = $backup->database_backup_retention_amount_locally;
     $retentionDays = $backup->database_backup_retention_days_locally;
+    $maxStorageGB = $backup->database_backup_retention_max_storage_locally;
 
-    if ($retentionAmount === 0 && $retentionDays === 0) {
+    if ($retentionAmount === 0 && $retentionDays === 0 && $maxStorageGB === 0) {
         return collect();
     }
 
@@ -279,6 +280,26 @@ function deleteOldBackupsLocally($backup): Collection
         $oldestAllowedDate = $successfulBackups->first()->created_at->clone()->utc()->subDays($retentionDays);
         $oldBackups = $successfulBackups->filter(fn ($execution) => $execution->created_at->utc() < $oldestAllowedDate);
         $backupsToDelete = $backupsToDelete->merge($oldBackups);
+    }
+
+    if ($maxStorageGB > 0) {
+        $maxStorageBytes = $maxStorageGB * pow(1024, 3);
+        $totalSize = 0;
+        $backupsOverLimit = collect();
+
+        $backupsToCheck = $successfulBackups->skip(1);
+
+        foreach ($backupsToCheck as $backupExecution) {
+            $totalSize += (int) $backupExecution->size;
+            if ($totalSize > $maxStorageBytes) {
+                $backupsOverLimit = $successfulBackups->filter(
+                    fn ($b) => $b->created_at->utc() <= $backupExecution->created_at->utc()
+                )->skip(1);
+                break;
+            }
+        }
+
+        $backupsToDelete = $backupsToDelete->merge($backupsOverLimit);
     }
 
     $backupsToDelete = $backupsToDelete->unique('id');
@@ -345,14 +366,18 @@ function deleteOldBackupsFromS3($backup): Collection
     }
 
     if ($maxStorageGB > 0) {
-        $maxStorageBytes = $maxStorageGB * 1024 * 1024 * 1024;
+        $maxStorageBytes = $maxStorageGB * pow(1024, 3);
         $totalSize = 0;
         $backupsOverLimit = collect();
 
-        foreach ($successfulBackups as $backup) {
-            $totalSize += (int) $backup->size;
+        $backupsToCheck = $successfulBackups->skip(1);
+
+        foreach ($backupsToCheck as $backupExecution) {
+            $totalSize += (int) $backupExecution->size;
             if ($totalSize > $maxStorageBytes) {
-                $backupsOverLimit = $successfulBackups->filter(fn ($b) => $b->created_at->utc() <= $backup->created_at->utc());
+                $backupsOverLimit = $successfulBackups->filter(
+                    fn ($b) => $b->created_at->utc() <= $backupExecution->created_at->utc()
+                )->skip(1);
                 break;
             }
         }
