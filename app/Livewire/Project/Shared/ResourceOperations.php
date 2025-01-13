@@ -153,14 +153,15 @@ class ResourceOperations extends Component
                         StopApplication::dispatch($this->resource, false, false);
                         $sourceVolume = $volume->name;
                         $targetVolume = $newPersistentVolume->name;
-                        $server = $this->resource->destination->server;
+                        $sourceServer = $this->resource->destination->server;
+                        $targetServer = $new_resource->destination->server;
 
-                        VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                        VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                         queue_application_deployment(
                             deployment_uuid: (string) new Cuid2,
                             application: $this->resource,
-                            server: $server,
+                            server: $sourceServer,
                             destination: $this->resource->destination,
                             no_questions_asked: true
                         );
@@ -276,9 +277,10 @@ class ResourceOperations extends Component
                         StopDatabase::dispatch($this->resource);
                         $sourceVolume = $volume->name;
                         $targetVolume = $newPersistentVolume->name;
-                        $server = $this->resource->destination->server;
+                        $sourceServer = $this->resource->destination->server;
+                        $targetServer = $new_resource->destination->server;
 
-                        VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                        VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                         StartDatabase::dispatch($this->resource);
                     } catch (\Exception $e) {
@@ -413,9 +415,10 @@ class ResourceOperations extends Component
                             StopService::dispatch($application, false, false);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
-                            $server = $application->service->destination->server;
+                            $sourceServer = $application->service->destination->server;
+                            $targetServer = $new_resource->destination->server;
 
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                             StartService::dispatch($application);
                         } catch (\Exception $e) {
@@ -454,9 +457,10 @@ class ResourceOperations extends Component
                             StopService::dispatch($database->service, false, false);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
-                            $server = $database->service->destination->server;
+                            $sourceServer = $database->service->destination->server;
+                            $targetServer = $new_resource->destination->server;
 
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                             StartService::dispatch($database->service);
                         } catch (\Exception $e) {

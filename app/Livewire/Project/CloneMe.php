@@ -218,14 +218,15 @@ class CloneMe extends Component
                             StopApplication::dispatch($application, false, false);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
-                            $server = $application->destination->server;
+                            $sourceServer = $application->destination->server;
+                            $targetServer = $newApplication->destination->server;
 
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                             queue_application_deployment(
                                 deployment_uuid: (string) new Cuid2,
                                 application: $application,
-                                server: $server,
+                                server: $sourceServer,
                                 destination: $application->destination,
                                 no_questions_asked: true
                             );
@@ -325,9 +326,10 @@ class CloneMe extends Component
                             StopDatabase::dispatch($database);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
-                            $server = $database->destination->server;
+                            $sourceServer = $database->destination->server;
+                            $targetServer = $newDatabase->destination->server;
 
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                             StartDatabase::dispatch($database);
                         } catch (\Exception $e) {
@@ -452,9 +454,10 @@ class CloneMe extends Component
                                 StopService::dispatch($application, false, false);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $server = $application->service->destination->server;
+                                $sourceServer = $application->service->destination->server;
+                                $targetServer = $newService->destination->server;
 
-                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                                 StartService::dispatch($application);
                             } catch (\Exception $e) {
@@ -505,9 +508,10 @@ class CloneMe extends Component
                                 StopService::dispatch($database->service, false, false);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
-                                $server = $database->service->destination->server;
+                                $sourceServer = $database->service->destination->server;
+                                $targetServer = $newService->destination->server;
 
-                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $server, $newPersistentVolume);
+                                VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                                 StartService::dispatch($database->service);
                             } catch (\Exception $e) {
