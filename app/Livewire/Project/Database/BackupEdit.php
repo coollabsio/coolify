@@ -123,13 +123,29 @@ class BackupEdit extends Component
         }
 
         try {
-            if ($this->delete_associated_backups_locally) {
-                $filenames = $this->backup->executions->pluck('filename')->filter()->all();
-                deleteBackupsLocally($filenames, $this->backup->server);
+            $server = null;
+            if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
+                $server = $this->backup->database->service->destination->server;
+            } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
+                $server = $this->backup->database->destination->server;
             }
-            if ($this->delete_associated_backups_s3 && $this->backup->s3) {
-                $filenames = $this->backup->executions->pluck('filename')->filter()->all();
-                deleteBackupsS3($filenames, $this->backup->s3);
+
+            $filenames = $this->backup->executions()
+                ->whereNotNull('filename')
+                ->where('filename', '!=', '')
+                ->where('scheduled_database_backup_id', $this->backup->id)
+                ->pluck('filename')
+                ->filter()
+                ->all();
+
+            if (! empty($filenames)) {
+                if ($this->delete_associated_backups_locally && $server) {
+                    deleteBackupsLocally($filenames, $server);
+                }
+
+                if ($this->delete_associated_backups_s3 && $this->backup->s3) {
+                    deleteBackupsS3($filenames, $this->backup->s3);
+                }
             }
 
             $this->backup->delete();
@@ -145,7 +161,9 @@ class BackupEdit extends Component
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
+
             return handleError($e, $this);
         }
     }

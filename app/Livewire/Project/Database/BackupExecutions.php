@@ -62,10 +62,12 @@ class BackupExecutions extends Component
             : $execution->scheduledDatabaseBackup->database->destination->server;
 
         try {
-            deleteBackupsLocally($execution->filename, $server);
+            if ($execution->filename) {
+                deleteBackupsLocally($execution->filename, $server);
 
-            if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
-                deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+                if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
+                    deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+                }
             }
 
             $execution->delete();
