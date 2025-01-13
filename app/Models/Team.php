@@ -247,8 +247,17 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function sources()
     {
         $sources = collect([]);
-        $github_apps = $this->hasMany(GithubApp::class)->whereisPublic(false)->get();
-        $gitlab_apps = $this->hasMany(GitlabApp::class)->whereisPublic(false)->get();
+        $github_apps = GithubApp::where(function ($query) {
+            $query->where('team_id', $this->id)
+                ->Where('is_public', false)
+                ->orWhere('is_system_wide', true);
+        })->get();
+
+        $gitlab_apps = GitlabApp::where(function ($query) {
+            $query->where('team_id', $this->id)
+                ->Where('is_public', false)
+                ->orWhere('is_system_wide', true);
+        })->get();
 
         return $sources->merge($github_apps)->merge($gitlab_apps);
     }
