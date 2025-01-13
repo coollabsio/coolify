@@ -12,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Visus\Cuid2\Cuid2;
 
@@ -183,6 +184,9 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server): voi
     }
     $quotedFiles = array_map(fn ($file) => "\"$file\"", $filenames);
     instant_remote_process(['rm -f '.implode(' ', $quotedFiles)], $server, throwError: false);
+
+    $foldersToCheck = collect($filenames)->map(fn ($file) => dirname($file))->unique();
+    $foldersToCheck->each(fn ($folder) => deleteEmptyBackupFolder($folder, $server));
 }
 
 function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
@@ -225,10 +229,27 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
     }
 }
 
-function deleteOldBackupsLocally($backup): void
+function removeOldBackups($backup): void
+{
+    try {
+        $processedBackups = deleteOldBackupsLocally($backup);
+
+        if ($backup->save_s3) {
+            $processedBackups = $processedBackups->merge(deleteOldBackupsFromS3($backup));
+        }
+
+        if ($processedBackups->isNotEmpty()) {
+            $backup->executions()->whereIn('id', $processedBackups->pluck('id'))->delete();
+        }
+    } catch (\Exception $e) {
+        throw $e;
+    }
+}
+
+function deleteOldBackupsLocally($backup): Collection
 {
     if (! $backup || ! $backup->executions) {
-        return;
+        return collect();
     }
 
     $successfulBackups = $backup->executions()
@@ -237,20 +258,21 @@ function deleteOldBackupsLocally($backup): void
         ->get();
 
     if ($successfulBackups->isEmpty()) {
-        return;
+        return collect();
     }
 
     $retentionAmount = $backup->database_backup_retention_amount_locally;
     $retentionDays = $backup->database_backup_retention_days_locally;
 
     if ($retentionAmount === 0 && $retentionDays === 0) {
-        return;
+        return collect();
     }
 
     $backupsToDelete = collect();
 
     if ($retentionAmount > 0) {
-        $backupsToDelete = $backupsToDelete->merge($successfulBackups->skip($retentionAmount));
+        $byAmount = $successfulBackups->skip($retentionAmount);
+        $backupsToDelete = $backupsToDelete->merge($byAmount);
     }
 
     if ($retentionDays > 0) {
@@ -260,35 +282,36 @@ function deleteOldBackupsLocally($backup): void
     }
 
     $backupsToDelete = $backupsToDelete->unique('id');
-    $foldersToCheck = collect();
+    $processedBackups = collect();
 
-    $backupsToDelete->chunk(10)->each(function ($chunk) use ($backup, &$foldersToCheck) {
-        $executionIds = [];
-        $filesToDelete = [];
+    $server = null;
+    if ($backup->database_type === \App\Models\ServiceDatabase::class) {
+        $server = $backup->database->service->server;
+    } else {
+        $server = $backup->database->destination->server;
+    }
 
-        foreach ($chunk as $execution) {
-            if ($execution->filename) {
-                $filesToDelete[] = $execution->filename;
-                $executionIds[] = $execution->id;
-                $foldersToCheck->push(dirname($execution->filename));
-            }
-        }
+    if (! $server) {
+        return collect();
+    }
 
-        if (! empty($filesToDelete)) {
-            deleteBackupsLocally($filesToDelete, $backup->server);
-            if (! empty($executionIds)) {
-                $backup->executions()->whereIn('id', $executionIds)->delete();
-            }
-        }
-    });
+    $filesToDelete = $backupsToDelete
+        ->filter(fn ($execution) => ! empty($execution->filename))
+        ->pluck('filename')
+        ->all();
 
-    $foldersToCheck->unique()->each(fn ($folder) => deleteEmptyBackupFolder($folder, $backup->server));
+    if (! empty($filesToDelete)) {
+        deleteBackupsLocally($filesToDelete, $server);
+        $processedBackups = $backupsToDelete;
+    }
+
+    return $processedBackups;
 }
 
-function deleteOldBackupsFromS3($backup): void
+function deleteOldBackupsFromS3($backup): Collection
 {
     if (! $backup || ! $backup->executions || ! $backup->s3) {
-        return;
+        return collect();
     }
 
     $successfulBackups = $backup->executions()
@@ -297,7 +320,7 @@ function deleteOldBackupsFromS3($backup): void
         ->get();
 
     if ($successfulBackups->isEmpty()) {
-        return;
+        return collect();
     }
 
     $retentionAmount = $backup->database_backup_retention_amount_s3;
@@ -305,13 +328,14 @@ function deleteOldBackupsFromS3($backup): void
     $maxStorageGB = $backup->database_backup_retention_max_storage_s3;
 
     if ($retentionAmount === 0 && $retentionDays === 0 && $maxStorageGB === 0) {
-        return;
+        return collect();
     }
 
     $backupsToDelete = collect();
 
     if ($retentionAmount > 0) {
-        $backupsToDelete = $backupsToDelete->merge($successfulBackups->skip($retentionAmount));
+        $byAmount = $successfulBackups->skip($retentionAmount);
+        $backupsToDelete = $backupsToDelete->merge($byAmount);
     }
 
     if ($retentionDays > 0) {
@@ -337,31 +361,19 @@ function deleteOldBackupsFromS3($backup): void
     }
 
     $backupsToDelete = $backupsToDelete->unique('id');
-    $foldersToCheck = collect();
+    $processedBackups = collect();
 
-    $backupsToDelete->chunk(10)->each(function ($chunk) use ($backup, &$foldersToCheck) {
-        $executionIds = [];
-        $filesToDelete = [];
+    $filesToDelete = $backupsToDelete
+        ->filter(fn ($execution) => ! empty($execution->filename))
+        ->pluck('filename')
+        ->all();
 
-        foreach ($chunk as $execution) {
-            if ($execution->filename) {
-                $filesToDelete[] = $execution->filename;
-                $executionIds[] = $execution->id;
-                $foldersToCheck->push(dirname($execution->filename));
-            }
-        }
+    if (! empty($filesToDelete)) {
+        deleteBackupsS3($filesToDelete, $backup->s3);
+        $processedBackups = $backupsToDelete;
+    }
 
-        if (! empty($filesToDelete)) {
-            deleteBackupsS3($filesToDelete, $backup->s3);
-            if (! empty($executionIds)) {
-                $backup->executions()
-                    ->whereIn('id', $executionIds)
-                    ->update(['s3_backup_deleted_at' => now()]);
-            }
-        }
-    });
-
-    $foldersToCheck->unique()->each(fn ($folder) => deleteEmptyBackupFolder($folder, $backup->server));
+    return $processedBackups;
 }
 
 function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null): bool
