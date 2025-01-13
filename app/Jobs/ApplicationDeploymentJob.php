@@ -166,8 +166,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $preserveRepository = false;
 
-    public $tries = 1;
-
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
