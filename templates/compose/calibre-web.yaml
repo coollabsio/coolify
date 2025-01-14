@@ -1,12 +1,12 @@
 # documentation: https://github.com/linuxserver/docker-calibre-web
-# slogan: Calibre-web is a web app providing a clean interface for browsing, reading and downloading eBooks using an existing Calibre database.
+# slogan: Calibre-web is a web app providing a clean interface for browsing, reading and downloading eBooks.
 # tags: calibre,calibre-web,ebook,library,epub,ereader,kindle,book,reader 
 # logo: svgs/calibre-web.svg
 # port: 8083
 
 services:
   calibre-web:
-    image: 'lscr.io/linuxserver/calibre-web:latest'
+    image: lscr.io/linuxserver/calibre-web:latest
     environment:
       - SERVICE_FQDN_CALIBRE_8083
       - PUID=1000
@@ -15,9 +15,8 @@ services:
       # optional & x86-64 only Adds the ability to perform ebook conversion
       - 'DOCKER_MODS=${DOCKER_MODS:-linuxserver/mods:universal-calibre}'
     volumes:
-      - 'calibre-web-data:/config'
-      - 'calibre-library:/books'
-    restart: unless-stopped
+      - calibre_web_data:/config
+      - calibre_library:/books
     healthcheck:
       test:
         - CMD

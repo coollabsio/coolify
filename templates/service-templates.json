@@ -266,6 +266,25 @@
         "minversion": "0.0.0",
         "port": "3000"
     },
+    "calibre-web": {
+        "documentation": "https://github.com/linuxserver/docker-calibre-web?utm_source=coolify.io",
+        "slogan": "Calibre-web is a web app providing a clean interface for browsing, reading and downloading eBooks.",
+        "compose": "c2VydmljZXM6CiAgY2FsaWJyZS13ZWI6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvY2FsaWJyZS13ZWI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0NBTElCUkVfODA4MwogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtICdUWj0ke1RaOi1FdGMvVVRDfScKICAgICAgLSAnRE9DS0VSX01PRFM9JHtET0NLRVJfTU9EUzotbGludXhzZXJ2ZXIvbW9kczp1bml2ZXJzYWwtY2FsaWJyZX0nCiAgICB2b2x1bWVzOgogICAgICAtICdjYWxpYnJlX3dlYl9kYXRhOi9jb25maWcnCiAgICAgIC0gJ2NhbGlicmVfbGlicmFyeTovYm9va3MnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODA4MycKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "calibre",
+            "calibre-web",
+            "ebook",
+            "library",
+            "epub",
+            "ereader",
+            "kindle",
+            "book",
+            "reader"
+        ],
+        "logo": "svgs/calibre-web.svg",
+        "minversion": "0.0.0",
+        "port": "8083"
+    },
     "castopod": {
         "documentation": "https://docs.castopod.org/main/en/?utm_source=coolify.io",
         "slogan": "Castopod is a free & open-source hosting platform made for podcasters who want engage and interact with their audience.",
