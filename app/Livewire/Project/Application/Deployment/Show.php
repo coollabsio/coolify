@@ -14,6 +14,8 @@ class Show extends Component
 
     public string $deployment_uuid;
 
+    public string $horizon_job_status;
+
     public $isKeepAliveOn = true;
 
     protected $listeners = ['refreshQueue'];
@@ -44,7 +46,9 @@ class Show extends Component
         }
         $this->application = $application;
         $this->application_deployment_queue = $application_deployment_queue;
+        $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
+        $this->isKeepAliveOn();
     }
 
     public function refreshQueue()
@@ -52,13 +56,21 @@ class Show extends Component
         $this->application_deployment_queue->refresh();
     }
 
+    private function isKeepAliveOn()
+    {
+        if (data_get($this->application_deployment_queue, 'status') === 'finished' || data_get($this->application_deployment_queue, 'status') === 'failed') {
+            $this->isKeepAliveOn = false;
+        } else {
+            $this->isKeepAliveOn = true;
+        }
+    }
+
     public function polling()
     {
         $this->dispatch('deploymentFinished');
         $this->application_deployment_queue->refresh();
-        if (data_get($this->application_deployment_queue, 'status') === 'finished' || data_get($this->application_deployment_queue, 'status') === 'failed') {
-            $this->isKeepAliveOn = false;
-        }
+        $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
+        $this->isKeepAliveOn();
     }
 
     public function getLogLinesProperty()

@@ -45,8 +45,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public static int $batch_counter = 0;
 
-    private int $application_deployment_queue_id;
-
     private bool $newVersionIsHealthy = false;
 
     private ApplicationDeploymentQueue $application_deployment_queue;
@@ -168,18 +166,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $preserveRepository = false;
 
-    public function __construct(int $application_deployment_queue_id)
+    public function tags()
+    {
+        // Do not remove this one, it needs to properly identify which worker is running the job
+        return ['App\Models\ApplicationDeploymentQueue:'.$this->application_deployment_queue_id];
+    }
+
+    public function __construct(public int $application_deployment_queue_id)
     {
         $this->onQueue('high');
 
+        $this->application_deployment_queue = ApplicationDeploymentQueue::find($this->application_deployment_queue_id);
         $this->nixpacks_plan_json = collect([]);
 
-        $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
         $this->build_args = collect([]);
 
-        $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
@@ -237,15 +240,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function tags(): array
-    {
-        return ['server:'.gethostname()];
-    }
-
     public function handle(): void
     {
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+            'horizon_job_worker' => gethostname(),
         ]);
         if ($this->server->isFunctional() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
@@ -2391,7 +2390,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
         if (
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value &&
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
         ) {
             $this->application_deployment_queue->update([
                 'status' => $status,

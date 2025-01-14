@@ -71,6 +71,31 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     return $output === 'null' ? null : $output;
 }
 
+function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
+{
+    $command = $command instanceof Collection ? $command->toArray() : $command;
+    if ($server->isNonRoot() && ! $no_sudo) {
+        $command = parseCommandsByLineForSudo(collect($command), $server);
+    }
+    $command_string = implode("\n", $command);
+
+    // $start_time = microtime(true);
+    $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
+    $process = Process::timeout(30)->run($sshCommand);
+    // $end_time = microtime(true);
+
+    // $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
+    // ray('SSH command execution time:', $execution_time.' ms')->orange();
+
+    $output = trim($process->output());
+    $exitCode = $process->exitCode();
+
+    if ($exitCode !== 0) {
+        return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
+    }
+
+    return $output === 'null' ? null : $output;
+}
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;

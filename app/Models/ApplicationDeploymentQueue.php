@@ -70,6 +70,11 @@ class ApplicationDeploymentQueue extends Model
         return collect(json_decode($this->logs))->where('name', $name)->first()?->output ?? null;
     }
 
+    public function getHorizonJobStatus()
+    {
+        return getJobStatus($this->horizon_job_id);
+    }
+
     public function commitMessage()
     {
         if (empty($this->commit_message) || is_null($this->commit_message)) {

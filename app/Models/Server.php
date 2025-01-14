@@ -54,6 +54,8 @@ class Server extends BaseModel
 
     public static $batch_counter = 0;
 
+    protected $appends = ['is_coolify_host'];
+
     protected static function booted()
     {
         static::saving(function ($server) {
@@ -154,6 +156,15 @@ class Server extends BaseModel
     public function type()
     {
         return 'server';
+    }
+
+    protected function isCoolifyHost(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->id === 0;
+            }
+        );
     }
 
     public static function isReachable()
@@ -656,9 +667,9 @@ $schema://$host {
         $containers = collect([]);
         $containerReplicates = collect([]);
         if ($this->isSwarm()) {
-            $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
             $containers = format_docker_command_output_to_json($containers);
-            $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this, false);
+            $containerReplicates = instant_remote_process_with_timeout(["docker service ls --format '{{json .}}'"], $this, false);
             if ($containerReplicates) {
                 $containerReplicates = format_docker_command_output_to_json($containerReplicates);
                 foreach ($containerReplicates as $containerReplica) {
@@ -682,7 +693,7 @@ $schema://$host {
                 }
             }
         } else {
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
             $containers = format_docker_command_output_to_json($containers);
             $containerReplicates = collect([]);
         }
