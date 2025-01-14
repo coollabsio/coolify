@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "85a775fb1a4b9ea329d8d893f43621c2",
+    "content-hash": "83823b6e6da5f7d476556d5c95620f5b",
     "packages": [
         {
             "name": "3sidedcube/laravel-redoc",
@@ -928,16 +928,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.336.12",
+            "version": "3.336.14",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "a173ab3af8d9186d266e4937d8254597f36a9e15"
+                "reference": "dc9ac0ab313bbfc4e41635ce6d6083f28d202bf0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/a173ab3af8d9186d266e4937d8254597f36a9e15",
-                "reference": "a173ab3af8d9186d266e4937d8254597f36a9e15",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/dc9ac0ab313bbfc4e41635ce6d6083f28d202bf0",
+                "reference": "dc9ac0ab313bbfc4e41635ce6d6083f28d202bf0",
                 "shasum": ""
             },
             "require": {
@@ -1020,9 +1020,9 @@
             "support": {
                 "forum": "https://forums.aws.amazon.com/forum.jspa?forumID=80",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.336.12"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.336.14"
             },
-            "time": "2025-01-09T19:04:34+00:00"
+            "time": "2025-01-13T19:04:40+00:00"
         },
         {
             "name": "bacon/bacon-qr-code",
@@ -8105,16 +8105,16 @@
         },
         {
             "name": "spatie/php-structure-discoverer",
-            "version": "2.2.1",
+            "version": "2.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/php-structure-discoverer.git",
-                "reference": "e2b39ba0baaf05d1300c5467e7ee8a6439324827"
+                "reference": "42d161298630ede76c61e8a437a06eea2e106f4c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/php-structure-discoverer/zipball/e2b39ba0baaf05d1300c5467e7ee8a6439324827",
-                "reference": "e2b39ba0baaf05d1300c5467e7ee8a6439324827",
+                "url": "https://api.github.com/repos/spatie/php-structure-discoverer/zipball/42d161298630ede76c61e8a437a06eea2e106f4c",
+                "reference": "42d161298630ede76c61e8a437a06eea2e106f4c",
                 "shasum": ""
             },
             "require": {
@@ -8173,7 +8173,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/php-structure-discoverer/issues",
-                "source": "https://github.com/spatie/php-structure-discoverer/tree/2.2.1"
+                "source": "https://github.com/spatie/php-structure-discoverer/tree/2.3.0"
             },
             "funding": [
                 {
@@ -8181,7 +8181,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2024-12-16T13:29:18+00:00"
+            "time": "2025-01-13T13:15:29+00:00"
         },
         {
             "name": "spatie/ray",
@@ -11629,16 +11629,16 @@
         },
         {
             "name": "zircote/swagger-php",
-            "version": "5.0.1",
+            "version": "5.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/zircote/swagger-php.git",
-                "reference": "2d365300e9bc64b935fca99a8f0bc8fe4314deb4"
+                "reference": "c6956de52edb270da4df2630b938c9ac3e26e42f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/zircote/swagger-php/zipball/2d365300e9bc64b935fca99a8f0bc8fe4314deb4",
-                "reference": "2d365300e9bc64b935fca99a8f0bc8fe4314deb4",
+                "url": "https://api.github.com/repos/zircote/swagger-php/zipball/c6956de52edb270da4df2630b938c9ac3e26e42f",
+                "reference": "c6956de52edb270da4df2630b938c9ac3e26e42f",
                 "shasum": ""
             },
             "require": {
@@ -11709,9 +11709,9 @@
             ],
             "support": {
                 "issues": "https://github.com/zircote/swagger-php/issues",
-                "source": "https://github.com/zircote/swagger-php/tree/5.0.1"
+                "source": "https://github.com/zircote/swagger-php/tree/5.0.2"
             },
-            "time": "2025-01-09T02:31:15+00:00"
+            "time": "2025-01-09T19:42:31+00:00"
         }
     ],
     "packages-dev": [
@@ -13198,16 +13198,16 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "1.12.15",
+            "version": "2.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "c91d4e8bc056f46cf653656e6f71004b254574d1"
+                "reference": "cd6e973e04b4c2b94c86e8612b5a65f0da0e08e7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/c91d4e8bc056f46cf653656e6f71004b254574d1",
-                "reference": "c91d4e8bc056f46cf653656e6f71004b254574d1",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/cd6e973e04b4c2b94c86e8612b5a65f0da0e08e7",
+                "reference": "cd6e973e04b4c2b94c86e8612b5a65f0da0e08e7",
                 "shasum": ""
             },
             "require": {
@@ -13252,7 +13252,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-01-05T16:40:22+00:00"
+            "time": "2025-01-05T16:43:48+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -15362,12 +15362,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
         "php": "^8.4"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "plugin-api-version": "2.6.0"
 }
