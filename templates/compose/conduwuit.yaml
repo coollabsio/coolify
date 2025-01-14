@@ -1,0 +1,52 @@
+# documentation: https://conduwuit.puppyirl.gay
+# slogan: Well-maintained, featureful Matrix chat homeserver (fork of Conduit).
+# tags: backend,chat,communication,matrix,server
+# logo: svgs/conduwuit.png
+# port: 6167
+
+services:
+  homeserver:
+    image: girlbossceo/conduwuit:latest
+    restart: unless-stopped
+    ports:
+      - 8448:6167
+    volumes:
+      - db:/var/lib/conduwuit
+      #- ./conduwuit.toml:/etc/conduwuit.toml
+    environment:
+      # Edit this in your Coolify Environment
+      CONDUWUIT_SERVER_NAME: ${CONDUWUIT_SERVER_NAME}
+
+      CONDUWUIT_DATABASE_PATH: /var/lib/conduwuit
+      CONDUWUIT_PORT: 6167
+      CONDUWUIT_MAX_REQUEST_SIZE: 20000000 # in bytes, ~20 MB
+
+      CONDUWUIT_ALLOW_REGISTRATION: 'true'
+      CONDUWUIT_REGISTRATION_TOKEN: ${SERVICE_PASSWORD_REGISTRATIONTOKEN}
+
+      CONDUWUIT_ALLOW_FEDERATION: 'true'
+      CONDUWUIT_ALLOW_CHECK_FOR_UPDATES: 'true'
+      CONDUWUIT_TRUSTED_SERVERS: '["matrix.org"]'
+      #CONDUWUIT_LOG: warn,state_res=warn
+      CONDUWUIT_ADDRESS: 0.0.0.0
+
+      # Uncomment if you mapped config toml in volumes
+      #CONDUWUIT_CONFIG: '/etc/conduwuit.toml'
+
+
+  ### Uncomment if you want to use your own Element-Web App.
+  ### Note: You need to provide a config.json for Element and you also need a second
+  ###     Domain or Subdomain for the communication between Element and conduwuit
+  ### Config-Docs: https://github.com/vector-im/element-web/blob/develop/docs/config.md
+  # element-web:
+  #   image: vectorim/element-web:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - 8009:80
+  #   volumes:
+  #     - ./element_config.json:/app/config.json
+  #   depends_on:
+  #     - homeserver
+
+volumes:
+  db:
