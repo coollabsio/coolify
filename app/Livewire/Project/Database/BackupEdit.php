@@ -210,7 +210,7 @@ class BackupEdit extends Component
         return view('livewire.project.database.backup-edit', [
             'checkboxes' => [
                 ['id' => 'delete_associated_backups_locally', 'label' => __('database.delete_backups_locally')],
-                ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this backup job for this database will be permanently deleted from the selected S3 Storage.'],
+                ['id' => 'delete_associated_backups_s3', 'label' => 'All backups will be permanently deleted (associated with this backup job) from the selected S3 Storage.'],
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected SFTP Storage.']
             ],
         ]);
