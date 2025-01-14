@@ -18,9 +18,9 @@ class BackupExecutions extends Component
 
     public $setDeletableBackup;
 
-    public $delete_backup_s3 = true;
+    public $delete_backup_s3 = false;
 
-    public $delete_backup_sftp = true;
+    public $delete_backup_sftp = false;
 
     public function getListeners()
     {
@@ -57,23 +57,25 @@ class BackupExecutions extends Component
             return;
         }
 
-        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
-        } else {
-            delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
-        }
+        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class
+            ? $execution->scheduledDatabaseBackup->database->service->destination->server
+            : $execution->scheduledDatabaseBackup->database->destination->server;
 
-        if ($this->delete_backup_s3) {
-            // Add logic to delete from S3
-        }
+        try {
+            if ($execution->filename) {
+                deleteBackupsLocally($execution->filename, $server);
 
-        if ($this->delete_backup_sftp) {
-            // Add logic to delete from SFTP
-        }
+                if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
+                    deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+                }
+            }
 
-        $execution->delete();
-        $this->dispatch('success', 'Backup deleted.');
-        $this->refreshBackupExecutions();
+            $execution->delete();
+            $this->dispatch('success', 'Backup deleted.');
+            $this->refreshBackupExecutions();
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
+        }
     }
 
     public function download_file($exeuctionId)
@@ -83,8 +85,10 @@ class BackupExecutions extends Component
 
     public function refreshBackupExecutions(): void
     {
-        if ($this->backup) {
-            $this->executions = $this->backup->executions()->get();
+        if ($this->backup && $this->backup->exists) {
+            $this->executions = $this->backup->executions()->get()->toArray();
+        } else {
+            $this->executions = [];
         }
     }
 
@@ -141,7 +145,7 @@ class BackupExecutions extends Component
         return view('livewire.project.database.backup-executions', [
             'checkboxes' => [
                 ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently form S3 Storage'],
-                ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently form SFTP Storage'],
+                // ['id' => 'delete_backup_sftp', 'label' => 'Delete the selected backup permanently form SFTP Storage'],
             ],
         ]);
     }

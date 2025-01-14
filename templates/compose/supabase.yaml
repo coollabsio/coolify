@@ -15,6 +15,7 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_SUPABASEKONG_8000
+      - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
@@ -278,7 +279,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240923-2e3e90c
+    image: supabase/studio:20241202-71e5240
     healthcheck:
       test:
         [
@@ -315,8 +316,9 @@ services:
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
   supabase-db:
-    image: supabase/postgres:15.1.1.78
+    image: supabase/postgres:15.6.1.146
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -366,6 +368,7 @@ services:
           \c _supabase
           create schema if not exists _supavisor;
           alter schema _supavisor owner to :pguser;
+          \c postgres
       - type: bind
         source: ./volumes/db/webhooks.sql
         target: /docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql
@@ -609,6 +612,7 @@ services:
           \c _supabase
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
+          \c postgres
       # Use named volume to persist pgsodium decryption key between restarts
       - supabase-db-config:/etc/postgresql-custom
 
@@ -927,7 +931,7 @@ services:
     command: "postgrest"
     exclude_from_hc: true
   supabase-auth:
-    image: supabase/gotrue:v2.158.1
+    image: supabase/gotrue:v2.164.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1018,7 +1022,7 @@ services:
 
   realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.30.34
+    image: supabase/realtime:v2.33.70
     container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
@@ -1061,6 +1065,9 @@ services:
       - RLIMIT_NOFILE=10000
       - APP_NAME=realtime
       - SEED_SELF_HOST=true
+      - LOG_LEVEL=error
+      - RUN_JANITOR=true
+      - JANITOR_INTERVAL=60000
     command: >
       sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
   supabase-minio:
@@ -1098,7 +1105,7 @@ services:
           exit 0
 
   supabase-storage:
-    image: supabase/storage-api:v1.10.1
+    image: supabase/storage-api:v1.14.6
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1137,12 +1144,14 @@ services:
       - UPLOAD_FILE_SIZE_LIMIT=524288000
       - UPLOAD_FILE_SIZE_LIMIT_STANDARD=524288000
       - UPLOAD_SIGNED_URL_EXPIRATION_TIME=120
-      - TUS_URL_PATH=/upload/resumable
+      - TUS_URL_PATH=upload/resumable
       - TUS_MAX_SIZE=3600000
       - ENABLE_IMAGE_TRANSFORMATION=true
       - IMGPROXY_URL=http://imgproxy:8080
       - IMGPROXY_REQUEST_TIMEOUT=15
       - DATABASE_SEARCH_PATH=storage
+      - NODE_ENV=production
+      - REQUEST_ALLOW_X_FORWARDED_PATH=true
 
       # - ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
       # - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
@@ -1182,7 +1191,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.83.2
+    image: supabase/postgres-meta:v0.84.2
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1198,7 +1207,7 @@ services:
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.58.3
+    image: supabase/edge-runtime:v1.65.3
     depends_on:
       supabase-analytics:
         condition: service_healthy

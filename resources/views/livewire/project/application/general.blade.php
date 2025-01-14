@@ -84,7 +84,7 @@
                         <option value="non-www">Redirect to non-www.</option>
                     </x-forms.select>
                     <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
-                        submitAction="set_redirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
+                        submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
                         confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
                         shortConfirmationLabel="Application URL" :confirmWithPassword="false" step2ButtonText="Set Direction">
                         <x-slot:customButton>
@@ -161,8 +161,7 @@
                             </div>
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
-                                <a class="underline"
-                                    href="https://coolify.io/docs/applications">Framework
+                                <a class="underline" href="https://coolify.io/docs/applications">Framework
                                     Specific Docs</a>
                             </div>
                         @endif
@@ -284,9 +283,9 @@
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
-                    <x-forms.checkbox label="Readonly labels"
-                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
-                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
+                    {{-- <x-forms.checkbox label="Readonly labels"
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can alway reset the labels to the coolify defaults manually)."
+                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox> --}}
                 </div>
             @endif
             @if ($application->dockerfile)
@@ -309,15 +308,20 @@
                     @endif
                 </div>
 
-                <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
-                    monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
+                @if ($application->settings->is_container_label_readonly_enabled)
+                    <x-forms.textarea readonly disabled label="Container Labels" rows="15" id="customLabels"
+                        monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
+                @else
+                    <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
+                        monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
+                @endif
                 <div class="w-96">
+                    <x-forms.checkbox label="Readonly labels"
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can alway reset the labels to the coolify defaults manually)."
+                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
-                    <x-forms.checkbox label="Readonly labels"
-                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
-                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
                     buttonTitle="Reset Labels to Defaults" buttonFullWidth submitAction="resetDefaultLabels(true)"

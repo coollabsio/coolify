@@ -1,1 +1,1 @@
-<x-forms.button wire:click='backup_now'>Backup Now</x-forms.button>
+<x-forms.button wire:click='backupNow'>Backup Now</x-forms.button>

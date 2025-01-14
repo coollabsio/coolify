@@ -47,6 +47,7 @@
                         @endif
                         <x-modal-confirmation title="Confirm Backup Deletion?" buttonTitle="Delete" isErrorButton
                             submitAction="deleteBackup({{ data_get($execution, 'id') }})"
+                            :checkboxes="$checkboxes"
                             :actions="['This backup will be permanently deleted from local storage.']" confirmationText="{{ data_get($execution, 'filename') }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
                             shortConfirmationLabel="Backup Filename" step3ButtonText="Permanently Delete" />

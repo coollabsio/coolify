@@ -542,7 +542,7 @@ echo -e "You can access Coolify through your Public IP: http://$(curl -4s https:
 
 set +e
 DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
-PRIVATE_IPS=$(hostname -I)
+PRIVATE_IPS=$(hostname -I 2>/dev/null || ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1)
 set -e
 
 if [ -n "$PRIVATE_IPS" ]; then

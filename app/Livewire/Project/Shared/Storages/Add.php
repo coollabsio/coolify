@@ -81,11 +81,18 @@ class Add extends Component
                 'file_storage_path' => 'string',
                 'file_storage_content' => 'nullable|string',
             ]);
+
             $this->file_storage_path = trim($this->file_storage_path);
             $this->file_storage_path = str($this->file_storage_path)->start('/')->value();
+
             if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $fs_path = application_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
+            } elseif (str($this->resource->getMorphClass())->contains('Standalone')) {
+                $fs_path = database_configuration_dir().'/'.$this->resource->uuid.$this->file_storage_path;
+            } else {
+                throw new \Exception('No valid resource type for file mount storage type!');
             }
+
             LocalFileVolume::create(
                 [
                     'fs_path' => $fs_path,
@@ -109,10 +116,12 @@ class Add extends Component
                 'file_storage_directory_source' => 'string',
                 'file_storage_directory_destination' => 'string',
             ]);
+
             $this->file_storage_directory_source = trim($this->file_storage_directory_source);
             $this->file_storage_directory_source = str($this->file_storage_directory_source)->start('/')->value();
             $this->file_storage_directory_destination = trim($this->file_storage_directory_destination);
             $this->file_storage_directory_destination = str($this->file_storage_directory_destination)->start('/')->value();
+
             LocalFileVolume::create(
                 [
                     'fs_path' => $this->file_storage_directory_source,

@@ -9,15 +9,21 @@ use Livewire\Component;
 
 class Configuration extends Component
 {
+    public $currentRoute;
+
+    public $project;
+
+    public $environment;
+
     public ?Service $service = null;
 
     public $applications;
 
     public $databases;
 
-    public array $parameters;
-
     public array $query;
+
+    public array $parameters;
 
     public function getListeners()
     {
@@ -38,11 +44,21 @@ class Configuration extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        $this->currentRoute = request()->route()->getName();
         $this->query = request()->query();
-        $this->service = Service::whereUuid($this->parameters['service_uuid'])->first();
-        if (! $this->service) {
-            return redirect()->route('dashboard');
-        }
+        $project = currentTeam()
+            ->projects()
+            ->select('id', 'uuid', 'team_id')
+            ->where('uuid', request()->route('project_uuid'))
+            ->firstOrFail();
+        $environment = $project->environments()
+            ->select('id', 'uuid', 'name', 'project_id')
+            ->where('uuid', request()->route('environment_uuid'))
+            ->firstOrFail();
+        $this->service = $environment->services()->whereUuid(request()->route('service_uuid'))->firstOrFail();
+
+        $this->project = $project;
+        $this->environment = $environment;
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
     }
@@ -83,7 +99,7 @@ class Configuration extends Component
             $this->service->databases->each(function ($database) {
                 $database->refresh();
             });
-            $this->dispatch('$refresh');
+            $this->dispatch('refresh');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

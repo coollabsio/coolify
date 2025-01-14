@@ -40,6 +40,7 @@ function get_socialite_provider(string $provider)
         'github' => \Laravel\Socialite\Two\GithubProvider::class,
         'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
         'google' => \Laravel\Socialite\Two\GoogleProvider::class,
+        'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
     ];
 
     return Socialite::buildProvider(

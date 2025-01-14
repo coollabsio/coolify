@@ -5,6 +5,7 @@
     "auth.login.github": "Přihlásit se pomocí GitHubu",
     "auth.login.gitlab": "Přihlásit se pomocí Gitlabu",
     "auth.login.google": "Přihlásit se pomocí Google",
+    "auth.login.infomaniak": "Přihlásit se pomocí Infomaniak",
     "auth.already_registered": "Již jste registrováni?",
     "auth.confirm_password": "Potvrďte heslo",
     "auth.forgot_password": "Zapomněli jste heslo",
