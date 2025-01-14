@@ -13,6 +13,23 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "actualbudget": {
+        "documentation": "https://actualbudget.org/docs/install/docker?utm_source=coolify.io",
+        "slogan": "A local-first personal finance app.",
+        "compose": "c2VydmljZXM6CiAgYWN0dWFsX3NlcnZlcjoKICAgIGltYWdlOiAnYWN0dWFsYnVkZ2V0L2FjdHVhbC1zZXJ2ZXI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0FDVFVBTF81MDA2CiAgICAgIC0gQUNUVUFMX0xPR0lOX01FVEhPRD1wYXNzd29yZAogICAgdm9sdW1lczoKICAgICAgLSAnYWN0dWFsX2RhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gImJhc2ggLWMgJzo+IC9kZXYvdGNwLzEyNy4wLjAuMS81MDA2JyB8fCBleGl0IDEiCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMwo=",
+        "tags": [
+            "budgeting",
+            "actual",
+            "finance",
+            "budget",
+            "money",
+            "expenses",
+            "income"
+        ],
+        "logo": "svgs/actualbudget.png",
+        "minversion": "0.0.0",
+        "port": "5006"
+    },
     "affine": {
         "documentation": "https://docs.affine.pro/docs/self-host-affine?utm_source=coolify.io",
         "slogan": "Affine is an open-source, all-in-one workspace and OS for knowledge management, a Notion/Miro alternative.",
@@ -2504,6 +2521,21 @@
         "logo": "svgs/radarr.svg",
         "minversion": "0.0.0",
         "port": "7878"
+    },
+    "rallly": {
+        "documentation": "https://support.rallly.co/self-hosting/introduction?utm_source=coolify.io",
+        "slogan": "Rallly is an open-source scheduling and collaboration tool designed to make organizing events and meetings easier.",
+        "compose": "c2VydmljZXM6CiAgcmFsbGx5X2RiOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNC4yJwogICAgdm9sdW1lczoKICAgICAgLSAncmFsbGx5X2RiX2RhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU30nCiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTX0RCOi1yYWxsbHl9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1kICQke1BPU1RHUkVTX0RCfSAtVSAkJHtQT1NUR1JFU19VU0VSfScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQogIHJhbGxseToKICAgIGltYWdlOiAnbHVrZXZlbGxhL3JhbGxseTpsYXRlc3QnCiAgICBwbGF0Zm9ybTogbGludXgvYW1kNjQKICAgIGRlcGVuZHNfb246CiAgICAgIHJhbGxseV9kYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1JBTExMWV8zMDAwCiAgICAgIC0gJ0RBVEFCQVNFX1VSTD1wb3N0Z3JlczovLyR7U0VSVklDRV9VU0VSX1BPU1RHUkVTfToke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9QHJhbGxseV9kYjo1NDMyLyR7UE9TVEdSRVNfREI6LXJhbGxseX0nCiAgICAgIC0gJ1NFQ1JFVF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfNjRfUkFMTExZfScKICAgICAgLSAnTkVYVF9QVUJMSUNfQkFTRV9VUkw9aHR0cHM6Ly8ke1NFUlZJQ0VfVVJMX1JBTExMWX0nCiAgICAgIC0gJ0FMTE9XRURfRU1BSUxTPSR7QUxMT1dFRF9FTUFJTFN9JwogICAgICAtICdTVVBQT1JUX0VNQUlMPSR7U1VQUE9SVF9FTUFJTDotc3VwcG9ydEBleGFtcGxlLmNvbX0nCiAgICAgIC0gJ1NNVFBfSE9TVD0ke1NNVFBfSE9TVH0nCiAgICAgIC0gJ1NNVFBfUE9SVD0ke1NNVFBfUE9SVH0nCiAgICAgIC0gJ1NNVFBfU0VDVVJFPSR7U01UUF9TRUNVUkV9JwogICAgICAtICdTTVRQX1VTRVI9JHtTTVRQX1VTRVJ9JwogICAgICAtICdTTVRQX1BXRD0ke1NNVFBfUFdEfScKICAgICAgLSAnU01UUF9UTFNfRU5BQkxFRD0ke1NNVFBfVExTX0VOQUJMRUR9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICJiYXNoIC1jICc6PiAvZGV2L3RjcC8xMjcuMC4wLjEvMzAwMCcgfHwgZXhpdCAxIgogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "scheduling",
+            "rallly",
+            "events",
+            "meeting",
+            "doodle"
+        ],
+        "logo": "svgs/rallly.svg",
+        "minversion": "0.0.0",
+        "port": "3000"
     },
     "reactive-resume": {
         "documentation": "https://rxresu.me/?utm_source=coolify.io",
