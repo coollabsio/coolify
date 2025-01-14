@@ -7,13 +7,12 @@
 services:
   nodebb:
     image: ghcr.io/nodebb/nodebb:latest
-    restart: unless-stopped
     environment:
       - SERVICE_FQDN_NODEBB_4567
     volumes:
-      - nodebb-build:/usr/src/app/build
-      - nodebb-uploads:/usr/src/app/public/uploads
-      - nodebb-config:/opt/config
+      - nodebb_build:/usr/src/app/build
+      - nodebb_uploads:/usr/src/app/public/uploads
+      - nodebb_config:/opt/config
     command: >
       /bin/bash -c "
       cat > /usr/src/app/setup.json <<EOL
@@ -31,24 +30,25 @@ services:
       EOL
       && tini -- entrypoint.sh
       "
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4567"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/4567' || exit 1"]
+      interval: 5s
+      timeout: 20s
       retries: 3
-      start_period: 30s
 
   postgres:
     image: postgres:17.2-alpine
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      POSTGRES_DB: nodebb
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=nodebb
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - nodebb_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U nodebb", "-d", "nodebb" ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
+      timeout: 20s
       retries: 10
-      timeout: 2s

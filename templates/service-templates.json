@@ -2067,6 +2067,19 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "nodebb": {
+        "documentation": "https://docs.nodebb.org/?utm_source=coolify.io",
+        "slogan": "A next-generation discussion platform.",
+        "compose": "c2VydmljZXM6CiAgbm9kZWJiOgogICAgaW1hZ2U6ICdnaGNyLmlvL25vZGViYi9ub2RlYmI6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX05PREVCQl80NTY3CiAgICB2b2x1bWVzOgogICAgICAtICdub2RlYmJfYnVpbGQ6L3Vzci9zcmMvYXBwL2J1aWxkJwogICAgICAtICdub2RlYmJfdXBsb2FkczovdXNyL3NyYy9hcHAvcHVibGljL3VwbG9hZHMnCiAgICAgIC0gJ25vZGViYl9jb25maWc6L29wdC9jb25maWcnCiAgICBjb21tYW5kOiAiL2Jpbi9iYXNoIC1jIFwiIGNhdCA+IC91c3Ivc3JjL2FwcC9zZXR1cC5qc29uIDw8RU9MIHtcbiAgICBcXFwiZGVmYXVsdHNcXFwiOiB7XG4gICAgICAgIFxcXCJwb3N0Z3Jlc1xcXCI6IHtcbiAgICAgICAgICAgIFxcXCJob3N0XFxcIjogXFxcInBvc3RncmVzXFxcIixcbiAgICAgICAgICAgIFxcXCJwb3J0XFxcIjogNTQzMixcbiAgICAgICAgICAgIFxcXCJkYXRhYmFzZVxcXCI6IFxcXCJub2RlYmJcXFwiLFxuICAgICAgICAgICAgXFxcInVzZXJuYW1lXFxcIjogXFxcIiR7U0VSVklDRV9VU0VSX1BPU1RHUkVTfVxcXCIsXG4gICAgICAgICAgICBcXFwicGFzc3dvcmRcXFwiOiBcXFwiJHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTfVxcXCJcbiAgICAgICAgfVxuICAgIH1cbn0gRU9MICYmIHRpbmkgLS0gZW50cnlwb2ludC5zaCBcIlxuIgogICAgZGVwZW5kc19vbjoKICAgICAgcG9zdGdyZXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAiYmFzaCAtYyAnOj4gL2Rldi90Y3AvMTI3LjAuMC4xLzQ1NjcnIHx8IGV4aXQgMSIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAzCiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE3LjItYWxwaW5lJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtIFBPU1RHUkVTX0RCPW5vZGViYgogICAgdm9sdW1lczoKICAgICAgLSAnbm9kZWJiX3Bvc3RncmVzX2RhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdwZ19pc3JlYWR5IC1VICQke1BPU1RHUkVTX1VTRVJ9IC1kICQke1BPU1RHUkVTX0RCfScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "communication",
+            "forums",
+            "discussion"
+        ],
+        "logo": "svgs/nodebb.svg",
+        "minversion": "0.0.0",
+        "port": "4567"
+    },
     "ntfy": {
         "documentation": "https://docs.ntfy.sh/?utm_source=coolify.io",
         "slogan": "ntfy is a simple HTTP-based pub-sub notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, and/or using a REST API.",
