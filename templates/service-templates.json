@@ -1183,6 +1183,20 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "gotenberg": {
+        "documentation": "https://gotenberg.dev/docs/getting-started/introduction?utm_source=coolify.io",
+        "slogan": "Gotenberg is a Docker-powered stateless API for PDF files.",
+        "compose": "c2VydmljZXM6CiAgZ290ZW5iZXJnOgogICAgaW1hZ2U6ICdnb3RlbmJlcmcvZ290ZW5iZXJnOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9HT1RFTkJFUkdfMzAwMAogICAgICAtICdHT1RFTkJFUkdfQVBJX0JBU0lDX0FVVEhfVVNFUk5BTUU9JHtTRVJWSUNFX1VTRVJfR09URU5CRVJHfScKICAgICAgLSAnR09URU5CRVJHX0FQSV9CQVNJQ19BVVRIX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HT1RFTkJFUkd9JwogICAgY29tbWFuZDoKICAgICAgLSBnb3RlbmJlcmcKICAgICAgLSAnLS1hcGktZW5hYmxlLWJhc2ljLWF1dGgnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMC92ZXJzaW9uJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "api",
+            "backend",
+            "pdf",
+            "tool"
+        ],
+        "logo": "svgs/gotenberg.png",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "grafana-with-postgresql": {
         "documentation": "https://grafana.com?utm_source=coolify.io",
         "slogan": "Grafana is the open source analytics & monitoring solution for every database.",
