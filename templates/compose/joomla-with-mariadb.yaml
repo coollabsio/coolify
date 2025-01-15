@@ -1,0 +1,46 @@
+# documentation: https://joomla.org
+# slogan: Joomla! is the mobile-ready and user-friendly way to build your website. Choose from thousands of features and designs. Joomla! is free and open source. 
+# tags: cms, blog, content, management, mariadb
+# logo: svgs/joomla.svg
+
+services:
+  joomla:
+    image: 'joomla:latest'
+    volumes:
+      - 'joomla-files:/var/www/html'
+    environment:
+      - SERVICE_FQDN_JOOMLA
+      - JOOMLA_DB_HOST=mariadb
+      - JOOMLA_DB_USER=$SERVICE_USER_JOOMLA
+      - JOOMLA_DB_PASSWORD=$SERVICE_PASSWORD_JOOMLA
+      - JOOMLA_DB_NAME=joomla
+    depends_on:
+      - mariadb
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1'
+      interval: 2s
+      timeout: 10s
+      retries: 10
+  mariadb:
+    image: 'mariadb:11'
+    volumes:
+      - 'mariadb-data:/var/lib/mysql'
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=joomla
+      - MYSQL_USER=$SERVICE_USER_JOOMLA
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_JOOMLA
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
