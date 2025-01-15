@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('uuid')->unique();
             $table->enum('status', ['success', 'failed', 'running'])->default('running');
             $table->text('message')->nullable();
-            $table->text('cleanup_details')->nullable();
+            $table->json('cleanup_log')->nullable();
             $table->foreignId('server_id');
             $table->timestamps();
         });
