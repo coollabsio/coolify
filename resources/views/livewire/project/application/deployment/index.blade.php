@@ -32,88 +32,85 @@
         @forelse ($deployments as $deployment)
             <div @class([
                 'dark:bg-coolgray-100 p-2 border-l-2 transition-colors hover:no-underline box-without-bg-without-border bg-white flex-col cursor-pointer dark:hover:text-neutral-400 dark:hover:bg-coolgray-200',
-                'border-white border-dashed ' =>
-                    data_get($deployment, 'status') === 'in_progress' ||
-                    data_get($deployment, 'status') === 'cancelled-by-user',
-                'border-error border-dashed ' =>
-                    data_get($deployment, 'status') === 'failed',
+                'border-blue-500/50 border-dashed' => data_get($deployment, 'status') === 'in_progress',
+                'border-purple-500/50 border-dashed' => data_get($deployment, 'status') === 'queued',
+                'border-white border-dashed' => data_get($deployment, 'status') === 'cancelled-by-user',
+                'border-error' => data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
             ])
                 x-on:click.stop="goto('{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}')">
                 <div class="flex flex-col justify-start">
-                    <div class="flex gap-1">
-                        {{ $deployment->created_at }} UTC
-                        <span class=" dark:text-warning">></span>
-                        {{ $deployment->status }}
+                    <div class="flex items-center gap-2 mb-2">
+                        <span @class([
+                            'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-sm',
+                            'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:shadow-blue-900/5' => data_get($deployment, 'status') === 'in_progress',
+                            'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 dark:shadow-purple-900/5' => data_get($deployment, 'status') === 'queued',
+                            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' => data_get($deployment, 'status') === 'failed',
+                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' => data_get($deployment, 'status') === 'finished',
+                            'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300 dark:shadow-gray-900/5' => data_get($deployment, 'status') === 'cancelled-by-user',
+                        ])>
+                            @php
+                                $statusText = match(data_get($deployment, 'status')) {
+                                    'finished' => 'Success',
+                                    'in_progress' => 'In Progress',
+                                    'cancelled-by-user' => 'Cancelled',
+                                    'queued' => 'Queued',
+                                    default => ucfirst(data_get($deployment, 'status'))
+                                };
+                            @endphp
+                            {{ $statusText }}
+                        </span>
                     </div>
-                    @if (data_get($deployment, 'is_webhook') || data_get($deployment, 'pull_request_id'))
-                        <div class="flex items-center gap-1">
-                            @if (data_get($deployment, 'is_webhook'))
-                                Webhook
+                    @if(data_get($deployment, 'status') !== 'queued')
+                        <div class="text-gray-600 dark:text-gray-400 text-sm">
+                            Started: {{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}
+                            @if($deployment->status !== 'in_progress')
+                                <br>Ended: {{ formatDateInServerTimezone(data_get($deployment, 'updated_at'), data_get($application, 'destination.server')) }}
+                                <br>Duration: {{ calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'updated_at')) }}
+                            @else
+                                <br>Running for: {{ calculateDuration(data_get($deployment, 'created_at'), now()) }}
                             @endif
-                            @if (data_get($deployment, 'pull_request_id'))
-                                @if (data_get($deployment, 'is_webhook'))
-                                    |
-                                @endif
-                                Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                            @endif
+                        </div>
+                    @endif
+
+                    <div class="text-gray-600 dark:text-gray-400 text-sm mt-2">
+                        <div class="flex items-center gap-2">
                             @if (data_get($deployment, 'commit'))
-                                <div class="dark:hover:text-white"
-                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
-                                    <div class="text-xs underline">
+                                <span>
+                                    Commit: <span class="dark:hover:text-white cursor-pointer underline"
+                                        x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
                                         @if ($deployment->commitMessage())
-                                            ({{ data_get_str($deployment, 'commit')->limit(7) }} -
-                                            {{ $deployment->commitMessage() }})
+                                            {{ data_get_str($deployment, 'commit')->limit(7) }} - {{ $deployment->commitMessage() }}
                                         @else
                                             {{ data_get_str($deployment, 'commit')->limit(7) }}
                                         @endif
-                                    </div>
-                                </div>
+                                    </span>
+                                </span>
                             @endif
-                        </div>
-                    @else
-                        <div class="flex items-center gap-1">
-                            @if (data_get($deployment, 'rollback') === true)
-                                Rollback
-                            @else
-                                @if (data_get($deployment, 'is_api'))
+                            <span class="bg-gray-200/70 dark:bg-gray-600/20 px-2 py-0.5 rounded-md text-xs text-gray-800 dark:text-gray-100 border border-gray-400/30 dark:border-gray-500/30 font-medium backdrop-blur-sm">
+                                @if (data_get($deployment, 'is_webhook'))
+                                    Webhook
+                                    @if (data_get($deployment, 'pull_request_id'))
+                                        | Pull Request #{{ data_get($deployment, 'pull_request_id') }}
+                                    @endif
+                                @elseif (data_get($deployment, 'pull_request_id'))
+                                    Pull Request #{{ data_get($deployment, 'pull_request_id') }}
+                                @elseif (data_get($deployment, 'rollback') === true)
+                                    Rollback
+                                @elseif (data_get($deployment, 'is_api'))
                                     API
                                 @else
                                     Manual
                                 @endif
-                            @endif
-                            @if (data_get($deployment, 'commit'))
-                                <div class="dark:hover:text-white"
-                                    x-on:click.stop="goto('{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}')">
-                                    <div class="text-xs underline">
-                                        @if ($deployment->commitMessage())
-                                            ({{ data_get_str($deployment, 'commit')->limit(7) }} -
-                                            {{ $deployment->commitMessage() }})
-                                        @else
-                                            {{ data_get_str($deployment, 'commit')->limit(7) }}
-                                        @endif
-                                    </div>
-                                </div>
-                            @endif
+                            </span>
                         </div>
-                    @endif
+                    </div>
+
                     @if (data_get($deployment, 'server_name') && $application->additional_servers->count() > 0)
-                        <div class="flex gap-1">
+                        <div class="text-gray-600 dark:text-gray-400 text-sm mt-2">
                             Server: {{ data_get($deployment, 'server_name') }}
                         </div>
                     @endif
-                </div>
-
-                <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
-                    <div>
-                        @if ($deployment->status !== 'in_progress')
-                            Finished <span x-text="measure_since_started()">0s</span> ago in
-                            <span class="font-bold" x-text="measure_finished_time()">0s</span>
-                        @else
-                            Running for <span class="font-bold" x-text="measure_since_started()">0s</span>
-                        @endif
-
-                    </div>
                 </div>
             </div>
         @empty
@@ -121,46 +118,10 @@
         @endforelse
 
         @if ($deployments_count > 0)
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
             <script>
                 function goto(url) {
                     window.location.href = url;
                 };
-                let timers = {};
-
-                dayjs.extend(window.dayjs_plugin_utc);
-                dayjs.extend(window.dayjs_plugin_relativeTime);
-
-                Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
-                    finished_time: 'calculating...',
-                    started_time: 'calculating...',
-                    init() {
-                        if (timers[uuid]) {
-                            clearInterval(timers[uuid]);
-                        }
-                        if (status === 'in_progress') {
-                            timers[uuid] = setInterval(() => {
-                                this.finished_time = dayjs().diff(dayjs.utc(created_at),
-                                    'second') + 's'
-                            }, 1000);
-                        } else {
-                            let seconds = dayjs.utc(updated_at).diff(dayjs.utc(created_at), 'second')
-                            this.finished_time = seconds + 's';
-                        }
-                    },
-                    measure_finished_time() {
-                        if (this.finished_time > 2000) {
-                            return 0;
-                        } else {
-                            return this.finished_time;
-                        }
-                    },
-                    measure_since_started() {
-                        return dayjs.utc(created_at).fromNow(true); // "true" prevents the "ago" suffix
-                    },
-                }))
             </script>
         @endif
     </div>
