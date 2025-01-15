@@ -72,6 +72,11 @@
             </ul>" />
                 </div>
             </div>
+
+            <div class="mt-8">
+                <h3 class="mb-4">Recent executions <span class="text-xs text-neutral-500">(click to check output)</span></h3>
+                <livewire:server.docker-cleanup-executions :server="$server" />
+            </div>
         </div>
     </div>
 </div>
