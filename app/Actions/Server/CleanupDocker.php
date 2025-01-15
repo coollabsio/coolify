@@ -25,17 +25,25 @@ class CleanupDocker
             "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
         ];
 
-        $serverSettings = $server->settings;
-        if ($serverSettings->delete_unused_volumes) {
+        if ($server->settings->delete_unused_volumes) {
             $commands[] = 'docker volume prune -af';
         }
 
-        if ($serverSettings->delete_unused_networks) {
+        if ($server->settings->delete_unused_networks) {
             $commands[] = 'docker network prune -f';
         }
 
+        $cleanupLog = [];
         foreach ($commands as $command) {
-            instant_remote_process([$command], $server, false);
+            $commandOutput = instant_remote_process([$command], $server, false);
+            if ($commandOutput !== null) {
+                $cleanupLog[] = [
+                    'command' => $command,
+                    'output' => $commandOutput,
+                ];
+            }
         }
+
+        return $cleanupLog;
     }
 }
