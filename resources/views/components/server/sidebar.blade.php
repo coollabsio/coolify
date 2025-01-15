@@ -5,6 +5,9 @@
         <a class="menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}"
             href="{{ route('server.advanced', ['server_uuid' => $server->uuid]) }}">Advanced
         </a>
+        <a class="menu-item {{ $activeMenu === 'docker-cleanup' ? 'menu-item-active' : '' }}"
+            href="{{ route('server.docker-cleanup', ['server_uuid' => $server->uuid]) }}">Docker Cleanup
+        </a>
     @endif
     <a class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}"
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">Private Key
