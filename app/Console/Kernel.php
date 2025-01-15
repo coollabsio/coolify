@@ -91,7 +91,13 @@ class Kernel extends ConsoleKernel
 
     private function pullImages(): void
     {
-        $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
+        if (isCloud()) {
+            $servers = $this->allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
+            $own = Team::find(0)->servers;
+            $servers = $servers->merge($own);
+        } else {
+            $servers = $this->allServers->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_reachable', true)->get();
+        }
         foreach ($servers as $server) {
             if ($server->isSentinelEnabled()) {
                 $this->scheduleInstance->job(function () use ($server) {
@@ -124,7 +130,7 @@ class Kernel extends ConsoleKernel
     private function checkResources(): void
     {
         if (isCloud()) {
-            $servers = $this->allServers->whereHas('team.subscription')->get();
+            $servers = $this->allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
         } else {
@@ -133,14 +139,14 @@ class Kernel extends ConsoleKernel
 
         foreach ($servers as $server) {
             $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+            if (validate_timezone($serverTimezone) === false) {
+                $serverTimezone = config('app.timezone');
+            }
 
             // Sentinel check
             $lastSentinelUpdate = $server->sentinel_updated_at;
             if (Carbon::parse($lastSentinelUpdate)->isBefore(now()->subSeconds($server->waitBeforeDoingSshCheck()))) {
                 // Check container status every minute if Sentinel does not activated
-                if (validate_timezone($serverTimezone) === false) {
-                    $serverTimezone = config('app.timezone');
-                }
                 if (isCloud()) {
                     $this->scheduleInstance->job(new ServerCheckJob($server))->timezone($serverTimezone)->everyFiveMinutes()->onOneServer();
                 } else {
@@ -148,14 +154,10 @@ class Kernel extends ConsoleKernel
                 }
                 // $this->scheduleInstance->job(new \App\Jobs\ServerCheckNewJob($server))->everyFiveMinutes()->onOneServer();
 
-                // Check storage usage every 10 minutes if Sentinel does not activated
-                $this->scheduleInstance->job(new ServerStorageCheckJob($server))->everyTenMinutes()->onOneServer();
+                $this->scheduleInstance->job(new ServerStorageCheckJob($server))->cron($server->settings->server_disk_usage_check_frequency)->timezone($serverTimezone)->onOneServer();
             }
-            if ($server->settings->force_docker_cleanup) {
-                $this->scheduleInstance->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
-            } else {
-                $this->scheduleInstance->job(new DockerCleanupJob($server))->everyTenMinutes()->timezone($serverTimezone)->onOneServer();
-            }
+
+            $this->scheduleInstance->job(new DockerCleanupJob($server))->cron($server->settings->docker_cleanup_frequency)->timezone($serverTimezone)->onOneServer();
 
             // Cleanup multiplexed connections every hour
             // $this->scheduleInstance->job(new ServerCleanupMux($server))->hourly()->onOneServer();
@@ -175,25 +177,47 @@ class Kernel extends ConsoleKernel
         if ($scheduled_backups->isEmpty()) {
             return;
         }
+        $finalScheduledBackups = collect();
         foreach ($scheduled_backups as $scheduled_backup) {
-            if (is_null(data_get($scheduled_backup, 'database'))) {
+            if (blank(data_get($scheduled_backup, 'database'))) {
                 $scheduled_backup->delete();
 
                 continue;
             }
+            $server = $scheduled_backup->server();
+            if (blank($server)) {
+                $scheduled_backup->delete();
+
+                continue;
+            }
+            if ($server->isFunctional() === false) {
+                continue;
+            }
+            if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
+                continue;
+            }
+            $finalScheduledBackups->push($scheduled_backup);
+        }
+
+        foreach ($finalScheduledBackups as $scheduled_backup) {
+            if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
+                $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
+            }
 
             $server = $scheduled_backup->server();
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
 
-            if (is_null($server)) {
-                continue;
+            if (validate_timezone($serverTimezone) === false) {
+                $serverTimezone = config('app.timezone');
             }
 
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
             }
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
             $this->scheduleInstance->job(new DatabaseBackupJob(
                 backup: $scheduled_backup
-            ))->cron($scheduled_backup->frequency)->timezone($this->instanceTimezone)->onOneServer();
+            ))->cron($scheduled_backup->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
 
@@ -203,37 +227,55 @@ class Kernel extends ConsoleKernel
         if ($scheduled_tasks->isEmpty()) {
             return;
         }
+        $finalScheduledTasks = collect();
         foreach ($scheduled_tasks as $scheduled_task) {
             $service = $scheduled_task->service;
             $application = $scheduled_task->application;
 
-            if (! $application && ! $service) {
+            $server = $scheduled_task->server();
+            if (blank($server)) {
                 $scheduled_task->delete();
 
                 continue;
             }
-            if ($application) {
-                if (str($application->status)->contains('running') === false) {
-                    continue;
-                }
-            }
-            if ($service) {
-                if (str($service->status)->contains('running') === false) {
-                    continue;
-                }
-            }
 
-            $server = $scheduled_task->server();
-            if (! $server) {
+            if ($server->isFunctional() === false) {
                 continue;
             }
 
+            if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
+                continue;
+            }
+
+            if (! $service && ! $application) {
+                $scheduled_task->delete();
+
+                continue;
+            }
+
+            if ($application && str($application->status)->contains('running') === false) {
+                continue;
+            }
+            if ($service && str($service->status)->contains('running') === false) {
+                continue;
+            }
+
+            $finalScheduledTasks->push($scheduled_task);
+        }
+
+        foreach ($finalScheduledTasks as $scheduled_task) {
+            $server = $scheduled_task->server();
             if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
                 $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
             }
+            $serverTimezone = data_get($server->settings, 'server_timezone', $this->instanceTimezone);
+
+            if (validate_timezone($serverTimezone) === false) {
+                $serverTimezone = config('app.timezone');
+            }
             $this->scheduleInstance->job(new ScheduledTaskJob(
                 task: $scheduled_task
-            ))->cron($scheduled_task->frequency)->timezone($this->instanceTimezone)->onOneServer();
+            ))->cron($scheduled_task->frequency)->timezone($serverTimezone)->onOneServer();
         }
     }
 

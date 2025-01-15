@@ -2,9 +2,9 @@
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2024-11-17T19-35-25Z
+ARG MINIO_VERSION=RELEASE.2024-11-21T17-21-54Z
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2024.11.1
+ARG CLOUDFLARED_VERSION=2025.1.0
 # https://www.postgresql.org/support/versioning/
 ARG POSTGRES_VERSION=15
 
@@ -98,6 +98,9 @@ RUN mkdir -p /usr/local/bin && \
 # Configure PHP
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=1
+
+# Configure entrypoint
+COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d
 
 # Copy application files from previous stages
 COPY --from=base --chown=www-data:www-data /var/www/html/vendor ./vendor

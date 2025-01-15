@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\Environment;
 use App\Models\Project;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Index extends Component
@@ -12,39 +13,42 @@ class Index extends Component
 
     public Environment $environment;
 
-    public $applications = [];
+    public Collection $applications;
 
-    public $postgresqls = [];
+    public Collection $postgresqls;
 
-    public $redis = [];
+    public Collection $redis;
 
-    public $mongodbs = [];
+    public Collection $mongodbs;
 
-    public $mysqls = [];
+    public Collection $mysqls;
 
-    public $mariadbs = [];
+    public Collection $mariadbs;
 
-    public $keydbs = [];
+    public Collection $keydbs;
 
-    public $dragonflies = [];
+    public Collection $dragonflies;
 
-    public $clickhouses = [];
+    public Collection $clickhouses;
 
-    public $services = [];
+    public Collection $services;
 
     public array $parameters;
 
     public function mount()
     {
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
         $this->parameters = get_route_parameters();
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (! $project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
-        if (! $environment) {
-            return redirect()->route('dashboard');
-        }
+        $project = currentTeam()
+            ->projects()
+            ->select('id', 'uuid', 'team_id', 'name')
+            ->where('uuid', request()->route('project_uuid'))
+            ->firstOrFail();
+        $environment = $project->environments()
+            ->select('id', 'uuid', 'name', 'project_id')
+            ->where('uuid', request()->route('environment_uuid'))
+            ->firstOrFail();
+
         $this->project = $project;
         $this->environment = $environment->loadCount([
             'applications',
@@ -69,9 +73,9 @@ class Index extends Component
         ])->get()->sortBy('name');
         $this->applications = $this->applications->map(function ($application) {
             $application->hrefLink = route('project.application.configuration', [
-                'project_uuid' => $this->project->uuid,
-                'application_uuid' => $application->uuid,
-                'environment_name' => $this->environment->name,
+                'project_uuid' => data_get($application, 'environment.project.uuid'),
+                'environment_uuid' => data_get($application, 'environment.uuid'),
+                'application_uuid' => data_get($application, 'uuid'),
             ]);
 
             return $application;
@@ -89,14 +93,6 @@ class Index extends Component
             'clickhouses' => 'clickhouses',
         ];
 
-        // Load all server-related data first to prevent duplicate queries
-        $serverData = $this->environment->applications()
-            ->with(['destination.server.settings'])
-            ->get()
-            ->pluck('destination.server')
-            ->filter()
-            ->unique('id');
-
         foreach ($databaseTypes as $property => $relation) {
             $this->{$property} = $this->environment->{$relation}()->with([
                 'tags',
@@ -106,7 +102,7 @@ class Index extends Component
                 $db->hrefLink = route('project.database.configuration', [
                     'project_uuid' => $this->project->uuid,
                     'database_uuid' => $db->uuid,
-                    'environment_name' => $this->environment->name,
+                    'environment_uuid' => data_get($this->environment, 'uuid'),
                 ]);
 
                 return $db;
@@ -120,9 +116,9 @@ class Index extends Component
         ])->get()->sortBy('name');
         $this->services = $this->services->map(function ($service) {
             $service->hrefLink = route('project.service.configuration', [
-                'project_uuid' => $this->project->uuid,
-                'service_uuid' => $service->uuid,
-                'environment_name' => $this->environment->name,
+                'project_uuid' => data_get($service, 'environment.project.uuid'),
+                'environment_uuid' => data_get($service, 'environment.uuid'),
+                'service_uuid' => data_get($service, 'uuid'),
             ]);
 
             return $service;

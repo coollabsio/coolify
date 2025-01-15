@@ -67,6 +67,10 @@ class StartDatabaseProxy
                     $type = \App\Models\StandaloneClickhouse::class;
                     $containerName = "clickhouse-{$database->service->uuid}";
                     break;
+                case 'standalone-supabase/postgres':
+                    $type = \App\Models\StandalonePostgresql::class;
+                    $containerName = "supabase-db-{$database->service->uuid}";
+                    break;
             }
         }
         if ($type === \App\Models\StandaloneRedis::class) {

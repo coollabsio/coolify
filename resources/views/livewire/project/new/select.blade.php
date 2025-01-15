@@ -216,28 +216,33 @@
         <h2>Select a server</h2>
         <div class="pb-5"></div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
-            @forelse($servers as $server)
-                <div class="w-full box group" wire:click="setServer({{ $server }})">
-                    <div class="flex flex-col mx-6">
-                        <div class="box-title">
-                            {{ $server->name }}
+            @if ($onlyBuildServerAvailable)
+                <div> Only build servers are available, you need at least one server that is not set as build
+                    server. <a class="underline dark:text-white" href="/servers">
+                        Go to servers page
+                    </a> </div>
+            @else
+                @forelse($servers as $server)
+                    <div class="w-full box group" wire:click="setServer({{ $server }})">
+                        <div class="flex flex-col mx-6">
+                            <div class="box-title">
+                                {{ $server->name }}
+                            </div>
+                            <div class="box-description">
+                                {{ $server->description }}</div>
                         </div>
-                        <div class="box-description">
-                            {{ $server->description }}</div>
                     </div>
-                </div>
-            @empty
-                <div>
-                    <div>No validated & reachable servers found. <a class="underline dark:text-white" href="/servers">
-                            Go to servers page
-                        </a></div>
-                </div>
-            @endforelse
+                @empty
+                    <div>
+
+                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
+                                href="/servers">
+                                Go to servers page
+                            </a></div>
+                    </div>
+                @endforelse
+            @endif
         </div>
-        {{-- @if ($isDatabase)
-                <div class="text-center">Swarm clusters are excluded from this type of resource at the moment. It will
-                    be activated soon. Stay tuned.</div>
-            @endif --}}
     @endif
     @if ($current_step === 'destinations')
         <h2>Select a destination</h2>
@@ -273,77 +278,74 @@
         <h2>Select a Postgresql type</h2>
         <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select PostgreSQL
             16 (default).</div>
-        <div class="flex flex-col gap-4">
-            <div class="flex flex-col gap-2">
-                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
-                    wire:click="setPostgresqlType('postgres:16-alpine')">
-                    <div class="flex flex-col">
-                        <div class="box-title">PostgreSQL 16 (default)</div>
-                        <div class="box-description">
-                            PostgreSQL is a powerful, open-source object-relational database system (no extensions).
-                        </div>
+        <div class="flex flex-col gap-6 pt-8">
+            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
+                wire:click="setPostgresqlType('postgres:16-alpine')">
+                <div class="flex flex-col">
+                    <div class="box-title">PostgreSQL 16 (default)</div>
+                    <div class="box-description">
+                        PostgreSQL is a powerful, open-source object-relational database system (no extensions).
                     </div>
-                    <div class="flex-1"></div>
+                </div>
+                <div class="flex-1"></div>
 
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-6000"
-                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/"
-                            target="_blank">
-                            Documentation
-                        </a>
+                <div class="flex items-center px-2" title="Read the documentation.">
+                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-6000"
+                        onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
+                        Documentation
+                    </a>
+                </div>
+            </div>
+            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                wire:click="setPostgresqlType('supabase/postgres:15.6.1.113')">
+                <div class="flex flex-col">
+                    <div class="box-title">Supabase PostgreSQL (with extensions)</div>
+                    <div class="box-description">
+                        Supabase is a modern, open-source alternative to PostgreSQL with lots of extensions.
                     </div>
                 </div>
-                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                    wire:click="setPostgresqlType('supabase/postgres:15.6.1.113')">
-                    <div class="flex flex-col">
-                        <div class="box-title">Supabase PostgreSQL (with extensions)</div>
-                        <div class="box-description">
-                            Supabase is a modern, open-source alternative to PostgreSQL with lots of extensions.
-                        </div>
-                    </div>
-                    <div class="flex-1"></div>
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
-                            target="_blank">
-                            Documentation
-                        </a>
+                <div class="flex-1"></div>
+                <div class="flex items-center px-2" title="Read the documentation.">
+                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                        onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
+                        target="_blank">
+                        Documentation
+                    </a>
+                </div>
+            </div>
+            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                wire:click="setPostgresqlType('postgis/postgis')">
+                <div class="flex flex-col">
+                    <div class="box-title">PostGIS</div>
+                    <div class="box-description">
+                        PostGIS is a PostgreSQL extension for geographic objects.
                     </div>
                 </div>
-                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                    wire:click="setPostgresqlType('postgis/postgis')">
-                    <div class="flex flex-col">
-                        <div class="box-title">PostGIS</div>
-                        <div class="box-description">
-                            PostGIS is a PostgreSQL extension for geographic objects.
-                        </div>
-                    </div>
-                    <div class="flex-1"></div>
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
-                            target="_blank">
-                            Documentation
-                        </a>
+                <div class="flex-1"></div>
+                <div class="flex items-center px-2" title="Read the documentation.">
+                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                        onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
+                        target="_blank">
+                        Documentation
+                    </a>
+                </div>
+            </div>
+            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                wire:click="setPostgresqlType('pgvector/pgvector:pg16')">
+                <div class="flex flex-col">
+                    <div class="box-title">PGVector (16)</div>
+                    <div class="box-description">
+                        PGVector is a PostgreSQL extension for vector data types.
                     </div>
                 </div>
-                <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                    wire:click="setPostgresqlType('pgvector/pgvector:pg16')">
-                    <div class="flex flex-col">
-                        <div class="box-title">PGVector (16)</div>
-                        <div class="box-description">
-                            PGVector is a PostgreSQL extension for vector data types.
-                        </div>
-                    </div>
-                    <div class="flex-1"></div>
+                <div class="flex-1"></div>
 
-                    <div class="flex items-center px-2" title="Read the documentation.">
-                        <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
-                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
-                            target="_blank">
-                            Documentation
-                        </a>
-                    </div>
+                <div class="flex items-center px-2" title="Read the documentation.">
+                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                        onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
+                        target="_blank">
+                        Documentation
+                    </a>
                 </div>
             </div>
         </div>
