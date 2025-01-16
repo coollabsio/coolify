@@ -16,10 +16,9 @@
                 wire:navigate>Advanced</a>
             @if ($application->destination->server->isSwarm())
                 <a class="menu-item"
-                    wire:current.exact="menu-item-active
+                    wire:current.exact="menu-item-active"
                     href="{{ route('project.application.swarm', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
-                    wire:navigate>Swarm
-                    Configuration</a>
+                    wire:navigate>Swarm Configuration</a>
             @endif
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.application.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"

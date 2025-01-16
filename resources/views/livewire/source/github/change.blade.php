@@ -167,6 +167,7 @@
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap"><a
                                                                 class=""
+                                                                wire:navigate
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>

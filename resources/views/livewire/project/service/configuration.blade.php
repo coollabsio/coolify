@@ -95,7 +95,8 @@
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}">
+                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}"
+                                        wire:navigate>
                                         Settings
                                     </a>
                                     @if (str($application->status)->contains('running'))
@@ -143,12 +144,14 @@
                                 <div class="flex items-center px-4">
                                     @if ($database->isBackupSolutionAvailable())
                                         <a class="mx-4 text-xs font-bold hover:underline"
-                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups">
+                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups"
+                                            wire:navigate>
                                             Backups
                                         </a>
                                     @endif
                                     <a class="mx-4 text-xs font-bold hover:underline"
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
+                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}"
+                                        wire:navigate>
                                         Settings
                                     </a>
                                     @if (str($database->status)->contains('running'))
