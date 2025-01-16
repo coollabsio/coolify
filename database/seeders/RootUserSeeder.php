@@ -21,8 +21,6 @@ class RootUserSeeder extends Seeder
             }
 
             if (! env('ROOT_USER_EMAIL') || ! env('ROOT_USER_PASSWORD')) {
-                echo "\n  ERROR  ROOT_USER_EMAIL and ROOT_USER_PASSWORD environment variables are required for root user creation.\n\n";
-
                 return;
             }
 
