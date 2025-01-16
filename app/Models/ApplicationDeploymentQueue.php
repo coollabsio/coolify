@@ -81,7 +81,7 @@ class ApplicationDeploymentQueue extends Model
             return null;
         }
 
-        return str($this->commit_message)->trim()->limit(50)->value();
+        return str($this->commit_message)->value();
     }
 
     public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false)

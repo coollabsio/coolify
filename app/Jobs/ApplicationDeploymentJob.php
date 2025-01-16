@@ -1497,7 +1497,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
+            $commit_message = str($this->saved_outputs->get('commit_message'));
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
