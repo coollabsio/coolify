@@ -1,11 +1,11 @@
 <div class="flex flex-col items-start gap-2 min-w-fit">
-    <a class="menu-item {{ $activeMenu === 'general' ? 'menu-item-active' : '' }}"
+    <a wire:navigate class="menu-item {{ $activeMenu === 'general' ? 'menu-item-active' : '' }}"
         href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}">General</a>
     <a class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}"
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">Private Key
     </a>
     @if (!$server->isLocalhost())
-        <a class="menu-item {{ $activeMenu === 'cloudflare-tunnels' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'cloudflare-tunnels' ? 'menu-item-active' : '' }}"
             href="{{ route('server.cloudflare-tunnels', ['server_uuid' => $server->uuid]) }}">Cloudflare
             Tunnels</a>
     @endif
@@ -22,11 +22,11 @@
         <a class="menu-item {{ $activeMenu === 'log-drains' ? 'menu-item-active' : '' }}"
             href="{{ route('server.log-drains', ['server_uuid' => $server->uuid]) }}">Log
             Drains</a>
-        <a class="menu-item {{ $activeMenu === 'metrics' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'metrics' ? 'menu-item-active' : '' }}"
             href="{{ route('server.charts', ['server_uuid' => $server->uuid]) }}">Metrics</a>
     @endif
     @if (!$server->isLocalhost())
-        <a class="menu-item {{ $activeMenu === 'danger' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'danger' ? 'menu-item-active' : '' }}"
             href="{{ route('server.delete', ['server_uuid' => $server->uuid]) }}">Danger</a>
     @endif
 </div>

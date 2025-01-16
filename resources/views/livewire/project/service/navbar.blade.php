@@ -10,15 +10,15 @@
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data">
         <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
-            <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.logs', $parameters) }}">
                 <button>Logs</button>
             </a>
-            <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.command', $parameters) }}">
                 <button>Terminal</button>
             </a>

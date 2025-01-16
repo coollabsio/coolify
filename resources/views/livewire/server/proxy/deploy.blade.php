@@ -14,7 +14,7 @@
                         $traefikDashboardAvailable &&
                         $server->proxyType() === ProxyTypes::TRAEFIK->value)
                     <button>
-                        <a target="_blank" href="http://{{ $serverIp }}:8080">
+                        <a wire:navigate target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard
                             <x-external-link />
                         </a>

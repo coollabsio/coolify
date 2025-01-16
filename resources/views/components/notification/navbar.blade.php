@@ -4,22 +4,27 @@
     <div class="navbar-main">
         <nav class="flex items-center gap-6 min-h-10">
             <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}"
+                wire:navigate
                 href="{{ route('notifications.email') }}">
                 <button>Email</button>
             </a>
             <a class="{{ request()->routeIs('notifications.discord') ? 'dark:text-white' : '' }}"
+                wire:navigate
                 href="{{ route('notifications.discord') }}">
                 <button>Discord</button>
             </a>
              <a class="{{ request()->routeIs('notifications.telegram') ? 'dark:text-white' : '' }}"
+                wire:navigate
                 href="{{ route('notifications.telegram') }}">
                 <button>Telegram</button>
             </a>
             <a class="{{ request()->routeIs('notifications.slack') ? 'dark:text-white' : '' }}"
+                wire:navigate
                 href="{{ route('notifications.slack') }}">
                 <button>Slack</button>
             </a>
             <a class="{{ request()->routeIs('notifications.pushover') ? 'dark:text-white' : '' }}"
+                wire:navigate
                 href="{{ route('notifications.pushover') }}">
                 <button>Pushover</button>
             </a>

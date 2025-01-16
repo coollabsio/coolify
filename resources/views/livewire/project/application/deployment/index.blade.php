@@ -38,7 +38,7 @@
                 'border-error' => data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
             ])
-                x-on:click.stop="goto('{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}')">
+                wire:navigate href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
                 <div class="flex flex-col justify-start">
                     <div class="flex items-center gap-2 mb-2">
                         <span @class([
@@ -116,13 +116,6 @@
         @empty
             <div class="">No deployments found</div>
         @endforelse
-
-        @if ($deployments_count > 0)
-            <script>
-                function goto(url) {
-                    window.location.href = url;
-                };
-            </script>
         @endif
     </div>
 </div>
