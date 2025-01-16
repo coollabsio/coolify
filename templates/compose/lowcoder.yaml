@@ -10,10 +10,10 @@ services:
     environment:
       - SERVICE_FQDN_LOWCODER_3000
       - LOWCODER_EMAIL_SIGNUP_ENABLED=${LOWCODER_EMAIL_SIGNUP_ENABLED:-true}
-      - LOWCODER_DB_ENCRYPTION_PASSWORD=$SERVICE_PASSWORD_ENCRYPTION
-      - LOWCODER_DB_ENCRYPTION_SALT=$SERVICE_PASSWORD_SALT
+      - LOWCODER_DB_ENCRYPTION_PASSWORD=${SERVICE_PASSWORD_ENCRYPTION}
+      - LOWCODER_DB_ENCRYPTION_SALT=${SERVICE_PASSWORD_SALT}
     volumes:
-      - lowcoder-data:/lowcoder-stacks
+      - lowcoder_data:/lowcoder-stacks
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
       interval: 5s
