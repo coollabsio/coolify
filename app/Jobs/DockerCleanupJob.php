@@ -8,6 +8,7 @@ use App\Models\DockerCleanupExecution;
 use App\Models\Server;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\Server\DockerCleanupSuccess;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -119,6 +120,12 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
             $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$e->getMessage()));
             throw $e;
+        } finally {
+            if ($this->execution_log) {
+                $this->execution_log->update([
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+            }
         }
     }
 }

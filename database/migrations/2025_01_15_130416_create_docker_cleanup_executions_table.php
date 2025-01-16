@@ -19,6 +19,7 @@ return new class extends Migration
             $table->json('cleanup_log')->nullable();
             $table->foreignId('server_id');
             $table->timestamps();
+            $table->timestamp('finished_at')->nullable();
         });
     }
 

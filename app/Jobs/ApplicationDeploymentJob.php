@@ -317,7 +317,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         } finally {
             $this->application_deployment_queue->update([
-                'finished_at' => now(),
+                'finished_at' => Carbon::now()->toImmutable(),
             ]);
 
             if ($this->use_build_server) {

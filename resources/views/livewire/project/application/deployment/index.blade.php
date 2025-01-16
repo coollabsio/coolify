@@ -66,8 +66,8 @@
                             <div class="text-gray-600 dark:text-gray-400 text-sm">
                                 Started: {{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}
                                 @if($deployment->status !== 'in_progress')
-                                    <br>Ended: {{ formatDateInServerTimezone(data_get($deployment, 'updated_at'), data_get($application, 'destination.server')) }}
-                                    <br>Duration: {{ calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'updated_at')) }}
+                                    <br>Ended: {{ formatDateInServerTimezone(data_get($deployment, 'finished_at'), data_get($application, 'destination.server')) }}
+                                    <br>Duration: {{ calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'finished_at')) }}
                                 @else
                                     <br>Running for: {{ calculateDuration(data_get($deployment, 'created_at'), now()) }}
                                 @endif

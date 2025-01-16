@@ -38,8 +38,8 @@
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
                         Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}
                         @if(data_get($execution, 'status') !== 'running')
-                            <br>Ended: {{ formatDateInServerTimezone(data_get($execution, 'updated_at'), $this->server()) }}
-                            <br>Duration: {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'updated_at')) }}
+                            <br>Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}
+                            <br>Duration: {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
                         @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
