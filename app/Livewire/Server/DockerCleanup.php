@@ -35,7 +35,7 @@ class DockerCleanup extends Component
             $this->parameters = get_route_parameters();
             $this->syncData();
         } catch (\Throwable) {
-            return redirect()->route('server.show');
+            return redirect()->route('server.index');
         }
     }
 
