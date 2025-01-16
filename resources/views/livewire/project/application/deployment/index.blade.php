@@ -5,12 +5,11 @@
     <h1>Deployments</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    {{-- <livewire:project.application.deployment.show :application="$application" :deployments="$deployments" :deployments_count="$deployments_count" /> --}}
     <div class="flex flex-col gap-2 pb-10"
         @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
         <div class="flex items-end gap-2 pt-4">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
-            @if ($deployments_count > 0)
+            @if ($deployments_count > 0 && $deployments_count > $default_take)
                 <x-forms.button disabled="{{ !$show_prev }}" wire:click="previous_page('{{ $default_take }}')"><svg
                         class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -38,8 +37,8 @@
                 'border-error border-dashed ' =>
                     data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
-            ])
-                wire:navigate href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
+            ]) wire:navigate
+                href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
                 <div class="flex flex-col justify-start">
                     <div class="flex gap-1">
                         {{ $deployment->created_at }} UTC
@@ -58,8 +57,8 @@
                                 Pull Request #{{ data_get($deployment, 'pull_request_id') }}
                             @endif
                             @if (data_get($deployment, 'commit'))
-                                <div class="dark:hover:text-white"
-                                    wire:navigate.prevent href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}">
+                                <div class="dark:hover:text-white" wire:navigate.prevent
+                                    href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}">
                                     <div class="text-xs underline">
                                         @if ($deployment->commitMessage())
                                             ({{ data_get_str($deployment, 'commit')->limit(7) }} -
@@ -83,8 +82,8 @@
                                 @endif
                             @endif
                             @if (data_get($deployment, 'commit'))
-                                <div class="dark:hover:text-white"
-                                    wire:navigate.prevent href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}">
+                                <div class="dark:hover:text-white" wire:navigate.prevent
+                                    href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}">
                                     <div class="text-xs underline">
                                         @if ($deployment->commitMessage())
                                             ({{ data_get_str($deployment, 'commit')->limit(7) }} -
@@ -104,13 +103,12 @@
                     @endif
                 </div>
 
-                <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
+                <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->finished_at }}')">
                     <div>
                         @if ($deployment->status !== 'in_progress')
-                            Finished <span x-text="measure_since_started()">0s</span> ago in
-                            <span class="font-bold" x-text="measure_finished_time()">0s</span>
+                            <span x-html="measurementText()" />
                         @else
-                            Running for <span class="font-bold" x-text="measure_since_started()">0s</span>
+                            Running for <span class="font-bold" x-text="measureSinceStarted()">0s</span>
                         @endif
 
                     </div>
@@ -121,16 +119,13 @@
         @endforelse
 
         @if ($deployments_count > 0)
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
             <script>
                 let timers = {};
 
                 dayjs.extend(window.dayjs_plugin_utc);
                 dayjs.extend(window.dayjs_plugin_relativeTime);
 
-                Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
+                Alpine.data('elapsedTime', (uuid, status, created_at, finished_at) => ({
                     finished_time: 'calculating...',
                     started_time: 'calculating...',
                     init() {
@@ -143,20 +138,29 @@
                                     'second') + 's'
                             }, 1000);
                         } else {
-                            let seconds = dayjs.utc(updated_at).diff(dayjs.utc(created_at), 'second')
-                            this.finished_time = seconds + 's';
+                            this.finished_time = dayjs.utc(finished_at).diff(dayjs.utc(created_at), 'second')
+                            if (isNaN(this.finished_time)) {
+                                this.finished_time = 0;
+                            }
                         }
                     },
-                    measure_finished_time() {
+                    measureFinishedTime() {
                         if (this.finished_time > 2000) {
                             return 0;
                         } else {
                             return this.finished_time;
                         }
                     },
-                    measure_since_started() {
+                    measureSinceStarted() {
                         return dayjs.utc(created_at).fromNow(true); // "true" prevents the "ago" suffix
                     },
+                    measurementText() {
+                        if (this.measureFinishedTime() === 0) {
+                            return 'Finished <span x-text="measureSinceStarted()"></span> ago';
+                        } else {
+                            return 'Finished <span x-text="measureSinceStarted()"></span> ago in <span class="font-bold" x-text="measureFinishedTime()"></span><span class="font-bold">s</span>';
+                        }
+                    }
                 }))
             </script>
         @endif

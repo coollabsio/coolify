@@ -39,7 +39,7 @@
                 ]) }}">
                 <button>Resources</button>
             </a>
-            <a wire:navigate class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.command', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
