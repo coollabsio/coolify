@@ -54,6 +54,8 @@
             @if ($resource->type() === 'standalone-postgresql')
                 <x-forms.input class="mb-2" label="Custom Import Command"
                     wire:model='postgresqlRestoreCommand'></x-forms.input>
+                <span>You can add "--clean" to drop objects before creating them, avoiding conflicts.</span>
+                <span>You can add "--verbose" to log more things.</span>
             @elseif ($resource->type() === 'standalone-mysql')
                 <x-forms.input class="mb-2" label="Custom Import Command"
                     wire:model='mysqlRestoreCommand'></x-forms.input>
@@ -62,6 +64,10 @@
                     wire:model='mariadbRestoreCommand'></x-forms.input>
             @endif
 
+            <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
+                @csrf
+            </form>
+
             <div x-show="isUploading">
                 <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
             </div>
@@ -69,10 +75,6 @@
                 <div>File: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
-
-            <form action="/upload/backup/{{ $resource->uuid }}" class="dropzone" id="my-dropzone">
-                @csrf
-            </form>
 
             <div class="container w-full mx-auto">
                 <livewire:activity-monitor header="Database Restore Output" />
