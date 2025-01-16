@@ -45,15 +45,14 @@ class AppServiceProvider extends ServiceProvider
     private function configurePasswords(): void
     {
         Password::defaults(function () {
-            $rule = Password::min(8)->letters();
-
             return App::isProduction()
-                ? $rule->mixedCase()
+                ? Password::min(8)
+                    ->mixedCase()
                     ->letters()
                     ->numbers()
                     ->symbols()
                     ->uncompromised()
-                : $rule;
+                : Password::min(8)->letters();
         });
     }
 
