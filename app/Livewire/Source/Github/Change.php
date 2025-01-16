@@ -76,7 +76,7 @@ class Change extends Component
     // Need administration:read:write permission
     // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
 
-    //     $github_access_token = generate_github_installation_token($this->github_app);
+    //     $github_access_token = generateGithubInstallationToken($this->github_app);
     //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
     //     $runners_by_repository = collect([]);
     //     $repositories = $repositories->json()['repositories'];
