@@ -39,6 +39,9 @@ class ProductionSeeder extends Seeder
                 ]);
             }
         }
+        // Seed root user first
+        $this->call(RootUserSeeder::class);
+
         if (InstanceSettings::find(0) == null) {
             InstanceSettings::create([
                 'id' => 0,
