@@ -13,13 +13,19 @@ class RootUserSeeder extends Seeder
 {
     public function run(): void
     {
-        if (User::where('id', 0)->exists()) {
-            echo "  Root user already exists. Skipping creation.\n";
+        try {
+            if (User::where('id', 0)->exists()) {
+                echo "  INFO  Root user already exists. Skipping creation.\n";
 
-            return;
-        }
+                return;
+            }
 
-        if (env('ROOT_USER_EMAIL') && env('ROOT_USER_PASSWORD')) {
+            if (! env('ROOT_USER_EMAIL') || ! env('ROOT_USER_PASSWORD')) {
+                echo "  ERROR  ROOT_USER_EMAIL and ROOT_USER_PASSWORD environment variables are required for root user creation.\n";
+
+                return;
+            }
+
             $validator = Validator::make([
                 'email' => env('ROOT_USER_EMAIL'),
                 'username' => env('ROOT_USERNAME', 'Root User'),
@@ -31,7 +37,7 @@ class RootUserSeeder extends Seeder
             ]);
 
             if ($validator->fails()) {
-                echo "  Error: Invalid ROOT User Environment Variables\n";
+                echo "  ERROR  Invalid Root User Environment Variables\n";
                 foreach ($validator->errors()->all() as $error) {
                     echo "  → {$error}\n";
                 }
@@ -39,22 +45,31 @@ class RootUserSeeder extends Seeder
                 return;
             }
 
-            User::create([
-                'id' => 0,
-                'name' => env('ROOT_USERNAME', 'Root User'),
-                'email' => env('ROOT_USER_EMAIL'),
-                'password' => Hash::make(env('ROOT_USER_PASSWORD')),
-            ]);
+            try {
+                User::create([
+                    'id' => 0,
+                    'name' => env('ROOT_USERNAME', 'Root User'),
+                    'email' => env('ROOT_USER_EMAIL'),
+                    'password' => Hash::make(env('ROOT_USER_PASSWORD')),
+                ]);
+                echo "  SUCCESS  Root user created successfully.\n";
+            } catch (\Exception $e) {
+                echo "  ERROR  Failed to create root user: {$e->getMessage()}\n";
 
-            InstanceSettings::updateOrCreate(
-                ['id' => 0],
-                ['is_registration_enabled' => false]
-            );
+                return;
+            }
 
-            echo "  Root user created successfully.\n";
-            echo "  Registration has been disabled.\n";
-        } else {
-            echo "  Warning: ROOT_USER_EMAIL and ROOT_USER_PASSWORD environment variables are required for root user creation.\n";
+            try {
+                InstanceSettings::updateOrCreate(
+                    ['id' => 0],
+                    ['is_registration_enabled' => false]
+                );
+                echo "  SUCCESS  Registration has been disabled.\n";
+            } catch (\Exception $e) {
+                echo "  ERROR  Failed to update instance settings: {$e->getMessage()}\n";
+            }
+        } catch (\Exception $e) {
+            echo "  ERROR  An unexpected error occurred: {$e->getMessage()}\n";
         }
     }
 }
