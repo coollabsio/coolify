@@ -1,7 +1,7 @@
 <div class="flex flex-col items-start gap-2 min-w-fit">
     <a wire:navigate class="menu-item {{ $activeMenu === 'general' ? 'menu-item-active' : '' }}"
         href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}">General</a>
-    <a class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}"
+    <a wire:navigate class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}"
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">Private Key
     </a>
     @if (!$server->isLocalhost())
@@ -10,16 +10,16 @@
             Tunnels</a>
     @endif
     @if ($server->isFunctional())
-        <a class="menu-item {{ $activeMenu === 'docker-cleanup' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'docker-cleanup' ? 'menu-item-active' : '' }}"
             href="{{ route('server.docker-cleanup', ['server_uuid' => $server->uuid]) }}">Docker Cleanup
         </a>
-        <a class="menu-item {{ $activeMenu === 'destinations' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'destinations' ? 'menu-item-active' : '' }}"
             href="{{ route('server.destinations', ['server_uuid' => $server->uuid]) }}">Destinations
         </a>
-        <a class="menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}"
             href="{{ route('server.advanced', ['server_uuid' => $server->uuid]) }}">Advanced
         </a>
-        <a class="menu-item {{ $activeMenu === 'log-drains' ? 'menu-item-active' : '' }}"
+        <a wire:navigate class="menu-item {{ $activeMenu === 'log-drains' ? 'menu-item-active' : '' }}"
             href="{{ route('server.log-drains', ['server_uuid' => $server->uuid]) }}">Log
             Drains</a>
         <a wire:navigate class="menu-item {{ $activeMenu === 'metrics' ? 'menu-item-active' : '' }}"
