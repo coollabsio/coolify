@@ -39,14 +39,15 @@ class ProductionSeeder extends Seeder
                 ]);
             }
         }
-        // Seed root user first
-        $this->call(RootUserSeeder::class);
 
         if (InstanceSettings::find(0) == null) {
             InstanceSettings::create([
                 'id' => 0,
             ]);
         }
+
+        $this->call(RootUserSeeder::class);
+
         if (GithubApp::find(0) == null) {
             GithubApp::create([
                 'id' => 0,
