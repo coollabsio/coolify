@@ -16,7 +16,7 @@
             </a>
             @if (!$application->destination->server->isSwarm())
                 <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                    wire:navigate href="{{ route('project.application.command', $parameters) }}">
+                 href="{{ route('project.application.command', $parameters) }}">
                     <button>Terminal</button>
                 </a>
             @endif

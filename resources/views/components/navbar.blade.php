@@ -261,7 +261,7 @@
                         </a>
                     </li>
                     <li>
-                        <a title="Terminal" wire:navigate
+                        <a title="Terminal"
                             class="{{ request()->is('terminal*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('terminal') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
