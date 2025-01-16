@@ -26,14 +26,14 @@ class RootUserSeeder extends Seeder
                 'password' => env('ROOT_USER_PASSWORD'),
             ], [
                 'email' => ['required', 'email:rfc,dns', 'max:255'],
-                'username' => ['required', 'string', 'min:3', 'max:255', 'regex:/^[a-zA-Z0-9\s-_]+$/'],
+                'username' => ['required', 'string', 'min:3', 'max:255', 'regex:/^[\w\s-]+$/'],
                 'password' => ['required', 'string', 'min:8', Password::min(8)->mixedCase()->letters()->numbers()->symbols()->uncompromised()],
             ]);
 
             if ($validator->fails()) {
-                echo "  Validation failed:\n";
+                echo "  Error: Invalid ROOT User Environment Variables\n";
                 foreach ($validator->errors()->all() as $error) {
-                    echo "  - {$error}\n";
+                    echo "  → {$error}\n";
                 }
 
                 return;
