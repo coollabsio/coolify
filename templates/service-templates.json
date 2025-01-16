@@ -1420,6 +1420,21 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "joomla-with-mariadb": {
+        "documentation": "https://joomla.org?utm_source=coolify.io",
+        "slogan": "Joomla! is the mobile-ready and user-friendly way to build your website. Choose from thousands of features and designs. Joomla! is free and open source.",
+        "compose": "c2VydmljZXM6CiAgam9vbWxhOgogICAgaW1hZ2U6ICdqb29tbGE6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnam9vbWxhX2RhdGE6L3Zhci93d3cvaHRtbCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9KT09NTEEKICAgICAgLSBKT09NTEFfREJfSE9TVD1tYXJpYWRiCiAgICAgIC0gJ0pPT01MQV9EQl9VU0VSPSR7U0VSVklDRV9VU0VSX0pPT01MQX0nCiAgICAgIC0gJ0pPT01MQV9EQl9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfSk9PTUxBfScKICAgICAgLSAnSk9PTUxBX0RCX05BTUU9JHtNWVNRTF9EQVRBQkFTRTotam9vbWxhLWRifScKICAgIGRlcGVuZHNfb246CiAgICAgIG1hcmlhZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAogIG1hcmlhZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICB2b2x1bWVzOgogICAgICAtICdqb29tbGFfbWFyaWFkYl9kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JPT1R9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1qb29tbGEtZGJ9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX0pPT01MQX0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9KT09NTEF9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "mariadb"
+        ],
+        "logo": "svgs/joomla.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "joplin": {
         "documentation": "https://github.com/laurent22/joplin/blob/dev/packages/server/README.md?utm_source=coolify.io",
         "slogan": "Self-hosted sync server for Joplin",
