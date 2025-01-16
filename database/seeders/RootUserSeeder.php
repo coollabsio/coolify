@@ -65,7 +65,7 @@ class RootUserSeeder extends Seeder
                     ['id' => 0],
                     ['is_registration_enabled' => false]
                 );
-                echo "\n  SUCCESS  Registration has been disabled.\n\n";
+                echo "\n  SUCCESS  Registration has been disabled successfully.\n\n";
             } catch (\Exception $e) {
                 echo "\n  ERROR  Failed to update instance settings: {$e->getMessage()}\n\n";
             }
