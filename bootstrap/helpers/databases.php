@@ -56,14 +56,16 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
     EnvironmentVariable::create([
         'key' => 'REDIS_PASSWORD',
         'value' => $redis_password,
-        'standalone_redis_id' => $database->id,
+        'resourceable_type' => StandaloneRedis::class,
+        'resourceable_id' => $database->id,
         'is_shared' => false,
     ]);
 
     EnvironmentVariable::create([
         'key' => 'REDIS_USERNAME',
         'value' => 'default',
-        'standalone_redis_id' => $database->id,
+        'resourceable_type' => StandaloneRedis::class,
+        'resourceable_id' => $database->id,
         'is_shared' => false,
     ]);
 
