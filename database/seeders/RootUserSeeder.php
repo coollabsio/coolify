@@ -14,11 +14,11 @@ class RootUserSeeder extends Seeder
     public function run(): void
     {
         try {
-            // if (User::where('id', 0)->exists()) {
-            //     echo "\n  INFO  Root user already exists. Skipping creation.\n\n";
+            if (User::where('id', 0)->exists()) {
+                echo "\n  INFO  Root user already exists. Skipping creation.\n\n";
 
-            //     return;
-            // }
+                return;
+            }
 
             if (! env('ROOT_USER_EMAIL') || ! env('ROOT_USER_PASSWORD')) {
                 echo "\n  ERROR  ROOT_USER_EMAIL and ROOT_USER_PASSWORD environment variables are required for root user creation.\n\n";
