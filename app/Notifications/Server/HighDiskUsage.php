@@ -65,8 +65,8 @@ class HighDiskUsage extends CustomEmailNotification
             level: 'warning',
             message: "Server '{$this->server->name}' high disk usage detected!<br/><br/><b>Disk usage:</b> {$this->disk_usage}%.<br/><b>Threshold:</b> {$this->server_disk_usage_notification_threshold}%.<br/>Please cleanup your disk to prevent data-loss.",
             buttons: [
-                'Change settings' => base_url().'/server/'.$this->server->uuid."#advanced",
-                'Tips for cleanup' => "https://coolify.io/docs/knowledge-base/server/automated-cleanup",
+                'Change settings' => base_url().'/server/'.$this->server->uuid.'#advanced',
+                'Tips for cleanup' => 'https://coolify.io/docs/knowledge-base/server/automated-cleanup',
             ],
         );
     }

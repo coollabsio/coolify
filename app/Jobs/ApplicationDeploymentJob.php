@@ -40,6 +40,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 1;
+
     public $timeout = 3600;
 
     public static int $batch_counter = 0;
@@ -167,11 +169,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $preserveRepository = false;
 
-    public $tries = 1;
-
     public function __construct(int $application_deployment_queue_id)
     {
         $this->onQueue('high');
+
+        $this->nixpacks_plan_json = collect([]);
 
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->application = Application::find($this->application_deployment_queue->application_id);

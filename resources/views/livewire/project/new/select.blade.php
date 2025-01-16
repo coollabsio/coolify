@@ -216,28 +216,33 @@
         <h2>Select a server</h2>
         <div class="pb-5"></div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
-            @forelse($servers as $server)
-                <div class="w-full box group" wire:click="setServer({{ $server }})">
-                    <div class="flex flex-col mx-6">
-                        <div class="box-title">
-                            {{ $server->name }}
+            @if ($onlyBuildServerAvailable)
+                <div> Only build servers are available, you need at least one server that is not set as build
+                    server. <a class="underline dark:text-white" href="/servers">
+                        Go to servers page
+                    </a> </div>
+            @else
+                @forelse($servers as $server)
+                    <div class="w-full box group" wire:click="setServer({{ $server }})">
+                        <div class="flex flex-col mx-6">
+                            <div class="box-title">
+                                {{ $server->name }}
+                            </div>
+                            <div class="box-description">
+                                {{ $server->description }}</div>
                         </div>
-                        <div class="box-description">
-                            {{ $server->description }}</div>
                     </div>
-                </div>
-            @empty
-                <div>
-                    <div>No validated & reachable servers found. <a class="underline dark:text-white" href="/servers">
-                            Go to servers page
-                        </a></div>
-                </div>
-            @endforelse
+                @empty
+                    <div>
+
+                        <div>No validated & reachable servers found. <a class="underline dark:text-white"
+                                href="/servers">
+                                Go to servers page
+                            </a></div>
+                    </div>
+                @endforelse
+            @endif
         </div>
-        {{-- @if ($isDatabase)
-                <div class="text-center">Swarm clusters are excluded from this type of resource at the moment. It will
-                    be activated soon. Stay tuned.</div>
-            @endif --}}
     @endif
     @if ($current_step === 'destinations')
         <h2>Select a destination</h2>

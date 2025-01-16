@@ -47,7 +47,7 @@ return [
     ],
 
     'docker' => [
-        'minimum_required_version' => '26.0',
+        'minimum_required_version' => '24.0',
     ],
 
     'ssh' => [
@@ -62,26 +62,6 @@ return [
         'link' => [
             'base_url' => '/invitations/',
             'expiration_days' => 3,
-        ],
-    ],
-
-    'limits' => [
-        'trial_period' => 0,
-        'server' => [
-            'zero' => 0,
-            'self-hosted' => 999999999999,
-            'basic' => env('LIMIT_SERVER_BASIC', 2),
-            'pro' => env('LIMIT_SERVER_PRO', 10),
-            'ultimate' => env('LIMIT_SERVER_ULTIMATE', 25),
-            'dynamic' => env('LIMIT_SERVER_DYNAMIC', 2),
-        ],
-        'email' => [
-            'zero' => true,
-            'self-hosted' => true,
-            'basic' => true,
-            'pro' => true,
-            'ultimate' => true,
-            'dynamic' => true,
         ],
     ],
 
