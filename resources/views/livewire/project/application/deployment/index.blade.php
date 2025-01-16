@@ -60,10 +60,10 @@
                         @if(data_get($deployment, 'status') !== 'queued')
                             <div class="text-gray-600 dark:text-gray-400 text-sm">
                                 Started: {{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}
-                                @if($deployment->status !== 'in_progress')
+                                @if($deployment->status !== 'in_progress' && $deployment->status !== 'cancelled-by-user' && $deployment->status !== 'failed')
                                     <br>Ended: {{ formatDateInServerTimezone(data_get($deployment, 'finished_at'), data_get($application, 'destination.server')) }}
                                     <br>Duration: {{ calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'finished_at')) }}
-                                @else
+                                @elseif($deployment->status === 'in_progress')
                                     <br>Running for: {{ calculateDuration(data_get($deployment, 'created_at'), now()) }}
                                 @endif
                             </div>
