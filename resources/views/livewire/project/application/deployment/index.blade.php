@@ -5,12 +5,11 @@
     <h1>Deployments</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    {{-- <livewire:project.application.deployment.show :application="$application" :deployments="$deployments" :deployments_count="$deployments_count" /> --}}
     <div class="flex flex-col gap-2 pb-10"
         @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
         <div class="flex items-end gap-2 pt-4">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
-            @if ($deployments_count > 0)
+            @if ($deployments_count > 0 && $deployments_count > $default_take)
                 <x-forms.button disabled="{{ !$show_prev }}" wire:click="previous_page('{{ $default_take }}')"><svg
                         class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -37,8 +36,8 @@
                 'border-white border-dashed' => data_get($deployment, 'status') === 'cancelled-by-user',
                 'border-error' => data_get($deployment, 'status') === 'failed',
                 'border-success' => data_get($deployment, 'status') === 'finished',
-            ])
-                wire:navigate href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
+            ]) wire:navigate
+                href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}">
                 <div class="flex flex-col justify-start">
                     <div class="flex items-center gap-2 mb-2">
                         <span @class([
@@ -116,6 +115,5 @@
         @empty
             <div class="">No deployments found</div>
         @endforelse
-        @endif
     </div>
 </div>

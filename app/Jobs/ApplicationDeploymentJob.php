@@ -316,6 +316,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->fail($e);
             throw $e;
         } finally {
+            $this->application_deployment_queue->update([
+                'finished_at' => now(),
+            ]);
+
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             } else {

@@ -1186,7 +1186,7 @@
     "gotenberg": {
         "documentation": "https://gotenberg.dev/docs/getting-started/introduction?utm_source=coolify.io",
         "slogan": "Gotenberg is a Docker-powered stateless API for PDF files.",
-        "compose": "c2VydmljZXM6CiAgZ290ZW5iZXJnOgogICAgaW1hZ2U6ICdnb3RlbmJlcmcvZ290ZW5iZXJnOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9HT1RFTkJFUkdfMzAwMAogICAgICAtICdHT1RFTkJFUkdfQVBJX0JBU0lDX0FVVEhfVVNFUk5BTUU9JHtTRVJWSUNFX1VTRVJfR09URU5CRVJHfScKICAgICAgLSAnR09URU5CRVJHX0FQSV9CQVNJQ19BVVRIX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HT1RFTkJFUkd9JwogICAgY29tbWFuZDoKICAgICAgLSBnb3RlbmJlcmcKICAgICAgLSAnLS1hcGktZW5hYmxlLWJhc2ljLWF1dGgnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMC92ZXJzaW9uJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "compose": "c2VydmljZXM6CiAgZ290ZW5iZXJnOgogICAgaW1hZ2U6ICdnb3RlbmJlcmcvZ290ZW5iZXJnOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9HT1RFTkJFUkdfMzAwMAogICAgICAtICdHT1RFTkJFUkdfQVBJX0JBU0lDX0FVVEhfVVNFUk5BTUU9JHtTRVJWSUNFX1VTRVJfR09URU5CRVJHfScKICAgICAgLSAnR09URU5CRVJHX0FQSV9CQVNJQ19BVVRIX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HT1RFTkJFUkd9JwogICAgY29tbWFuZDoKICAgICAgLSBnb3RlbmJlcmcKICAgICAgLSAnLS1hcGktZW5hYmxlLWJhc2ljLWF1dGgnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMC9oZWFsdGgnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
         "tags": [
             "api",
             "backend",
@@ -1419,6 +1419,21 @@
         "logo": "svgs/jenkins.svg",
         "minversion": "0.0.0",
         "port": "8080"
+    },
+    "joomla-with-mariadb": {
+        "documentation": "https://joomla.org?utm_source=coolify.io",
+        "slogan": "Joomla! is the mobile-ready and user-friendly way to build your website. Choose from thousands of features and designs. Joomla! is free and open source.",
+        "compose": "c2VydmljZXM6CiAgam9vbWxhOgogICAgaW1hZ2U6ICdqb29tbGE6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnam9vbWxhX2RhdGE6L3Zhci93d3cvaHRtbCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9KT09NTEEKICAgICAgLSBKT09NTEFfREJfSE9TVD1tYXJpYWRiCiAgICAgIC0gJ0pPT01MQV9EQl9VU0VSPSR7U0VSVklDRV9VU0VSX0pPT01MQX0nCiAgICAgIC0gJ0pPT01MQV9EQl9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfSk9PTUxBfScKICAgICAgLSAnSk9PTUxBX0RCX05BTUU9JHtNWVNRTF9EQVRBQkFTRTotam9vbWxhLWRifScKICAgIGRlcGVuZHNfb246CiAgICAgIG1hcmlhZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAogIG1hcmlhZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICB2b2x1bWVzOgogICAgICAtICdqb29tbGFfbWFyaWFkYl9kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gJ01ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1JPT1R9JwogICAgICAtICdNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFOi1qb29tbGEtZGJ9JwogICAgICAtICdNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX0pPT01MQX0nCiAgICAgIC0gJ01ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9KT09NTEF9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "cms",
+            "blog",
+            "content",
+            "management",
+            "mariadb"
+        ],
+        "logo": "svgs/joomla.svg",
+        "minversion": "0.0.0",
+        "port": "80"
     },
     "joplin": {
         "documentation": "https://github.com/laurent22/joplin/blob/dev/packages/server/README.md?utm_source=coolify.io",
@@ -1674,6 +1689,25 @@
         ],
         "logo": "svgs/logto_dark.svg",
         "minversion": "0.0.0"
+    },
+    "lowcoder": {
+        "documentation": "https://docs.lowcoder.cloud/?utm_source=coolify.io",
+        "slogan": "Lowcoder (forked from OpenBlocks) is a self-hosted, open-source, low-code platform for building internal tools.",
+        "compose": "c2VydmljZXM6CiAgbG93Y29kZXI6CiAgICBpbWFnZTogbG93Y29kZXJvcmcvbG93Y29kZXItY2UKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9MT1dDT0RFUl8zMDAwCiAgICAgIC0gJ0xPV0NPREVSX0VNQUlMX1NJR05VUF9FTkFCTEVEPSR7TE9XQ09ERVJfRU1BSUxfU0lHTlVQX0VOQUJMRUQ6LXRydWV9JwogICAgICAtICdMT1dDT0RFUl9EQl9FTkNSWVBUSU9OX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9FTkNSWVBUSU9OfScKICAgICAgLSAnTE9XQ09ERVJfREJfRU5DUllQVElPTl9TQUxUPSR7U0VSVklDRV9QQVNTV09SRF9TQUxUfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2xvd2NvZGVyX2RhdGE6L2xvd2NvZGVyLXN0YWNrcycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTozMDAwL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "lowcoder",
+            "openblocks",
+            "low",
+            "code",
+            "platform",
+            "open",
+            "source",
+            "low",
+            "code"
+        ],
+        "logo": "svgs/lowcoder.svg",
+        "minversion": "0.0.0",
+        "port": "3000"
     },
     "mailpit": {
         "documentation": "https://mailpit.axllent.org/docs/?utm_source=coolify.io",
@@ -2185,24 +2219,6 @@
         "logo": "svgs/onedev.svg",
         "minversion": "0.0.0",
         "port": "6610"
-    },
-    "openblocks": {
-        "documentation": "https://openblocks.dev?utm_source=coolify.io",
-        "slogan": "OpenBlocks is a self-hosted, open-source, low-code platform for building internal tools.",
-        "compose": "c2VydmljZXM6CiAgb3BlbmJsb2NrczoKICAgIGltYWdlOiBvcGVuYmxvY2tzZGV2L29wZW5ibG9ja3MtY2UKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9PUEVOQkxPQ0tTXzMwMDAKICAgICAgLSAnRU5BQkxFX1VTRVJfU0lHTl9VUD0ke0VOQUJMRV9VU0VSX1NJR05fVVA6LXRydWV9JwogICAgICAtIEVOQ1JZUFRJT05fUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfRU5DUllQVElPTgogICAgICAtIEVOQ1JZUFRJT05fU0FMVD0kU0VSVklDRV9QQVNTV09SRF9TQUxUCiAgICB2b2x1bWVzOgogICAgICAtICdvcGVuYmxvY2tzLWRhdGE6L29wZW5ibG9ja3Mtc3RhY2tzJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjMwMDAvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
-        "tags": [
-            "openblocks",
-            "low",
-            "code",
-            "platform",
-            "open",
-            "source",
-            "low",
-            "code"
-        ],
-        "logo": "svgs/openblocks.svg",
-        "minversion": "0.0.0",
-        "port": "3000"
     },
     "organizr": {
         "documentation": "https://docs.organizr.app/?utm_source=coolify.io",

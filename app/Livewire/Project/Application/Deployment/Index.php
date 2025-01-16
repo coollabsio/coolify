@@ -18,7 +18,7 @@ class Index extends Component
 
     public int $skip = 0;
 
-    public int $default_take = 40;
+    public int $default_take = 10;
 
     public bool $show_next = false;
 
@@ -42,7 +42,7 @@ class Index extends Component
         if (! $application) {
             return redirect()->route('dashboard');
         }
-        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, 40);
+        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, $this->default_take);
         $this->application = $application;
         $this->deployments = $deployments;
         $this->deployments_count = $count;
