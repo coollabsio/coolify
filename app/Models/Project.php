@@ -140,4 +140,16 @@ class Project extends BaseModel
     {
         return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
     }
+
+    public function navigateTo()
+    {
+        if ($this->environments->count() === 1) {
+            return route('project.resource.index', [
+                'project_uuid' => $this->uuid,
+                'environment_uuid' => $this->environments->first()->uuid,
+            ]);
+        }
+
+        return route('project.show', ['project_uuid' => $this->uuid]);
+    }
 }
