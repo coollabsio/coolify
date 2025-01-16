@@ -10,6 +10,7 @@ class DeleteServerDockerImages
 
     public static function run($server, $ids)
     {
+
         $idsForCommand = implode(' ', $ids);
         return instant_remote_process(["docker rmi $idsForCommand -f"], $server);
     }

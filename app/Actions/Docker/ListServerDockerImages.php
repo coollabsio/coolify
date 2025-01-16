@@ -2,6 +2,7 @@
 
 namespace App\Actions\Docker;
 
+use App\Models\Application;
 use Illuminate\Database\Eloquent\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -23,34 +24,35 @@ class ListServerDockerImages
 
         $command = "curl --unix-socket /var/run/docker.sock http://localhost/images/json";
         $imagesJson = json_decode(instant_remote_process([$command], $server), true);
-
         $images = [];
 
         foreach ($imagesJson as $image) {
             $isRunning = key_exists($image['Id'], $runningImages);
 
-            if ($image['RepoTags'] == []){
+            if ($image['RepoTags'] == []) {
                 $imageCopy = $image;
-
                 $imageCopy["Status"] = 'unused';
                 $imageCopy["Dangling"] = true;
-
                 array_push($images, $imageCopy);
-
-            }else{
-
+            } else {
                 foreach ($image['RepoTags'] as $tag) {
                     $imageCopy = $image;
-
                     $imageCopy["RepoTags"] = $tag;
 
-                    if ($isRunning){
+                    if ($isRunning) {
                         $imageCopy["Status"] = 'in use';
-                    }else{
+                    } else {
                         $imageCopy["Status"] = 'unused';
                     }
 
                     $imageCopy["Dangling"] = false;
+
+                    // Add applications using this image
+                    [$name, $tag] = array_pad(explode(':', $tag, 2), 2, 'latest');
+                    $imageCopy['IsUsedBy'] = Application::query()
+                        ->where('docker_registry_image_name', $name)
+                        ->where('docker_registry_image_tag', $tag)
+                        ->get();
 
                     array_push($images, $imageCopy);
                 }

@@ -5,6 +5,7 @@ namespace App\Livewire\Images\Images;
 use App\Actions\Docker\DeleteAllDanglingServerDockerImages;
 use App\Actions\Docker\DeleteServerDockerImages;
 use App\Actions\Docker\GetServerDockerImageDetails;
+use App\Actions\Docker\UpdateServerDockerImageTag;
 use App\Actions\Docker\ListServerDockerImages;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Collection;
@@ -19,6 +20,7 @@ class Index extends Component
     public Collection $servers;
     public bool $isLoadingImages = false;
     public array $selectedImages = [];
+
     public ?array $imageDetails = null;
     public string $searchQuery = '';
     public bool $showOnlyDangling = false;
@@ -27,28 +29,70 @@ class Index extends Component
     public array $imagesToDelete = [];
     public string $confirmationText = '';
 
+    public $editingImageId = null;
+    public $newTag = '';
+    public $newRepo = '';
     public function mount()
     {
         $this->servers = Server::isReachable()->get();
         $this->serverImages = collect([]);
     }
 
+    /**
+     * Whenever user picks a new server, load images & reset selection
+     */
     public function updatedSelectedUuid()
     {
         $this->loadServerImages();
-        $this->selectedImages = [];
+        $this->resetSelection();
     }
 
+    /**
+     * "Select all" checkbox toggled
+     */
+    public function updatedSelectAll($value)
+    {
+        // If selectAll is true, grab all filtered images' IDs
+        // If false, clear out selectedImages
+        $this->selectedImages = $value
+            ? $this->filteredImages->pluck('Id')->toArray()
+            : [];
+    }
+
+    /**
+     * Clears out selections (helper function)
+     */
+    protected function resetSelection()
+    {
+        $this->selectedImages = [];
+        $this->selectAll = false;
+    }
+    /**
+     * Whenever we search or change "dangling only", reset selection
+     */
+    public function updatedSearchQuery()
+    {
+        $this->resetSelection();
+    }
+
+    public function updatedShowOnlyDangling()
+    {
+        $this->resetSelection();
+    }
+
+    /**
+     * Load images for the chosen server
+     */
     public function loadServerImages()
     {
         $this->isLoadingImages = true;
         $this->imageDetails = null;
 
-        try {
-            if ($this->selected_uuid === 'default') {
-                return;
-            }
+        if ($this->selected_uuid === 'default') {
+            return;
+        }
 
+        try {
             $server = $this->servers->firstWhere('uuid', $this->selected_uuid);
             if (!$server) {
                 return;
@@ -62,12 +106,15 @@ class Index extends Component
                 return $image;
             });
         } catch (\Exception $e) {
-            $this->addError('images', "Error loading docker images: " . $e->getMessage());
+            $this->dispatch('error', "Error loading docker images: " . $e->getMessage());
         } finally {
             $this->isLoadingImages = false;
         }
     }
 
+    /**
+     * Fetch details for a specific image
+     */
     public function getImageDetails($imageId)
     {
         try {
@@ -75,21 +122,18 @@ class Index extends Component
             if (!$server) {
                 return;
             }
+
             $details = GetServerDockerImageDetails::run($server, $imageId);
 
-            // Add formatted size (total size)
-            if (isset($details['Size'])) {
-                $details['FormattedSize'] = $this->formatBytes($details['Size']);
-            } else {
-                $details['FormattedSize'] = 'N/A';
-            }
+            // Add some nicely formatted fields
+            $details['FormattedSize'] = isset($details['Size'])
+                ? $this->formatBytes($details['Size'])
+                : 'N/A';
 
-            // Add formatted virtual size
             if (isset($details['VirtualSize'])) {
                 $details['FormattedVirtualSize'] = $this->formatBytes($details['VirtualSize']);
             }
 
-            // Add formatted creation date
             if (isset($details['Created'])) {
                 $details['FormattedCreated'] = \Carbon\Carbon::parse($details['Created'])->diffForHumans();
             } else {
@@ -98,39 +142,33 @@ class Index extends Component
 
             $this->imageDetails = $details;
         } catch (\Exception $e) {
-            $this->addError('details', "Error loading image details: " . $e->getMessage());
+            $this->dispatch('error', "Error loading image details: " . $e->getMessage());
         }
     }
 
     public function confirmDelete($imageId = null)
     {
-        dd($imageId);
-
-
+        // You can open a modal here or similar
+        // dd($imageId);
         $this->showDeleteConfirmation = true;
     }
 
     public function deleteImages($imageId = null)
     {
-
-        if ($imageId) {
-            $this->imagesToDelete = [$imageId];
-        } else {
-            $this->imagesToDelete = $this->selectedImages;
-        }
+        // If a single ID was passed, we delete just that
+        // Otherwise, we delete the entire selection
+        $this->imagesToDelete = $imageId
+            ? [$imageId]
+            : $this->selectedImages;
 
         if (empty($this->imagesToDelete)) {
-            dd('empty');
+            $this->dispatch('error', 'No images selected for deletion');
             return;
         }
+
         try {
             $server = $this->servers->firstWhere('uuid', $this->selected_uuid);
             if (!$server) {
-                return;
-            }
-
-            if (empty($this->imagesToDelete)) {
-                $this->addError('delete', 'No images selected for deletion');
                 return;
             }
 
@@ -139,19 +177,47 @@ class Index extends Component
             // Reset states
             $this->showDeleteConfirmation = false;
             $this->imagesToDelete = [];
-            $this->selectedImages = [];
+            $this->resetSelection();
             $this->imageDetails = null;
             $this->confirmationText = '';
-            $this->selectAll = false;
 
+            // Reload images
             $this->loadServerImages();
+
             $this->dispatch('success', 'Images deleted successfully.');
         } catch (\Exception $e) {
-            dd($e);
-            $this->addError('delete', "Error deleting images: " . $e->getMessage());
+            $this->dispatch('error', "Error deleting images: " . $e->getMessage());
         }
     }
 
+    /**
+     * Delete all dangling images
+     */
+    public function deleteUnusedImages()
+    {
+        try {
+            $server = $this->servers->firstWhere('uuid', $this->selected_uuid);
+            if (!$server) {
+                return;
+            }
+
+            $unusedIds = $this->filteredImages
+                ->filter(fn($image) => ($image['Status'] ?? '') === 'unused')
+                ->pluck('Id')
+                ->toArray();
+
+            DeleteServerDockerImages::run($server, $unusedIds);
+
+            $this->loadServerImages();
+            $this->dispatch('success', 'Unused images deleted successfully.');
+        } catch (\Exception $e) {
+            $this->dispatch('error', "Error deleting unused images: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Prune (delete) *dangling* images
+     */
     public function pruneUnused()
     {
         try {
@@ -163,23 +229,32 @@ class Index extends Component
             DeleteAllDanglingServerDockerImages::run($server);
             $this->loadServerImages();
         } catch (\Exception $e) {
-            $this->addError('prune', "Error pruning images: " . $e->getMessage());
+            $this->dispatch('error', "Error pruning images: " . $e->getMessage());
         }
     }
 
+    /**
+     * Dynamically filter images based on search/dangling
+     */
     public function getFilteredImagesProperty()
     {
         return $this->serverImages
             ->when($this->searchQuery, function ($collection) {
                 return $collection->filter(function ($image) {
-                    // Check if RepoTags is an array and has elements
-                    $tags = is_array($image['RepoTags']) ? $image['RepoTags'] : [$image['RepoTags']];
-                    $tags = array_filter($tags); // Remove empty values
+                    $tags = is_array($image['RepoTags'])
+                        ? $image['RepoTags']
+                        : [$image['RepoTags']];
 
-                    // Search in all tags and ID
-                    return collect($tags)->some(function ($tag) {
+                    $tags = array_filter($tags); // remove null or empty
+
+                    // search by any tag or the ID
+                    $matchTag = collect($tags)->some(function ($tag) {
                         return str_contains(strtolower($tag), strtolower($this->searchQuery));
-                    }) || str_contains(strtolower($image['Id'] ?? ''), strtolower($this->searchQuery));
+                    });
+
+                    $matchId = str_contains(strtolower($image['Id'] ?? ''), strtolower($this->searchQuery));
+
+                    return $matchTag || $matchId;
                 });
             })
             ->when($this->showOnlyDangling, function ($collection) {
@@ -190,36 +265,28 @@ class Index extends Component
             ->values();
     }
 
-    public function updatedSelectAll($value)
+    /**
+     * Return how many images are "unused"
+     */
+    public function getUnusedImagesCountProperty()
     {
-        if ($value) {
-            $this->selectedImages = $this->filteredImages->pluck('Id')->toArray();
-        } else {
-            $this->selectedImages = [];
-        }
+        return $this->serverImages
+            ->filter(fn($image) => ($image['Status'] ?? '') === 'unused')
+            ->count();
     }
 
-    public function updatedSearchQuery()
-    {
-        $this->selectAll = false;
-        $this->selectedImages = [];
-    }
-
-    public function updatedShowOnlyDangling()
-    {
-        $this->selectAll = false;
-        $this->selectedImages = [];
-    }
-
+    /**
+     * Convert bytes to a human-readable format
+     */
     protected function formatBytes($bytes, $precision = 2)
     {
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
 
         $bytes = max($bytes, 0);
-        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
+        $pow   = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow   = min($pow, count($units) - 1);
 
-        $bytes /= pow(1024, $pow);
+        $bytes /= (1 << (10 * $pow)); // same as pow(1024, $pow)
 
         return round($bytes, $precision) . ' ' . $units[$pow];
     }
@@ -227,7 +294,49 @@ class Index extends Component
     public function render()
     {
         return view('livewire.images.images.index', [
-            'filteredImages' => $this->getFilteredImagesProperty(),
+            'filteredImages' => $this->filteredImages,
         ]);
+    }
+
+    public function startEditingTag($imageId)
+    {
+        $this->editingImageId = $imageId;
+        $image = $this->serverImages->firstWhere('Id', $imageId);
+        if ($image && isset($image['RepoTags'])) {
+            $tag = is_array($image['RepoTags']) ? $image['RepoTags'][0] : $image['RepoTags'];
+            $this->newTag = explode(':', $tag)[1] ?? '';
+            $this->newRepo = explode(':', $tag)[0] ?? '';
+        }
+    }
+
+    public function updateTag()
+    {
+        try {
+            $server = $this->servers->firstWhere('uuid', $this->selected_uuid);
+            if (!$server) {
+                return;
+            }
+
+            UpdateServerDockerImageTag::run($server, $this->editingImageId, $this->newRepo, $this->newTag);
+
+            // Reset states
+            $this->editingImageId = null;
+            $this->newTag = '';
+            $this->newRepo = '';
+
+
+            // Reload images
+            $this->loadServerImages();
+            $this->dispatch('success', 'Image tag updated successfully.');
+        } catch (\Exception $e) {
+            $this->dispatch('error', "Error updating tag: " . $e->getMessage());
+        }
+    }
+
+    public function cancelEditTag()
+    {
+        $this->editingImageId = null;
+        $this->newTag = '';
+        $this->newRepo = '';
     }
 }

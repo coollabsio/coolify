@@ -8,10 +8,12 @@ class UpdateServerDockerImageTag
 {
     use AsAction;
 
-    public static function run($server, $imageId, $tagName)
+    public static function run($server, $imageId, $imageRepo, $tagName)
     {
-        $imageDetails = GetServerDockerImageDetails::run($server, $imageId);
 
-        return instant_remote_process(["docker tag {$imageId} {$imageDetails['Repository']}:{$tagName}"], $server);
+        //$imageDetails = GetServerDockerImageDetails::run($server, $imageId);
+        //$imageRepo = explode(':', $imageDetails['RepoTags'][0])[0];
+        // dd($imageId, $imageRepo, $tagName);
+        return instant_remote_process(["docker tag {$imageId} {$imageRepo}:{$tagName}"], $server);
     }
 }
