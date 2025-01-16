@@ -39,11 +39,15 @@ class ProductionSeeder extends Seeder
                 ]);
             }
         }
+
         if (InstanceSettings::find(0) == null) {
             InstanceSettings::create([
                 'id' => 0,
             ]);
         }
+
+        $this->call(RootUserSeeder::class);
+
         if (GithubApp::find(0) == null) {
             GithubApp::create([
                 'id' => 0,
