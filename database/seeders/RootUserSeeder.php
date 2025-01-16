@@ -15,13 +15,13 @@ class RootUserSeeder extends Seeder
     {
         try {
             if (User::where('id', 0)->exists()) {
-                echo "  INFO  Root user already exists. Skipping creation.\n";
+                echo "\n  INFO  Root user already exists. Skipping creation.\n\n";
 
                 return;
             }
 
             if (! env('ROOT_USER_EMAIL') || ! env('ROOT_USER_PASSWORD')) {
-                echo "  ERROR  ROOT_USER_EMAIL and ROOT_USER_PASSWORD environment variables are required for root user creation.\n";
+                echo "\n  ERROR  ROOT_USER_EMAIL and ROOT_USER_PASSWORD environment variables are required for root user creation.\n\n";
 
                 return;
             }
@@ -37,10 +37,11 @@ class RootUserSeeder extends Seeder
             ]);
 
             if ($validator->fails()) {
-                echo "  ERROR  Invalid Root User Environment Variables\n";
+                echo "\n  ERROR  Invalid Root User Environment Variables\n";
                 foreach ($validator->errors()->all() as $error) {
                     echo "  → {$error}\n";
                 }
+                echo "\n";
 
                 return;
             }
@@ -52,9 +53,9 @@ class RootUserSeeder extends Seeder
                     'email' => env('ROOT_USER_EMAIL'),
                     'password' => Hash::make(env('ROOT_USER_PASSWORD')),
                 ]);
-                echo "  SUCCESS  Root user created successfully.\n";
+                echo "\n  SUCCESS  Root user created successfully.\n\n";
             } catch (\Exception $e) {
-                echo "  ERROR  Failed to create root user: {$e->getMessage()}\n";
+                echo "\n  ERROR  Failed to create root user: {$e->getMessage()}\n\n";
 
                 return;
             }
@@ -64,12 +65,12 @@ class RootUserSeeder extends Seeder
                     ['id' => 0],
                     ['is_registration_enabled' => false]
                 );
-                echo "  SUCCESS  Registration has been disabled.\n";
+                echo "\n  SUCCESS  Registration has been disabled.\n\n";
             } catch (\Exception $e) {
-                echo "  ERROR  Failed to update instance settings: {$e->getMessage()}\n";
+                echo "\n  ERROR  Failed to update instance settings: {$e->getMessage()}\n\n";
             }
         } catch (\Exception $e) {
-            echo "  ERROR  An unexpected error occurred: {$e->getMessage()}\n";
+            echo "\n  ERROR  An unexpected error occurred: {$e->getMessage()}\n\n";
         }
     }
 }
