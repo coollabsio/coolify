@@ -40,9 +40,6 @@
         <script type="text/javascript" src="{{ URL::asset('js/echo.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
-        <script type="text/javascript" src="{{ URL::asset('js/dayjs.min.js') }}"></script>
-        <script type="text/javascript" src="{{ URL::asset('js/dayjs-plugin-utc.js') }}"></script>
-        <script type="text/javascript" src="{{ URL::asset('js/dayjs-plugin-relativeTime.js') }}"></script>
     @endauth
 </head>
 @section('body')
