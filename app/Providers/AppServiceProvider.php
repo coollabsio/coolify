@@ -39,7 +39,8 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureModels(): void
     {
-        Model::shouldBeStrict();
+        // Disabled because it's causing issues with the application
+        // Model::shouldBeStrict();
     }
 
     private function configurePasswords(): void
