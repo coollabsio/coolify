@@ -6,17 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->timestamp('finished_at')->nullable();
+            $table->text('commit_message')->nullable()->change();
         });
     }
 
-    public function down()
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->dropColumn('finished_at');
+            $table->string('commit_message', 50)->nullable()->change();
         });
     }
 };

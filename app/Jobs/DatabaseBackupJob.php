@@ -331,6 +331,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->team) {
                 BackupCreated::dispatch($this->team->id);
             }
+            if ($this->backup_log) {
+                $this->backup_log->update([
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+            }
         }
     }
 

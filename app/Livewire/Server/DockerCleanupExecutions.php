@@ -1,76 +1,59 @@
 <?php
 
-namespace App\Livewire\Project\Shared\ScheduledTask;
+namespace App\Livewire\Server;
 
-use App\Models\ScheduledTask;
+use App\Models\DockerCleanupExecution;
+use App\Models\Server;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\Locked;
 use Livewire\Component;
 
-class Executions extends Component
+class DockerCleanupExecutions extends Component
 {
-    public ScheduledTask $task;
+    public Server $server;
 
-    #[Locked]
-    public int $taskId;
-
-    #[Locked]
     public Collection $executions;
 
-    #[Locked]
     public ?int $selectedKey = null;
 
-    #[Locked]
-    public ?string $serverTimezone = null;
+    public $selectedExecution = null;
+
+    public bool $isPollingActive = false;
 
     public $currentPage = 1;
 
     public $logsPerPage = 100;
 
-    public $selectedExecution = null;
-
-    public $isPollingActive = false;
-
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
+        $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},ScheduledTaskDone" => 'refreshExecutions',
+            "echo-private:team.{$teamId},DockerCleanupDone" => 'refreshExecutions',
         ];
     }
 
-    public function mount($taskId)
+    public function mount(Server $server)
     {
-        try {
-            $this->taskId = $taskId;
-            $this->task = ScheduledTask::findOrFail($taskId);
-            $this->executions = $this->task->executions()->take(20)->get();
-            $this->serverTimezone = data_get($this->task, 'application.destination.server.settings.server_timezone');
-            if (! $this->serverTimezone) {
-                $this->serverTimezone = data_get($this->task, 'service.destination.server.settings.server_timezone');
-            }
-            if (! $this->serverTimezone) {
-                $this->serverTimezone = 'UTC';
-            }
-        } catch (\Exception $e) {
-            return handleError($e);
-        }
+        $this->server = $server;
+        $this->refreshExecutions();
     }
 
     public function refreshExecutions(): void
     {
-        $this->executions = $this->task->executions()->take(20)->get();
+        $this->executions = $this->server->dockerCleanupExecutions()
+            ->orderBy('created_at', 'desc')
+            ->take(20)
+            ->get();
+
         if ($this->selectedKey) {
-            $this->selectedExecution = $this->task->executions()->find($this->selectedKey);
+            $this->selectedExecution = DockerCleanupExecution::find($this->selectedKey);
             if ($this->selectedExecution && $this->selectedExecution->status !== 'running') {
                 $this->isPollingActive = false;
             }
         }
     }
 
-    public function selectTask($key): void
+    public function selectExecution($key): void
     {
         if ($key == $this->selectedKey) {
             $this->selectedKey = null;
@@ -81,10 +64,9 @@ class Executions extends Component
             return;
         }
         $this->selectedKey = $key;
-        $this->selectedExecution = $this->task->executions()->find($key);
+        $this->selectedExecution = DockerCleanupExecution::find($key);
         $this->currentPage = 1;
 
-        // Start polling if task is running
         if ($this->selectedExecution && $this->selectedExecution->status === 'running') {
             $this->isPollingActive = true;
         }
@@ -98,6 +80,7 @@ class Executions extends Component
                 $this->isPollingActive = false;
             }
         }
+        $this->refreshExecutions();
     }
 
     public function loadMoreLogs()
@@ -112,7 +95,7 @@ class Executions extends Component
         }
 
         if (! $this->selectedExecution->message) {
-            return collect(['Waiting for task output...']);
+            return collect(['Waiting for execution output...']);
         }
 
         $lines = collect(explode("\n", $this->selectedExecution->message));
@@ -129,7 +112,7 @@ class Executions extends Component
 
         return response()->streamDownload(function () use ($execution) {
             echo $execution->message;
-        }, 'task-execution-'.$execution->id.'.log');
+        }, "docker-cleanup-{$execution->uuid}.log");
     }
 
     public function hasMoreLogs()
@@ -140,5 +123,10 @@ class Executions extends Component
         $lines = collect(explode("\n", $this->selectedExecution->message));
 
         return $lines->count() > ($this->currentPage * $this->logsPerPage);
+    }
+
+    public function render()
+    {
+        return view('livewire.server.docker-cleanup-executions');
     }
 }

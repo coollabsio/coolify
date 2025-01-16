@@ -117,29 +117,6 @@ class BackupExecutions extends Component
         return null;
     }
 
-    public function getServerTimezone()
-    {
-        $server = $this->server();
-        if (! $server) {
-            return 'UTC';
-        }
-
-        return $server->settings->server_timezone;
-    }
-
-    public function formatDateInServerTimezone($date)
-    {
-        $serverTimezone = $this->getServerTimezone();
-        $dateObj = new \DateTime($date);
-        try {
-            $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
-        } catch (\Exception) {
-            $dateObj->setTimezone(new \DateTimeZone('UTC'));
-        }
-
-        return $dateObj->format('Y-m-d H:i:s T');
-    }
-
     public function render()
     {
         return view('livewire.project.database.backup-executions', [

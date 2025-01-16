@@ -18,7 +18,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
-use Exception;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -317,7 +317,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         } finally {
             $this->application_deployment_queue->update([
-                'finished_at' => now(),
+                'finished_at' => Carbon::now()->toImmutable(),
             ]);
 
             if ($this->use_build_server) {
@@ -1501,7 +1501,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
+            $commit_message = str($this->saved_outputs->get('commit_message'));
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
