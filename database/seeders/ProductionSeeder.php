@@ -21,22 +21,10 @@ class ProductionSeeder extends Seeder
 {
     public function run(): void
     {
-
         $user = 'root';
-        echo "Starting ProductionSeeder...\n";
 
-        if (isCloud()) {
-            echo "  Running in cloud mode.\n";
-        } else {
-            echo "  Running in self-hosted mode.\n";
-        }
-
-        // Fix for 4.0.0-beta.37
-        echo "Checking for beta.37 fix...\n";
         if (User::find(0) !== null && Team::find(0) !== null) {
-            echo "  Found User 0 and Team 0\n";
             if (DB::table('team_user')->where('user_id', 0)->first() === null) {
-                echo "  Creating team_user relationship\n";
                 DB::table('team_user')->insert([
                     'user_id' => 0,
                     'team_id' => 0,
@@ -47,17 +35,13 @@ class ProductionSeeder extends Seeder
             }
         }
 
-        echo "Checking InstanceSettings...\n";
         if (InstanceSettings::find(0) == null) {
-            echo "  Creating InstanceSettings\n";
             InstanceSettings::create([
                 'id' => 0,
             ]);
         }
 
-        echo "Checking GithubApp...\n";
         if (GithubApp::find(0) == null) {
-            echo "  Creating GithubApp\n";
             GithubApp::create([
                 'id' => 0,
                 'name' => 'Public GitHub',
@@ -68,9 +52,7 @@ class ProductionSeeder extends Seeder
             ]);
         }
 
-        echo "Checking GitlabApp...\n";
         if (GitlabApp::find(0) == null) {
-            echo "  Creating GitlabApp\n";
             GitlabApp::create([
                 'id' => 0,
                 'name' => 'Public GitLab',
@@ -82,16 +64,13 @@ class ProductionSeeder extends Seeder
         }
 
         if (! isCloud() && config('constants.coolify.is_windows_docker_desktop') == false) {
-            echo "Setting up SSH keys for non-Windows environment...\n";
             $coolify_key_name = '@host.docker.internal';
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
-            echo '  Found '.count($ssh_keys_directory)." SSH keys\n";
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
 
             $private_key_found = PrivateKey::find(0);
             if (! $private_key_found) {
                 if ($coolify_key) {
-                    echo "  Found Coolify SSH key\n";
                     $user = str($coolify_key)->before('@')->after('id.');
                     $coolify_key = Storage::disk('ssh-keys')->get($coolify_key);
                     PrivateKey::create([
@@ -104,17 +83,15 @@ class ProductionSeeder extends Seeder
                     echo "SSH key found for the Coolify host machine (localhost).\n";
                 } else {
                     echo "No SSH key found for the Coolify host machine (localhost).\n";
-                    echo "Please read the following documentation (point 3) to fix it: https://coolify.io/docs/knowledge-base/server/openssh/\n";
+                    echo "Please read the following documentation (point 3) to fix it: https://coolify.
+                io/docs/knowledge-base/server/openssh/\n";
                     echo "Your localhost connection won't work until then.";
                 }
             }
         }
 
-        // Add Coolify host (localhost) as Server if it doesn't exist
         if (! isCloud()) {
-            echo "Setting up localhost server...\n";
             if (Server::find(0) == null) {
-                echo "  Creating localhost server\n";
                 $server_details = [
                     'id' => 0,
                     'name' => 'localhost',
@@ -133,16 +110,13 @@ class ProductionSeeder extends Seeder
                 $server->settings->is_usable = true;
                 $server->settings->save();
             } else {
-                echo "  Updating existing localhost server\n";
                 $server = Server::find(0);
                 $server->settings->is_reachable = true;
                 $server->settings->is_usable = true;
                 $server->settings->save();
             }
 
-            echo "Checking StandaloneDocker...\n";
             if (StandaloneDocker::find(0) == null) {
-                echo "  Creating StandaloneDocker\n";
                 StandaloneDocker::create([
                     'id' => 0,
                     'name' => 'localhost-coolify',
@@ -153,8 +127,6 @@ class ProductionSeeder extends Seeder
         }
 
         if (config('constants.coolify.is_windows_docker_desktop')) {
-            echo "Setting up Windows Docker Desktop environment...\n";
-            echo "  Creating/updating private key\n";
             PrivateKey::updateOrCreate(
                 [
                     'id' => 0,
@@ -174,7 +146,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 ]
             );
             if (Server::find(0) == null) {
-                echo "  Creating Windows localhost server\n";
                 $server_details = [
                     'id' => 0,
                     'uuid' => 'coolify-testing-host',
@@ -194,16 +165,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 $server->settings->is_usable = true;
                 $server->settings->save();
             } else {
-                echo "  Updating Windows localhost server\n";
                 $server = Server::find(0);
                 $server->settings->is_reachable = true;
                 $server->settings->is_usable = true;
                 $server->settings->save();
             }
 
-            echo "Checking Windows StandaloneDocker...\n";
             if (StandaloneDocker::find(0) == null) {
-                echo "  Creating Windows StandaloneDocker\n";
                 StandaloneDocker::create([
                     'id' => 0,
                     'name' => 'localhost-coolify',
@@ -213,19 +181,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             }
         }
 
-        echo "Getting public IPs...\n";
         get_public_ips();
 
-        echo "Running additional seeders...\n";
-        echo "  Running OauthSettingSeeder\n";
         $this->call(OauthSettingSeeder::class);
-        echo "  Running PopulateSshKeysDirectorySeeder\n";
         $this->call(PopulateSshKeysDirectorySeeder::class);
-        echo "  Running SentinelSeeder\n";
         $this->call(SentinelSeeder::class);
-        echo "  Running RootUserSeeder\n";
         $this->call(RootUserSeeder::class);
-
-        echo "ProductionSeeder complete!\n";
     }
 }
