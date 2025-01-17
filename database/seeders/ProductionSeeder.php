@@ -88,9 +88,8 @@ class ProductionSeeder extends Seeder
             echo '  Found '.count($ssh_keys_directory)." SSH keys\n";
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
 
-            $server = Server::find(0);
-            $found = $server->privateKey;
-            if (! $found) {
+            $private_key_found = PrivateKey::find(0);
+            if (! $private_key_found) {
                 if ($coolify_key) {
                     echo "  Found Coolify SSH key\n";
                     $user = str($coolify_key)->before('@')->after('id.');
