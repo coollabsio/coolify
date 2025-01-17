@@ -128,7 +128,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     user: root
     ports:
-      - '9020:9020'
+      - '127.0.0.1:9020:9020'
     depends_on:
       trigger:
         condition: service_healthy
