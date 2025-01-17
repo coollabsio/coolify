@@ -33,6 +33,7 @@ fi
 docker network create --attachable coolify 2>/dev/null
 # docker network create --attachable --driver=overlay coolify-overlay 2>/dev/null
 
+echo "If you encounter any issues, please check the log file: $LOGFILE"
 if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
     echo "docker-compose.custom.yml detected." >> $LOGFILE
     docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >> $LOGFILE 2>&1
