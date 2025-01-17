@@ -8,7 +8,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.6"
+VERSION="1.7"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -488,13 +488,13 @@ fi
 
 # Add default root user credentials from environment variables
 if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
-    if ! grep -q "^ROOT_USERNAME=" "$ENV_FILE-$DATE"; then
+    if grep -q "^ROOT_USERNAME=" "$ENV_FILE-$DATE"; then
         sed -i "s|^ROOT_USERNAME=.*|ROOT_USERNAME=$ROOT_USERNAME|" "$ENV_FILE-$DATE"
     fi
-    if ! grep -q "^ROOT_USER_EMAIL=" "$ENV_FILE-$DATE"; then
+    if grep -q "^ROOT_USER_EMAIL=" "$ENV_FILE-$DATE"; then
         sed -i "s|^ROOT_USER_EMAIL=.*|ROOT_USER_EMAIL=$ROOT_USER_EMAIL|" "$ENV_FILE-$DATE"
     fi
-    if ! grep -q "^ROOT_USER_PASSWORD=" "$ENV_FILE-$DATE"; then
+    if grep -q "^ROOT_USER_PASSWORD=" "$ENV_FILE-$DATE"; then
         sed -i "s|^ROOT_USER_PASSWORD=.*|ROOT_USER_PASSWORD=$ROOT_USER_PASSWORD|" "$ENV_FILE-$DATE"
     fi
 fi
