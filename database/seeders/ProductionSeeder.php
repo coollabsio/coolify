@@ -46,8 +46,6 @@ class ProductionSeeder extends Seeder
             ]);
         }
 
-        $this->call(RootUserSeeder::class);
-
         if (GithubApp::find(0) == null) {
             GithubApp::create([
                 'id' => 0,
@@ -190,5 +188,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->call(OauthSettingSeeder::class);
         $this->call(PopulateSshKeysDirectorySeeder::class);
         $this->call(SentinelSeeder::class);
+        $this->call(RootUserSeeder::class);
     }
 }
