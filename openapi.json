@@ -65,6 +65,7 @@
                                     "project_uuid",
                                     "server_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "git_repository",
                                     "git_branch",
                                     "build_pack",
@@ -81,7 +82,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "The environment name."
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "git_repository": {
                                         "type": "string",
@@ -342,8 +347,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -377,6 +394,7 @@
                                     "project_uuid",
                                     "server_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "github_app_uuid",
                                     "git_repository",
                                     "git_branch",
@@ -394,7 +412,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "The environment name."
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "github_app_uuid": {
                                         "type": "string",
@@ -659,8 +681,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -694,6 +728,7 @@
                                     "project_uuid",
                                     "server_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "private_key_uuid",
                                     "git_repository",
                                     "git_branch",
@@ -711,7 +746,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "The environment name."
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "private_key_uuid": {
                                         "type": "string",
@@ -976,8 +1015,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -1011,6 +1062,7 @@
                                     "project_uuid",
                                     "server_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "dockerfile"
                                 ],
                                 "properties": {
@@ -1024,7 +1076,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "The environment name."
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "dockerfile": {
                                         "type": "string",
@@ -1222,8 +1278,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -1257,6 +1325,7 @@
                                     "project_uuid",
                                     "server_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "docker_registry_image_name",
                                     "ports_exposes"
                                 ],
@@ -1271,7 +1340,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "The environment name."
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "docker_registry_image_name": {
                                         "type": "string",
@@ -1451,8 +1524,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -1486,6 +1571,7 @@
                                     "project_uuid",
                                     "server_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "docker_compose_raw"
                                 ],
                                 "properties": {
@@ -1499,7 +1585,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "The environment name."
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "docker_compose_raw": {
                                         "type": "string",
@@ -1533,8 +1623,20 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Application created successfully."
+                    "201": {
+                        "description": "Application created successfully.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
@@ -3079,7 +3181,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3092,7 +3195,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "postgres_user": {
                                         "type": "string",
@@ -3215,7 +3322,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3228,7 +3336,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -3335,7 +3447,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3348,7 +3461,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -3451,7 +3568,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3464,7 +3582,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -3571,7 +3693,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3584,7 +3707,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -3691,7 +3818,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3704,7 +3832,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -3823,7 +3955,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3836,7 +3969,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -3955,7 +4092,8 @@
                                 "required": [
                                     "server_uuid",
                                     "project_uuid",
-                                    "environment_name"
+                                    "environment_name",
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "server_uuid": {
@@ -3968,7 +4106,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Name of the environment"
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "destination_uuid": {
                                         "type": "string",
@@ -4808,14 +4950,14 @@
                 ]
             }
         },
-        "\/projects\/{uuid}\/{environment_name}": {
+        "\/projects\/{uuid}\/{environment_name_or_uuid}": {
             "get": {
                 "tags": [
                     "Projects"
                 ],
                 "summary": "Environment",
-                "description": "Get environment by name.",
-                "operationId": "get-environment-by-name",
+                "description": "Get environment by name or UUID.",
+                "operationId": "get-environment-by-name-or-uuid",
                 "parameters": [
                     {
                         "name": "uuid",
@@ -4827,9 +4969,9 @@
                         }
                     },
                     {
-                        "name": "environment_name",
+                        "name": "environment_name_or_uuid",
                         "in": "path",
-                        "description": "Environment name",
+                        "description": "Environment name or UUID",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -5724,6 +5866,7 @@
                                     "server_uuid",
                                     "project_uuid",
                                     "environment_name",
+                                    "environment_uuid",
                                     "type"
                                 ],
                                 "properties": {
@@ -5835,7 +5978,11 @@
                                     },
                                     "environment_name": {
                                         "type": "string",
-                                        "description": "Environment name."
+                                        "description": "Environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "Environment UUID. You need to provide at least one of environment_name or environment_uuid."
                                     },
                                     "server_uuid": {
                                         "type": "string",
@@ -7282,13 +7429,10 @@
                     "uuid": {
                         "type": "string"
                     },
-                    "application_id": {
-                        "type": "integer"
+                    "resourceable_type": {
+                        "type": "string"
                     },
-                    "service_id": {
-                        "type": "integer"
-                    },
-                    "database_id": {
+                    "resourceable_id": {
                         "type": "integer"
                     },
                     "is_build_time": {
@@ -7684,173 +7828,13 @@
                         "type": "string",
                         "description": "The date and time the team was last updated."
                     },
-                    "smtp_enabled": {
-                        "type": "boolean",
-                        "description": "Whether SMTP is enabled or not."
-                    },
-                    "smtp_from_address": {
-                        "type": "string",
-                        "description": "The email address to send emails from."
-                    },
-                    "smtp_from_name": {
-                        "type": "string",
-                        "description": "The name to send emails from."
-                    },
-                    "smtp_recipients": {
-                        "type": "string",
-                        "description": "The email addresses to send emails to."
-                    },
-                    "smtp_host": {
-                        "type": "string",
-                        "description": "The SMTP host."
-                    },
-                    "smtp_port": {
-                        "type": "string",
-                        "description": "The SMTP port."
-                    },
-                    "smtp_encryption": {
-                        "type": "string",
-                        "description": "The SMTP encryption."
-                    },
-                    "smtp_username": {
-                        "type": "string",
-                        "description": "The SMTP username."
-                    },
-                    "smtp_password": {
-                        "type": "string",
-                        "description": "The SMTP password."
-                    },
-                    "smtp_timeout": {
-                        "type": "string",
-                        "description": "The SMTP timeout."
-                    },
-                    "smtp_notifications_test": {
-                        "type": "boolean",
-                        "description": "Whether to send test notifications via SMTP."
-                    },
-                    "smtp_notifications_deployments": {
-                        "type": "boolean",
-                        "description": "Whether to send deployment notifications via SMTP."
-                    },
-                    "smtp_notifications_status_changes": {
-                        "type": "boolean",
-                        "description": "Whether to send status change notifications via SMTP."
-                    },
-                    "smtp_notifications_scheduled_tasks": {
-                        "type": "boolean",
-                        "description": "Whether to send scheduled task notifications via SMTP."
-                    },
-                    "smtp_notifications_database_backups": {
-                        "type": "boolean",
-                        "description": "Whether to send database backup notifications via SMTP."
-                    },
-                    "smtp_notifications_server_disk_usage": {
-                        "type": "boolean",
-                        "description": "Whether to send server disk usage notifications via SMTP."
-                    },
-                    "discord_enabled": {
-                        "type": "boolean",
-                        "description": "Whether Discord is enabled or not."
-                    },
-                    "discord_webhook_url": {
-                        "type": "string",
-                        "description": "The Discord webhook URL."
-                    },
-                    "discord_notifications_test": {
-                        "type": "boolean",
-                        "description": "Whether to send test notifications via Discord."
-                    },
-                    "discord_notifications_deployments": {
-                        "type": "boolean",
-                        "description": "Whether to send deployment notifications via Discord."
-                    },
-                    "discord_notifications_status_changes": {
-                        "type": "boolean",
-                        "description": "Whether to send status change notifications via Discord."
-                    },
-                    "discord_notifications_database_backups": {
-                        "type": "boolean",
-                        "description": "Whether to send database backup notifications via Discord."
-                    },
-                    "discord_notifications_scheduled_tasks": {
-                        "type": "boolean",
-                        "description": "Whether to send scheduled task notifications via Discord."
-                    },
-                    "discord_notifications_server_disk_usage": {
-                        "type": "boolean",
-                        "description": "Whether to send server disk usage notifications via Discord."
-                    },
                     "show_boarding": {
                         "type": "boolean",
                         "description": "Whether to show the boarding screen or not."
                     },
-                    "resend_enabled": {
-                        "type": "boolean",
-                        "description": "Whether to enable resending or not."
-                    },
-                    "resend_api_key": {
-                        "type": "string",
-                        "description": "The resending API key."
-                    },
-                    "use_instance_email_settings": {
-                        "type": "boolean",
-                        "description": "Whether to use instance email settings or not."
-                    },
-                    "telegram_enabled": {
-                        "type": "boolean",
-                        "description": "Whether Telegram is enabled or not."
-                    },
-                    "telegram_token": {
-                        "type": "string",
-                        "description": "The Telegram token."
-                    },
-                    "telegram_chat_id": {
-                        "type": "string",
-                        "description": "The Telegram chat ID."
-                    },
-                    "telegram_notifications_test": {
-                        "type": "boolean",
-                        "description": "Whether to send test notifications via Telegram."
-                    },
-                    "telegram_notifications_deployments": {
-                        "type": "boolean",
-                        "description": "Whether to send deployment notifications via Telegram."
-                    },
-                    "telegram_notifications_status_changes": {
-                        "type": "boolean",
-                        "description": "Whether to send status change notifications via Telegram."
-                    },
-                    "telegram_notifications_database_backups": {
-                        "type": "boolean",
-                        "description": "Whether to send database backup notifications via Telegram."
-                    },
-                    "telegram_notifications_test_message_thread_id": {
-                        "type": "string",
-                        "description": "The Telegram test message thread ID."
-                    },
-                    "telegram_notifications_deployments_message_thread_id": {
-                        "type": "string",
-                        "description": "The Telegram deployment message thread ID."
-                    },
-                    "telegram_notifications_status_changes_message_thread_id": {
-                        "type": "string",
-                        "description": "The Telegram status change message thread ID."
-                    },
-                    "telegram_notifications_database_backups_message_thread_id": {
-                        "type": "string",
-                        "description": "The Telegram database backup message thread ID."
-                    },
                     "custom_server_limit": {
                         "type": "string",
                         "description": "The custom server limit."
-                    },
-                    "telegram_notifications_scheduled_tasks": {
-                        "type": "boolean",
-                        "description": "Whether to send scheduled task notifications via Telegram."
-                    },
-                    "telegram_notifications_scheduled_tasks_thread_id": {
-                        "type": "string",
-                        "description": "The Telegram scheduled task message thread ID."
                     },
                     "members": {
                         "description": "The members of the team.",

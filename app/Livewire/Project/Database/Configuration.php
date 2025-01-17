@@ -6,23 +6,34 @@ use Livewire\Component;
 
 class Configuration extends Component
 {
+    public $currentRoute;
+
     public $database;
+
+    public $project;
+
+    public $environment;
 
     public function mount()
     {
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (! $project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (! $environment) {
-            return redirect()->route('dashboard');
-        }
-        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
-        if (! $database) {
-            return redirect()->route('dashboard');
-        }
+        $this->currentRoute = request()->route()->getName();
+
+        $project = currentTeam()
+            ->projects()
+            ->select('id', 'uuid', 'team_id')
+            ->where('uuid', request()->route('project_uuid'))
+            ->firstOrFail();
+        $environment = $project->environments()
+            ->select('id', 'name', 'project_id', 'uuid')
+            ->where('uuid', request()->route('environment_uuid'))
+            ->firstOrFail();
+        $database = $environment->databases()
+            ->where('uuid', request()->route('database_uuid'))
+            ->firstOrFail();
+
         $this->database = $database;
+        $this->project = $project;
+        $this->environment = $environment;
         if (str($this->database->status)->startsWith('running') && is_null($this->database->config_hash)) {
             $this->database->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');

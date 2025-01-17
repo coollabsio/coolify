@@ -223,8 +223,7 @@
                                     <x-forms.input id="sentinelMetricsHistoryDays" label="Metrics history (days)"
                                         required helper="Number of days to retain metrics data for." />
                                     <x-forms.input id="sentinelPushIntervalSeconds" label="Push interval (seconds)"
-                                        required
-                                        helper="Interval at which metrics data is sent to the collector." />
+                                        required helper="Interval at which metrics data is sent to the collector." />
                                 </div>
                             </div>
                         @endif

@@ -12,21 +12,23 @@
     <div x-data="searchComponent()">
         <x-forms.input placeholder="Search for name, description..." x-model="search" id="null" />
         <div class="grid grid-cols-2 gap-4 pt-4">
-            <template x-if="allFilteredItems.length === 0">
+            <template x-if="filteredProjects.length === 0">
                 <div>No project found with the search term "<span x-text="search"></span>".</div>
             </template>
 
-            <template x-for="item in allFilteredItems" :key="item.uuid">
-                <div class="box group" @click="gotoProject(item)">
+            <template x-for="project in filteredProjects" :key="project.uuid">
+                <div class="box group cursor-pointer" @click="$wire.navigateToProject(project.uuid)">
                     <div class="flex flex-col justify-center flex-1 mx-6">
-                        <div class="box-title" x-text="item.name"></div>
-                        <div class="box-description ">
-                            <div x-text="item.description"></div>
+                        <div class="box-title" x-text="project.name"></div>
+                        <div class="box-description">
+                            <div x-text="project.description"></div>
                         </div>
                     </div>
                     <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
-                        <a class="mx-4 font-bold hover:underline"
-                           :href="item.settingsRoute">
+                        <a class="mx-4 font-bold hover:underline" 
+                           wire:navigate 
+                           wire:click.stop
+                           :href="`/project/${project.uuid}/edit`">
                             Settings
                         </a>
                     </div>
@@ -36,37 +38,20 @@
     </div>
 
     <script>
-        function sortFn(a, b) {
-            return a.name.localeCompare(b.name)
-        }
-
         function searchComponent() {
             return {
                 search: '',
-                projects: @js($projects),
-                filterAndSort(items) {
+                get filteredProjects() {
+                    const projects = @js($projects);
                     if (this.search === '') {
-                        return Object.values(items).sort(sortFn);
+                        return projects;
                     }
                     const searchLower = this.search.toLowerCase();
-                    return Object.values(items).filter(item => {
-                        return (item.name?.toLowerCase().includes(searchLower) ||
-                            item.description?.toLowerCase().includes(searchLower))
-                    }).sort(sortFn);
-                },
-                get allFilteredItems() {
-                    return [
-                        this.projects,
-                    ].flatMap((items) => this.filterAndSort(items));
+                    return projects.filter(project => {
+                        return (project.name?.toLowerCase().includes(searchLower) ||
+                            project.description?.toLowerCase().includes(searchLower))
+                    });
                 }
-            }
-        }
-
-        function gotoProject(item) {
-            if (item.default_environment) {
-                window.location.href = '/project/' + item.uuid + '/' + item.default_environment;
-            } else {
-                window.location.href = '/project/' + item.uuid;
             }
         }
     </script>

@@ -23,6 +23,9 @@ class StartPostgresql
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        if (isDev()) {
+            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
+        }
 
         $this->commands = [
             "echo 'Starting database.'",
@@ -47,11 +50,7 @@ class StartPostgresql
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'labels' => [
-                        'coolify.managed' => 'true',
-                        'coolify.type' => 'database',
-                        'coolify.databaseId' => $this->database->id,
-                    ],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
@@ -78,7 +77,7 @@ class StartPostgresql
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -108,7 +107,7 @@ class StartPostgresql
                 ];
             }
         }
-        if (! is_null($this->database->postgres_conf) && ! empty($this->database->postgres_conf)) {
+        if (filled($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/custom-postgres.conf',
@@ -199,9 +198,12 @@ class StartPostgresql
 
     private function generate_init_scripts()
     {
-        if (is_null($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
+        $this->commands[] = "rm -rf $this->configuration_dir/docker-entrypoint-initdb.d/*";
+
+        if (blank($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
             return;
         }
+
         foreach ($this->database->init_scripts as $init_script) {
             $filename = data_get($init_script, 'filename');
             $content = data_get($init_script, 'content');
@@ -213,10 +215,15 @@ class StartPostgresql
 
     private function add_custom_conf()
     {
-        if (is_null($this->database->postgres_conf) || empty($this->database->postgres_conf)) {
+        $filename = 'custom-postgres.conf';
+        $config_file_path = "$this->configuration_dir/$filename";
+
+        if (blank($this->database->postgres_conf)) {
+            $this->commands[] = "rm -f $config_file_path";
+
             return;
         }
-        $filename = 'custom-postgres.conf';
+
         $content = $this->database->postgres_conf;
         if (! str($content)->contains('listen_addresses')) {
             $content .= "\nlisten_addresses = '*'";
@@ -224,6 +231,6 @@ class StartPostgresql
             $this->database->save();
         }
         $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
     }
 }

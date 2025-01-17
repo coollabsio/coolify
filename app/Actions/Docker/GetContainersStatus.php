@@ -112,7 +112,7 @@ class GetContainersStatus
                             $preview->update(['last_online_at' => now()]);
                         }
                     } else {
-                        //Notify user that this container should not be there.
+                        // Notify user that this container should not be there.
                     }
                 } else {
                     $application = $this->applications->where('id', $applicationId)->first();
@@ -125,7 +125,7 @@ class GetContainersStatus
                             $application->update(['last_online_at' => now()]);
                         }
                     } else {
-                        //Notify user that this container should not be there.
+                        // Notify user that this container should not be there.
                     }
                 }
             } else {

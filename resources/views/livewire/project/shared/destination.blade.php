@@ -62,17 +62,13 @@
                             <x-forms.button isError
                                 wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
                         @endif
-                        <x-modal-confirmation
-                            title="Confirm server removal?"
-                            isErrorButton
-                            buttonTitle="Remove Server"
+                        <x-modal-confirmation title="Confirm server removal?" isErrorButton buttonTitle="Remove Server"
                             submitAction="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
-                            :actions="['This will stop the all running applications on this server and remove it as a deployment destination.']"
-                            confirmationText="{{ data_get($destination, 'server.name') }}"
+                            :actions="[
+                                'This will stop the all running applications on this server and remove it as a deployment destination.',
+                            ]" confirmationText="{{ data_get($destination, 'server.name') }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                            shortConfirmationLabel="Server Name"
-                            step3ButtonText="Permanently Remove Server"
-                        />
+                            shortConfirmationLabel="Server Name" step3ButtonText="Permanently Remove Server" />
                     </div>
                 </div>
             @endforeach

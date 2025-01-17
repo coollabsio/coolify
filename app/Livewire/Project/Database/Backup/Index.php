@@ -14,7 +14,7 @@ class Index extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first()->load(['applications']);
         if (! $environment) {
             return redirect()->route('dashboard');
         }
@@ -31,7 +31,7 @@ class Index extends Component
         ) {
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'database_uuid' => $database->uuid,
             ]);
         }

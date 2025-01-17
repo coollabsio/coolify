@@ -38,7 +38,7 @@ class Heading extends Component
     {
         $this->parameters = [
             'project_uuid' => $this->application->project()->uuid,
-            'environment_name' => $this->application->environment->name,
+            'environment_uuid' => $this->application->environment->uuid,
             'application_uuid' => $this->application->uuid,
         ];
         $lastDeployment = $this->application->get_last_successful_deployment();
@@ -90,12 +90,12 @@ class Heading extends Component
             force_rebuild: $force_rebuild,
         );
 
-        return redirect()->route('project.application.deployment.show', [
+        return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
-            'environment_name' => $this->parameters['environment_name'],
-        ]);
+            'environment_uuid' => $this->parameters['environment_uuid'],
+        ], navigate: true);
     }
 
     protected function setDeploymentUuid()
@@ -132,12 +132,12 @@ class Heading extends Component
             restart_only: true,
         );
 
-        return redirect()->route('project.application.deployment.show', [
+        return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
-            'environment_name' => $this->parameters['environment_name'],
-        ]);
+            'environment_uuid' => $this->parameters['environment_uuid'],
+        ], navigate: true);
     }
 
     public function render()

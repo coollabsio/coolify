@@ -3,18 +3,18 @@
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Database Startup</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" showWaiting />
+            <livewire:activity-monitor header="Logs" showWaiting fullHeight />
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
         <nav
             class="flex overflow-x-scroll flex-shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
 
-            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.logs', $parameters) }}">
                 <button>Logs</button>
             </a>
@@ -27,7 +27,8 @@
                     $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-                <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
+                <a wire:navigate
+                    class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
                     href="{{ route('project.database.backup.index', $parameters) }}">
                     <button>Backups</button>
                 </a>

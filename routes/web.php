@@ -42,6 +42,7 @@ use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnels;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
+use App\Livewire\Server\DockerCleanup;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
@@ -147,7 +148,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/projects', ProjectSharedVariablesIndex::class)->name('shared-variables.project.index');
         Route::get('/project/{project_uuid}', ProjectSharedVariablesShow::class)->name('shared-variables.project.show');
         Route::get('/environments', EnvironmentSharedVariablesIndex::class)->name('shared-variables.environment.index');
-        Route::get('/environment/{project_uuid}/{environment_name}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
+        Route::get('/environments/project/{project_uuid}/environment/{environment_uuid}', EnvironmentSharedVariablesShow::class)->name('shared-variables.environment.show');
     });
 
     Route::prefix('team')->group(function () {
@@ -175,29 +176,65 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}/application/{application_uuid}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
+        Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
+        Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
+        Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
+        Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
+        Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
+        Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
+        Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
+        Route::get('/webhooks', ApplicationConfiguration::class)->name('project.application.webhooks');
+        Route::get('/preview-deployments', ApplicationConfiguration::class)->name('project.application.preview-deployments');
+        Route::get('/healthcheck', ApplicationConfiguration::class)->name('project.application.healthcheck');
+        Route::get('/rollback', ApplicationConfiguration::class)->name('project.application.rollback');
+        Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
+        Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
+        Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+        Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
+        Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
+
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
+        Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
+        Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
+        Route::get('/import-backups', DatabaseConfiguration::class)->name('project.database.import-backups');
+        Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
+        Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
+        Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
+        Route::get('/resource-operations', DatabaseConfiguration::class)->name('project.database.resource-operations');
+        Route::get('/metrics', DatabaseConfiguration::class)->name('project.database.metrics');
+        Route::get('/tags', DatabaseConfiguration::class)->name('project.database.tags');
+        Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
+
         Route::get('/logs', Logs::class)->name('project.database.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
-    Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
+        Route::get('/logs', Logs::class)->name('project.service.logs');
+        Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
+        Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+        Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
+        Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
+        Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
+        Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
+        Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
@@ -220,6 +257,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
+        Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');

@@ -153,7 +153,7 @@ class General extends Component
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
-        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
+        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && $this->application->settings->is_container_label_readonly_enabled === true) {
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -327,7 +327,7 @@ class General extends Component
         }
     }
 
-    public function set_redirect()
+    public function setRedirect()
     {
         try {
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
@@ -360,10 +360,10 @@ class General extends Component
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
-            $this->resetDefaultLabels();
+            // $this->resetDefaultLabels();
 
             if ($this->application->isDirty('redirect')) {
-                $this->set_redirect();
+                $this->setRedirect();
             }
 
             $this->checkFqdns();
