@@ -17,7 +17,7 @@
         "doctrine/dbal": "^4.2",
         "guzzlehttp/guzzle": "^7.5.0",
         "laravel/fortify": "^1.16.0",
-        "laravel/framework": "11.35.0",
+        "laravel/framework": "^11.0",
         "laravel/horizon": "^5.29.1",
         "laravel/pail": "^1.1",
         "laravel/prompts": "^0.1.18|^0.2.0|^0.3.0",
