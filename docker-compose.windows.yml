@@ -6,7 +6,7 @@ services:
     container_name: coolify-testing-host
     volumes:
       - //var/run/docker.sock://var/run/docker.sock
-      - ./:/data/coolify
+      - ./:${BASE_CONFIG_PATH:-/data/coolify}
   coolify:
     image: "ghcr.io/coollabsio/coolify:latest"
     pull_policy: always

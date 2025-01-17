@@ -24,7 +24,8 @@ class StartSentinel
         $token = data_get($server, 'settings.sentinel_token');
         $endpoint = data_get($server, 'settings.sentinel_custom_url');
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
-        $mountDir = '/data/coolify/sentinel';
+        $base_path = config('coolify.base_config_path');
+        $mountDir = "$base_path/sentinel";
         $image = "ghcr.io/coollabsio/sentinel:$version";
         if (! $endpoint) {
             throw new \Exception('You should set FQDN in Instance Settings.');
