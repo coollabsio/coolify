@@ -35,10 +35,7 @@ class Init extends Command
         }
 
         $this->servers = Server::all();
-        if (isCloud()) {
-            echo "Running in cloud mode\n";
-        } else {
-            echo "Running in self-hosted mode\n";
+        if (! isCloud()) {
             $this->send_alive_signal();
             get_public_ips();
         }
@@ -64,7 +61,7 @@ class Init extends Command
         try {
             $this->pullHelperImage();
         } catch (\Throwable $e) {
-            echo "Error pulling helper image: {$e->getMessage()}\n";
+            //
         }
 
         if (isCloud()) {
@@ -124,7 +121,6 @@ class Init extends Command
     {
         try {
             User::whereRaw('email ~ \'[A-Z]\'')->get()->each(function (User $user) {
-                $user->update(['email' => strtolower($user->email)]);
                 $user->update(['email' => strtolower($user->email)]);
             });
         } catch (\Throwable $e) {
@@ -229,7 +225,6 @@ class Init extends Command
 
     private function send_alive_signal()
     {
-        echo "Sending alive signal...\n";
         $id = config('app.id');
         $version = config('constants.coolify.version');
         $settings = instanceSettings();
@@ -255,7 +250,6 @@ class Init extends Command
             }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
-                echo "Marking deployment {$deployment->id} as failed\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
             }

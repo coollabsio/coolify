@@ -23,6 +23,12 @@ class ProductionSeeder extends Seeder
     {
         $user = 'root';
 
+        if (isCloud()) {
+            echo "  Running in cloud mode.\n";
+        } else {
+            echo "  Running in self-hosted mode.\n";
+        }
+
         if (User::find(0) !== null && Team::find(0) !== null) {
             if (DB::table('team_user')->where('user_id', 0)->first() === null) {
                 DB::table('team_user')->insert([
