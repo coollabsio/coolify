@@ -2005,7 +2005,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     projectName: $resource->project()->name,
                     resourceName: $resource->name,
                     type: 'service',
-                    subType: $isDatabase ? 'database' : 'application', 
+                    subType: $isDatabase ? 'database' : 'application',
                     subId: $savedService->id,
                     subName: $savedService->name,
                     environment: $resource->environment->name,
@@ -2872,7 +2872,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_forget($service, 'volumes.*.is_directory');
             data_forget($service, 'exclude_from_hc');
             data_set($service, 'environment', $serviceVariables->toArray());
-            updateCompose($savedService);
+            updateCompose($service);
 
             return $service;
         });

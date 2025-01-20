@@ -195,6 +195,31 @@ class SecurityController extends Controller
         if (! $request->description) {
             $request->offsetSet('description', 'Created by Coolify via API');
         }
+
+        $isPrivateKeyString = str_starts_with($request->private_key, '-----BEGIN');
+        if (! $isPrivateKeyString) {
+            try {
+                $base64PrivateKey = base64_decode($request->private_key);
+                $request->offsetSet('private_key', $base64PrivateKey);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Invalid private key.',
+                ], 422);
+            }
+        }
+        $isPrivateKeyValid = PrivateKey::validatePrivateKey($request->private_key);
+        if (! $isPrivateKeyValid) {
+            return response()->json([
+                'message' => 'Invalid private key.',
+            ], 422);
+        }
+        $fingerPrint = PrivateKey::generateFingerprint($request->private_key);
+        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint);
+        if ($isFingerPrintExists) {
+            return response()->json([
+                'message' => 'Private key already exists.',
+            ], 422);
+        }
         $key = PrivateKey::create([
             'team_id' => $teamId,
             'name' => $request->name,

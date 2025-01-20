@@ -8,7 +8,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.6"
+VERSION="1.7"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -21,6 +21,11 @@ fi
 echo -e "Welcome to Coolify Installer!"
 echo -e "This script will install everything for you. Sit back and relax."
 echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+# Predefined root user
+ROOT_USERNAME=${ROOT_USERNAME:-}
+ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
+ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
 
 TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
 AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
@@ -479,6 +484,19 @@ else
     sed -i "s|^PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
     sed -i "s|^PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
     sed -i "s|^PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE-$DATE"
+fi
+
+# Add default root user credentials from environment variables
+if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+    if grep -q "^ROOT_USERNAME=" "$ENV_FILE-$DATE"; then
+        sed -i "s|^ROOT_USERNAME=.*|ROOT_USERNAME=$ROOT_USERNAME|" "$ENV_FILE-$DATE"
+    fi
+    if grep -q "^ROOT_USER_EMAIL=" "$ENV_FILE-$DATE"; then
+        sed -i "s|^ROOT_USER_EMAIL=.*|ROOT_USER_EMAIL=$ROOT_USER_EMAIL|" "$ENV_FILE-$DATE"
+    fi
+    if grep -q "^ROOT_USER_PASSWORD=" "$ENV_FILE-$DATE"; then
+        sed -i "s|^ROOT_USER_PASSWORD=.*|ROOT_USER_PASSWORD=$ROOT_USER_PASSWORD|" "$ENV_FILE-$DATE"
+    fi
 fi
 
 # Merge .env and .env.production. New values will be added to .env
