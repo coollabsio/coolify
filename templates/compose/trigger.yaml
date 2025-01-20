@@ -4,11 +4,13 @@
 # logo: svgs/trigger.png
 # port: 3000
 
+
 x-common-env: &common-env
   REMIX_APP_PORT: 3030
   NODE_ENV: production
   RUNTIME_PLATFORM: docker-compose
   V3_ENABLED: true
+  TRIGGER_TELEMETRY_DISABLED: 1
   INTERNAL_OTEL_TRACE_DISABLED: 1
   INTERNAL_OTEL_TRACE_LOGGING_ENABLED: 0
   POSTGRES_USER: $SERVICE_USER_POSTGRES
@@ -53,44 +55,46 @@ services:
       SERVICE_FQDN_WEBAPP_3030: ""
       <<: *common-env
     depends_on:
-      postgresql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      electric:
-        condition: service_healthy
+      - postgresql
+      - redis
+    restart: unless-stopped  
     healthcheck:
-      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3030' || exit 1"
-      interval: 10s
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:3030/healthcheck', (r) => {if (r.statusCode !== 200) process.exit(1); else process.exit(0); }).on('error', () => process.exit(1))"
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   electric:
     image: electricsql/electric
+    restart: unless-stopped
     environment:
       <<: *common-env
-    depends_on:
-      postgresql:
-        condition: service_healthy
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pwd
+      test: 'curl --fail http://127.0.0.1:3000/v1/health || exit 1'
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+    depends_on:
+      - postgresql  
 
   redis:
-    image: "redis:7"
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+    image: 'redis:7'
+    restart: unless-stopped
     healthcheck:
       test:
         - CMD-SHELL
-        - "redis-cli -h localhost -p 6379 ping"
-      interval: 5s
-      timeout: 5s
-      retries: 3
+        - 'redis-cli ping | grep PONG'
+      interval: 1s
+      timeout: 3s
+      retries: 5
     volumes:
       - redis-data:/data
-
   postgresql:
     image: postgres:16-alpine
     volumes:
@@ -108,13 +112,19 @@ services:
 
   docker-provider:
     image: ghcr.io/triggerdotdev/provider/docker:v3
-    platform: linux/amd64
+    restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    user: root
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:9020/health', (r) => {if (r.statusCode !== 200) process.exit(1); else process.exit(0); }).on('error', () => process.exit(1))"
+      interval: 5s
     depends_on:
-      webapp:
-        condition: service_healthy
+      - webapp    
+    user: root
     environment:
       <<: *common-env
       PLATFORM_HOST: webapp
@@ -126,13 +136,21 @@ services:
       ENFORCE_MACHINE_PRESETS: true
   coordinator:
     image: ghcr.io/triggerdotdev/coordinator:v3
-    platform: linux/amd64
+    restart: unless-stopped
+    user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    user: root
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:${HTTP_SERVER_PORT:-9020}/health', (r) => {if (r.statusCode !== 200) process.exit(1); else process.exit(0); }).on('error', () => process.exit(1))"
+      interval: 5s
+    ports:
+      - '127.0.0.1:9020:9020'
     depends_on:
-      webapp:
-        condition: service_healthy
+      - webapp
     environment:
       <<: *common-env
       PLATFORM_HOST: webapp
@@ -141,7 +159,3 @@ services:
       PLATFORM_SECRET: $SERVICE_PASSWORD_64_COORDINATOR
       HTTP_SERVER_PORT: 9020
       FORCE_CHECKPOINT_SIMULATION: 0
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - pwd
