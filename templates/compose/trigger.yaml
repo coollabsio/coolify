@@ -5,7 +5,7 @@
 # port: 3000
 
 x-common-env: &common-env
-  REMIX_APP_PORT: 3000
+  REMIX_APP_PORT: 3030
   NODE_ENV: production
   RUNTIME_PLATFORM: docker-compose
   V3_ENABLED: true
@@ -14,9 +14,9 @@ x-common-env: &common-env
   POSTGRES_USER: $SERVICE_USER_POSTGRES
   POSTGRES_PASSWORD: $SERVICE_PASSWORD_POSTGRES
   POSTGRES_DB: ${POSTGRES_DB:-trigger}
-  MAGIC_LINK_SECRET: $SERVICE_PASSWORD_64_MAGIC
-  SESSION_SECRET: $SERVICE_PASSWORD_64_SESSION
-  ENCRYPTION_KEY: $SERVICE_PASSWORD_64_ENCRYPTION
+  MAGIC_LINK_SECRET: $SERVICE_BASE64_MAGICLINK
+  SESSION_SECRET: $SERVICE_BASE64_SESSION
+  ENCRYPTION_KEY: $SERVICE_BASE64_ENCRYPTION
   PROVIDER_SECRET: $SERVICE_PASSWORD_64_PROVIDER
   COORDINATOR_SECRET: $SERVICE_PASSWORD_64_COORDINATOR
   DATABASE_HOST: postgresql:5432
@@ -40,17 +40,17 @@ x-common-env: &common-env
   RESEND_API_KEY: ${RESEND_API_KEY}
   FROM_EMAIL: ${FROM_EMAIL}
   REPLY_TO_EMAIL: ${REPLY_TO_EMAIL}
-  LOGIN_ORIGIN: $SERVICE_FQDN_TRIGGER_3000
-  APP_ORIGIN: $SERVICE_FQDN_TRIGGER_3000
-  DEV_OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_FQDN_TRIGGER_3000/otel
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://trigger:3040/otel"
+  LOGIN_ORIGIN: $SERVICE_FQDN_WEBAPP_3030
+  APP_ORIGIN: $SERVICE_FQDN_WEBAPP_3030
+  DEV_OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_FQDN_WEBAPP_3030/otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: $SERVICE_FQDN_WEBAPP_3030/otel
   ELECTRIC_ORIGIN: http://electric:3000
 
 services:
-  trigger:
+  webapp:
     image: ghcr.io/triggerdotdev/trigger.dev:v3
     environment:
-      SERVICE_FQDN_TRIGGER_3000: ""
+      SERVICE_FQDN_WEBAPP_3030: ""
       <<: *common-env
     depends_on:
       postgresql:
@@ -60,7 +60,7 @@ services:
       electric:
         condition: service_healthy
     healthcheck:
-      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"
+      test: "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/3030' || exit 1"
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,6 +90,7 @@ services:
       retries: 3
     volumes:
       - redis-data:/data
+
   postgresql:
     image: postgres:16-alpine
     volumes:
@@ -112,14 +113,17 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     user: root
     depends_on:
-      trigger:
+      webapp:
         condition: service_healthy
     environment:
       <<: *common-env
-      PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3000
-      SECURE_CONNECTION: "false"
-      PLATFORM_SECRET: $PROVIDER_SECRET
+      PLATFORM_HOST: webapp
+      PLATFORM_WS_PORT: 3030
+      SECURE_CONNECTION: false
+      PLATFORM_SECRET: $SERVICE_PASSWORD_64_PROVIDER
+      FORCE_CHECKPOINT_SIMULATION: 0
+      HTTP_SERVER_PORT: 9020
+      ENFORCE_MACHINE_PRESETS: true
   coordinator:
     image: ghcr.io/triggerdotdev/coordinator:v3
     platform: linux/amd64
@@ -127,14 +131,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     user: root
     depends_on:
-      trigger:
+      webapp:
         condition: service_healthy
     environment:
       <<: *common-env
-      PLATFORM_HOST: trigger
-      PLATFORM_WS_PORT: 3000
-      SECURE_CONNECTION: "false"
-      PLATFORM_SECRET: $COORDINATOR_SECRET
+      PLATFORM_HOST: webapp
+      PLATFORM_WS_PORT: 3030
+      SECURE_CONNECTION: false
+      PLATFORM_SECRET: $SERVICE_PASSWORD_64_COORDINATOR
+      HTTP_SERVER_PORT: 9020
+      FORCE_CHECKPOINT_SIMULATION: 0
     healthcheck:
       test:
         - CMD-SHELL
