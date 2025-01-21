@@ -449,7 +449,7 @@
     "cloudflared": {
         "documentation": "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/?utm_source=coolify.io",
         "slogan": "Client for Cloudflare Tunnel, a daemon that exposes private services through the Cloudflare edge.",
-        "compose": "c2VydmljZXM6CiAgY2xvdWRmbGFyZWQ6CiAgICBjb250YWluZXJfbmFtZTogY2xvdWRmbGFyZS10dW5uZWwKICAgIGltYWdlOiAnY2xvdWRmbGFyZS9jbG91ZGZsYXJlZDpsYXRlc3QnCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgbmV0d29ya19tb2RlOiBob3N0CiAgICBjb21tYW5kOiAndHVubmVsIC0tbm8tYXV0b3VwZGF0ZSBydW4nCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnVFVOTkVMX1RPS0VOPSR7Q0xPVURGTEFSRV9UVU5ORUxfVE9LRU59Jwo=",
+        "compose": "c2VydmljZXM6CiAgY2xvdWRmbGFyZWQ6CiAgICBjb250YWluZXJfbmFtZTogY2xvdWRmbGFyZS10dW5uZWwKICAgIGltYWdlOiAnY2xvdWRmbGFyZS9jbG91ZGZsYXJlZDpsYXRlc3QnCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgbmV0d29ya19tb2RlOiBob3N0CiAgICBjb21tYW5kOiAndHVubmVsIC0tbm8tYXV0b3VwZGF0ZSBydW4nCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnVFVOTkVMX1RPS0VOPSR7Q0xPVURGTEFSRV9UVU5ORUxfVE9LRU59JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGNsb3VkZmxhcmVkCiAgICAgICAgLSAnLS12ZXJzaW9uJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": null,
         "logo": "svgs/cloudflared.svg",
         "minversion": "0.0.0"

@@ -5,13 +5,14 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            {{--
-            <x-forms.button wire:click="downloadConfig">
+
+            {{-- <x-forms.button wire:click="downloadConfig">
                 Download Config
-            <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
+            </x-forms.button> --}}
+            {{-- <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
                 <livewire:project.shared.upload-config :applicationId="$application->id" />
-            </x-modal-input>
- --}}
+            </x-modal-input> --}}
+
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">

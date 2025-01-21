@@ -2872,7 +2872,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_forget($service, 'volumes.*.is_directory');
             data_forget($service, 'exclude_from_hc');
             data_set($service, 'environment', $serviceVariables->toArray());
-            updateCompose($service);
 
             return $service;
         });
