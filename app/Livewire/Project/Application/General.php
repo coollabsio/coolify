@@ -442,6 +442,7 @@ class General extends Component
     {
         $config = GenerateConfig::run($this->application, true);
         $fileName = str($this->application->name)->slug()->append('_config.json');
+        dd($config);
 
         return response()->streamDownload(function () use ($config) {
             echo $config;
