@@ -48,6 +48,9 @@ class General extends Component
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
+        'database.enable_ssl' => 'nullable|boolean',
+        'database.ssl_mode' => 'nullable|string',
+        'database.custom_domain' => 'nullable|string',
     ];
 
     protected $validationAttributes = [
@@ -65,6 +68,9 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
         'database.custom_docker_run_options' => 'Custom Docker Run Options',
+        'database.enable_ssl' => 'Enable SSL',
+        'database.ssl_mode' => 'SSL Mode',
+        'database.custom_domain' => 'Custom PostgreSQL Domain',
     ];
 
     public function mount()
@@ -77,7 +83,7 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
-            if (! $this->server->isLogDrainEnabled()) {
+            if (!$this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
@@ -94,14 +100,31 @@ class General extends Component
     public function instantSave()
     {
         try {
-            if ($this->database->is_public && ! $this->database->public_port) {
+            if ($this->database->isDirty('enable_ssl')) {
+                // If db is not started, show error
+                if (!str($this->database->status)->startsWith('running')) {
+                    $this->dispatch('error', 'Database must be started to enable SSL.');
+                    $this->database->enable_ssl = false;
+
+                    return;
+                }
+                if ($this->database->enable_ssl && empty($this->database->ssl_mode)) {
+                    $this->database->ssl_mode = 'require';
+                }
+                \Log::info('PostgreSQL SSL settings changed', [
+                    'database_id' => $this->database->id,
+                    'enable_ssl' => $this->database->enable_ssl,
+                    'ssl_mode' => $this->database->ssl_mode,
+                ]);
+            }
+            if ($this->database->is_public && !$this->database->public_port) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
 
                 return;
             }
             if ($this->database->is_public) {
-                if (! str($this->database->status)->startsWith('running')) {
+                if (!str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->database->is_public = false;
 
@@ -116,7 +139,7 @@ class General extends Component
             $this->db_url_public = $this->database->external_db_url;
             $this->database->save();
         } catch (\Throwable $e) {
-            $this->database->is_public = ! $this->database->is_public;
+            $this->database->is_public = !$this->database->is_public;
 
             return handleError($e, $this);
         }
@@ -136,7 +159,7 @@ class General extends Component
         }
 
         $container_name = $this->database->uuid;
-        $configuration_dir = database_configuration_dir().'/'.$container_name;
+        $configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         if ($oldScript && $oldScript['filename'] !== $script['filename']) {
             $old_file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$oldScript['filename']}";
@@ -144,7 +167,7 @@ class General extends Component
             try {
                 instant_remote_process([$delete_command], $this->server);
             } catch (\Exception $e) {
-                $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
+                $this->dispatch('error', 'Failed to remove old init script from server: ' . $e->getMessage());
 
                 return;
             }
@@ -178,19 +201,19 @@ class General extends Component
         $found = $collection->firstWhere('filename', $script['filename']);
         if ($found) {
             $container_name = $this->database->uuid;
-            $configuration_dir = database_configuration_dir().'/'.$container_name;
+            $configuration_dir = database_configuration_dir() . '/' . $container_name;
             $file_path = "$configuration_dir/docker-entrypoint-initdb.d/{$script['filename']}";
 
             $command = "rm -f $file_path";
             try {
                 instant_remote_process([$command], $this->server);
             } catch (\Exception $e) {
-                $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
+                $this->dispatch('error', 'Failed to remove init script from server: ' . $e->getMessage());
 
                 return;
             }
 
-            $updatedScripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])
+            $updatedScripts = $collection->filter(fn($s) => $s['filename'] !== $script['filename'])
                 ->values()
                 ->map(function ($item, $index) {
                     $item['index'] = $index;
@@ -223,7 +246,7 @@ class General extends Component
 
             return;
         }
-        if (! isset($this->database->init_scripts)) {
+        if (!isset($this->database->init_scripts)) {
             $this->database->init_scripts = [];
         }
         $this->database->init_scripts = array_merge($this->database->init_scripts, [

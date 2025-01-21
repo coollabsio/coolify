@@ -3053,6 +3053,18 @@
                                         "type": "string",
                                         "description": "PostgreSQL conf"
                                     },
+                                    "enable_ssl": {
+                                        "type": "boolean",
+                                        "description": "Enable SSL"
+                                    },
+                                    "ssl_mode": {
+                                        "type": "string",
+                                        "description": "SSL Mode"
+                                    },
+                                    "custom_domain": {
+                                        "type": "string",
+                                        "description": "Custom PostgreSQL Domain"
+                                    },
                                     "clickhouse_admin_user": {
                                         "type": "string",
                                         "description": "Clickhouse admin user"
@@ -3224,6 +3236,18 @@
                                     "postgres_conf": {
                                         "type": "string",
                                         "description": "PostgreSQL conf"
+                                    },
+                                    "enable_ssl": {
+                                        "type": "boolean",
+                                        "description": "Enable SSL"
+                                    },
+                                    "ssl_mode": {
+                                        "type": "string",
+                                        "description": "SSL Mode"
+                                    },
+                                    "custom_domain": {
+                                        "type": "string",
+                                        "description": "Custom PostgreSQL Domain"
                                     },
                                     "destination_uuid": {
                                         "type": "string",

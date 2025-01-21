@@ -2104,9 +2104,15 @@ paths:
                 postgres_conf:
                   type: string
                   description: 'PostgreSQL conf'
-                clickhouse_admin_user:
+                enable_ssl:
+                  type: boolean
+                  description: 'Enable SSL'
+                ssl_mode:
                   type: string
-                  description: 'Clickhouse admin user'
+                  description: 'SSL Mode'
+                custom_domain:
+                  type: string
+                  description: 'Custom PostgreSQL Domain'
                 clickhouse_admin_password:
                   type: string
                   description: 'Clickhouse admin password'
@@ -2229,6 +2235,15 @@ paths:
                 postgres_conf:
                   type: string
                   description: 'PostgreSQL conf'
+                enable_ssl:
+                  type: boolean
+                  description: 'Enable SSL'
+                ssl_mode:
+                  type: string
+                  description: 'SSL Mode'
+                custom_domain:
+                  type: string
+                  description: 'Custom PostgreSQL Domain'
                 destination_uuid:
                   type: string
                   description: 'UUID of the destination if the server has multiple destinations'

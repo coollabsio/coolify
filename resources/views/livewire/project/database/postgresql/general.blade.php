@@ -72,32 +72,51 @@
                     helper="If you change the user/password/port, this could be different. This is with the default values."
                     type="password" readonly wire:model="db_url_public" />
             @endif
-        </div>
-        <div>
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
+
+            <div>
+                <div class="flex flex-col py-2 w-64">
+                    <div class="flex items-center gap-2 pb-2">
+                        <div class="flex items-center">
+                            <h3>Proxy</h3>
+                            <x-loading wire:loading wire:target="instantSave" />
+                        </div>
+                        @if (data_get($database, 'is_public'))
+                            <x-slide-over fullScreen>
+                                <x-slot:title>Proxy Logs</x-slot:title>
+                                <x-slot:content>
+                                    <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                        container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                                </x-slot:content>
+                                <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
+                                    @click="slideOverOpen=true">Logs</x-forms.button>
+                            </x-slide-over>
+                        @endif
                     </div>
-                    @if (data_get($database, 'is_public'))
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
+                    <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
                 </div>
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                    id="database.public_port" label="Public Port" />
             </div>
-            <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                id="database.public_port" label="Public Port" />
-        </div>
-        <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
+            <div class="flex flex-col gap-2">
+
+                <div class="w-64">
+                    <x-forms.checkbox instantSave label="Enable SSL" id="database.enable_ssl" />
+
+                </div>
+                @if ($database->enable_ssl)
+                    <x-forms.select label="SSL Mode" id="database.ssl_mode">
+                        <option value="PREFERRED">Preferred</option>
+                        <option value="DISABLED">Disabled</option>
+                        <option value="ALLOW">Allow</option>
+                        <option value="VERIFY-CA">Verify CA</option>
+                        <option value="VERIFY-FULL">Verify Full</option>
+                    </x-forms.select>
+                @endif
+                <x-forms.input label="Custom Domain" id="database.custom_domain"
+                    helper="You can specify a custom domain to use for the database. This will be used for the database URL. (Only available if SSL is enabled)"
+                    disabled="{{ !$database->enable_ssl }}" />
+            </div>
+            <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
     </form>
     <h3 class="pt-4">Advanced</h3>
     <div class="flex flex-col">
@@ -110,8 +129,8 @@
             <x-modal-input buttonTitle="+ Add" title="New Init Script">
                 <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
                     <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
-                    <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
-                        label="Content" required />
+                    <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content" label="Content"
+                        required />
                     <x-forms.button type="submit">
                         Save
                     </x-forms.button>
@@ -119,7 +138,7 @@
             </x-modal-input>
         </div>
         <div class="flex flex-col gap-2">
-            @forelse(data_get($database,'init_scripts', []) as $script)
+            @forelse(data_get($database, 'init_scripts', []) as $script)
                 <livewire:project.database.init-script :script="$script" :wire:key="$script['index']" />
             @empty
                 <div>No initialization scripts found.</div>

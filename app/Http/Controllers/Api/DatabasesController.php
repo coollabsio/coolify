@@ -193,6 +193,9 @@ class DatabasesController extends Controller
                         'postgres_initdb_args' => ['type' => 'string', 'description' => 'PostgreSQL initdb args'],
                         'postgres_host_auth_method' => ['type' => 'string', 'description' => 'PostgreSQL host auth method'],
                         'postgres_conf' => ['type' => 'string', 'description' => 'PostgreSQL conf'],
+                        'enable_ssl' => ['type' => 'boolean', 'description' => 'Enable SSL'],
+                        'ssl_mode' => ['type' => 'string', 'description' => 'SSL Mode'],
+                        'custom_domain' => ['type' => 'string', 'description' => 'Custom PostgreSQL Domain'],
                         'clickhouse_admin_user' => ['type' => 'string', 'description' => 'Clickhouse admin user'],
                         'clickhouse_admin_password' => ['type' => 'string', 'description' => 'Clickhouse admin password'],
                         'dragonfly_password' => ['type' => 'string', 'description' => 'DragonFly password'],
@@ -283,7 +286,7 @@ class DatabasesController extends Controller
         }
         switch ($database->type()) {
             case 'standalone-postgresql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'enable_ssl', 'ssl_mode', 'custom_domain'];
                 $validator = customApiValidator($request->all(), [
                     'postgres_user' => 'string',
                     'postgres_password' => 'string',
@@ -535,6 +538,9 @@ class DatabasesController extends Controller
                         'postgres_initdb_args' => ['type' => 'string', 'description' => 'PostgreSQL initdb args'],
                         'postgres_host_auth_method' => ['type' => 'string', 'description' => 'PostgreSQL host auth method'],
                         'postgres_conf' => ['type' => 'string', 'description' => 'PostgreSQL conf'],
+                        'enable_ssl' => ['type' => 'boolean', 'description' => 'Enable SSL'],
+                        'ssl_mode' => ['type' => 'string', 'description' => 'SSL Mode'],
+                        'custom_domain' => ['type' => 'string', 'description' => 'Custom PostgreSQL Domain'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'UUID of the destination if the server has multiple destinations'],
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
@@ -1021,7 +1027,7 @@ class DatabasesController extends Controller
 
     public function create_database(Request $request, NewDatabaseTypes $type)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'enable_ssl', 'ssl_mode', 'custom_domain', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1122,7 +1128,7 @@ class DatabasesController extends Controller
             }
         }
         if ($type === NewDatabaseTypes::POSTGRESQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'enable_ssl', 'ssl_mode', 'custom_domain'];
             $validator = customApiValidator($request->all(), [
                 'postgres_user' => 'string',
                 'postgres_password' => 'string',
@@ -1130,6 +1136,9 @@ class DatabasesController extends Controller
                 'postgres_initdb_args' => 'string',
                 'postgres_host_auth_method' => 'string',
                 'postgres_conf' => 'string',
+                'enable_ssl' => 'boolean',
+                'ssl_mode' => 'string',
+                'custom_domain' => 'string',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
