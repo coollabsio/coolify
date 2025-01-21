@@ -54,6 +54,11 @@ services:
       - POSTGRES_DB=superset
     volumes:
       - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   redis:
     image: redis
@@ -61,6 +66,12 @@ services:
     volumes:
       - redis:/data
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      retries: 10
+      timeout: 2s
+
 
 volumes:
   postgres:
