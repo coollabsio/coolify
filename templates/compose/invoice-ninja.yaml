@@ -15,8 +15,8 @@ services:
       - APP_KEY=base64:${SERVICE_REALBASE64_INVOICENINJA}
       - APP_DEBUG=${APP_DEBUG:-false}
       - "REQUIRE_HTTPS=${REQUIRE_HTTPS:-false}"
-      - "PHANTOMJS_PDF_GENERATION=${PHANTOMJS_PDF_GENERATION:-false}"
-      - "PDF_GENERATOR=${PDF_GENERATOR:-snappdf}"
+      - PHANTOMJS_PDF_GENERATION=false
+      - PDF_GENERATOR=hosted_ninja
       - "TRUSTED_PROXIES=${TRUSTED_PROXIES:-*}"
       - CACHE_DRIVER=redis
       - "QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}"
@@ -49,7 +49,6 @@ services:
       - NORDIGEN_SECRET_KEY=${NORDIGEN_SECRET_KEY:-}
       - IS_DOCKER=true
       - SCOUT_DRIVER=${SCOUT_DRIVER:-null}
-      - SNAPPDF_CHROMIUM_PATH=${SNAPPDF_CHROMIUM_PATH:-/usr/bin/google-chrome-stable}
       - LICENSE_KEY=${LICENSE_KEY}
     healthcheck:
       test: ["CMD", "echo", "ok"]
