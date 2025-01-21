@@ -90,12 +90,12 @@ class Heading extends Component
             force_rebuild: $force_rebuild,
         );
 
-        return redirect()->route('project.application.deployment.show', [
+        return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_uuid' => $this->parameters['environment_uuid'],
-        ]);
+        ], navigate: true);
     }
 
     protected function setDeploymentUuid()
@@ -132,12 +132,12 @@ class Heading extends Component
             restart_only: true,
         );
 
-        return redirect()->route('project.application.deployment.show', [
+        return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_uuid' => $this->parameters['environment_uuid'],
-        ]);
+        ], navigate: true);
     }
 
     public function render()

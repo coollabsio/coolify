@@ -183,7 +183,7 @@ class Emails extends Command
                         'team_id' => 0,
                     ]);
                 }
-                //$this->mail = (new BackupSuccess($backup->frequency, $db->name))->toMail();
+                // $this->mail = (new BackupSuccess($backup->frequency, $db->name))->toMail();
                 $this->sendEmail();
                 break;
                 // case 'invitation-link':

@@ -530,11 +530,11 @@ class ServersController extends Controller
             'user' => $request->user,
             'private_key_id' => $privateKey->id,
             'team_id' => $teamId,
-            'proxy' => [
-                'type' => $proxyType,
-                'status' => ProxyStatus::EXITED->value,
-            ],
         ]);
+        $server->proxy->set('type', $proxyType);
+        $server->proxy->set('status', ProxyStatus::EXITED->value);
+        $server->save();
+
         $server->settings()->update([
             'is_build_server' => $request->is_build_server,
         ]);
@@ -741,6 +741,9 @@ class ServersController extends Controller
         }
         if ($server->definedResources()->count() > 0) {
             return response()->json(['message' => 'Server has resources, so you need to delete them before.'], 400);
+        }
+        if ($server->isLocalhost()) {
+            return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
         $server->delete();
         DeleteServer::dispatch($server);

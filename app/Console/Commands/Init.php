@@ -35,8 +35,7 @@ class Init extends Command
         }
 
         $this->servers = Server::all();
-        if (isCloud()) {
-        } else {
+        if (! isCloud()) {
             $this->send_alive_signal();
             get_public_ips();
         }
@@ -88,8 +87,10 @@ class Init extends Command
             $settings = instanceSettings();
             if (! is_null(config('constants.coolify.autoupdate', null))) {
                 if (config('constants.coolify.autoupdate') == true) {
+                    echo "Enabling auto-update\n";
                     $settings->update(['is_auto_update_enabled' => true]);
                 } else {
+                    echo "Disabling auto-update\n";
                     $settings->update(['is_auto_update_enabled' => false]);
                 }
             }
@@ -119,7 +120,9 @@ class Init extends Command
     private function update_user_emails()
     {
         try {
-            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(fn (User $user) => $user->update(['email' => strtolower($user->email)]));
+            User::whereRaw('email ~ \'[A-Z]\'')->get()->each(function (User $user) {
+                $user->update(['email' => strtolower($user->email)]);
+            });
         } catch (\Throwable $e) {
             echo "Error in updating user emails: {$e->getMessage()}\n";
         }
@@ -200,7 +203,6 @@ class Init extends Command
             try {
                 $database = StandalonePostgresql::withTrashed()->find(0);
                 if ($database && $database->trashed()) {
-                    echo "Restoring coolify db backup\n";
                     $database->restore();
                     $scheduledBackup = ScheduledDatabaseBackup::find(0);
                     if (! $scheduledBackup) {

@@ -153,7 +153,7 @@ class General extends Component
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
-        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
+        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && $this->application->settings->is_container_label_readonly_enabled === true) {
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -442,6 +442,7 @@ class General extends Component
     {
         $config = GenerateConfig::run($this->application, true);
         $fileName = str($this->application->name)->slug()->append('_config.json');
+        dd($config);
 
         return response()->streamDownload(function () use ($config) {
             echo $config;

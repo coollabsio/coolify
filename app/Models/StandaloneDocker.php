@@ -6,6 +6,19 @@ class StandaloneDocker extends BaseModel
 {
     protected $guarded = [];
 
+    protected static function boot()
+    {
+        parent::boot();
+        static::created(function ($newStandaloneDocker) {
+            $server = $newStandaloneDocker->server;
+            instant_remote_process([
+                "docker network inspect $newStandaloneDocker->network >/dev/null 2>&1 || docker network create --driver overlay --attachable $newStandaloneDocker->network >/dev/null",
+            ], $server, false);
+            $connectProxyToDockerNetworks = connectProxyToNetworks($server);
+            instant_remote_process($connectProxyToDockerNetworks, $server, false);
+        });
+    }
+
     public function applications()
     {
         return $this->morphMany(Application::class, 'destination');

@@ -12,6 +12,8 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_LABELSTUDIO_8080
+      - CSRF_TRUSTED_ORIGINS=${SERVICE_FQDN_LABELSTUDIO}
+      - EXPERIMENTAL_FEATURES=${EXPERIMENTAL_FEATURES:-false}
       - DJANGO_DB=${DJANGO_DB:-default}
       - POSTGRE_NAME=${POSTGRES_DB:-labelstudio}
       - POSTGRE_USER=${SERVICE_USER_POSTGRES}

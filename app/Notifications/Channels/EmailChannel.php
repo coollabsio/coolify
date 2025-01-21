@@ -53,6 +53,7 @@ class EmailChannel
             if (! $type) {
                 throw new Exception('No email settings found.');
             }
+            config()->set('mail.default', $type);
 
             return;
         }
