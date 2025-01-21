@@ -1,9 +1,4 @@
 <div id="terminal-container" x-data="terminalData()">
-    {{-- <div x-show="!terminalActive" class="flex items-center justify-center w-full py-4 mx-auto h-[510px]">
-        <div class="p-1 w-full h-full rounded border dark:bg-coolgray-100 dark:border-coolgray-300">
-            <span class="font-mono text-sm text-gray-500" x-text="message"></span>
-        </div>
-    </div> --}}
     <div x-ref="terminalWrapper"
         :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
         <div id="terminal" wire:ignore></div>
