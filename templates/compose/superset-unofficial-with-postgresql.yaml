@@ -1,0 +1,67 @@
+# documentation: https://github.com/amancevice/docker-superset
+# slogan: Modern data exploration and visualization platform
+# tags: analytics,bi,dashboard,database,sql
+# logo: svgs/superset.svg
+# port: 8088
+
+services:
+  superset:
+    image: amancevice/superset
+    restart: always
+    depends_on:
+      - db
+      - redis
+    environment:
+      - SERVICE_FQDN_AFFINE_8088
+      - SECRET_KEY=${SERVICE_BASE64_64_SUPERSETSECRETKEY}
+      - MAPBOX_API_KEY=${MAPBOX_API_KEY}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=superset
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - type: bind
+        source: ./superset/superset_config.py
+        target: /etc/superset/superset_config.py
+        content: |
+          import os
+
+          SECRET_KEY = os.getenv("SECRET_KEY")
+          MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY", "")
+
+          CACHE_CONFIG = {
+            "CACHE_TYPE": "RedisCache",
+            "CACHE_DEFAULT_TIMEOUT": 300,
+            "CACHE_KEY_PREFIX": "superset_",
+            "CACHE_REDIS_HOST": "redis",
+            "CACHE_REDIS_PORT": 6379,
+            "CACHE_REDIS_DB": 1,
+            "CACHE_REDIS_URL": f"redis://:{os.getenv('REDIS_PASSWORD')}@redis:6379/1",
+          }
+
+          FILTER_STATE_CACHE_CONFIG = {**CACHE_CONFIG, "CACHE_KEY_PREFIX": "superset_filter_"}
+          EXPLORE_FORM_DATA_CACHE_CONFIG = {**CACHE_CONFIG, "CACHE_KEY_PREFIX": "superset_explore_form_"}
+
+          SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@db:5432/{os.getenv('POSTGRES_DB')}"
+          SQLALCHEMY_TRACK_MODIFICATIONS = True
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=superset
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis
+    restart: always
+    volumes:
+      - redis:/data
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+
+volumes:
+  postgres:
+  redis:
