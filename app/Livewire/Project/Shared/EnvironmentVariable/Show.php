@@ -77,18 +77,29 @@ class Show extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
-            $this->validate();
+            if ($this->isSharedVariable) {
+                $this->validate([
+                    'key' => 'required|string',
+                    'value' => 'nullable',
+                    'is_multiline' => 'required|boolean',
+                    'is_literal' => 'required|boolean',
+                    'is_shown_once' => 'required|boolean',
+                ]);
+            } else {
+                $this->validate();
+                $this->env->is_build_time = $this->is_build_time;
+                $this->env->is_required = $this->is_required;
+                $this->env->is_shared = $this->is_shared;
+            }
+
             $this->env->key = $this->key;
             $this->env->value = $this->value;
-            $this->env->is_build_time = $this->is_build_time;
             $this->env->is_multiline = $this->is_multiline;
             $this->env->is_literal = $this->is_literal;
             $this->env->is_shown_once = $this->is_shown_once;
-            $this->env->is_required = $this->is_required;
-            $this->env->is_shared = $this->is_shared;
+
             $this->env->save();
         } else {
-
             $this->key = $this->env->key;
             $this->value = $this->env->value;
             $this->is_build_time = $this->env->is_build_time ?? false;
