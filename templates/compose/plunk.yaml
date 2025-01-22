@@ -27,7 +27,7 @@ services:
       - DISABLE_SIGNUPS=${DISABLE_SIGNUPS:-False}
     entrypoint: [ "/app/entry.sh" ]
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 2s
       timeout: 10s
       retries: 15
