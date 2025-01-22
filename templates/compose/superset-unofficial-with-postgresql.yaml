@@ -6,7 +6,7 @@ services:
       - db
       - redis
     environment:
-      - SERVICE_FQDN_AFFINE_8088
+      - SERVICE_FQDN_SUPERSET_8088
       - SECRET_KEY=${SERVICE_BASE64_64_SUPERSETSECRETKEY}
       - MAPBOX_API_KEY=${MAPBOX_API_KEY}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
