@@ -2289,6 +2289,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function generate_build_env_variables()
     {
         $variables = collect($this->nixpacks_plan_json->get('variables'));
+        $variables->put('SOURCE_COMMIT', $this->commit);
 
         $this->build_args = $variables->map(function ($value, $key) {
             $value = escapeshellarg($value);
