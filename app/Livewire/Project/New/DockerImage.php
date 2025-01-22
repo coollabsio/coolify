@@ -7,6 +7,7 @@ use App\Models\DockerRegistry;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\DockerImageParser;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -38,12 +39,8 @@ class DockerImage extends Component
             'selectedRegistries.*' => 'exists:docker_registries,id'
         ]);
 
-        $image = str($this->dockerImage)->before(':');
-        if (str($this->dockerImage)->contains(':')) {
-            $tag = str($this->dockerImage)->after(':');
-        } else {
-            $tag = 'latest';
-        }
+        $parser = new DockerImageParser;
+        $parser->parse($this->dockerImage);
 
         $destination_uuid = $this->query['destination'];
         $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
@@ -64,8 +61,8 @@ class DockerImage extends Component
             'git_branch' => 'main',
             'build_pack' => 'dockerimage',
             'ports_exposes' => 80,
-            'docker_registry_image_name' => $image,
-            'docker_registry_image_tag' => $tag,
+            'docker_registry_image_name' => $parser->getFullImageNameWithoutTag(),
+            'docker_registry_image_tag' => $parser->getTag(),
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,

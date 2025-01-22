@@ -37,6 +37,9 @@ services:
       - MAILER_USER=${MAILER_USER}
       - MAILER_PASSWORD=${MAILER_PASSWORD}
       - MAILER_SENDER=${MAILER_SENDER}
+      - COPILOT_FAL_API_KEY=${COPILOT_FAL_API_KEY}
+      - COPILOT_PERPLEXITY_API_KEY=${COPILOT_PERPLEXITY_API_KEY}
+      - COPILOT_OPENAI_API_KEY=${COPILOT_OPENAI_API_KEY}
     healthcheck:
       test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/3010' || exit 1"]
       interval: 5s

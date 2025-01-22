@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
+use Laravel\Horizon\Contracts\JobRepository;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
@@ -1257,14 +1258,22 @@ function get_public_ips()
 
 function isAnyDeploymentInprogress()
 {
-    // Only use it in the deployment script
-    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
-    if ($count > 0) {
-        echo "There are $count deployments in progress. Exiting...\n";
-        exit(1);
+    $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
+    $horizonJobIds = [];
+    foreach ($runningJobs as $runningJob) {
+        $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
+        if ($horizonJobStatus === 'unknown') {
+            return true;
+        }
+        $horizonJobIds[] = $runningJob->horizon_job_id;
     }
-    echo "No deployments in progress.\n";
-    exit(0);
+    if (count($horizonJobIds) === 0) {
+        echo "No deployments in progress.\n";
+        exit(0);
+    }
+    $horizonJobIds = collect($horizonJobIds)->unique()->toArray();
+    echo 'There are '.count($horizonJobIds)." deployments in progress.\n";
+    exit(1);
 }
 
 function isBase64Encoded($strValue)
@@ -1996,7 +2005,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     projectName: $resource->project()->name,
                     resourceName: $resource->name,
                     type: 'service',
-                    subType: $isDatabase ? 'database' : 'application', 
+                    subType: $isDatabase ? 'database' : 'application',
                     subId: $savedService->id,
                     subName: $savedService->name,
                     environment: $resource->environment->name,
@@ -2636,7 +2645,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($value?->startsWith('$')) {
                     $foundEnv = EnvironmentVariable::where([
                         'key' => $key,
-                        'application_id' => $resource->id,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
                         'is_preview' => false,
                     ])->first();
                     $value = replaceVariables($value);
@@ -2644,7 +2654,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                         if (! is_null($command)) {
@@ -2667,7 +2678,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'key' => $key,
                                         'value' => $fqdn,
                                         'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -2678,7 +2690,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'key' => $key,
                                         'value' => $generatedValue,
                                         'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -2703,7 +2716,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                             'is_preview' => false,
                         ])->first();
                         if ($foundEnv) {
@@ -2713,7 +2727,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($foundEnv) {
                             $foundEnv->update([
                                 'key' => $key,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_build_time' => $isBuildTime,
                                 'value' => $defaultValue,
                             ]);
@@ -2722,7 +2737,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'key' => $key,
                                 'value' => $defaultValue,
                                 'is_build_time' => $isBuildTime,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -2863,7 +2879,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_forget($service, 'volumes.*.is_directory');
             data_forget($service, 'exclude_from_hc');
             data_set($service, 'environment', $serviceVariables->toArray());
-            updateCompose($savedService);
 
             return $service;
         });
@@ -4123,4 +4138,17 @@ function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp
         'repository' => $repository,
         'port' => $providerInfo['port'],
     ];
+}
+
+function getJobStatus(?string $jobId = null)
+{
+    if (blank($jobId)) {
+        return 'unknown';
+    }
+    $jobFound = app(JobRepository::class)->getJobs([$jobId]);
+    if ($jobFound->isEmpty()) {
+        return 'unknown';
+    }
+
+    return $jobFound->first()->status;
 }

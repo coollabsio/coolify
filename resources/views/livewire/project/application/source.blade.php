@@ -10,7 +10,7 @@
                 </x-forms.button>
             </a>
             @if (data_get($application, 'source.is_public') === false)
-                <a target="_blank" class="hover:no-underline" href="{{ get_installation_path($application->source) }}">
+                <a target="_blank" class="hover:no-underline" href="{{ getInstallationPath($application->source) }}">
                     <x-forms.button>
                         Open Git App
                         <x-external-link />

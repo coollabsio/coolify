@@ -6,12 +6,8 @@
 ])
 <div class="flex items-center">
     <div class="flex items-center">
-        <span wire:loading.delay.longer>
-            <div class="badge badge-warning"></div>
-        </span>
-        <span wire:loading.remove.delay.longer>
-            <div class="badge badge-success"></div>
-        </span>
+        <div wire:loading.delay.longer wire:target="checkProxy(true)" class="badge badge-warning"></div>
+        <div wire:loading.remove.delay.longer wire:target="checkProxy(true)" class="badge badge-success"></div>
         <div class="pl-2 pr-1 text-xs font-bold tracking-wider text-success"
             @if ($title) title="{{ $title }}" @endif>
             @if ($lastDeploymentLink)

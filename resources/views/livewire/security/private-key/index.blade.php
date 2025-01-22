@@ -19,6 +19,7 @@
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($privateKeys as $key)
             <a class="box group"
+                wire:navigate
                 href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="box-title">

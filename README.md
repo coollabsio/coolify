@@ -58,7 +58,7 @@ Special thanks to our biggest sponsors!
 * [PFGlabs](https://pfglabs.com/?ref=coolify.io) - Build real project with Golang.
 * [Treive](https://trieve.ai/?ref=coolify.io) - An AI-powered search and discovery platform for enhancing information retrieval in large datasets.
 * [Blacksmith](https://blacksmith.sh/?ref=coolify.io) - A cloud-native platform for automating infrastructure provisioning and management across multiple cloud providers.
-* [Brand Dev](https://brand.dev/?ref=coolify.io) - A web development agency specializing in creating custom digital experiences and brand identities.
+* [Brand Dev](https://brand.dev/?ref=coolify.io) - The #1 Brand API for B2B software startups - instantly pull logos, fonts, descriptions, social links, slogans, and so much more from any domain via a single api call.
 * [Jobscollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - A job search platform connecting professionals with remote work opportunities across various industries.
 * [Hostinger](https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io) - A web hosting provider offering affordable hosting solutions, domain registration, and website building tools.
 * [Glueops](https://www.glueops.dev/?ref=coolify.io) - A DevOps consulting company providing infrastructure automation and cloud optimization services.
@@ -75,6 +75,7 @@ Special thanks to our biggest sponsors!
 <a href="https://www.runpod.io/?ref=coolify.io">
 <svg style="width:60px;height:60px;background:#fff;" xmlns="http://www.w3.org/2000/svg" version="1.0" viewBox="0 0 200 200"><g><path d="M74.5 51.1c-25.4 14.9-27 16-29.6 20.2-1.8 3-1.9 5.3-1.9 32.3 0 21.7.3 29.4 1.3 30.6 1.9 2.5 46.7 27.9 48.5 27.6 1.5-.3 1.7-3.1 2-27.7.2-21.9 0-27.8-1.1-29.5-.8-1.2-9.9-6.8-20.2-12.6-10.3-5.8-19.4-11.5-20.2-12.7-1.8-2.6-.9-5.9 1.8-7.4 1.6-.8 6.3 0 21.8 4C87.8 78.7 98 81 99.6 81c4.4 0 49.9-25.9 49.9-28.4 0-1.6-3.4-2.8-24-8.2-13.2-3.5-25.1-6.3-26.5-6.3-1.4.1-12.4 5.9-24.5 13z"></path><path d="m137.2 68.1-3.3 2.1 6.3 3.7c3.5 2 6.3 4.3 6.3 5.1 0 .9-8 6.1-19.4 12.6-10.6 6-20 11.9-20.7 12.9-1.2 1.6-1.4 7.2-1.2 29.4.3 24.8.5 27.6 2 27.9 1.8.3 46.6-25.1 48.6-27.6.9-1.2 1.2-8.8 1.2-30.2s-.3-29-1.2-30.2c-1.6-1.9-12.1-7.8-13.9-7.8-.8 0-2.9 1-4.7 2.1z"></path></g></svg></a>
 <a href="https://lightspeed.run/?ref=coolify.io"><img src="https://github.com/lightspeedrun.png" width="60px" alt="Lightspeed.run"/></a>
+<a href="https://dartnode.com/?ref=coolify.io"><img src="https://github.com/DartNode-com.png" width="60px" alt="DartNode"/></a>
 <a href="https://www.flint.sh/en/home?ref=coolify.io"> <img src="https://github.com/Flint-company.png" width="60px" alt="FlintCompany"/></a>
 <a href="https://americancloud.com/?ref=coolify.io"><img src="https://github.com/American-Cloud.png" width="60px" alt="American Cloud"/></a>
 <a href="https://cryptojobslist.com/?ref=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>

@@ -88,7 +88,7 @@ services:
       retries: 3
 
   postgres:
-    image: postgres:12
+    image: pgvector/pgvector:pg12
     restart: always
     volumes:
       - postgres-data:/var/lib/postgresql/data

@@ -7,7 +7,7 @@
     </div>
     <div class="flex flex-wrap gap-2 ">
         @forelse ($tags as $oneTag)
-            <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs hover:bg-coollabs-100'"
+            <a wire:navigate :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs hover:bg-coollabs-100'"
                 class="w-64 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold"
                 href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
         @empty
@@ -34,7 +34,7 @@
             <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 @if (isset($applications) && count($applications) > 0)
                     @foreach ($applications as $application)
-                        <a href="{{ $application->link() }}" class="box group">
+                        <a wire:navigate href="{{ $application->link() }}" class="box group">
                             <div class="flex flex-col">
                                 <div class="box-title">
                                     {{ $application->project()->name }}/{{ $application->environment->name }}
@@ -47,7 +47,7 @@
                 @endif
                 @if (isset($services) && count($services) > 0)
                     @foreach ($services as $service)
-                        <a href="{{ $service->link() }}" class="flex flex-col box group">
+                        <a wire:navigate href="{{ $service->link() }}" class="flex flex-col box group">
                             <div class="flex flex-col">
                                 <div class="box-title">
                                     {{ $service->project()->name }}/{{ $service->environment->name }}
@@ -70,7 +70,7 @@
                     <h4 class="py-4">{{ $serverName }}</h4>
                     <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                         @foreach ($deployments as $deployment)
-                            <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
+                            <a wire:navigate href="{{ data_get($deployment, 'deployment_url') }}" @class([
                                 'gap-2 cursor-pointer box group border-l-2 border-dotted',
                                 'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
                                 'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',

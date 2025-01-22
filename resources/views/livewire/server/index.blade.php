@@ -11,7 +11,7 @@
     <div class="subtitle">All your servers are here.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
-            <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
+            <a wire:navigate href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                 @class([
                     'gap-2 border cursor-pointer box group',
                     'border-transparent' =>
@@ -54,10 +54,5 @@
                 <span>{{ $error }}</span>
             </div>
         @endisset
-        <script>
-            function goto(uuid) {
-                window.location.href = '/server/' + uuid;
-            }
-        </script>
     </div>
 </div>
