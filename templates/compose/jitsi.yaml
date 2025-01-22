@@ -10,8 +10,8 @@ services:
     container_name: jitsi-web
     restart: unless-stopped
     ports:
-      - "8001:80"
-      - "8443:443"
+      - '127.0.0.1:8001:80'
+      - '127.0.0.1:8443:443'
     volumes:
       - ~/.jitsi-meet-cfg/web:/config:Z
       - ~/.jitsi-meet-cfg/web/crontabs:/var/spool/cron/crontabs:Z
@@ -26,6 +26,9 @@ services:
       - JIGASI_XMPP_PASSWORD=$SERVICE_PASSWORD_JITSI
       - JVB_AUTH_PASSWORD=$SERVICE_PASSWORD_JITSI
       - TZ=UTC
+      - DISABLE_HTTPS=1
+      - ENABLE_HTTP_REDIRECT=0
+      - ENABLE_LETS_ENCRYPT=0
     networks:
       meet.jitsi:
         aliases:
@@ -54,6 +57,8 @@ services:
       - JVB_AUTH_PASSWORD
       - PUBLIC_URL=$SERVICE_FQDN_JITSI
       - TZ
+      - ENABLE_AUTH=1
+      - AUTH_TYPE=internal
     networks:
       meet.jitsi:
         aliases:
