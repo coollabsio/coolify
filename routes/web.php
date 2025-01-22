@@ -81,7 +81,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use ThreeSidedCube\LaravelRedoc\Http\Controllers\DefinitionController;
 use ThreeSidedCube\LaravelRedoc\Http\Controllers\DocumentationController;
 
-Route::middleware(['auth', ApiAllowed::class])->group(function () {
+Route::group(['middleware' => ['auth:sanctum', ApiAllowed::class]], function () {
     Route::get('/docs/api', DocumentationController::class)->name('redoc.documentation');
     Route::get('/docs/api/definition', DefinitionController::class)->name('redoc.definition');
 });
