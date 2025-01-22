@@ -13,7 +13,7 @@
             @if ($serviceDatabase?->isBackupSolutionAvailable())
                 <a :class="activeTab === 'backups' && 'menu-item-active'" class="menu-item"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'"
-                    wire:navigate href="#">Backups</a>
+                    wire:navigate href="#backups">Backups</a>
             @endif
         </div>
         <div class="w-full">

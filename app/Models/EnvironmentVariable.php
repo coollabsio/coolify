@@ -4,9 +4,7 @@ namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Environment Variable model',
@@ -30,7 +28,7 @@ use Visus\Cuid2\Cuid2;
         'updated_at' => ['type' => 'string'],
     ]
 )]
-class EnvironmentVariable extends Model
+class EnvironmentVariable extends BaseModel
 {
     protected $guarded = [];
 
@@ -49,12 +47,6 @@ class EnvironmentVariable extends Model
 
     protected static function booted()
     {
-        static::creating(function (Model $model) {
-            if (! $model->uuid) {
-                $model->uuid = (string) new Cuid2;
-            }
-        });
-
         static::created(function (EnvironmentVariable $environment_variable) {
             if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)

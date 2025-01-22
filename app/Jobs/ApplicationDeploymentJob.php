@@ -1122,7 +1122,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
             $nixpacks_php_fallback_path->is_build_time = false;
-            $nixpacks_php_fallback_path->application_id = $this->application->id;
+            $nixpacks_php_fallback_path->resourceable_id = $this->application->id;
+            $nixpacks_php_fallback_path->resourceable_type = 'App\Models\Application';
             $nixpacks_php_fallback_path->save();
         }
         if (! $nixpacks_php_root_dir) {
@@ -1130,7 +1131,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
             $nixpacks_php_root_dir->is_build_time = false;
-            $nixpacks_php_root_dir->application_id = $this->application->id;
+            $nixpacks_php_root_dir->resourceable_id = $this->application->id;
+            $nixpacks_php_root_dir->resourceable_type = 'App\Models\Application';
             $nixpacks_php_root_dir->save();
         }
 
@@ -2286,8 +2288,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_build_env_variables()
     {
-        $variables = collect($this->nixpacks_plan_json->get('variables'));
+        if ($this->application->build_pack === 'nixpacks') {
+            $variables = collect($this->nixpacks_plan_json->get('variables'));
+        } else {
+            $this->generate_env_variables();
+            $variables = collect([])->merge($this->env_args);
+        }
+
         $this->build_args = $variables->map(function ($value, $key) {
+            $value = escapeshellarg($value);
+
             return "--build-arg {$key}={$value}";
         });
     }

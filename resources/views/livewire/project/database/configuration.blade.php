@@ -20,8 +20,8 @@
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
                 wire:navigate>Persistent Storage</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
-                wire:navigate>Import Backups</a>
+                href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
+                Backups</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
                 wire:navigate>Webhooks</a>
@@ -32,8 +32,7 @@
                 href="{{ route('project.database.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
                 wire:navigate>Resource Operations</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.database.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
-                wire:navigate>Metrics</a>
+                href="{{ route('project.database.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Metrics</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"
                 wire:navigate>Tags</a>

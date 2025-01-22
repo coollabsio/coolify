@@ -42,7 +42,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getRealtimeVersion.php)"|xargs >> $GITHUB_OUTPUT
 
       - name: Build and Push Image
         uses: docker/build-push-action@v6
@@ -82,7 +82,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getRealtimeVersion.php)"|xargs >> $GITHUB_OUTPUT
 
       - name: Build and Push Image
         uses: docker/build-push-action@v6
@@ -125,7 +125,7 @@ jobs:
       - name: Get Version
         id: version
         run: |
-           echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app ghcr.io/jqlang/jq:latest '.coolify.realtime.version' versions.json)"|xargs >> $GITHUB_OUTPUT
+          echo "VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getRealtimeVersion.php)"|xargs >> $GITHUB_OUTPUT
 
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         run: |
