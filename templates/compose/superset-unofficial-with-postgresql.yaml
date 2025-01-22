@@ -1,9 +1,3 @@
-# documentation: https://github.com/amancevice/docker-superset
-# slogan: Modern data exploration and visualization platform
-# tags: analytics,bi,dashboard,database,sql
-# logo: svgs/superset.svg
-# port: 8088
-
 services:
   superset:
     image: amancevice/superset
@@ -44,6 +38,9 @@ services:
 
           SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@db:5432/{os.getenv('POSTGRES_DB')}"
           SQLALCHEMY_TRACK_MODIFICATIONS = True
+    networks:
+      - default
+      - coolify
 
   db:
     image: postgres
@@ -59,6 +56,8 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+    networks:
+      - default
 
   redis:
     image: redis
@@ -71,8 +70,15 @@ services:
       interval: 5s
       retries: 10
       timeout: 2s
-
+    networks:
+      - default
 
 volumes:
   postgres:
   redis:
+
+networks:
+  default:
+    driver: bridge
+  coolify:
+    external: true
