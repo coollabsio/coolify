@@ -9,6 +9,9 @@ services:
     image: ghcr.io/rahulhaque/soketi-app-manager-filament-alpine:latest
     environment:
       - SERVICE_FQDN_SOKETIAPPMANAGER_8080
+      - AUTORUN_ENABLED=true
+      - AUTORUN_LARAVEL_MIGRATION=${AUTORUN_LARAVEL_MIGRATION:-true}
+      - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=$SERVICE_FQDN_SOKETIAPPMANAGER
       - APP_KEY=$APP_KEY
       - DB_CONNECTION=$DB_CONNECTION
