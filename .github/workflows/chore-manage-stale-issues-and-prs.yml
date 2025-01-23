@@ -13,16 +13,16 @@ jobs:
         id: stale
         with:
           stale-issue-message: 'This issue will be automatically closed in a few days if no response is received. Please provide an update with the requested information.'
-          stale-pr-message: 'This pull request will be automatically closed in a few days if no response is received. Please update your PR or comment if you would like to continue working on it.'
+          stale-pr-message: 'This pull request requires attention. If no changes or response is received within the next few days, it will be automatically closed. Please update your PR or leave a comment with the requested information.'
           close-issue-message: 'This issue has been automatically closed due to inactivity.'
-          close-pr-message: 'This pull request has been automatically closed due to inactivity.'
+          close-pr-message: 'Thank you for your contribution. Due to inactivity, this PR was automatically closed. If you would like to continue working on this change in the future, feel free to reopen this PR or submit a new one.'
           days-before-stale: 14
           days-before-close: 7
           stale-issue-label: '⏱︎ Stale'
           stale-pr-label: '⏱︎ Stale'
-          only-labels: '💤 Waiting for feedback'
+          only-labels: '💤 Waiting for feedback, 💤 Waiting for changes'
           remove-stale-when-updated: true
           operations-per-run: 100
-          labels-to-remove-when-unstale: '⏱︎ Stale, 💤 Waiting for feedback'
+          labels-to-remove-when-unstale: '⏱︎ Stale, 💤 Waiting for feedback, 💤 Waiting for changes'
           close-issue-reason: 'not_planned'
           exempt-all-milestones: false

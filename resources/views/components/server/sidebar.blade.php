@@ -22,7 +22,7 @@
         <a wire:navigate class="menu-item {{ $activeMenu === 'log-drains' ? 'menu-item-active' : '' }}"
             href="{{ route('server.log-drains', ['server_uuid' => $server->uuid]) }}">Log
             Drains</a>
-        <a wire:navigate class="menu-item {{ $activeMenu === 'metrics' ? 'menu-item-active' : '' }}"
+        <a class="menu-item {{ $activeMenu === 'metrics' ? 'menu-item-active' : '' }}"
             href="{{ route('server.charts', ['server_uuid' => $server->uuid]) }}">Metrics</a>
     @endif
     @if (!$server->isLocalhost())

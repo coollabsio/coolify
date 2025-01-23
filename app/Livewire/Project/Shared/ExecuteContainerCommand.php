@@ -146,11 +146,16 @@ class ExecuteContainerCommand extends Component
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);
-        $result = instant_remote_process([
-            "docker exec {$escapedContainer} which bash || docker exec {$escapedContainer} which sh",
-        ], $server, false);
+        try {
+            instant_remote_process([
+                "docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
+                "docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
+            ], $server);
 
-        return ! empty($result);
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     #[On('connectToServer')]

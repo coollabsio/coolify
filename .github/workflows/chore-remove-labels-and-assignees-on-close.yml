@@ -19,8 +19,12 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
 
-            async function processIssue(issueNumber) {
+            async function processIssue(issueNumber, isFromPR = false, prBaseBranch = null) {
               try {
+                if (isFromPR && prBaseBranch !== 'main') {
+                  return;
+                }
+
                 const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
                   owner,
                   repo,
@@ -59,19 +63,19 @@ jobs:
               }
             }
 
-            if (context.eventName === 'issues' || context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
-              const issue = context.payload.issue || context.payload.pull_request;
-              await processIssue(issue.number);
+            if (context.eventName === 'issues') {
+              await processIssue(context.payload.issue.number);
             }
 
             if (context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
               const pr = context.payload.pull_request;
-              if (pr.body) {
+              await processIssue(pr.number);
+              if (pr.merged && pr.base.ref === 'main' && pr.body) {
                 const issueReferences = pr.body.match(/#(\d+)/g);
                 if (issueReferences) {
                   for (const reference of issueReferences) {
                     const issueNumber = parseInt(reference.substring(1));
-                    await processIssue(issueNumber);
+                    await processIssue(issueNumber, true, pr.base.ref);
                   }
                 }
               }
