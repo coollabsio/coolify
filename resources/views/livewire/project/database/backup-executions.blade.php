@@ -4,7 +4,7 @@
             <h3 class="py-4">Executions</h3>
             <x-forms.button wire:click='cleanupFailed'>Cleanup Failed Backups</x-forms.button>
         </div>
-        <div class="flex flex-col gap-4">
+        <div wire:poll.5000ms="refreshBackupExecutions" class="flex flex-col gap-4">
             @forelse($executions as $execution)
                 <div wire:key="{{ data_get($execution, 'id') }}" @class([
                     'flex flex-col border-l-2 transition-colors p-4 bg-white dark:bg-coolgray-100 text-black dark:text-white',
@@ -40,6 +40,7 @@
                         @if(data_get($execution, 'status') !== 'running')
                             <br>Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}
                             <br>Duration: {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
+                            <br>Finished {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
                         @endif
                     </div>
                     <div class="text-gray-600 dark:text-gray-400 text-sm">
