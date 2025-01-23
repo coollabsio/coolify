@@ -187,7 +187,6 @@ function generate_default_proxy_configuration(Server $server)
                         '--entryPoints.https.http2.maxConcurrentStreams=50',
                         '--entrypoints.https.http3',
                         '--providers.file.directory=/traefik/dynamic/',
-                        '--providers.docker.exposedbydefault=false',
                         '--providers.file.watch=true',
                         '--certificatesresolvers.letsencrypt.acme.httpchallenge=true',
                         '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http',
@@ -212,7 +211,8 @@ function generate_default_proxy_configuration(Server $server)
             data_forget($config, 'services.traefik.restart');
             data_forget($config, 'services.traefik.labels');
 
-            $config['services']['traefik']['command'][] = '--providers.docker.swarmMode=true';
+            $config['services']['traefik']['command'][] = '--providers.swarm.endpoint=unix:///var/run/docker.sock';
+            $config['services']['traefik']['command'][] = '--providers.swarm.exposedbydefault=false';
             $config['services']['traefik']['deploy'] = [
                 'labels' => $labels,
                 'placement' => [
@@ -223,6 +223,7 @@ function generate_default_proxy_configuration(Server $server)
             ];
         } else {
             $config['services']['traefik']['command'][] = '--providers.docker=true';
+            $config['services']['traefik']['command'][] = '--providers.docker.exposedbydefault=false';
         }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
