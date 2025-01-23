@@ -40,11 +40,6 @@ class S3Storage extends BaseModel
         return "{$this->endpoint}/{$this->bucket}";
     }
 
-    public function isHetzner()
-    {
-        return str($this->endpoint)->contains('your-objectstorage.com');
-    }
-
     public function isDigitalOcean()
     {
         return str($this->endpoint)->contains('digitaloceanspaces.com');

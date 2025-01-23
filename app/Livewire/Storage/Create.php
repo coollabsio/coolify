@@ -49,12 +49,6 @@ class Create extends Component
             $this->endpoint = 'https://'.$value;
             $value = $this->endpoint;
         }
-
-        if (str($value)->contains('your-objectstorage.com') && ! isset($this->bucket)) {
-            $this->bucket = str($value)->after('//')->before('.');
-        } elseif (str($value)->contains('your-objectstorage.com')) {
-            $this->bucket = $this->bucket ?: str($value)->after('//')->before('.');
-        }
     }
 
     public function submit()

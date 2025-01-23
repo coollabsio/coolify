@@ -208,7 +208,7 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'bucket' => $s3->bucket,
         'endpoint' => $s3->endpoint,
         'use_path_style_endpoint' => true,
-        'bucket_endpoint' => $s3->isHetzner() || $s3->isDigitalOcean(),
+        'bucket_endpoint' => $s3->isDigitalOcean(),
         'aws_url' => $s3->awsUrl(),
     ]);
 
