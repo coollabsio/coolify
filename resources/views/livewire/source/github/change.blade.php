@@ -135,7 +135,7 @@
                         <div class="flex gap-2">
                             <h2>Resources</h2>
                         </div>
-                        <div class="pb-4 title">Here you can find all resources that are used by this source.</div>
+                        <div class="pb-4 title">Here you can find all resources that using this source.</div>
                     </div>
                     <div class="flex flex-col">
                         <div class="flex flex-col">
