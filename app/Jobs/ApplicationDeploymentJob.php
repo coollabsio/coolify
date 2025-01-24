@@ -923,6 +923,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
+                }
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
                     $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
                 }
@@ -981,6 +984,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
+                }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
                 }
                 if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
                     $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
