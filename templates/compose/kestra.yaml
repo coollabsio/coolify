@@ -6,7 +6,6 @@
 
 services:
   postgres:
-    container_name: kestra_postgres
     image: postgres:16
     volumes:
       - kestra-postgres-data:/var/lib/postgresql/data
@@ -21,10 +20,8 @@ services:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-kestra}
-      - PGDATA=/var/lib/postgresql/data/pgdata
 
   kestra:
-    container_name: kestra_server
     user: "root"
     image: kestra/kestra:latest
     pull_policy: always
