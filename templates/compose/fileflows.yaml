@@ -5,7 +5,7 @@
 # port: 5000
 
 services:
-  radarr:
+  fileflows:
     image: revenz/fileflows
     environment:
       - SERVICE_FQDN_FILEFLOWS_5000

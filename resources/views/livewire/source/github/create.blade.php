@@ -7,6 +7,12 @@
         <x-forms.input helper="If empty, your GitHub user will be used."
             placeholder="If empty, your GitHub user will be used." id="organization" label="Organization (on GitHub)" />
     </div>
+    @if (!isCloud())
+        <div class="w-48">
+            <x-forms.checkbox id="is_system_wide" label="System Wide"
+                helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
+        </div>
+    @endif
     <div x-data="{
         activeAccordion: '',
         setActiveAccordion(id) {
@@ -40,9 +46,7 @@
         </div>
     </div>
 
-    @if (!isCloud())
-        <x-forms.checkbox id="is_system_wide" label="System Wide" />
-    @endif
+
     <x-forms.button class="mt-4" type="submit">
         Continue
     </x-forms.button>

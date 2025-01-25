@@ -18,7 +18,7 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
-use Exception;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,11 +39,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 1;
+
     public $timeout = 3600;
 
     public static int $batch_counter = 0;
-
-    private int $application_deployment_queue_id;
 
     private bool $newVersionIsHealthy = false;
 
@@ -126,6 +126,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $nixpacks_plan = null;
 
+    private Collection $nixpacks_plan_json;
+
     private ?string $nixpacks_type = null;
 
     private string $dockerfile_location = '/Dockerfile';
@@ -164,18 +166,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $preserveRepository = false;
 
-    public $tries = 1;
+    public function tags()
+    {
+        // Do not remove this one, it needs to properly identify which worker is running the job
+        return ['App\Models\ApplicationDeploymentQueue:'.$this->application_deployment_queue_id];
+    }
 
-    public function __construct(int $application_deployment_queue_id)
+    public function __construct(public int $application_deployment_queue_id)
     {
         $this->onQueue('high');
 
-        $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
+        $this->application_deployment_queue = ApplicationDeploymentQueue::find($this->application_deployment_queue_id);
+        $this->nixpacks_plan_json = collect([]);
+
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
         $this->build_args = collect([]);
 
-        $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
@@ -233,15 +240,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    public function tags(): array
-    {
-        return ['server:'.gethostname()];
-    }
-
     public function handle(): void
     {
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+            'horizon_job_worker' => gethostname(),
         ]);
         if ($this->server->isFunctional() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
@@ -313,6 +316,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->fail($e);
             throw $e;
         } finally {
+            $this->application_deployment_queue->update([
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             } else {
@@ -1115,7 +1122,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
             $nixpacks_php_fallback_path->value = '/index.php';
             $nixpacks_php_fallback_path->is_build_time = false;
-            $nixpacks_php_fallback_path->application_id = $this->application->id;
+            $nixpacks_php_fallback_path->resourceable_id = $this->application->id;
+            $nixpacks_php_fallback_path->resourceable_type = 'App\Models\Application';
             $nixpacks_php_fallback_path->save();
         }
         if (! $nixpacks_php_root_dir) {
@@ -1123,7 +1131,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
             $nixpacks_php_root_dir->value = '/app/public';
             $nixpacks_php_root_dir->is_build_time = false;
-            $nixpacks_php_root_dir->application_id = $this->application->id;
+            $nixpacks_php_root_dir->resourceable_id = $this->application->id;
+            $nixpacks_php_root_dir->resourceable_type = 'App\Models\Application';
             $nixpacks_php_root_dir->save();
         }
 
@@ -1405,7 +1414,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'project_uuid' => data_get($this->application, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->application, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,
-                'environment_name' => data_get($this->application, 'environment.name'),
+                'environment_uuid' => data_get($this->application, 'environment.uuid'),
             ]));
         }
     }
@@ -1494,7 +1503,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {
-            $commit_message = str($this->saved_outputs->get('commit_message'))->limit(47);
+            $commit_message = str($this->saved_outputs->get('commit_message'));
             $this->application_deployment_queue->commit_message = $commit_message->value();
             ApplicationDeploymentQueue::whereCommit($this->commit)->whereApplicationId($this->application->id)->update(
                 ['commit_message' => $commit_message->value()]
@@ -1545,7 +1554,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 // Do any modifications here
                 $this->generate_env_variables();
-                $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
+                $merged_envs = collect(data_get($parsed, 'variables', []))->merge($this->env_args);
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
                 if (count($aptPkgs) === 0) {
                     $aptPkgs = ['curl', 'wget'];
@@ -1570,6 +1579,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->elixir_finetunes();
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
+                $this->nixpacks_plan_json = collect($parsed);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
                 if ($this->nixpacks_type === 'rust') {
                     // temporary: disable healthcheck for rust because the start phase does not have curl/wget
@@ -1678,7 +1688,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
-            if (! $this->application->settings->is_container_label_readonly_enabled) {
+            if ($this->application->settings->is_container_label_readonly_enabled) {
                 $labels = collect(generateLabelsApplication($this->application, $this->preview));
             }
         }
@@ -1690,7 +1700,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return escapeDollarSign($value);
             });
         }
-        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
+        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
@@ -2278,18 +2288,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_build_env_variables()
     {
-        $this->build_args = collect(["--build-arg SOURCE_COMMIT=\"{$this->commit}\""]);
-        if ($this->pull_request_id === 0) {
-            foreach ($this->application->build_environment_variables as $env) {
-                $value = escapeshellarg($env->real_value);
-                $this->build_args->push("--build-arg {$env->key}={$value}");
-            }
+        if ($this->application->build_pack === 'nixpacks') {
+            $variables = collect($this->nixpacks_plan_json->get('variables'));
         } else {
-            foreach ($this->application->build_environment_variables_preview as $env) {
-                $value = escapeshellarg($env->real_value);
-                $this->build_args->push("--build-arg {$env->key}={$value}");
-            }
+            $this->generate_env_variables();
+            $variables = collect([])->merge($this->env_args);
         }
+
+        $this->build_args = $variables->map(function ($value, $key) {
+            $value = escapeshellarg($value);
+
+            return "--build-arg {$key}={$value}";
+        });
     }
 
     private function add_build_env_variables_to_dockerfile()
@@ -2394,7 +2404,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
         if (
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value &&
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
         ) {
             $this->application_deployment_queue->update([
                 'status' => $status,

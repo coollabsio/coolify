@@ -9,24 +9,49 @@ services:
     image: invoiceninja/invoiceninja:5
     environment:
       - SERVICE_FQDN_INVOICENINJA
+      - APP_NAME=${APP_NAME:-"Invoice Ninja"}
       - APP_ENV=${APP_ENV:-production}
       - APP_URL=${SERVICE_FQDN_INVOICENINJA}
       - APP_KEY=base64:${SERVICE_REALBASE64_INVOICENINJA}
       - APP_DEBUG=${APP_DEBUG:-false}
       - REQUIRE_HTTPS=${REQUIRE_HTTPS:-false}
       - PHANTOMJS_PDF_GENERATION=${PHANTOMJS_PDF_GENERATION:-false}
-      - PDF_GENERATOR=${PDF_GENERATOR:-snappdf}
+      - PDF_GENERATOR=${PDF_GENERATOR:-hosted_ninja}
       - TRUSTED_PROXIES=${TRUSTED_PROXIES:-*}
-      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
-      - IN_USER_EMAIL=${IN_USER_EMAIL:-admin@example.com}
-      - IN_PASSWORD=${SERVICE_PASSWORD_INVOICENINJAUSER}
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION:-redis}
+      - SESSION_DRIVER=redis
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - DB_HOST=${DB_HOST:-mariadb}
       - DB_PORT=${DB_PORT:-3306}
       - DB_DATABASE=${DB_DATABASE:-invoiceninja}
-      - DB_USERNAME=$SERVICE_USER_MARIADB
-      - DB_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - DB_USERNAME=${SERVICE_USER_MARIADB}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - IN_USER_EMAIL=${IN_USER_EMAIL:-admin@example.com}
+      - IN_PASSWORD=${SERVICE_PASSWORD_INVOICENINJAUSER}
+      - MAIL_MAILER=${MAIL_MAILER:-log}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - AWS_BUCKET=${AWS_BUCKET}
+      - AWS_URL=${AWS_URL}
+      - AWS_ENDPOINT=${AWS_ENDPOINT}
+      - NORDIGEN_SECRET_ID=${NORDIGEN_SECRET_ID}
+      - NORDIGEN_SECRET_KEY=${NORDIGEN_SECRET_KEY}
+      - IS_DOCKER=true
+      - SCOUT_DRIVER=${SCOUT_DRIVER}
+      - LICENSE_KEY=${LICENSE_KEY}
     healthcheck:
-      test: ['CMD', 'echo', 'ok']
+      test: ["CMD", "echo", "ok"]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -133,12 +158,25 @@ services:
     volumes:
       - mariadb-data:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MARIADBROOT
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
       - MYSQL_DATABASE=${DB_DATABASE:-invoiceninja}
-      - MYSQL_USER=$SERVICE_USER_MARIADB
-      - MYSQL_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 20s
       retries: 10
+
+  redis:
+    image: "redis:7.4-alpine"
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - "invoice-ninja-redis-data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

@@ -11,20 +11,21 @@
 ])
 
 <div @class([
-    'flex flex-row items-center gap-4 pr-2 py-1 form-control min-w-fit dark:hover:bg-coolgray-100',
+    'flex flex-row items-center gap-4 pr-2 py-1 form-control min-w-fit',
     'w-full' => $fullWidth,
+    'dark:hover:bg-coolgray-100 cursor-pointer' => !$disabled,
 ])>
-    <label @class([
-        'flex gap-4 items-center px-0 min-w-fit label w-full cursor-pointer',
-    ])>
+    <label @class(['flex gap-4 items-center px-0 min-w-fit label w-full'])>
         <span class="flex flex-grow gap-2">
             @if ($label)
-                {!! $label !!}
-            @else
-                {{ $id }}
-            @endif
-            @if ($helper)
-                <x-helper :helper="$helper" />
+                @if ($disabled)
+                    <span class="opacity-60">{!! $label !!}</span>
+                @else
+                    {!! $label !!}
+                @endif
+                @if ($helper)
+                    <x-helper :helper="$helper" />
+                @endif
             @endif
         </span>
         @if ($instantSave)

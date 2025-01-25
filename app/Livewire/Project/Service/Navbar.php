@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Actions\Shared\PullImage;
+use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
 use App\Models\Service;
 use Illuminate\Support\Facades\Auth;
@@ -68,11 +69,9 @@ class Navbar extends Component
     public function checkDeployments()
     {
         try {
-            // TODO: This is a temporary solution. We need to refactor this.
-            // We need to delete null bytes somehow.
             $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
             $status = data_get($activity, 'properties.status');
-            if ($status === 'queued' || $status === 'in_progress') {
+            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
                 $this->isDeploymentProgress = true;
             } else {
                 $this->isDeploymentProgress = false;
@@ -80,25 +79,46 @@ class Navbar extends Component
         } catch (\Throwable) {
             $this->isDeploymentProgress = false;
         }
+
+        return $this->isDeploymentProgress;
     }
 
     public function start()
     {
-        $this->checkDeployments();
-        if ($this->isDeploymentProgress) {
-            $this->dispatch('error', 'There is a deployment in progress.');
-
-            return;
-        }
         $this->service->parse();
         $activity = StartService::run($this->service);
         $this->dispatch('activityMonitor', $activity->id);
     }
 
-    public function stop()
+    public function forceDeploy()
     {
-        StopService::run($this->service, false, $this->docker_cleanup);
-        ServiceStatusChanged::dispatch();
+        try {
+            $activities = Activity::where('properties->type_uuid', $this->service->uuid)->where('properties->status', ProcessStatus::IN_PROGRESS->value)->orWhere('properties->status', ProcessStatus::QUEUED->value)->get();
+            foreach ($activities as $activity) {
+                $activity->properties->status = ProcessStatus::ERROR->value;
+                $activity->save();
+            }
+            $this->service->parse();
+            $activity = StartService::run($this->service);
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    public function stop($cleanupContainers = false)
+    {
+        try {
+            StopService::run($this->service, false, $this->docker_cleanup);
+            ServiceStatusChanged::dispatch();
+            if ($cleanupContainers) {
+                $this->dispatch('success', 'Containers cleaned up.');
+            } else {
+                $this->dispatch('success', 'Service stopped.');
+            }
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function restart()

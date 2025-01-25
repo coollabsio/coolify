@@ -5,7 +5,7 @@
             <livewire:source.github.create />
         </x-modal-input>
         @if ($repositories->count() > 0)
-            <a target="_blank" class="flex hover:no-underline" href="{{ get_installation_path($github_app) }}">
+            <a target="_blank" class="flex hover:no-underline" href="{{ getInstallationPath($github_app) }}">
                 <x-forms.button>
                     Change Repositories on GitHub
                     <x-external-link />

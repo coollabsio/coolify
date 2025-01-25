@@ -83,9 +83,7 @@ class Docker extends Component
                     ]);
                 }
             }
-            $connectProxyToDockerNetworks = connectProxyToNetworks($this->selectedServer);
-            instant_remote_process($connectProxyToDockerNetworks, $this->selectedServer, false);
-            $this->dispatch('reloadWindow');
+            $this->redirect(route('destination.show', $docker->uuid));
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

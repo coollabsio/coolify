@@ -6,11 +6,11 @@
 
 html,
 body {
-    @apply h-full bg-neutral-50 text-neutral-800 dark:bg-base dark:text-neutral-400 w-full;
+    @apply min-h-full bg-neutral-50 dark:bg-base dark:text-neutral-400 w-full;
 }
 
 body {
-    @apply text-sm antialiased scrollbar;
+    @apply text-sm antialiased scrollbar min-h-screen;
 }
 
 .apexcharts-tooltip {
@@ -313,7 +313,7 @@ section {
 }
 
 .fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] dark:bg-coolgray-100 bg-white overflow-y-auto scrollbar pb-4;
+    @apply fixed top-0 left-0 w-full h-full z-[9999] dark:bg-coolgray-100 bg-white overflow-y-auto scrollbar;
 }
 
 .toast {
@@ -322,4 +322,8 @@ section {
 
 .dz-button {
     @apply w-full p-4 py-10 my-4 font-bold bg-white border dark:border-coolgray-400 dark:text-white dark:bg-transparent hover:dark:bg-coolgray-400;
+}
+
+.xterm {
+    @apply p-2;
 }

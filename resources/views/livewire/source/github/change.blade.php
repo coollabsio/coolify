@@ -6,7 +6,7 @@
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
                         <x-forms.button type="submit">Save</x-forms.button>
-                        <a href="{{ get_installation_path($github_app) }}">
+                        <a href="{{ getInstallationPath($github_app) }}">
                             <x-forms.button>
                                 Update Repositories
                                 <x-external-link />
@@ -52,7 +52,7 @@
                     </svg>
                     <span>You must complete this step before you can use this source!</span>
                 </div>
-                <a class="items-center justify-center box" href="{{ get_installation_path($github_app) }}">
+                <a class="items-center justify-center box" href="{{ getInstallationPath($github_app) }}">
                     Install Repositories on GitHub
                 </a>
             @else
@@ -106,7 +106,7 @@
                     <div class="flex items-end gap-2 ">
                         <h2 class="pt-4">Permissions</h2>
                         <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
-                        <a href="{{ get_permissions_path($github_app) }}">
+                        <a href="{{ getPermissionsPath($github_app) }}">
                             <x-forms.button>
                                 Update
                                 <x-external-link />
@@ -167,6 +167,7 @@
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap"><a
                                                                 class=""
+                                                                wire:navigate
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>

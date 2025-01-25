@@ -88,12 +88,12 @@ class General extends Component
             if (version_compare($this->redis_version, '6.0', '>=')) {
                 $this->database->runtime_environment_variables()->updateOrCreate(
                     ['key' => 'REDIS_USERNAME'],
-                    ['value' => $this->redis_username, 'standalone_redis_id' => $this->database->id]
+                    ['value' => $this->redis_username, 'resourceable_id' => $this->database->id]
                 );
             }
             $this->database->runtime_environment_variables()->updateOrCreate(
                 ['key' => 'REDIS_PASSWORD'],
-                ['value' => $this->redis_password, 'standalone_redis_id' => $this->database->id]
+                ['value' => $this->redis_password, 'resourceable_id' => $this->database->id]
             );
 
             $this->database->save();

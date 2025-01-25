@@ -14,6 +14,8 @@ class Show extends Component
 
     public string $deployment_uuid;
 
+    public string $horizon_job_status;
+
     public $isKeepAliveOn = true;
 
     protected $listeners = ['refreshQueue'];
@@ -26,7 +28,7 @@ class Show extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first()->load(['applications']);
         if (! $environment) {
             return redirect()->route('dashboard');
         }
@@ -34,25 +36,19 @@ class Show extends Component
         if (! $application) {
             return redirect()->route('dashboard');
         }
-        // $activity = Activity::where('properties->type_uuid', '=', $deploymentUuid)->first();
-        // if (!$activity) {
-        //     return redirect()->route('project.application.deployment.index', [
-        //         'project_uuid' => $project->uuid,
-        //         'environment_name' => $environment->name,
-        //         'application_uuid' => $application->uuid,
-        //     ]);
-        // }
         $application_deployment_queue = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)->first();
         if (! $application_deployment_queue) {
             return redirect()->route('project.application.deployment.index', [
                 'project_uuid' => $project->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'application_uuid' => $application->uuid,
             ]);
         }
         $this->application = $application;
         $this->application_deployment_queue = $application_deployment_queue;
+        $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
+        $this->isKeepAliveOn();
     }
 
     public function refreshQueue()
@@ -60,13 +56,21 @@ class Show extends Component
         $this->application_deployment_queue->refresh();
     }
 
+    private function isKeepAliveOn()
+    {
+        if (data_get($this->application_deployment_queue, 'status') === 'finished' || data_get($this->application_deployment_queue, 'status') === 'failed') {
+            $this->isKeepAliveOn = false;
+        } else {
+            $this->isKeepAliveOn = true;
+        }
+    }
+
     public function polling()
     {
         $this->dispatch('deploymentFinished');
         $this->application_deployment_queue->refresh();
-        if (data_get($this->application_deployment_queue, 'status') === 'finished' || data_get($this->application_deployment_queue, 'status') === 'failed') {
-            $this->isKeepAliveOn = false;
-        }
+        $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
+        $this->isKeepAliveOn();
     }
 
     public function getLogLinesProperty()

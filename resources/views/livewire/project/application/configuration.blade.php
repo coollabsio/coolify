@@ -5,34 +5,35 @@
     <h1>Configuration</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+
+    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
-            <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
-                @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
+            <a class='menu-item' wire:current.exact="menu-item-active"
+                href="{{ route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>General</a>
+            <a class='menu-item' wire:current.exact="menu-item-active"
+                href="{{ route('project.application.advanced', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Advanced</a>
             @if ($application->destination->server->isSwarm())
-                <a class="menu-item" :class="activeTab === 'swarm' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'swarm'; window.location.hash = 'swarm'" href="#">Swarm
-                    Configuration</a>
+                <a class="menu-item"
+                    wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.swarm', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                    wire:navigate>Swarm Configuration</a>
             @endif
-            <a class="menu-item" :class="activeTab === 'advanced' && 'menu-item-active'"
-                @click.prevent="activeTab = 'advanced'; window.location.hash = 'advanced'" href="#">Advanced</a>
-            @if ($application->build_pack !== 'static')
-                <a class="menu-item" :class="activeTab === 'environment-variables' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
-                    href="#">Environment
-                    Variables</a>
-            @endif
-            @if ($application->build_pack !== 'static')
-                <a class="menu-item" :class="activeTab === 'storages' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
-                </a>
-            @endif
+            <a class='menu-item' wire:current.exact="menu-item-active"
+                href="{{ route('project.application.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Environment Variables</a>
+            <a class='menu-item' wire:current.exact="menu-item-active"
+                href="{{ route('project.application.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Persistent Storage</a>
             @if ($application->git_based())
-                <a class="menu-item" :class="activeTab === 'source' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
+                <a class='menu-item' wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.source', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                    wire:navigate>Git Source</a>
             @endif
-            <a class="menu-item" :class="activeTab === 'servers' && 'menu-item-active'" class="flex items-center gap-2"
-                @click.prevent="activeTab = 'servers'; window.location.hash = 'servers'" href="#">Servers
+            <a class="menu-item flex items-center gap-2" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.servers', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Servers
                 @if (str($application->status)->contains('degraded'))
                     <span title="Some servers are unavailable">
                         <svg class="w-4 h-4 text-error" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
@@ -50,102 +51,73 @@
                     </span>
                 @endif
             </a>
-            <a class="menu-item" :class="activeTab === 'scheduled-tasks' && 'menu-item-active'"
-                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
-                href="#">Scheduled Tasks
-            </a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Scheduled Tasks</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Webhooks</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Preview Deployments</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Healthcheck</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Rollback</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.resource-limits', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Resource Limits</a>
 
-            <a class="menu-item" :class="activeTab === 'webhooks' && 'menu-item-active'"
-                @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
-            </a>
-            @if ($application->git_based())
-                <a class="menu-item" :class="activeTab === 'previews' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Preview
-                    Deployments
-                </a>
-            @endif
-            @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
-                <a class="menu-item" :class="activeTab === 'health' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Healthchecks
-                </a>
-            @endif
-            <a class="menu-item" :class="activeTab === 'rollback' && 'menu-item-active'"
-                @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
-            </a>
-            @if ($application->build_pack !== 'dockercompose')
-                <a class="menu-item" :class="activeTab === 'resource-limits' && 'menu-item-active'"
-                    @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
-                    href="#">Resource Limits
-                </a>
-            @endif
-            <a class="menu-item" :class="activeTab === 'resource-operations' && 'menu-item-active'"
-                @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
-                href="#">Resource Operations
-            </a>
-            <a class="menu-item" :class="activeTab === 'metrics' && 'menu-item-active'"
-                @click.prevent="activeTab = 'metrics'; window.location.hash = 'metrics'" href="#">Metrics
-            </a>
-            <a class="menu-item" :class="activeTab === 'tags' && 'menu-item-active'"
-                @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
-            </a>
-            <a class="menu-item" :class="activeTab === 'danger' && 'menu-item-active'"
-                @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
-            </a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Resource Operations</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}" >Metrics</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Tags</a>
+            <a class="menu-item" wire:current.exact="menu-item-active"
+                href="{{ route('project.application.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                wire:navigate>Danger Zone</a>
         </div>
         <div class="w-full">
-            <div x-cloak x-show="activeTab === 'general'" class="h-full">
+            @if ($currentRoute === 'project.application.configuration')
                 <livewire:project.application.general :application="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'swarm'" class="h-full">
+            @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'advanced'" class="h-full">
+            @elseif ($currentRoute === 'project.application.advanced')
                 <livewire:project.application.advanced :application="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'environment-variables'">
+            @elseif ($currentRoute === 'project.application.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$application" />
-            </div>
-            @if ($application->git_based())
-                <div x-cloak x-show="activeTab === 'source'">
-                    <livewire:project.application.source :application="$application" />
-                </div>
-            @endif
-            <div x-cloak x-show="activeTab === 'servers'">
-                <livewire:project.shared.destination :resource="$application" :servers="$servers" />
-            </div>
-            <div x-cloak x-show="activeTab === 'storages'">
-                <livewire:project.service.storage :resource="$application" lazy />
-            </div>
-            <div x-cloak x-show="activeTab === 'webhooks'">
-                <livewire:project.shared.webhooks :resource="$application" lazy />
-            </div>
-            <div x-cloak x-show="activeTab === 'previews'">
-                <livewire:project.application.previews :application="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'health'">
-                <livewire:project.shared.health-checks :resource="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'rollback'">
-                <livewire:project.application.rollback :application="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'resource-limits'">
-                <livewire:project.shared.resource-limits :resource="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'scheduled-tasks'">
+            @elseif ($currentRoute === 'project.application.persistent-storage')
+                <livewire:project.service.storage :resource="$application" />
+            @elseif ($currentRoute === 'project.application.source' && $application->git_based())
+                <livewire:project.application.source :application="$application" />
+            @elseif ($currentRoute === 'project.application.servers')
+                <livewire:project.shared.destination :resource="$application" />
+            @elseif ($currentRoute === 'project.application.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'resource-operations'">
+            @elseif ($currentRoute === 'project.application.webhooks')
+                <livewire:project.shared.webhooks :resource="$application" />
+            @elseif ($currentRoute === 'project.application.preview-deployments')
+                <livewire:project.application.previews :application="$application" />
+            @elseif ($currentRoute === 'project.application.healthcheck')
+                <livewire:project.shared.health-checks :resource="$application" />
+            @elseif ($currentRoute === 'project.application.rollback')
+                <livewire:project.application.rollback :application="$application" />
+            @elseif ($currentRoute === 'project.application.resource-limits')
+                <livewire:project.shared.resource-limits :resource="$application" />
+            @elseif ($currentRoute === 'project.application.resource-operations')
                 <livewire:project.shared.resource-operations :resource="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'metrics'">
+            @elseif ($currentRoute === 'project.application.metrics')
                 <livewire:project.shared.metrics :resource="$application" />
-            </div>
-            <div x-cloak x-show="activeTab === 'tags'">
-                <livewire:project.shared.tags :resource="$application" lazy />
-            </div>
-            <div x-cloak x-show="activeTab === 'danger'">
+            @elseif ($currentRoute === 'project.application.tags')
+                <livewire:project.shared.tags :resource="$application" />
+            @elseif ($currentRoute === 'project.application.danger')
                 <livewire:project.shared.danger :resource="$application" />
-            </div>
+            @endif
         </div>
     </div>
 </div>
