@@ -3,6 +3,7 @@
 namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
+use Illuminate\Support\Uri;
 use Livewire\Component;
 
 class Create extends Component
@@ -45,9 +46,24 @@ class Create extends Component
 
     public function updatedEndpoint($value)
     {
-        if (! str($value)->startsWith('https://') && ! str($value)->startsWith('http://')) {
-            $this->endpoint = 'https://'.$value;
-            $value = $this->endpoint;
+        try {
+            if (empty($value)) {
+                return;
+            }
+            if (str($value)->contains('digitaloceanspaces.com')) {
+                $uri = Uri::of($value);
+                $host = $uri->host();
+
+                if (preg_match('/^(.+)\.([^.]+\.digitaloceanspaces\.com)$/', $host, $matches)) {
+                    $host = $matches[2];
+                    $value = "https://{$host}";
+                }
+            }
+        } finally {
+            if (! str($value)->startsWith('https://') && ! str($value)->startsWith('http://')) {
+                $value = 'https://'.$value;
+            }
+            $this->endpoint = $value;
         }
     }
 
