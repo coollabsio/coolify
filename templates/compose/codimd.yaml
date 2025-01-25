@@ -1,5 +1,5 @@
 # documentation: https://hackmd.io/c/codimd-documentation
-# slogan: Realtime collaborative markdown notes on all platforms.
+# slogan: Realtime collaborative markdown notes on all platforms
 # tags: markdown, md, editor, opensource, collaborative, realtime-collaboration, notes
 # logo: svgs/codimd.png
 # port: 3000
@@ -51,16 +51,6 @@ services:
     volumes:
       - "upload-data:/home/hackmd/app/public/uploads"
     restart: always
-    command:
-      # Script to remove the port and protocol on $COOLIFY_URL for the CMD_DOMAIN environment variable
-      # https://github.com/hackmdio/codimd/blob/develop/deployments/Dockerfile#L28C14-L28C51
-      - /bin/bash
-      - -c
-      - |
-        domain=$${COOLIFY_URL#https://}
-        domain=$${domain%:3000}
-        export CMD_DOMAIN=$$domain
-        /home/hackmd/app/docker-entrypoint.sh
   postgresql:
     image: "postgres:16-alpine"
     volumes:
