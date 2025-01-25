@@ -10,10 +10,7 @@ services:
     environment:
       # Port setup for Coolify/Traefik
       - SERVICE_FQDN_CODIMD_3000
-      # - CMD_DOMAIN=$SERVICE_FQDN_CODIMD
-      # Please note that $CMD_DOMAIN is defined in the command section below
-      # This is because $COOLIFY_URL (which is not available as a docker compose variable)
-      # actually has the correct fqdn if the user modifies it on Coolify
+      - CMD_DOMAIN=$SERVICE_URL_CODIMD
       - CMD_PROTOCOL_USESSL=true
       # This forces the use of https in return urls (for oauth2 ? if used)
 
