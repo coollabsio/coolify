@@ -98,7 +98,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databaseType = $this->database->databaseType();
                 $serviceUuid = $this->database->service->uuid;
                 $serviceName = str($this->database->service->name)->slug();
-                if (str($databaseType)->contains('postgres')) {
+                if (str($databaseType)->contains('postgres') || str($databaseType)->contains('postgis')) {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName.'-'.$this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
@@ -198,7 +198,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $databasesToBackup = data_get($this->backup, 'databases_to_backup');
             }
             if (blank($databasesToBackup)) {
-                if (str($databaseType)->contains('postgres')) {
+                if (str($databaseType)->contains('postgres') || str($databaseType)->contains('postgis')) {
                     $databasesToBackup = [$this->database->postgres_db];
                 } elseif (str($databaseType)->contains('mongodb')) {
                     $databasesToBackup = ['*'];
@@ -210,7 +210,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     return;
                 }
             } else {
-                if (str($databaseType)->contains('postgres')) {
+                if (str($databaseType)->contains('postgres') || str($databaseType)->contains('postgis')) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
@@ -240,7 +240,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($databasesToBackup as $database) {
                 $size = 0;
                 try {
-                    if (str($databaseType)->contains('postgres')) {
+                    if (str($databaseType)->contains('postgres') || str($databaseType)->contains('postgis')) {
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
                         if ($this->backup->dump_all) {
                             $this->backup_file = '/pg-dump-all-'.Carbon::now()->timestamp.'.gz';
