@@ -1,0 +1,205 @@
+# documentation: https://zou.cg-wire.com/
+# slogan: Kitsu is a collaboration platform for animation and VFX studios.
+# tags: production, collaboration, animation, VFX
+# logo: svgs/kitsu.svg
+# port: 80
+
+# This file is adapted from the original docker-compose.yml located at:
+#   https://github.com/EmberLightVFX/Kitsu-for-Docker
+# Original Author:Ember Light, Apache License 2.0
+# Modifications Copyright 2025, Kia
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: '3.8'
+
+services:
+  kitsu:
+    container_name: cgwire-kitsu
+    image: ghcr.io/emberlightvfx/kitsu-for-docker:latest
+    depends_on:
+      - zou-app
+      - zou-event
+      - zou-jobs
+    restart: unless-stopped
+    networks:
+      - cgwire
+    environment:
+      - SERVICE_FQDN_KITSU_80
+      - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
+      - TMP_DIR=${TMP_DIR:-/tmp/zou}
+      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_HOST=${INDEXER_HOST:-meilisearch}
+      - INDEXER_PORT=${INDEXER_PORT:-7700}
+      - KV_HOST=${KV_HOST:-redis}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-SERVICE_PASSWORD_POSTGRES}
+      - DB_DB=${DB_DB:-zoudb}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+      - SAML_ENABLED=${SAML_ENABLED}
+      - SAML_IDP_NAME=${SAML_IDP_NAME}
+      - SAML_METADATA_URL=${SAML_METADATA_URL}
+      - MAIL_SERVER=${MAIL_SERVER}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_DEFAULT_SENDER=${MAIL_DEFAULT_SENDER}
+      - MAIL_USE_TLS=${MAIL_USE_TLS}
+
+  zou-app:
+    container_name: cgwire-zou-app
+    image: ghcr.io/emberlightvfx/zou-for-docker:latest
+    depends_on:
+      - db
+    volumes:
+      - 'previews:/opt/zou/previews'
+      - 'tmp:/tmp/zou'
+    restart: unless-stopped
+    networks:
+      - cgwire
+    command: >
+      sh -c "/init_zou.sh && /upgrade_zou.sh && gunicorn --error-logfile - --access-logfile - -w 3 -k gevent -b :5000 zou.app:app"
+    environment:
+      - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
+      - TMP_DIR=${TMP_DIR:-/tmp/zou}
+      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_HOST=${INDEXER_HOST:-meilisearch}
+      - INDEXER_PORT=${INDEXER_PORT:-7700}
+      - KV_HOST=${KV_HOST:-redis}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_DB=${DB_DB:-zoudb}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+
+  zou-event:
+    container_name: cgwire-zou-event
+    image: ghcr.io/emberlightvfx/zou-for-docker:latest
+    depends_on:
+      - redis
+    volumes:
+      - 'previews:/opt/zou/previews'
+      - 'tmp:/tmp/zou'
+    restart: unless-stopped
+    networks:
+      - cgwire
+    command: >
+      sh -c "gunicorn --error-logfile - --access-logfile - -w 1 -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -b :5001 zou.event_stream:app"
+    environment:
+      - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
+      - TMP_DIR=${TMP_DIR:-/tmp/zou}
+      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_HOST=${INDEXER_HOST:-meilisearch}
+      - INDEXER_PORT=${INDEXER_PORT:-7700}
+      - KV_HOST=${KV_HOST:-redis}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_DB=${DB_DB:-zoudb}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+
+  zou-jobs:
+    container_name: cgwire-zou-jobs
+    image: ghcr.io/emberlightvfx/zou-for-docker:latest
+    volumes:
+      - 'previews:/opt/zou/previews'
+      - 'tmp:/tmp/zou'
+    restart: unless-stopped
+    networks:
+      - cgwire
+    command: >
+      sh -c "rq worker -c zou.job_settings"
+    environment:
+      - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
+      - TMP_DIR=${TMP_DIR:-/tmp/zou}
+      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+      - INDEXER_HOST=${INDEXER_HOST:-meilisearch}
+      - INDEXER_PORT=${INDEXER_PORT:-7700}
+      - KV_HOST=${KV_HOST:-redis}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_DB=${DB_DB:-zoudb}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+
+  meilisearch:
+    container_name: cgwire-meilisearch
+    image: getmeili/meilisearch:v1.3.1
+    volumes:
+      - 'meili_data:/meili_data'
+    restart: unless-stopped
+    networks:
+      - cgwire
+    environment:
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+
+  db:
+    container_name: cgwire-db-12
+    image: postgres:12-alpine
+    volumes:
+      - 'db:/var/lib/postgresql/data'
+      - ./db/pg_ctl.conf:/etc/postgresql/12/main/pg_ctl.conf:ro
+    restart: unless-stopped
+    networks:
+      - cgwire
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+
+  redis:
+    container_name: cgwire-redis
+    image: redis:alpine
+    volumes:
+      - 'redis:/data'
+    restart: unless-stopped
+    networks:
+      - cgwire
+
+volumes:
+  db:
+    name: zou-db-12
+  redis:
+    name: cgwire-redis
+  meili_data:
+    name: cgwire-meili_data
+  previews:
+    name: cgwire-previews
+  tmp:
+    name: cgwire-tmp
+  kitsu:
+    name: cgwire-kitsu
+
+networks:
+  cgwire:
+    name: cgwire
