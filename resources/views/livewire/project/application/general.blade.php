@@ -285,7 +285,7 @@
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
                     {{-- <x-forms.checkbox label="Readonly labels"
-                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can alway reset the labels to the coolify defaults manually)."
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox> --}}
                 </div>
             @endif
@@ -318,7 +318,7 @@
                 @endif
                 <div class="w-96">
                     <x-forms.checkbox label="Readonly labels"
-                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can alway reset the labels to the coolify defaults manually)."
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
