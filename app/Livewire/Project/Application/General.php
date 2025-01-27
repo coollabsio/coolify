@@ -187,6 +187,9 @@ class General extends Component
                 });
             }
         }
+        if ($this->application->settings->is_container_label_readonly_enabled) {
+            $this->resetDefaultLabels(false);
+        }
     }
 
     public function loadComposeFile($isInit = false)

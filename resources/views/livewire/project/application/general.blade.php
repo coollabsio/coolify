@@ -71,27 +71,50 @@
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
-
-                    <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn" label="Domains"
-                        helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
-                    <x-forms.button wire:click="getWildcardDomain">Generate Domain
-                    </x-forms.button>
+                    @if ($application->settings->is_container_label_readonly_enabled == false)
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn"
+                            label="Domains" readonly
+                            helper="Readonly labels are disabled. You can set the domains in the labels section." />
+                    @else
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn"
+                            label="Domains"
+                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
+                        <x-forms.button wire:click="getWildcardDomain">Generate Domain
+                        </x-forms.button>
+                    @endif
                 </div>
                 <div class="flex items-end gap-2">
-                    <x-forms.select label="Direction" id="application.redirect" required
-                        helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
-                        <option value="both">Allow www & non-www.</option>
-                        <option value="www">Redirect to www.</option>
-                        <option value="non-www">Redirect to non-www.</option>
-                    </x-forms.select>
-                    <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
-                        submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
-                        confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
-                        shortConfirmationLabel="Application URL" :confirmWithPassword="false" step2ButtonText="Set Direction">
-                        <x-slot:customButton>
-                            <div class="w-[7.2rem]">Set Direction</div>
-                        </x-slot:customButton>
-                    </x-modal-confirmation>
+                    @if ($application->settings->is_container_label_readonly_enabled == false)
+                        @if ($application->redirect === 'both')
+                            <x-forms.input label="Direction" value="Allow www & non-www." readonly
+                                helper="Readonly labels are disabled. You can set the direction in the labels section." />
+                        @elseif ($application->redirect === 'www')
+                            <x-forms.input label="Direction" value="Redirect to www." readonly
+                                helper="Readonly labels are disabled. You can set the direction in the labels section." />
+                        @elseif ($application->redirect === 'non-www')
+                            <x-forms.input label="Direction" value="Redirect to non-www." readonly
+                                helper="Readonly labels are disabled. You can set the direction in the labels section." />
+                        @endif
+                    @else
+                        <x-forms.select label="Direction" id="application.redirect" required
+                            helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
+                            <option value="both">Allow www & non-www.</option>
+                            <option value="www">Redirect to www.</option>
+                            <option value="non-www">Redirect to non-www.</option>
+                        </x-forms.select>
+                        @if ($application->settings->is_container_label_readonly_enabled)
+                            <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
+                                submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']"
+                                confirmationText="{{ $application->fqdn . '/' }}"
+                                confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
+                                shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+                                step2ButtonText="Set Direction">
+                                <x-slot:customButton>
+                                    <div class="w-[7.2rem]">Set Direction</div>
+                                </x-slot:customButton>
+                            </x-modal-confirmation>
+                        @endif
+                    @endif
                 </div>
             @endif
 
@@ -299,9 +322,15 @@
                     @if ($application->settings->is_static || $application->build_pack === 'static')
                         <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
                     @else
-                        <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes"
-                            required
-                            helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
+                        @if ($application->settings->is_container_label_readonly_enabled === false)
+                            <x-forms.input placeholder="3000,3001" id="application.ports_exposes"
+                                label="Ports Exposes" readonly
+                                helper="Readonly labels are disabled. You can set the ports manually in the labels section." />
+                        @else
+                            <x-forms.input placeholder="3000,3001" id="application.ports_exposes"
+                                label="Ports Exposes" required
+                                helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
+                        @endif
                     @endif
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
