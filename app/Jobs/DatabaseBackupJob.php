@@ -495,12 +495,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             }
-            if ($this->s3->isHetzner()) {
-                $endpointWithoutBucket = 'https://'.str($endpoint)->after('https://')->after('.')->value();
-                $commands[] = "docker exec backup-of-{$this->backup->uuid} mc alias set --path=off --api=S3v4 temporary {$endpointWithoutBucket} $key $secret";
-            } else {
-                $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
-            }
+            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
 
