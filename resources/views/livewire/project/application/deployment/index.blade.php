@@ -75,8 +75,8 @@
                                 <div x-data="{ expanded: false }">
                                     <div class="flex items-center gap-2">
                                         <span class="font-medium">Commit:</span>
-                                        <a wire:navigate.prevent 
-                                           href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}" 
+                                        <a wire:navigate.prevent
+                                           href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
                                            target="_blank"
                                            class="underline">
                                             {{ substr(data_get($deployment, 'commit'), 0, 7) }}
@@ -101,18 +101,20 @@
                                         @endif
                                         @if ($deployment->commitMessage())
                                             <span class="text-gray-600 dark:text-gray-400">-</span>
-                                            <a wire:navigate.prevent 
-                                               href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}" 
+                                            <a wire:navigate.prevent
+                                               href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
                                                target="_blank"
                                                class="text-gray-600 dark:text-gray-400 truncate max-w-md underline">
                                                 {{ Str::before($deployment->commitMessage(), "\n") }}
                                             </a>
-                                            <button @click="expanded = !expanded"
-                                                class="text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                                                <svg x-bind:class="{'rotate-180': expanded}" class="w-4 h-4 transition-transform" viewBox="0 0 24 24">
-                                                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/>
-                                                </svg>
-                                            </button>
+                                            @if ($deployment->commitMessage() !== Str::before($deployment->commitMessage(), "\n"))
+                                                <button @click="expanded = !expanded"
+                                                    class="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                                    <svg x-bind:class="{'rotate-180': expanded}" class="w-4 h-4 transition-transform" viewBox="0 0 24 24">
+                                                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9l6 6l6-6"/>
+                                                    </svg>
+                                                </button>
+                                            @endif
                                             <span class="bg-gray-200/70 dark:bg-gray-600/20 px-2 py-0.5 rounded-md text-xs text-gray-800 dark:text-gray-100 border border-gray-400/30">
                                                 @if (data_get($deployment, 'is_webhook'))
                                                     Webhook
@@ -132,7 +134,7 @@
                                         @endif
                                     </div>
                                     @if ($deployment->commitMessage())
-                                        <div x-show="expanded" 
+                                        <div x-show="expanded"
                                              x-transition:enter="transition ease-out duration-200"
                                              x-transition:enter-start="opacity-0 transform -translate-y-2"
                                              x-transition:enter-end="opacity-100 transform translate-y-0"
