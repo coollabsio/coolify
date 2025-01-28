@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-2" x-data="{
+<div class="flex flex-col gap-2" wire:poll.5000ms="refreshExecutions" x-data="{
     init() {
         let interval;
         $wire.$watch('isPollingActive', value => {
@@ -48,6 +48,7 @@
             @if(data_get($execution, 'status') !== 'running')
             <br>Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}
             <br>Duration: {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
+            <br>Finished {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
             @endif
         </div>
     </a>

@@ -187,6 +187,9 @@ class General extends Component
                 });
             }
         }
+        if ($this->application->settings->is_container_label_readonly_enabled) {
+            $this->resetDefaultLabels(false);
+        }
     }
 
     public function loadComposeFile($isInit = false)
@@ -294,7 +297,7 @@ class General extends Component
     public function resetDefaultLabels($manualReset = false)
     {
         try {
-            if ($this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
+            if (! $this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
                 return;
             }
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
@@ -324,6 +327,7 @@ class General extends Component
             }
             check_domain_usage(resource: $this->application);
             $this->application->fqdn = $domains->implode(',');
+            $this->resetDefaultLabels(false);
         }
     }
 
@@ -442,6 +446,7 @@ class General extends Component
     {
         $config = GenerateConfig::run($this->application, true);
         $fileName = str($this->application->name)->slug()->append('_config.json');
+        dd($config);
 
         return response()->streamDownload(function () use ($config) {
             echo $config;

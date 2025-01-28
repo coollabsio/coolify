@@ -8,7 +8,7 @@
     @elseif(!$resource->destination->server->isMetricsEnabled())
         <div class="alert alert-warning">Metrics are only available for servers with Sentinel & Metrics enabled!</div>
         <div> Go to <a class="underline dark:text-white"
-                href="{{ route('server.show', $resource->destination->server->uuid) }}">Server settings</a> to
+                wire:navigate href="{{ route('server.show', $resource->destination->server->uuid) }}">Server settings</a> to
             enable
             it.</div>
     @else

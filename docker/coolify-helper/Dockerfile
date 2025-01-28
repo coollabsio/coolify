@@ -1,5 +1,6 @@
 # Versions
 
+
 # https://hub.docker.com/_/alpine
 ARG BASE_IMAGE=alpine:3.21
 # https://download.docker.com/linux/static/stable/
@@ -11,7 +12,7 @@ ARG DOCKER_BUILDX_VERSION=0.19.3
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.36.2
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.30.0
+ARG NIXPACKS_VERSION=1.29.0
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2024-11-21T17-21-54Z
 

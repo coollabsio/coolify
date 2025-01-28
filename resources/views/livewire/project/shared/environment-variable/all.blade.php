@@ -55,10 +55,10 @@
                 <h3>Preview Deployments Environment Variables</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            {{-- @foreach ($resource->environment_variables_preview as $env)
+            @foreach ($resource->environment_variables_preview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
-            @endforeach --}}
+            @endforeach
         @endif
     @else
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
