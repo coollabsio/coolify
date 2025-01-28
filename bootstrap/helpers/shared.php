@@ -2115,6 +2115,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $parsedServiceVariables->put($key, $value);
                     }
                 }
+                $parsedServiceVariables->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
 
                 // TODO: move this in a shared function
@@ -3604,6 +3605,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             if ($originalResource->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                 $coolifyEnvironments->put('COOLIFY_BRANCH', "\"{$branch}\"");
             }
+        }
+
+        // Add COOLIFY_RESOURCE_UUID to environment
+        if ($resource->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $coolifyEnvironments->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
         }
 
         // Add COOLIFY_CONTAINER_NAME to environment
