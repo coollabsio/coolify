@@ -23,7 +23,7 @@ services:
           SECRET_KEY = os.getenv("SECRET_KEY")
           MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY", "")
 
-          COOLIFY_UUID = os.getenv('COOLIFY_CONTAINER_NAME').strip('"').split('-')[-1]
+          COOLIFY_UUID = os.getenv('COOLIFY_CONTAINER_NAME').split('-')[-1]
 
           CACHE_CONFIG = {
             "CACHE_TYPE": "RedisCache",
