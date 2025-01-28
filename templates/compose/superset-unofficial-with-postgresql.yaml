@@ -1,3 +1,9 @@
+# documentation: https://github.com/amancevice/docker-superset
+# slogan: Modern data exploration and visualization platform (unofficial docker image)
+# tags: analytics,bi,dashboard,database,sql,unofficial
+# logo: svgs/superset.svg
+# port: 8088
+
 services:
   superset:
     image: amancevice/superset
