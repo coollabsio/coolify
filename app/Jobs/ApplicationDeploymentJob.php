@@ -924,7 +924,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
@@ -983,7 +983,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
                 if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
