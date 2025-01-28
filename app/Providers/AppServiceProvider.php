@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
@@ -30,13 +29,6 @@ class AppServiceProvider extends ServiceProvider
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
 
-        Vite::useScriptTagAttributes([
-            'data-cfasync' => 'false',
-        ]);
-
-        Vite::useStyleTagAttributes([
-            'data-cfasync' => 'false',
-        ]);
     }
 
     private function configureCommands(): void
