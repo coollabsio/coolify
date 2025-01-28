@@ -45,6 +45,11 @@ services:
 
           SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@superset_postgres-{COOLIFY_RESOURCE_UUID}:5432/{os.getenv('POSTGRES_DB')}"
           SQLALCHEMY_TRACK_MODIFICATIONS = True
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8088/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   superset_postgres:
     image: postgres
@@ -70,8 +75,8 @@ services:
     healthcheck:
       test: redis-cli ping
       interval: 5s
+      timeout: 20s
       retries: 10
-      timeout: 2s
 
 volumes:
   superset_postgres_data:
