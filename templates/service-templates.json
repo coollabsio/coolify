@@ -2234,6 +2234,21 @@
         "minversion": "0.0.0",
         "port": "6610"
     },
+    "open-webui": {
+        "documentation": "https://docs.openwebui.com?utm_source=coolify.io",
+        "slogan": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+        "compose": "c2VydmljZXM6CiAgb3Blbi13ZWJ1aToKICAgIGltYWdlOiAnZ2hjci5pby9vcGVuLXdlYnVpL29wZW4td2VidWk6bWFpbicKICAgIHZvbHVtZXM6CiAgICAgIC0gJ29wZW4td2VidWk6L2FwcC9iYWNrZW5kL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fT1BFTldFQlVJXzgwODAKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MDgwJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMzBzCiAgICAgIHJldHJpZXM6IDEwCnZvbHVtZXM6CiAgb3Blbi13ZWJ1aTogbnVsbAo=",
+        "tags": [
+            "ai",
+            "models",
+            "deployment",
+            "open-web-ui",
+            "integration"
+        ],
+        "logo": "svgs/openwebui.svg",
+        "minversion": "0.0.0",
+        "port": "8080"
+    },
     "organizr": {
         "documentation": "https://docs.organizr.app/?utm_source=coolify.io",
         "slogan": "Homelab Services Organizer",
