@@ -48,6 +48,8 @@ class General extends Component
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
+        'database.enable_ssl' => 'boolean',
+        'database.ssl_mode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
     ];
 
     protected $validationAttributes = [
@@ -65,6 +67,8 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
         'database.custom_docker_run_options' => 'Custom Docker Run Options',
+        'database.enable_ssl' => 'Enable SSL',
+        'database.ssl_mode' => 'SSL Mode',
     ];
 
     public function mount()
@@ -86,6 +90,18 @@ class General extends Component
             $this->database->save();
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSaveSSL()
+    {
+        try {
+            $this->database->enable_ssl = $this->database->enable_ssl;
+            $this->database->ssl_mode = $this->database->ssl_mode;
+            $this->database->save();
+            $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
         }

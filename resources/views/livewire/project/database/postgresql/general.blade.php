@@ -73,58 +73,81 @@
                     type="password" readonly wire:model="db_url_public" />
             @endif
         </div>
-        <div>
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
-                    </div>
-                    @if (data_get($database, 'is_public'))
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
-                </div>
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
-            </div>
-            <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                id="database.public_port" label="Public Port" />
-        </div>
-        <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
-    </form>
-    <h3 class="pt-4">Advanced</h3>
-    <div class="flex flex-col">
-        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-            instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
-    </div>
-    <div class="pb-16">
-        <div class="flex gap-2 pt-4 pb-2">
-            <h3>Initialization scripts</h3>
-            <x-modal-input buttonTitle="+ Add" title="New Init Script">
-                <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
-                    <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
-                    <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
-                        label="Content" required />
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
-                </form>
-            </x-modal-input>
-        </div>
         <div class="flex flex-col gap-2">
-            @forelse(data_get($database,'init_scripts', []) as $script)
-                <livewire:project.database.init-script :script="$script" :wire:key="$script['index']" />
-            @empty
-                <div>No initialization scripts found.</div>
-            @endforelse
+            <h3 class="py-2">SSL Configuration</h3>
+            <div class="flex flex-col gap-2">
+                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                @if($database->enable_ssl)
+                    <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode" instantSave="instantSaveSSL"
+                        helper="Choose the SSL verification mode for PostgreSQL connections">
+                        <option value="allow">allow</option>
+                        <option value="prefer">prefer</option>
+                        <option value="require">require</option>
+                        <option value="verify-ca">verify-ca</option>
+                        <option value="verify-full">verify-full</option>
+                    </x-forms.select>
+                @endif
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between py-2">
+                <div class="flex items-center gap-2">
+                    <h3>Proxy</h3>
+                    <x-loading wire:loading wire:target="instantSave" />
+                </div>
+                @if (data_get($database, 'is_public'))
+                    <x-slide-over fullScreen>
+                        <x-slot:title>Proxy Logs</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                        </x-slot:content>
+                        <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
+                            @click="slideOverOpen=true">Logs</x-forms.button>
+                    </x-slide-over>
+                @endif
+            </div>
+            <div class="flex flex-col gap-2">
+                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                    id="database.public_port" label="Public Port" />
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-2">
+            <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
+        </div>
+    </form>
+
+    <div class="flex flex-col gap-4 pt-4">
+        <h3>Advanced</h3>
+        <div class="flex flex-col">
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+        </div>
+
+        <div class="pb-16">
+            <div class="flex items-center gap-2 pb-2">
+                <h3>Initialization scripts</h3>
+                <x-modal-input buttonTitle="+ Add" title="New Init Script">
+                    <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
+                        <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
+                        <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
+                            label="Content" required />
+                        <x-forms.button type="submit">
+                            Save
+                        </x-forms.button>
+                    </form>
+                </x-modal-input>
+            </div>
+            <div class="flex flex-col gap-2">
+                @forelse(data_get($database,'init_scripts', []) as $script)
+                    <livewire:project.database.init-script :script="$script" :wire:key="$script['index']" />
+                @empty
+                    <div>No initialization scripts found.</div>
+                @endforelse
+            </div>
         </div>
     </div>
-
 </div>
