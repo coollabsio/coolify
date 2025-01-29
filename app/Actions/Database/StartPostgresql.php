@@ -2,6 +2,8 @@
 
 namespace App\Actions\Database;
 
+use App\Helpers\SslHelper;
+use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
@@ -18,6 +20,8 @@ class StartPostgresql
 
     public string $configuration_dir;
 
+    private ?SslCertificate $ssl_certificate = null;
+
     public function handle(StandalonePostgresql $database)
     {
         $this->database = $database;
@@ -31,7 +35,26 @@ class StartPostgresql
             "echo 'Starting database.'",
             "mkdir -p $this->configuration_dir",
             "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/",
+            "mkdir -p $this->configuration_dir/ssl",
         ];
+
+        if ($this->database->enable_ssl) {
+            $this->commands[] = "echo 'Setting up SSL certificate.'";
+            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->where('certificate_type', 'internal')
+                ->first();
+
+            if (! $this->ssl_certificate) {
+                $this->commands[] = "echo 'Generating new SSL certificate.'";
+                $this->ssl_certificate = SslHelper::generateSslCertificate(
+                    resourceType: $this->database->getMorphClass(),
+                    resourceId: $this->database->id,
+                    certificateType: 'internal',
+                );
+                $this->addSslFilesToFileStorage();
+            }
+        }
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
@@ -106,6 +129,17 @@ class StartPostgresql
                     'read_only' => true,
                 ];
             }
+        }
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['command'] = [
+                'postgres',
+                '-c',
+                'ssl=off', // temp for dev
+                '-c',
+                'ssl_cert_file=/etc/postgresql/ssl/internal.crt',
+                '-c',
+                'ssl_key_file=/etc/postgresql/ssl/internal.key',
+            ];
         }
         if (filled($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
@@ -232,5 +266,28 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+    }
+
+    private function addSslFilesToFileStorage()
+    {
+        if (! $this->ssl_certificate) {
+            return;
+        }
+
+        $this->database->fileStorages()->create([
+            'fs_path' => $this->configuration_dir.'/ssl/internal.crt',
+            'mount_path' => '/etc/postgresql/ssl/internal.crt',
+            'content' => $this->ssl_certificate->ssl_certificate,
+            'is_directory' => false,
+            'chmod' => '644',
+        ]);
+
+        $this->database->fileStorages()->create([
+            'fs_path' => $this->configuration_dir.'/ssl/internal.key',
+            'mount_path' => '/etc/postgresql/ssl/internal.key',
+            'content' => $this->ssl_certificate->ssl_private_key,
+            'is_directory' => false,
+            'chmod' => '600',
+        ]);
     }
 }
