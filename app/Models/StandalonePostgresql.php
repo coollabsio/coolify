@@ -219,7 +219,14 @@ class StandalonePostgresql extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}",
+            get: function () {
+                $url = "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}";
+                if ($this->enable_ssl) {
+                    $url .= "?sslmode={$this->ssl_mode}";
+                }
+
+                return $url;
+            },
         );
     }
 
@@ -228,7 +235,12 @@ class StandalonePostgresql extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+                    $url = "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+                    if ($this->enable_ssl) {
+                        $url .= "?sslmode={$this->ssl_mode}";
+                    }
+
+                    return $url;
                 }
 
                 return null;
