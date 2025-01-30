@@ -134,7 +134,7 @@ class StartPostgresql
             $docker_compose['services'][$container_name]['command'] = [
                 'postgres',
                 '-c',
-                'ssl=off', // temp for dev
+                'ssl=on',
                 '-c',
                 'ssl_cert_file=/etc/postgresql/ssl/internal.crt',
                 '-c',
@@ -166,6 +166,9 @@ class StartPostgresql
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
+        if ($this->database->enable_ssl) {
+            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /etc/postgresql/ssl/internal.key /etc/postgresql/ssl/internal.crt");
+        }
         $this->commands[] = "echo 'Database started.'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
