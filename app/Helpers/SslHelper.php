@@ -23,9 +23,8 @@ class SslHelper
 
         try {
             $privateKey = openssl_pkey_new([
-                'private_key_type' => OPENSSL_KEYTYPE_RSA,
-                'private_key_bits' => 4096,
-                'encrypt_key' => false,
+                'private_key_type' => OPENSSL_KEYTYPE_EC,
+                'curve_name' => 'secp521r1',
             ]);
 
             if ($privateKey === false) {
