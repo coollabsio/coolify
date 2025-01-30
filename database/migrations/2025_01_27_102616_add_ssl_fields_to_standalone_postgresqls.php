@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('standalone_postgresqls', function (Blueprint $table) {
             $table->boolean('enable_ssl')->default(true);
-            $table->string('ssl_mode')->nullable()->default('verify-full');
+            $table->string('ssl_mode')->nullable()->default('require');
         });
     }
 
