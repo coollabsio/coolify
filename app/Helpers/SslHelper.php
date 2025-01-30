@@ -7,10 +7,6 @@ use Carbon\Carbon;
 
 class SslHelper
 {
-    private const DEFAULT_KEY_BITS = 4096;
-
-    private const DEFAULT_DIGEST_ALG = 'sha256';
-
     private const DEFAULT_VALIDITY_YEARS = 10;
 
     private const DEFAULT_ORG_NAME = 'Coolify';
@@ -27,9 +23,9 @@ class SslHelper
 
         try {
             $privateKey = openssl_pkey_new([
-                'private_key_bits' => self::DEFAULT_KEY_BITS,
                 'private_key_type' => OPENSSL_KEYTYPE_RSA,
-                'encrypt_key' => true,
+                'private_key_bits' => 4096,
+                'encrypt_key' => false,
             ]);
 
             if ($privateKey === false) {
@@ -46,9 +42,9 @@ class SslHelper
             ];
 
             $csr = openssl_csr_new($dn, $privateKey, [
-                'digest_alg' => self::DEFAULT_DIGEST_ALG,
+                'digest_alg' => 'sha512',
                 'config' => null,
-                'encrypt_key' => true,
+                'encrypt_key' => false,
             ]);
 
             if ($csr === false) {
@@ -63,7 +59,7 @@ class SslHelper
                 $privateKey,
                 $validityDays,
                 [
-                    'digest_alg' => self::DEFAULT_DIGEST_ALG,
+                    'digest_alg' => 'sha512',
                     'config' => null,
                 ],
                 random_int(PHP_INT_MIN, PHP_INT_MAX)
