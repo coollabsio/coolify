@@ -14,7 +14,6 @@ return new class extends Migration
             $table->text('ssl_private_key')->nullable();
             $table->string('resource_type')->nullable();
             $table->unsignedBigInteger('resource_id')->nullable();
-            $table->enum('certificate_type', ['internal', 'external'])->default('internal');
             $table->timestamp('valid_until')->nullable();
             $table->timestamps();
 
