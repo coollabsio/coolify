@@ -923,8 +923,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
+                }
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
@@ -982,8 +985,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
+                }
                 if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
@@ -1145,7 +1151,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Rolling update started.');
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "docker stack deploy --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}"),
+                    executeInDocker($this->deployment_uuid, "docker stack deploy --detach=true --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}"),
                 ],
             );
             $this->application_deployment_queue->addLogEntry('Rolling update completed.');

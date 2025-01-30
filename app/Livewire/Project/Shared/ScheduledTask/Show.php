@@ -77,6 +77,11 @@ class Show extends Component
     {
         if ($toModel) {
             $this->validate();
+            $isValid = validate_cron_expression($this->frequency);
+            if (! $isValid) {
+                $this->frequency = $this->task->frequency;
+                throw new \Exception('Invalid Cron / Human expression.');
+            }
             $this->task->enabled = $this->isEnabled;
             $this->task->name = str($this->name)->trim()->value();
             $this->task->command = str($this->command)->trim()->value();
@@ -109,7 +114,7 @@ class Show extends Component
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
         } catch (\Exception $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 

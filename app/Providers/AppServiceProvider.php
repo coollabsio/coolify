@@ -28,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
+
     }
 
     private function configureCommands(): void
