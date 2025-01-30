@@ -3,23 +3,20 @@
 namespace App\Helpers;
 
 use App\Models\SslCertificate;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 
 class SslHelper
 {
-    private const DEFAULT_VALIDITY_YEARS = 10;
-
-    private const DEFAULT_ORG_NAME = 'Coolify';
+    private const DEFAULT_ORGANIZATION_NAME = 'Coolify';
 
     public static function generateSslCertificate(
+        string $commonName,
+        array $additionalSans,
         string $resourceType,
         int $resourceId,
-        string $commonName,
-        ?Carbon $validUntil = null,
-        ?string $organizationName = null
+        ?string $organizationName = null,
     ): SslCertificate {
-        $validUntil ??= Carbon::now()->addYears(self::DEFAULT_VALIDITY_YEARS);
-        $organizationName ??= self::DEFAULT_ORG_NAME;
+        $organizationName ??= self::DEFAULT_ORGANIZATION_NAME;
 
         try {
             $privateKey = openssl_pkey_new([
@@ -38,6 +35,7 @@ class SslHelper
             $dn = [
                 'commonName' => $commonName,
                 'organizationName' => $organizationName,
+                'subjectAltName' => implode(', ', array_merge(["DNS:$commonName"], $additionalSans)),
             ];
 
             $csr = openssl_csr_new($dn, $privateKey, [
@@ -50,13 +48,11 @@ class SslHelper
                 throw new \RuntimeException('Failed to generate CSR: '.openssl_error_string());
             }
 
-            $validityDays = max(1, Carbon::now()->diffInDays($validUntil));
-
             $certificate = openssl_csr_sign(
                 $csr,
                 null,
                 $privateKey,
-                $validityDays,
+                90,
                 [
                     'digest_alg' => 'sha512',
                     'config' => null,
@@ -77,7 +73,7 @@ class SslHelper
                 'ssl_private_key' => $privateKeyStr,
                 'resource_type' => $resourceType,
                 'resource_id' => $resourceId,
-                'valid_until' => $validUntil,
+                'valid_until' => CarbonImmutable::now()->addDays(90),
             ]);
         } catch (\Throwable $e) {
             throw new \RuntimeException('SSL Certificate generation failed: '.$e->getMessage(), 0, $e);
