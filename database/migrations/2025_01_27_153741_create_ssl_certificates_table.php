@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('ssl_certificates', function (Blueprint $table) {
             $table->id();
-            $table->text('ssl_certificate')->nullable();
-            $table->text('ssl_private_key')->nullable();
+            $table->text('ssl_certificate');
+            $table->text('ssl_private_key');
             $table->string('resource_type')->nullable();
             $table->unsignedBigInteger('resource_id')->nullable();
             $table->timestamp('valid_until')->nullable();
