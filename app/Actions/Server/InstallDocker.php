@@ -32,8 +32,8 @@ class InstallDocker
                 "mkdir -p $serverCertPath",
                 "chown -R 9999:root $serverCertPath",
                 "chmod -R 700 $serverCertPath",
-                "echo '{$serverCert->ssl_certificate}' > $serverCertPath/ca.crt",
-                "chmod 644 $serverCertPath/ca.crt",
+                "echo '{$serverCert->ssl_certificate}' > $serverCertPath/coolify-ca.crt",
+                "chmod 644 $serverCertPath/coolify-ca.crt",
             ]);
             remote_process($commands, $server);
         }
