@@ -14,10 +14,12 @@ return new class extends Migration
             $table->text('ssl_private_key');
             $table->string('resource_type')->nullable();
             $table->unsignedBigInteger('resource_id')->nullable();
-            $table->timestamp('valid_until')->nullable();
+            $table->unsignedBigInteger('server_id')->nullable();
+            $table->timestamp('valid_until');
             $table->timestamps();
 
-            $table->index(['resource_type', 'resource_id']);
+            $table->foreign('server_id')->references('id')->on('servers');
+            $table->unique(['server_id', 'resource_id']);
         });
     }
 

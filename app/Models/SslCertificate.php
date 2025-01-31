@@ -11,6 +11,7 @@ class SslCertificate extends Model
         'ssl_private_key',
         'resource_type',
         'resource_id',
+        'server_id',
         'valid_until',
     ];
 
@@ -23,5 +24,10 @@ class SslCertificate extends Model
     public function resource()
     {
         return $this->morphTo();
+    }
+
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
     }
 }
