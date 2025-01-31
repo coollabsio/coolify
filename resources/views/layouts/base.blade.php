@@ -21,7 +21,7 @@
     @endphp
     <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
-    <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
+    <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/x-icon" />
 @else
     <link rel="icon" href="{{ asset('coolify-transparent.png') }}" type="image/x-icon" />
     @endenv
