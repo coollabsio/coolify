@@ -33,24 +33,30 @@ class StartPostgresql
 
         $this->commands = [
             "echo 'Starting database.'",
+            "echo 'Creating directories.'",
             "mkdir -p $this->configuration_dir",
             "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/",
             "mkdir -p $this->configuration_dir/ssl",
+            "echo 'Directories created successfully.'",
         ];
 
         if ($this->database->enable_ssl) {
-            $this->commands[] = "echo 'Setting up SSL certificate.'";
-            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())
-                ->where('resource_id', $this->database->id)
-                ->where('certificate_type', 'internal')
-                ->first();
+            $this->commands[] = "echo 'Setting up SSL for this database.'";
+            $server = $this->database->destination->server;
+
+            $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
+
+            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())->where('resource_id', $this->database->id)->first();
 
             if (! $this->ssl_certificate) {
-                $this->commands[] = "echo 'Generating new SSL certificate.'";
+                $this->commands[] = "echo 'No SSL certificate found, generating new SSL certificate for this database.'";
                 $this->ssl_certificate = SslHelper::generateSslCertificate(
+                    commonName: $this->database->uuid,
+                    // additionalSans: ["IP:{$server->ip_address}"], // Issue is the server IP can be also be a domain/ hostname and we need to be sure what it is before setting it.
                     resourceType: $this->database->getMorphClass(),
                     resourceId: $this->database->id,
-                    certificateType: 'internal',
+                    caCert: $caCert->ssl_certificate,
+                    caKey: $caCert->ssl_private_key,
                 );
                 $this->addSslFilesToFileStorage();
             }
