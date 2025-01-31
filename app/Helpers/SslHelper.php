@@ -11,10 +11,14 @@ class SslHelper
 
     public static function generateSslCertificate(
         string $commonName,
-        array $additionalSans,
-        string $resourceType,
-        int $resourceId,
+        array $additionalSans = [],
+        ?string $resourceType = null,
+        ?int $resourceId = null,
+        ?int $serverId = null,
         ?string $organizationName = null,
+        int $validityDays = 365,
+        ?string $caCert = null,
+        ?string $caKey = null
     ): SslCertificate {
         $organizationName ??= self::DEFAULT_ORGANIZATION_NAME;
 
@@ -50,9 +54,9 @@ class SslHelper
 
             $certificate = openssl_csr_sign(
                 $csr,
-                null,
-                $privateKey,
-                90,
+                $caCert ?? null,
+                $caKey ?? $privateKey,
+                $validityDays,
                 [
                     'digest_alg' => 'sha512',
                     'config' => null,
@@ -73,7 +77,8 @@ class SslHelper
                 'ssl_private_key' => $privateKeyStr,
                 'resource_type' => $resourceType,
                 'resource_id' => $resourceId,
-                'valid_until' => CarbonImmutable::now()->addDays(90),
+                'server_id' => $serverId,
+                'valid_until' => CarbonImmutable::now()->addDays($validityDays),
             ]);
         } catch (\Throwable $e) {
             throw new \RuntimeException('SSL Certificate generation failed: '.$e->getMessage(), 0, $e);
