@@ -4,7 +4,6 @@ namespace App\View\Components\Forms;
 
 use Closure;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Str;
 use Illuminate\View\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -35,8 +34,6 @@ class Select extends Component
         if (is_null($this->name)) {
             $this->name = $this->id;
         }
-
-        $this->label = Str::title($this->label);
 
         return view('components.forms.select');
     }
