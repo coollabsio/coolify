@@ -38,6 +38,82 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="flex flex-col gap-4 pt-8">
+                <h3>CA SSL Certificate</h3>
+                <div class="flex gap-2">
+                    <x-modal-confirmation 
+                        title="Confirm changing of CA Certificate?" 
+                        buttonTitle="Save Certificate"
+                        submitAction="saveCaCertificate" 
+                        :actions="[
+                            'This will overwrite the existing CA certificate at /data/coolify/ca/coolify-ca.crt with your custom CA certificate.', 
+                            'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
+                            'You must manually redeploy all your databases to use the new SSL certificate.',
+                            'You proabley also need to redeploy all your resources using the CA certificate.'
+                        ]"
+                        confirmationText="/data/coolify/ca/coolify-ca.crt"
+                        shortConfirmationLabel="CA Certificate Path"
+                        step3ButtonText="Save Certificate">
+                    </x-modal-confirmation>
+                    <x-modal-confirmation 
+                        title="Confirm Regenerate Certificate?" 
+                        buttonTitle="Regenerate Certificate" 
+                        submitAction="regenerateCaCertificate" 
+                        :actions="[
+                            'This will generate a new CA certificate at /data/coolify/ca/coolify-ca.crt and replace the existing one.', 
+                            'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
+                            'You must manually redeploy all your databases to use the new SSL certificate.',
+                            'You proabley also need to redeploy all your resources using the CA certificate.'
+                        ]"
+                        confirmationText="/data/coolify/ca/coolify-ca.crt"
+                        shortConfirmationLabel="CA Certificate Path"
+                        step3ButtonText="Regenerate Certificate">
+                    </x-modal-confirmation>
+                </div>
+                <div class="space-y-4">
+                    <div class="text-sm">
+                        <p class="font-medium mb-2">Recommended Configuration:</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>Mount this Coolify CA certificate into all containers that need to connect to a database over SSL.</li>
+                            <li>Use verify-full (recommended) or verify-ca when connecting to a database over SSL.</li>
+                        </ul>
+                    </div>
+                    <div class="relative">
+                        <x-forms.copy-button 
+                            text="- /data/coolify/ca/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" 
+                        />
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm">CA Certificate Content</span>
+                        <x-forms.button 
+                            wire:click="toggleCertificate" 
+                            type="button" 
+                            class="!py-1 !px-2 text-sm">
+                            {{ $showCertificate ? 'Hide' : 'Show' }}
+                        </x-forms.button>
+                    </div>
+                    @if($showCertificate)
+                        <textarea 
+                            class="w-full h-[370px] input"
+                            wire:model="certificateContent"
+                            placeholder="Paste or edit CA certificate content here..."></textarea>
+                    @else
+                        <div class="w-full h-[370px] input">
+                            <div class="h-full flex flex-col items-center justify-center text-gray-300">
+                                <div class="mb-2">
+                                    ━━━━━━━━ CERTIFICATE CONTENT ━━━━━━━━
+                                </div>
+                                <div class="text-sm">
+                                    Click "Show" to view or edit
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
         </form>
     </div>
 </div>
