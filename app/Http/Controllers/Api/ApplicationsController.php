@@ -1100,7 +1100,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
+                $request->offsetSet('name', 'dockerfile-' . new Cuid2);
             }
 
             $return = $this->validateDataApplications($request, $server);
@@ -1187,7 +1187,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-'.new Cuid2);
+                $request->offsetSet('name', 'docker-image-' . new Cuid2);
             }
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
@@ -1253,7 +1253,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'service'.new Cuid2);
+                $request->offsetSet('name', 'service' . new Cuid2);
             }
             $validationRules = [
                 'docker_compose_raw' => 'string|required',
@@ -1386,6 +1386,72 @@ class ApplicationsController extends Controller
         }
 
         return response()->json($this->removeSensitiveData($application));
+    }
+
+    #[OA\Get(
+        summary: 'Get application logs.',
+        description: 'Get application logs by UUID.',
+        path: '/applications/{uuid}/logs',
+        operationId: 'get-application-logs-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get application logs by UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            ref: '#/components/schemas/Application'
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function logs_by_uuid(Request $request)
+    {
+        // TODO: Implement logs_by_uuid() method.
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
     }
 
     #[OA\Delete(
@@ -1690,7 +1756,7 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 $domain = trim($domain);
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false || ! preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
-                    $errors[] = 'Invalid domain: '.$domain;
+                    $errors[] = 'Invalid domain: ' . $domain;
                 }
 
                 return $domain;
@@ -2926,7 +2992,7 @@ class ApplicationsController extends Controller
             $errors = [];
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                    $errors[] = 'Invalid domain: '.$domain;
+                    $errors[] = 'Invalid domain: ' . $domain;
                 }
 
                 return str($domain)->trim()->lower();
