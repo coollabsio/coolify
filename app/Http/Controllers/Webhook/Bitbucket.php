@@ -47,7 +47,7 @@ class Bitbucket extends Controller
             if ($x_bitbucket_event === 'pullrequest:updated') {
                 if (!data_get($payload, 'changes.source.commit.hash')) {
                     return response([
-                        'status' => 'ignored',
+                        'status' => 'failed',
                         'message' => 'Nothing to do. The PR update is not due to a new commit.',
                     ]);
                 }
