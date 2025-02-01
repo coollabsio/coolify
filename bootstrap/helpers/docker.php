@@ -852,6 +852,21 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
+function getContainerLogs(Server $server, string $container_id, int $lines = 100): string
+{
+    if ($server->isSwarm()) {
+        $output = instant_remote_process([
+            "docker service logs -n {$lines} {$container_id}",
+        ], $server);
+    } else {
+        $output = instant_remote_process([
+            "docker logs -n {$lines} {$container_id}",
+        ], $server);
+    }
+
+    return $output;
+}
+
 function escapeEnvVariables($value)
 {
     $search = ['\\', "\r", "\t", "\x0", '"', "'"];

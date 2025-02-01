@@ -1100,7 +1100,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'dockerfile-' . new Cuid2);
+                $request->offsetSet('name', 'dockerfile-'.new Cuid2);
             }
 
             $return = $this->validateDataApplications($request, $server);
@@ -1187,7 +1187,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'docker-image-' . new Cuid2);
+                $request->offsetSet('name', 'docker-image-'.new Cuid2);
             }
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
@@ -1253,7 +1253,7 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             if (! $request->has('name')) {
-                $request->offsetSet('name', 'service' . new Cuid2);
+                $request->offsetSet('name', 'service'.new Cuid2);
             }
             $validationRules = [
                 'docker_compose_raw' => 'string|required',
@@ -1452,6 +1452,25 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
+        // TODO: fix error when getting status
+        $status = getContainerStatus($application->destination->server, $container['name']);
+        // return response()->json([
+        //     'logs' => $status,
+        // ]);
+
+        if ($status !== 'running') {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
+        }
+
+        $logs = getContainerLogs($application->destination->server, $container['Id']);
+
+        return response()->json([
+            'logs' => 'yey',
+        ]);
     }
 
     #[OA\Delete(
@@ -1756,7 +1775,7 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 $domain = trim($domain);
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false || ! preg_match('/^https?:\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}/', $domain)) {
-                    $errors[] = 'Invalid domain: ' . $domain;
+                    $errors[] = 'Invalid domain: '.$domain;
                 }
 
                 return $domain;
@@ -2992,7 +3011,7 @@ class ApplicationsController extends Controller
             $errors = [];
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                    $errors[] = 'Invalid domain: ' . $domain;
+                    $errors[] = 'Invalid domain: '.$domain;
                 }
 
                 return str($domain)->trim()->lower();
