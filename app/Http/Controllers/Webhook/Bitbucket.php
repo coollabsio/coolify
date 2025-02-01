@@ -37,23 +37,23 @@ class Bitbucket extends Controller
             $headers = $request->headers->all();
             $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
             $x_bitbucket_event = data_get($headers, 'x-event-key.0', '');
-            $handled_events = collect(['repo:push', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
+            $handled_events = collect(['pullrequest:updated', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
             if (! $handled_events->contains($x_bitbucket_event)) {
                 return response([
                     'status' => 'failed',
                     'message' => 'Nothing to do. Event not handled.',
                 ]);
             }
-            if ($x_bitbucket_event === 'repo:push') {
-                $branch = data_get($payload, 'push.changes.0.new.name');
-                $full_name = data_get($payload, 'repository.full_name');
-                $commit = data_get($payload, 'push.changes.0.new.target.hash');
-                if (! $branch) {
+            if ($x_bitbucket_event === 'pullrequest:updated') {
+                if (!data_get($payload, 'changes.source.commit.hash')) {
                     return response([
-                        'status' => 'failed',
-                        'message' => 'Nothing to do. No branch found in the request.',
+                        'status' => 'ignored',
+                        'message' => 'Nothing to do. The PR update is not due to a new commit.',
                     ]);
                 }
+                $branch = data_get($payload, 'pullrequest.destination.branch.name');
+                $full_name = data_get($payload, 'repository.full_name');
+                $commit = data_get($payload, 'pullrequest.source.commit.hash');
             }
             if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
                 $branch = data_get($payload, 'pullrequest.destination.branch.name');
