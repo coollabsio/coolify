@@ -1743,7 +1743,7 @@ class ApplicationsController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->all();
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        if ($domains && $server->isProxyShouldRun()) {
             data_set($data, 'fqdn', $domains);
         }
 
