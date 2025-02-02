@@ -1438,8 +1438,6 @@ class ApplicationsController extends Controller
     )]
     public function logs_by_uuid(Request $request)
     {
-        // TODO: Implement logs_by_uuid() method.
-
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -1453,23 +1451,27 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
-        // TODO: fix error when getting status
-        $status = getContainerStatus($application->destination->server, $container['name']);
-        // return response()->json([
-        //     'logs' => $status,
-        // ]);
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
 
+        if ($containers->count() == 0) {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
+        }
+
+        $container = $containers->first();
+
+        $status = getContainerStatus($application->destination->server, $container['Names']);
         if ($status !== 'running') {
             return response()->json([
                 'message' => 'Application is not running.',
             ], 400);
         }
 
-        $logs = getContainerLogs($application->destination->server, $container['Id']);
+        $logs = getContainerLogs($application->destination->server, $container['ID']);
 
         return response()->json([
-            'logs' => 'yey',
+            'logs' => $logs,
         ]);
     }
 
