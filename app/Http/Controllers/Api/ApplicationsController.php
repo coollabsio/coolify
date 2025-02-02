@@ -1408,6 +1408,17 @@ class ApplicationsController extends Controller
                     format: 'uuid',
                 )
             ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    format: 'int32',
+                    default: 100,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1468,7 +1479,8 @@ class ApplicationsController extends Controller
             ], 400);
         }
 
-        $logs = getContainerLogs($application->destination->server, $container['ID']);
+        $lines = $request->query->get('lines', 100) ?: 100;
+        $logs = getContainerLogs($application->destination->server, $container['ID'], $lines);
 
         return response()->json([
             'logs' => $logs,
