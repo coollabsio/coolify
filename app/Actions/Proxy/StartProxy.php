@@ -57,7 +57,7 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
                 "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --remove-orphans',
+                'docker compose up -d',
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));
