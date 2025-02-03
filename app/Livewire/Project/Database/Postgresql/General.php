@@ -25,6 +25,8 @@ class General extends Component
 
     public ?string $db_url_public = null;
 
+    public $certificateValidUntil = null;
+
     public function getListeners()
     {
         return [
@@ -78,6 +80,14 @@ class General extends Component
         $this->db_url = $this->database->internal_db_url;
         $this->db_url_public = $this->database->external_db_url;
         $this->server = data_get($this->database, 'destination.server');
+
+        $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
+            ->where('resource_id', $this->database->id)
+            ->first();
+
+        if ($existingCert) {
+            $this->certificateValidUntil = $existingCert->valid_until;
+        }
     }
 
     public function instantSaveAdvanced()
@@ -112,12 +122,6 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
-            if (! $this->database->enable_ssl) {
-                $this->dispatch('error', 'SSL is not enabled for this database.');
-
-                return;
-            }
-
             $server = $this->database->destination->server;
 
             $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
