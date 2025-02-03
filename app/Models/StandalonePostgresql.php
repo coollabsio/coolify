@@ -223,6 +223,9 @@ class StandalonePostgresql extends BaseModel
                 $url = "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}";
                 if ($this->enable_ssl) {
                     $url .= "?sslmode={$this->ssl_mode}";
+                    if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {
+                        $url .= '&sslrootcert=/etc/ssl/certs/coolify-ca.crt';
+                    }
                 }
 
                 return $url;
@@ -238,6 +241,9 @@ class StandalonePostgresql extends BaseModel
                     $url = "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
                     if ($this->enable_ssl) {
                         $url .= "?sslmode={$this->ssl_mode}";
+                        if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {
+                            $url .= '&sslrootcert=/etc/ssl/certs/coolify-ca.crt';
+                        }
                     }
 
                     return $url;
