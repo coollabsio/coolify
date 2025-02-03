@@ -12,7 +12,10 @@ class SslCertificate extends Model
         'resource_type',
         'resource_id',
         'server_id',
+        'common_name',
+        'subject_alternative_names',
         'valid_until',
+        'is_ca_certificate',
     ];
 
     protected $casts = [
