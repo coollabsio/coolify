@@ -24,9 +24,10 @@ class InstallDocker
             $serverCert = SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $server->id,
+                isCaCertificate: true,
                 validityDays: 15 * 365
             );
-            $serverCertPath = config('constants.coolify.base_config_path').'/ca/';
+            $serverCertPath = config('constants.coolify.base_config_path').'/ssl/';
 
             $commands = collect([
                 "mkdir -p $serverCertPath",
