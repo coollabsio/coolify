@@ -51,9 +51,9 @@ services:
           SQLALCHEMY_TRACK_MODIFICATIONS = True
           SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@superset_postgres-{COOLIFY_RESOURCE_UUID}:5432/{os.getenv('POSTGRES_DB')}"
 
-          # Uncomment if you want to load example data (using `superset load_examples`)
-          # at in the same location as your metadata database. Otherwise, the default
-          # sqlite will be used, which will not persist in volume by default.
+          # Uncomment if you want to load example data (using "superset load_examples") at
+          # the same location as your metadata database. Otherwise, the default sqlite will
+          # be used, which will not persist in volume when restarting superset by default.
           #SQLALCHEMY_EXAMPLES_URI = SQLALCHEMY_DATABASE_URI
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8088/health"]
