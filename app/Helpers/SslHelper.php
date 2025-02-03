@@ -54,9 +54,12 @@ class SslHelper
                 }
             }
 
+            $subjectAlternativeNames = array_unique(
+                array_merge(["DNS:$commonName"], $subjectAlternativeNames)
+            );
             $certificateSubject = [
                 'commonName' => $commonName,
-                'subjectAltName' => implode(', ', array_merge(["DNS:$commonName"], $subjectAlternativeNames)),
+                'subjectAltName' => $subjectAlternativeNames,
                 'organizationName' => self::DEFAULT_ORGANIZATION_NAME,
                 'countryName' => self::DEFAULT_COUNTRY_CODE,
                 'stateOrProvinceName' => self::DEFAULT_STATE,
