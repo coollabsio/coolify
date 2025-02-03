@@ -21,6 +21,7 @@ class SslCertificate extends Model
     protected $casts = [
         'ssl_certificate' => 'encrypted',
         'ssl_private_key' => 'encrypted',
+        'subject_alternative_names' => 'array',
         'valid_until' => 'datetime',
     ];
 

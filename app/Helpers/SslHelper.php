@@ -107,7 +107,7 @@ class SslHelper
                 'valid_until' => CarbonImmutable::now()->addDays($validityDays),
                 'is_ca_certificate' => $isCaCertificate,
                 'common_name' => $commonName,
-                'subject_alternative_names' => implode(', ', array_merge(["DNS:$commonName"], $subjectAlternativeNames)),
+                'subject_alternative_names' => $subjectAlternativeNames,
             ]);
         } catch (\Throwable $e) {
             throw new \RuntimeException('SSL Certificate generation failed: '.$e->getMessage(), 0, $e);

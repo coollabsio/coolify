@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('resource_id')->nullable();
             $table->unsignedBigInteger('server_id');
             $table->text('common_name');
-            $table->text('subject_alternative_names')->nullable();
+            $table->json('subject_alternative_names')->nullable();
             $table->timestamp('valid_until');
             $table->boolean('is_ca_certificate')->default(false);
             $table->timestamps();
