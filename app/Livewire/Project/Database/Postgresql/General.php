@@ -4,7 +4,9 @@ namespace App\Livewire\Project\Database\Postgresql;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Helpers\SslHelper;
 use App\Models\Server;
+use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
 use Exception;
 use Livewire\Component;
@@ -102,6 +104,45 @@ class General extends Component
             $this->database->ssl_mode = $this->database->ssl_mode;
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function regenerateSslCertificate()
+    {
+        try {
+            if (! $this->database->enable_ssl) {
+                $this->dispatch('error', 'SSL is not enabled for this database.');
+
+                return;
+            }
+
+            $server = $this->database->destination->server;
+
+            $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->first();
+
+            if (! $existingCert) {
+                $this->dispatch('error', 'No existing SSL certificate found for this database.');
+
+                return;
+            }
+
+            $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
+
+            SslHelper::generateSslCertificate(
+                commonName: $existingCert->common_name,
+                subjectAlternativeNames: $existingCert->subject_alternative_names ?? [],
+                resourceType: $existingCert->resource_type,
+                resourceId: $existingCert->resource_id,
+                serverId: $existingCert->server_id,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
+            );
+
+            $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
         } catch (Exception $e) {
             return handleError($e, $this);
         }

@@ -74,7 +74,39 @@
             @endif
         </div>
         <div class="flex flex-col gap-2">
-            <h3 class="py-2">SSL Configuration</h3>
+            <div class="flex items-center justify-between py-2">
+                <div class="flex flex-col gap-1">
+                    <h3>SSL Configuration</h3>
+                    @if($database->enable_ssl)
+                        @php
+                            $cert = \App\Models\SslCertificate::where('resource_type', $database->getMorphClass())
+                                ->where('resource_id', $database->id)
+                                ->first();
+                        @endphp
+                        @if($cert)
+                            <span class="text-sm">Valid until: 
+                                @if(now()->gt($cert->valid_until))
+                                    <span class="text-red-500">{{ $cert->valid_until->format('d.m.Y H:i:s') }} - Expired</span>
+                                @elseif(now()->addDays(30)->gt($cert->valid_until))
+                                    <span class="text-red-500">{{ $cert->valid_until->format('d.m.Y H:i:s') }} - Expiring soon</span>
+                                @else
+                                    <span>{{ $cert->valid_until->format('d.m.Y H:i:s') }}</span>
+                                @endif
+                            </span>
+                        @endif
+                    @endif
+                </div>
+                @if($database->enable_ssl)
+                    <x-modal-confirmation
+                        title="Regenerate SSL Certificates"
+                        buttonTitle="Regenerate SSL Certificates"
+                        :actions="['The SSL certificate of this database will be regenerated.','You must restart the database after regenerating the certificate to start using the new certificate.']"
+                        submitAction="regenerateSslCertificate"
+                        :confirmWithText="false"
+                        :confirmWithPassword="false"
+                    />
+                @endif
+            </div>
             <div class="flex flex-col gap-2">
                 <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
                 @if($database->enable_ssl)
