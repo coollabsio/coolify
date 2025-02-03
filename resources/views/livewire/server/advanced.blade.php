@@ -47,12 +47,12 @@
                         buttonTitle="Save Certificate"
                         submitAction="saveCaCertificate" 
                         :actions="[
-                            'This will overwrite the existing CA certificate at /data/coolify/ca/coolify-ca.crt with your custom CA certificate.', 
+                            'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.', 
                             'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
-                            'You must manually redeploy all your databases to use the new SSL certificate.',
-                            'You proabley also need to redeploy all your resources using the CA certificate.'
+                            'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
+                            'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.'
                         ]"
-                        confirmationText="/data/coolify/ca/coolify-ca.crt"
+                        confirmationText="/data/coolify/ssl/coolify-ca.crt"
                         shortConfirmationLabel="CA Certificate Path"
                         step3ButtonText="Save Certificate">
                     </x-modal-confirmation>
@@ -61,12 +61,12 @@
                         buttonTitle="Regenerate Certificate" 
                         submitAction="regenerateCaCertificate" 
                         :actions="[
-                            'This will generate a new CA certificate at /data/coolify/ca/coolify-ca.crt and replace the existing one.', 
-                            'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
-                            'You must manually redeploy all your databases to use the new SSL certificate.',
-                            'You proabley also need to redeploy all your resources using the CA certificate.'
+                            'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.', 
+                            'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
+                            'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with the new CA certificate.',
+                            'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.'
                         ]"
-                        confirmationText="/data/coolify/ca/coolify-ca.crt"
+                        confirmationText="/data/coolify/ssl/coolify-ca.crt"
                         shortConfirmationLabel="CA Certificate Path"
                         step3ButtonText="Regenerate Certificate">
                     </x-modal-confirmation>
@@ -75,19 +75,32 @@
                     <div class="text-sm">
                         <p class="font-medium mb-2">Recommended Configuration:</p>
                         <ul class="list-disc pl-5 space-y-1">
-                            <li>Mount this Coolify CA certificate into all containers that need to connect to a database over SSL.</li>
-                            <li>Use verify-full (recommended) or verify-ca when connecting to a database over SSL.</li>
+                            <li>Mount this CA certificate of Coolify into all containers that need to connect to one of your databases over SSL. You can see and copy the bind mount below.</li>
+                            <li>Read more when and why this is needed <a class="underline" href="https://coolify.io/docs/databases/ssl" target="_blank">here</a>.</li>
                         </ul>
                     </div>
                     <div class="relative">
                         <x-forms.copy-button 
-                            text="- /data/coolify/ca/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" 
+                            text="- /data/coolify/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" 
                         />
                     </div>
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm">CA Certificate Content</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm">CA Certificate</span>
+                            @if($certificateValidUntil)
+                                <span class="text-sm">(Valid until: 
+                                    @if(now()->gt($certificateValidUntil))
+                                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired)</span>
+                                    @elseif(now()->addDays(30)->gt($certificateValidUntil))
+                                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expiring soon)</span>
+                                    @else
+                                        <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }})</span>
+                                    @endif
+                                </span>
+                            @endif
+                        </div>
                         <x-forms.button 
                             wire:click="toggleCertificate" 
                             type="button" 
