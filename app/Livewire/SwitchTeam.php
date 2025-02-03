@@ -30,6 +30,6 @@ class SwitchTeam extends Component
         }
         refreshSession($team_to_switch_to);
 
-        return redirect(request()->header('Referer'));
+        return redirect('dashboard');
     }
 }
