@@ -149,6 +149,7 @@ function generate_default_proxy_configuration(Server $server)
             'coolify.proxy=true',
         ];
         $config = [
+            'name' => 'coolify-proxy',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'traefik' => [
