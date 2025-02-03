@@ -30,7 +30,6 @@ class StopDatabaseProxy
         }
         instant_remote_process(["docker rm -f {$uuid}-proxy"], $server);
 
-        $database->is_public = false;
         $database->save();
 
         DatabaseProxyStopped::dispatch();

@@ -188,11 +188,22 @@ class PublicGitRepository extends Component
 
     private function getGitSource()
     {
+        $this->git_branch = 'main';
+        $this->base_directory = '/';
+
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
+
         if ($this->repository_url_parsed->getSegment(3) === 'tree') {
-            $this->git_branch = str($this->repository_url_parsed->getPath())->after('tree/')->value();
+            $path = str($this->repository_url_parsed->getPath())->trim('/');
+            $this->git_branch = str($path)->after('tree/')->before('/')->value();
+            $this->base_directory = str($path)->after($this->git_branch)->after('/')->value();
+            if (filled($this->base_directory)) {
+                $this->base_directory = '/'.$this->base_directory;
+            } else {
+                $this->base_directory = '/';
+            }
         } else {
             $this->git_branch = 'main';
         }

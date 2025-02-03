@@ -1681,7 +1681,8 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $domains = $request->domains;
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        $requestHasDomains = $request->has('domains');
+        if ($requestHasDomains && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
@@ -1743,7 +1744,7 @@ class ApplicationsController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->all();
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        if ($requestHasDomains && $server->isProxyShouldRun()) {
             data_set($data, 'fqdn', $domains);
         }
 
