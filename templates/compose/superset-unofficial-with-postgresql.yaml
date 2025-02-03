@@ -24,6 +24,11 @@ services:
         source: ./superset/superset_config.py
         target: /etc/superset/superset_config.py
         content: |
+          """
+          For more configuration options, see:
+          - https://superset.apache.org/docs/configuration/configuring-superset
+          """
+
           import os
 
           SECRET_KEY = os.getenv("SECRET_KEY")
@@ -43,8 +48,13 @@ services:
           FILTER_STATE_CACHE_CONFIG = {**CACHE_CONFIG, "CACHE_KEY_PREFIX": "superset_filter_"}
           EXPLORE_FORM_DATA_CACHE_CONFIG = {**CACHE_CONFIG, "CACHE_KEY_PREFIX": "superset_explore_form_"}
 
-          SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@superset_postgres-{COOLIFY_RESOURCE_UUID}:5432/{os.getenv('POSTGRES_DB')}"
           SQLALCHEMY_TRACK_MODIFICATIONS = True
+          SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@superset_postgres-{COOLIFY_RESOURCE_UUID}:5432/{os.getenv('POSTGRES_DB')}"
+
+          # Uncomment if you want to load example data (using `superset load_examples`)
+          # at in the same location as your metadata database. Otherwise, the default
+          # sqlite will be used, which will not persist in volume by default.
+          #SQLALCHEMY_EXAMPLES_URI = SQLALCHEMY_DATABASE_URI
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8088/health"]
       interval: 5s
