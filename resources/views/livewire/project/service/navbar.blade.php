@@ -165,10 +165,12 @@
                     return;
                 }
                 $wire.$dispatch('info', 'Service restart in progress.');
+                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('restart');
             });
             $wire.$on('pullAndRestartEvent', () => {
-                $wire.$dispatch('info', 'Pulling new images.');
+                $wire.$dispatch('info', 'Pulling new images and restarting service.');
+                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('pullAndRestartEvent');
             });
             $wire.on('imagePulled', () => {
