@@ -89,7 +89,7 @@
                     @endif
                 </div>
             </div>
-            @if($database->enable_ssl)
+            @if($database->enable_ssl && $certificateValidUntil)
                 <span class="text-sm">Valid until: 
                 @if(now()->gt($certificateValidUntil))
                     <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
