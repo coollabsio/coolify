@@ -96,7 +96,7 @@ class TaskSuccess extends CustomEmailNotification
         $description = "Scheduled task ({$this->task->name}) succeeded.";
 
         if ($this->url) {
-            $description .= "\n\n**Task URL:** {$this->url}";
+            $description .= "\n\n*Task URL:* {$this->url}";
         }
 
         return new SlackMessage(

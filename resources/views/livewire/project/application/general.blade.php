@@ -291,16 +291,18 @@
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"
-                        helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
-                        useMonacoEditor />
+                        helper="You need to modify the docker compose file in the git repository."
+                        monacoEditorLanguage="yaml" useMonacoEditor />
                 @else
                     @if ((int) $application->compose_parsing_version >= 3)
                         <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
-                            label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
+                            label="Docker Compose Content (raw)"
+                            helper="You need to modify the docker compose file in the git repository."
                             monacoEditorLanguage="yaml" useMonacoEditor />
                     @endif
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
-                        label="Docker Compose Content" helper="You need to modify the docker compose file."
+                        label="Docker Compose Content"
+                        helper="You need to modify the docker compose file in the git repository."
                         monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
                 <div class="w-96">
