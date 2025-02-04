@@ -1428,7 +1428,10 @@ class ApplicationsController extends Controller
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            ref: '#/components/schemas/Application'
+                            type: 'object',
+                            properties: [
+                                'logs' => ['type' => 'string'],
+                            ]
                         )
                     ),
                 ]
