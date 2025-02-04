@@ -173,7 +173,7 @@ class StartMysql
                 'mysqld',
                 '--ssl-cert=/etc/mysql/certs/server.crt',
                 '--ssl-key=/etc/mysql/certs/server.key',
-                '--require-secure-transport=ON',
+                '--require-secure-transport=1',
             ];
         }
 
