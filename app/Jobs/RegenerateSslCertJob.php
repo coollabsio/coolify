@@ -51,7 +51,8 @@ class RegenerateSslCertJob implements ShouldQueue
                     resourceType: $certificate->resource_type,
                     resourceId: $certificate->resource_id,
                     serverId: $certificate->server_id,
-                    validityDays: 365
+                    validityDays: 365,
+                    configurationDir: $certificate->configuration_dir,
                 );
                 $regenerated->push($certificate);
             } catch (\Exception $e) {
