@@ -2002,7 +2002,7 @@
             "transformation",
             "service"
         ],
-        "logo": "svgs/coolify.png",
+        "logo": "svgs/coolify-transparent.png",
         "minversion": "0.0.0",
         "port": "3000"
     },
@@ -2101,8 +2101,8 @@
         "port": "8081"
     },
     "nitropage-with-postgresql": {
-        "documentation": "https://nitropage.com?utm_source=coolify.io",
-        "slogan": "Nitropage is an extensible visual website builder, offering a growing collection of versatile building blocks, focal-point image cropping and sovereign font management.",
+        "documentation": "https://nitropage.org?utm_source=coolify.io",
+        "slogan": "Nitropage is an extensible, visual website builder, offering a growing library of versatile building blocks, focal-point image cropping and sovereign font management.",
         "compose": "c2VydmljZXM6CiAgbml0cm9wYWdlOgogICAgaW1hZ2U6IGNvZGViZXJnLm9yZy9uaXRyb3BhZ2Uvbml0cm9wYWdlCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTklUUk9QQUdFXzMwMDAKICAgICAgLSAnTlBfQVVUSF9TQUxUPSR7U0VSVklDRV9CQVNFNjRfU0FMVH0nCiAgICAgIC0gJ05QX0FVVEhfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEXzY0X1NFU1NJT059JwogICAgICAtICdEQVRBQkFTRV9VUkw9cG9zdGdyZXNxbDovLyR7U0VSVklDRV9VU0VSX1BPU1RHUkVTUUx9OiR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU1FMfUBwb3N0Z3Jlc3FsOjU0MzIvJHtQT1NUR1JFU1FMX0RBVEFCQVNFOi1uaXRyb3BhZ2V9JwogICAgdm9sdW1lczoKICAgICAgLSAnbml0cm9wYWdlLWRhdGE6L2FwcC8uZGF0YScKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzcWw6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTozMDAwL2FkbWluJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1CiAgcG9zdGdyZXNxbDoKICAgIGltYWdlOiAncG9zdGdyZXM6MTYtYWxwaW5lJwogICAgdm9sdW1lczoKICAgICAgLSAnbml0cm9wYWdlLXBvc3RncmVzcWwtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU1FMfScKICAgICAgLSAnUE9TVEdSRVNfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTUUx9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTUUxfREFUQUJBU0U6LW5pdHJvcGFnZX0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": [
             "nitropage",
@@ -2118,8 +2118,8 @@
         "port": "3000"
     },
     "nitropage": {
-        "documentation": "https://nitropage.com?utm_source=coolify.io",
-        "slogan": "Nitropage is an extensible visual website builder, offering a growing collection of versatile building blocks, focal-point image cropping and sovereign font management.",
+        "documentation": "https://nitropage.org?utm_source=coolify.io",
+        "slogan": "Nitropage is an extensible, visual website builder, offering a growing library of versatile building blocks, focal-point image cropping and sovereign font management.",
         "compose": "c2VydmljZXM6CiAgbml0cm9wYWdlOgogICAgaW1hZ2U6ICdjb2RlYmVyZy5vcmcvbml0cm9wYWdlL25pdHJvcGFnZTpzcWxpdGUnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTklUUk9QQUdFXzMwMDAKICAgICAgLSAnTlBfQVVUSF9TQUxUPSR7U0VSVklDRV9CQVNFNjRfU0FMVH0nCiAgICAgIC0gJ05QX0FVVEhfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEXzY0X1NFU1NJT059JwogICAgICAtICdEQVRBQkFTRV9VUkw9ZmlsZTouLi8uLi8uZGF0YS9kZXYuZGInCiAgICB2b2x1bWVzOgogICAgICAtICduaXRyb3BhZ2UtZGF0YTovYXBwLy5kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjMwMDAvYWRtaW4nCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "nitropage",
