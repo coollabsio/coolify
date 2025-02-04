@@ -4,7 +4,9 @@ namespace App\Livewire\Project\Database\Mariadb;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Helpers\SslHelper;
 use App\Models\Server;
+use App\Models\SslCertificate;
 use App\Models\StandaloneMariadb;
 use Exception;
 use Livewire\Component;
@@ -21,6 +23,8 @@ class General extends Component
 
     public ?string $db_url_public = null;
 
+    public $certificateValidUntil = null;
+
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
@@ -35,6 +39,8 @@ class General extends Component
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
+        'database.enable_ssl' => 'boolean',
+        'database.ssl_mode' => 'nullable|string|in:PREFERRED,REQUIRED,VERIFY_CA,VERIFY_IDENTITY',
     ];
 
     protected $validationAttributes = [
@@ -50,6 +56,8 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
         'database.custom_docker_run_options' => 'Custom Docker Options',
+        'database.enable_ssl' => 'Enable SSL',
+        'database.ssl_mode' => 'SSL Mode',
     ];
 
     public function mount()
@@ -57,6 +65,14 @@ class General extends Component
         $this->db_url = $this->database->internal_db_url;
         $this->db_url_public = $this->database->external_db_url;
         $this->server = data_get($this->database, 'destination.server');
+
+        $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
+            ->where('resource_id', $this->database->id)
+            ->first();
+
+        if ($existingCert) {
+            $this->certificateValidUntil = $existingCert->valid_until;
+        }
     }
 
     public function instantSaveAdvanced()
@@ -123,6 +139,52 @@ class General extends Component
         } catch (\Throwable $e) {
             $this->database->is_public = ! $this->database->is_public;
 
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSaveSSL()
+    {
+        try {
+            $this->database->enable_ssl = $this->database->enable_ssl;
+            $this->database->ssl_mode = $this->database->ssl_mode;
+            $this->database->save();
+            $this->dispatch('success', 'SSL configuration updated.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function regenerateSslCertificate()
+    {
+        try {
+            $server = $this->database->destination->server;
+
+            $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->first();
+
+            if (! $existingCert) {
+                $this->dispatch('error', 'No existing SSL certificate found for this database.');
+
+                return;
+            }
+
+            $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
+
+            SslHelper::generateSslCertificate(
+                commonName: $existingCert->common_name,
+                subjectAlternativeNames: $existingCert->subject_alternative_names ?? [],
+                resourceType: $existingCert->resource_type,
+                resourceId: $existingCert->resource_id,
+                serverId: $existingCert->server_id,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
+                configurationDir: $existingCert->configuration_dir,
+            );
+
+            $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
+        } catch (Exception $e) {
             return handleError($e, $this);
         }
     }
