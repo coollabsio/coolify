@@ -25,9 +25,19 @@ class SslCertificate extends Model
         'valid_until' => 'datetime',
     ];
 
-    public function resource()
+    public function application()
     {
-        return $this->morphTo();
+        return $this->morphTo('resource');
+    }
+
+    public function service()
+    {
+        return $this->morphTo('resource');
+    }
+
+    public function database()
+    {
+        return $this->morphTo('resource');
     }
 
     public function server()

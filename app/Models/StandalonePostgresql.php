@@ -259,9 +259,19 @@ class StandalonePostgresql extends BaseModel
         return $this->belongsTo(Environment::class);
     }
 
+    public function persistentStorages()
+    {
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
+
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
     }
 
     public function destination()
@@ -274,14 +284,15 @@ class StandalonePostgresql extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
-    public function persistentStorages()
-    {
-        return $this->morphMany(LocalPersistentVolume::class, 'resource');
-    }
-
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderBy('key', 'asc');
     }
 
     public function isBackupSolutionAvailable()
@@ -331,11 +342,5 @@ class StandalonePostgresql extends BaseModel
         });
 
         return $parsedCollection->toArray();
-    }
-
-    public function environment_variables()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderBy('key', 'asc');
     }
 }
