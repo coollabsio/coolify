@@ -16,25 +16,27 @@ class CaSslCertSeeder extends Seeder
                 $existingCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
 
                 if (! $existingCert) {
-                    $serverCert = SslHelper::generateSslCertificate(
+                    $caCert = SslHelper::generateSslCertificate(
                         commonName: 'Coolify CA Certificate',
                         serverId: $server->id,
                         isCaCertificate: true,
                         validityDays: 15 * 365
                     );
-
-                    $serverCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-                    $commands = collect([
-                        "mkdir -p $serverCertPath",
-                        "chown -R 9999:root $serverCertPath",
-                        "chmod -R 700 $serverCertPath",
-                        "echo '{$serverCert->ssl_certificate}' > $serverCertPath/coolify-ca.crt",
-                        "chmod 644 $serverCertPath/coolify-ca.crt",
-                    ]);
-
-                    remote_process($commands, $server);
+                } else {
+                    $caCert = $existingCert;
                 }
+                $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+
+                $commands = collect([
+                    "mkdir -p $caCertPath",
+                    "chown -R 9999:root $caCertPath",
+                    "chmod -R 700 $caCertPath",
+                    "rm -f $caCertPath/coolify-ca.crt",
+                    "echo '{$caCert->ssl_certificate}' > $caCertPath/coolify-ca.crt",
+                    "chmod 644 $caCertPath/coolify-ca.crt",
+                ]);
+
+                remote_process($commands, $server);
             }
         });
     }

@@ -96,7 +96,7 @@ class Advanced extends Component
     public function regenerateCaCertificate()
     {
         try {
-            $caCert = SslHelper::generateSslCertificate(
+            SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $this->server->id,
                 isCaCertificate: true,
@@ -119,15 +119,15 @@ class Advanced extends Component
 
     private function writeCertificateToServer()
     {
-        $serverCertPath = config('constants.coolify.base_config_path').'/ssl/';
+        $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
 
         $commands = collect([
-            "mkdir -p $serverCertPath",
-            "chown -R 9999:root $serverCertPath",
-            "chmod -R 700 $serverCertPath",
-            "rm -f $serverCertPath/coolify-ca.crt",
-            "echo '{$this->caCertificate->ssl_certificate}' > $serverCertPath/coolify-ca.crt",
-            "chmod 644 $serverCertPath/coolify-ca.crt",
+            "mkdir -p $caCertPath",
+            "chown -R 9999:root $caCertPath",
+            "chmod -R 700 $caCertPath",
+            "rm -f $caCertPath/coolify-ca.crt",
+            "echo '{$this->caCertificate->ssl_certificate}' > $caCertPath/coolify-ca.crt",
+            "chmod 644 $caCertPath/coolify-ca.crt",
         ]);
 
         remote_process($commands, $this->server);
