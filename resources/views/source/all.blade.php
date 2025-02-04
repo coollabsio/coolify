@@ -2,7 +2,7 @@
     <x-slot:title>
         Sources | Coolify
     </x-slot>
-    <div class="flex items-start gap-2">
+    <div class="flex items-center gap-2">
         <h1>Sources</h1>
         <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
             <livewire:source.github.create />
