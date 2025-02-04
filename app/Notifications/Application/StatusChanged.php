@@ -103,9 +103,9 @@ class StatusChanged extends CustomEmailNotification
         $title = 'Application stopped';
         $description = "{$this->resource_name} has been stopped";
 
-        $description .= "\n\n**Project:** ".data_get($this->resource, 'environment.project.name');
-        $description .= "\n**Environment:** {$this->environment_name}";
-        $description .= "\n**Application URL:** {$this->resource_url}";
+        $description .= "\n\n*Project:* ".data_get($this->resource, 'environment.project.name');
+        $description .= "\n*Environment:* {$this->environment_name}";
+        $description .= "\n*Application URL:* {$this->resource_url}";
 
         return new SlackMessage(
             title: $title,

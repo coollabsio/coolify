@@ -12,19 +12,24 @@ class StartService
 
     public string $jobQueue = 'high';
 
-    public function handle(Service $service)
+    public function handle(Service $service, bool $pullLatestImages = false, bool $stopBeforeStart = false)
     {
+        $service->parse();
+        if ($stopBeforeStart) {
+            StopService::run(service: $service, dockerCleanup: false);
+        }
         $service->saveComposeConfigs();
         $commands[] = 'cd '.$service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
+        if ($pullLatestImages) {
+            $commands[] = "echo 'Pulling images.'";
+            $commands[] = 'docker compose pull';
+        }
         if ($service->networks()->count() > 0) {
             $commands[] = "echo 'Creating Docker network.'";
             $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid";
         }
         $commands[] = 'echo Starting service.';
-        $commands[] = "echo 'Pulling images.'";
-        $commands[] = 'docker compose pull';
-        $commands[] = "echo 'Starting containers.'";
         $commands[] = 'docker compose up -d --remove-orphans --force-recreate --build';
         $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         if (data_get($service, 'connect_to_docker_network')) {
