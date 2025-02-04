@@ -36,12 +36,33 @@ class StartPostgresql
             "echo 'Creating directories.'",
             "mkdir -p $this->configuration_dir",
             "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/",
-            "mkdir -p $this->configuration_dir/ssl",
             "echo 'Directories created successfully.'",
         ];
 
-        if ($this->database->enable_ssl) {
+        if (! $this->database->enable_ssl) {
+            $this->commands[] = "rm -rf $this->configuration_dir/ssl";
+
+            SslCertificate::where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->delete();
+
+            $this->database->fileStorages()
+                ->where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->get()
+                ->filter(function ($storage) {
+                    return in_array($storage->mount_path, [
+                        '/var/lib/postgresql/certs/server.crt',
+                        '/var/lib/postgresql/certs/server.key',
+                    ]);
+                })
+                ->each(function ($storage) {
+                    $storage->delete();
+                });
+        } else {
             $this->commands[] = "echo 'Setting up SSL for this database.'";
+            $this->commands[] = "rm -rf $this->configuration_dir/ssl";
+            $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
             $server = $this->database->destination->server;
 
             $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
@@ -57,8 +78,8 @@ class StartPostgresql
                     serverId: $server->id,
                     caCert: $caCert->ssl_certificate,
                     caKey: $caCert->ssl_private_key,
+                    configurationDir: $this->configuration_dir,
                 );
-                $this->addSslFilesToFileStorage();
             }
         }
 
@@ -299,28 +320,5 @@ class StartPostgresql
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
-    }
-
-    private function addSslFilesToFileStorage()
-    {
-        if (! $this->ssl_certificate) {
-            return;
-        }
-
-        $this->database->fileStorages()->create([
-            'fs_path' => $this->configuration_dir.'/ssl/server.crt',
-            'mount_path' => '/var/lib/postgresql/certs/server.crt',
-            'content' => $this->ssl_certificate->ssl_certificate,
-            'is_directory' => false,
-            'chmod' => '644',
-        ]);
-
-        $this->database->fileStorages()->create([
-            'fs_path' => $this->configuration_dir.'/ssl/server.key',
-            'mount_path' => '/var/lib/postgresql/certs/server.key',
-            'content' => $this->ssl_certificate->ssl_private_key,
-            'is_directory' => false,
-            'chmod' => '600',
-        ]);
     }
 }

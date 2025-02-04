@@ -23,7 +23,8 @@ class SslHelper
         int $validityDays = 365,
         ?string $caCert = null,
         ?string $caKey = null,
-        bool $isCaCertificate = false
+        bool $isCaCertificate = false,
+        ?string $configurationDir = null
     ): SslCertificate {
 
         try {
@@ -101,17 +102,58 @@ class SslHelper
                 ->where('server_id', $serverId)
                 ->delete();
 
-            return SslCertificate::create([
+            $sslCertificate = SslCertificate::create([
                 'ssl_certificate' => $certificateStr,
                 'ssl_private_key' => $privateKeyStr,
                 'resource_type' => $resourceType,
                 'resource_id' => $resourceId,
                 'server_id' => $serverId,
+                'configuration_dir' => $configurationDir,
                 'valid_until' => CarbonImmutable::now()->addDays($validityDays),
                 'is_ca_certificate' => $isCaCertificate,
                 'common_name' => $commonName,
                 'subject_alternative_names' => $subjectAlternativeNames,
             ]);
+
+            if ($configurationDir && $resourceType && $resourceId) {
+                $model = app($resourceType)->find($resourceId);
+
+                $model->fileStorages()
+                    ->where('resource_type', $model->getMorphClass())
+                    ->where('resource_id', $model->id)
+                    ->get()
+                    ->filter(function ($storage) {
+                        return in_array($storage->mount_path, [
+                            '/var/lib/postgresql/certs/server.crt',
+                            '/var/lib/postgresql/certs/server.key',
+                        ]);
+                    })
+                    ->each(function ($storage) {
+                        $storage->delete();
+                    });
+
+                $model->fileStorages()->create([
+                    'fs_path' => $configurationDir.'/ssl/server.crt',
+                    'mount_path' => '/var/lib/postgresql/certs/server.crt',
+                    'content' => $certificateStr,
+                    'is_directory' => false,
+                    'chmod' => '644',
+                    'resource_type' => $resourceType,
+                    'resource_id' => $resourceId,
+                ]);
+
+                $model->fileStorages()->create([
+                    'fs_path' => $configurationDir.'/ssl/server.key',
+                    'mount_path' => '/var/lib/postgresql/certs/server.key',
+                    'content' => $privateKeyStr,
+                    'is_directory' => false,
+                    'chmod' => '600',
+                    'resource_type' => $resourceType,
+                    'resource_id' => $resourceId,
+                ]);
+            }
+
+            return $sslCertificate;
         } catch (\Throwable $e) {
             throw new \RuntimeException('SSL Certificate generation failed: '.$e->getMessage(), 0, $e);
         }

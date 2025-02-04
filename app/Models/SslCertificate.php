@@ -9,6 +9,7 @@ class SslCertificate extends Model
     protected $fillable = [
         'ssl_certificate',
         'ssl_private_key',
+        'configuration_dir',
         'resource_type',
         'resource_id',
         'server_id',

@@ -144,6 +144,7 @@ class General extends Component
                 serverId: $existingCert->server_id,
                 caCert: $caCert->ssl_certificate,
                 caKey: $caCert->ssl_private_key,
+                configurationDir: $existingCert->configuration_dir,
             );
 
             $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
