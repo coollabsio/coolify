@@ -24,7 +24,8 @@ class SslHelper
         ?string $caCert = null,
         ?string $caKey = null,
         bool $isCaCertificate = false,
-        ?string $configurationDir = null
+        ?string $configurationDir = null,
+        ?string $mountPath = null
     ): SslCertificate {
 
         try {
@@ -115,17 +116,17 @@ class SslHelper
                 'subject_alternative_names' => $subjectAlternativeNames,
             ]);
 
-            if ($configurationDir && $resourceType && $resourceId) {
+            if ($configurationDir && $mountPath && $resourceType && $resourceId) {
                 $model = app($resourceType)->find($resourceId);
 
                 $model->fileStorages()
                     ->where('resource_type', $model->getMorphClass())
                     ->where('resource_id', $model->id)
                     ->get()
-                    ->filter(function ($storage) {
+                    ->filter(function ($storage) use ($mountPath) {
                         return in_array($storage->mount_path, [
-                            '/var/lib/postgresql/certs/server.crt',
-                            '/var/lib/postgresql/certs/server.key',
+                            $mountPath.'/server.crt',
+                            $mountPath.'/server.key',
                         ]);
                     })
                     ->each(function ($storage) {
@@ -134,7 +135,7 @@ class SslHelper
 
                 $model->fileStorages()->create([
                     'fs_path' => $configurationDir.'/ssl/server.crt',
-                    'mount_path' => '/var/lib/postgresql/certs/server.crt',
+                    'mount_path' => $mountPath.'/server.crt',
                     'content' => $certificateStr,
                     'is_directory' => false,
                     'chmod' => '644',
@@ -144,7 +145,7 @@ class SslHelper
 
                 $model->fileStorages()->create([
                     'fs_path' => $configurationDir.'/ssl/server.key',
-                    'mount_path' => '/var/lib/postgresql/certs/server.key',
+                    'mount_path' => $mountPath.'/server.key',
                     'content' => $privateKeyStr,
                     'is_directory' => false,
                     'chmod' => '600',

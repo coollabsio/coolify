@@ -79,6 +79,7 @@ class StartPostgresql
                     caCert: $caCert->ssl_certificate,
                     caKey: $caCert->ssl_private_key,
                     configurationDir: $this->configuration_dir,
+                    mountPath: '/var/lib/postgresql/certs',
                 );
             }
         }
