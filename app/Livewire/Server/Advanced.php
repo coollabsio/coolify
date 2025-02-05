@@ -80,6 +80,8 @@ class Advanced extends Component
                 $this->caCertificate->ssl_certificate = $this->certificateContent;
                 $this->caCertificate->save();
 
+                $this->loadCaCertificate();
+
                 $this->writeCertificateToServer();
 
                 dispatch(new RegenerateSslCertJob(
@@ -102,6 +104,8 @@ class Advanced extends Component
                 isCaCertificate: true,
                 validityDays: 15 * 365
             );
+
+            $this->loadCaCertificate();
 
             $this->writeCertificateToServer();
 
@@ -126,7 +130,7 @@ class Advanced extends Component
             "chown -R 9999:root $caCertPath",
             "chmod -R 700 $caCertPath",
             "rm -f $caCertPath/coolify-ca.crt",
-            "echo '{$this->caCertificate->ssl_certificate}' > $caCertPath/coolify-ca.crt",
+            "echo '{$this->certificateContent}' > $caCertPath/coolify-ca.crt",
             "chmod 644 $caCertPath/coolify-ca.crt",
         ]);
 
