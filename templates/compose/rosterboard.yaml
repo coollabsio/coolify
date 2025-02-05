@@ -1,0 +1,46 @@
+# documentation: https://docs.rosterboard.app/
+# slogan: A simple to use, drag-and-drop rapid personnel management board designed for mobile, fluid teams.
+# tags: rosterboard,postgresql,team,management
+# logo: svgs/rosterboard.png
+# port: 8080
+
+services:
+  rosterboard-db:
+    image: postgres:17
+    volumes:
+      - rosterboard-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rosterboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rosterboard}
+      POSTGRES_DB: ${POSTGRES_DB:-rosterboard}
+    container_name: rosterboard-db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  rosterboard-redis:
+    image: redis:latest
+    container_name: rosterboard-redis
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "redis-cli -h localhost -p 6379 ping"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  rosterboard:
+    image: jouleworks/rosterboard:v1.2
+    restart: unless-stopped
+    container_name: rosterboard
+    environment:
+      - ALLOWED_HOSTS=$SERVICE_FQDN_ROSTERBOARD
+      - SERVICE_FQDN_ROSTERBOARD_9418
+    volumes:
+      - rosterboard-data:/app/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9418/ping/ || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
