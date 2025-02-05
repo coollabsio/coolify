@@ -56,7 +56,6 @@ class StartMariadb
                 });
         } else {
             $this->commands[] = "echo 'Setting up SSL for this database.'";
-            $this->commands[] = "rm -rf $this->configuration_dir/ssl";
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
             $server = $this->database->destination->server;
             $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
@@ -188,7 +187,7 @@ class StartMariadb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
         if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, 'chown mariadb:mariadb /etc/mysql/certs/server.crt /etc/mysql/certs/server.key');
+            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->mariadb_user}:{$this->database->mariadb_user} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
         }
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');

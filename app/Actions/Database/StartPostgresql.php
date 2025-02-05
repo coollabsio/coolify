@@ -61,7 +61,6 @@ class StartPostgresql
                 });
         } else {
             $this->commands[] = "echo 'Setting up SSL for this database.'";
-            $this->commands[] = "rm -rf $this->configuration_dir/ssl";
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
             $server = $this->database->destination->server;
 
