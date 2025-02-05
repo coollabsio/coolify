@@ -243,7 +243,20 @@ class StandaloneMongodb extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true",
+            get: function () {
+                $url = "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true";
+                if ($this->enable_ssl) {
+                    $url .= '&ssl=true';
+                    if (in_array($this->ssl_mode, ['verifyCA', 'verifyFull'])) {
+                        $url .= '&tlsAllowInvalidCertificates=false';
+                    }
+                    if ($this->ssl_mode === 'verifyFull') {
+                        $url .= '&tlsAllowInvalidHostnames=false';
+                    }
+                }
+
+                return $url;
+            },
         );
     }
 
@@ -252,7 +265,18 @@ class StandaloneMongodb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+                    $url = "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+                    if ($this->enable_ssl) {
+                        $url .= '&ssl=true';
+                        if (in_array($this->ssl_mode, ['verifyCA', 'verifyFull'])) {
+                            $url .= '&tlsAllowInvalidCertificates=false';
+                        }
+                        if ($this->ssl_mode === 'verifyFull') {
+                            $url .= '&tlsAllowInvalidHostnames=false';
+                        }
+                    }
+
+                    return $url;
                 }
 
                 return null;
