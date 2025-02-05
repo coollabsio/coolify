@@ -35,6 +35,8 @@ class RegenerateSslCertJob implements ShouldQueue
             $query->where('valid_until', '<=', now()->addDays(14));
         }
 
+        $query->where('is_ca_certificate', false);
+
         $certificates = $query->get();
 
         if ($certificates->isEmpty()) {
