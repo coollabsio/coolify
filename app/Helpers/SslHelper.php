@@ -59,17 +59,56 @@ class SslHelper
             $subjectAlternativeNames = array_unique(
                 array_merge(["DNS:$commonName"], $subjectAlternativeNames)
             );
-            $certificateSubject = [
+
+            $countryCode = self::DEFAULT_COUNTRY_CODE;
+            $state = self::DEFAULT_STATE;
+            $organization = self::DEFAULT_ORGANIZATION_NAME;
+
+            $altNames = [];
+            foreach ($subjectAlternativeNames as $index => $san) {
+                [$type, $value] = explode(':', $san, 2);
+                $altNames[] = "{$type}.".($index + 1)." = $value";
+            }
+            $altNamesSection = implode("\n", $altNames);
+
+            $basicConstraints = $isCaCertificate ? 'CA:TRUE' : 'CA:FALSE';
+            $keyUsage = $isCaCertificate ? 'keyCertSign, cRLSign' : 'digitalSignature, keyEncipherment';
+            $extendedKeyUsage = $isCaCertificate ? '' : 'extendedKeyUsage = serverAuth';
+
+            $config = <<<CONF
+                [req]
+                prompt = no
+                distinguished_name = req_distinguished_name
+                req_extensions = v3_req
+
+                [req_distinguished_name]
+                C = $countryCode
+                ST = $state
+                O = $organization
+                CN = $commonName
+
+                [v3_req]
+                basicConstraints = $basicConstraints
+                keyUsage = $keyUsage
+                $extendedKeyUsage
+                subjectAltName = @alt_names
+
+                [alt_names]
+                $altNamesSection
+            CONF;
+
+            $tempConfig = tmpfile();
+            fwrite($tempConfig, $config);
+            $tempConfigPath = stream_get_meta_data($tempConfig)['uri'];
+
+            $csr = openssl_csr_new([
                 'commonName' => $commonName,
-                'subjectAltName' => $subjectAlternativeNames,
                 'organizationName' => self::DEFAULT_ORGANIZATION_NAME,
                 'countryName' => self::DEFAULT_COUNTRY_CODE,
                 'stateOrProvinceName' => self::DEFAULT_STATE,
-            ];
-
-            $csr = openssl_csr_new($certificateSubject, $privateKey, [
+            ], $privateKey, [
                 'digest_alg' => 'sha512',
-                'config' => null,
+                'config' => $tempConfigPath,
                 'encrypt_key' => false,
             ]);
 
@@ -84,9 +123,10 @@ class SslHelper
                 $validityDays,
                 [
                     'digest_alg' => 'sha512',
-                    'config' => null,
+                    'config' => $tempConfigPath,
+                    'x509_extensions' => 'v3_req',
                 ],
-                random_int(PHP_INT_MIN, PHP_INT_MAX)
+                random_int(1, PHP_INT_MAX)
             );
 
             if ($certificate === false) {
@@ -153,6 +193,8 @@ class SslHelper
                     'resource_id' => $resourceId,
                 ]);
             }
+
+            fclose($tempConfig);
 
             return $sslCertificate;
         } catch (\Throwable $e) {
