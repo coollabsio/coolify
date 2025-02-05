@@ -2,16 +2,16 @@
 
 namespace App\Jobs\Notifications;
 
-use App\Notifications\Dto\PushoverMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 
-class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
+class SendMessageToEmailJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -21,21 +21,27 @@ class SendMessageToPushoverJob implements ShouldBeEncrypted, ShouldQueue
 
     public int $maxExceptions = 5;
 
+    public int $timeout = 30;
+
     public function __construct(
-        private readonly PushoverMessage $message,
-        private readonly string $token,
-        private readonly string $user,
+        private readonly MailMessage $message,
+        private readonly array $recipients
     ) {
         $this->onQueue('high');
     }
 
     public function handle(): void
     {
-        $response = Http::timeout(15)->post('https://api.pushover.net/1/messages.json', $this->message->toPayload($this->token, $this->user));
-
-        if (! $response->successful()) {
+        try {
+            Mail::html(
+                (string) $this->message->render(),
+                fn ($message) => $message
+                    ->to($this->recipients)
+                    ->subject($this->message->subject)
+            );
+        } catch (\Throwable $e) {
             throw new \RuntimeException(
-                "Pushover notification failed with status {$response->status()}: {$response->body()}"
+                "Failed to send email the following error occurred: {$e->getMessage()}"
             );
         }
     }
