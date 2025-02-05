@@ -158,10 +158,9 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
-            $server = $this->database->destination->server;
-
             $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
                 ->where('resource_id', $this->database->id)
+                ->where('server_id', $this->server->id)
                 ->first();
 
             if (! $existingCert) {
@@ -170,7 +169,10 @@ class General extends Component
                 return;
             }
 
-            $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
+            $caCertificate = SslCertificate::where('server_id', $this->server->id)
+                ->where('resource_type', null)
+                ->where('resource_id', null)
+                ->first();
 
             SslHelper::generateSslCertificate(
                 commonName: $existingCert->common_name,
@@ -178,9 +180,10 @@ class General extends Component
                 resourceType: $existingCert->resource_type,
                 resourceId: $existingCert->resource_id,
                 serverId: $existingCert->server_id,
-                caCert: $caCert->ssl_certificate,
-                caKey: $caCert->ssl_private_key,
+                caCert: $caCertificate->ssl_certificate,
+                caKey: $caCertificate->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
+                mountPath: '/var/lib/mysql/certs',
             );
 
             $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
