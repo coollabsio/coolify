@@ -164,6 +164,11 @@ class StandaloneRedis extends BaseModel
         return data_get($this, 'environment.project.team');
     }
 
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {

@@ -289,6 +289,11 @@ class StandaloneMariadb extends BaseModel
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
 
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
     public function getCpuMetrics(int $mins = 5)
     {
         $server = $this->destination->server;

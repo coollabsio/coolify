@@ -177,6 +177,11 @@ class StandaloneMongodb extends BaseModel
         return data_get($this, 'is_log_drain_enabled', false);
     }
 
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
