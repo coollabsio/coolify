@@ -10,9 +10,9 @@ class SslHelper
 {
     private const DEFAULT_ORGANIZATION_NAME = 'Coolify';
 
-    private const DEFAULT_COUNTRY_CODE = 'ZZ';
+    private const DEFAULT_COUNTRY_NAME = 'ZZ';
 
-    private const DEFAULT_STATE = 'Default';
+    private const DEFAULT_STATE_NAME = 'Default';
 
     public static function generateSslCertificate(
         string $commonName,
@@ -27,6 +27,9 @@ class SslHelper
         ?string $configurationDir = null,
         ?string $mountPath = null
     ): SslCertificate {
+        $organizationName = self::DEFAULT_ORGANIZATION_NAME;
+        $countryName = self::DEFAULT_COUNTRY_NAME;
+        $stateName = self::DEFAULT_STATE_NAME;
 
         try {
             $privateKey = openssl_pkey_new([
@@ -60,41 +63,42 @@ class SslHelper
                 array_merge(["DNS:$commonName"], $subjectAlternativeNames)
             );
 
-            $countryCode = self::DEFAULT_COUNTRY_CODE;
-            $state = self::DEFAULT_STATE;
-            $organization = self::DEFAULT_ORGANIZATION_NAME;
-
-            $altNames = [];
+            $formattedSubjectAltNames = [];
             foreach ($subjectAlternativeNames as $index => $san) {
                 [$type, $value] = explode(':', $san, 2);
-                $altNames[] = "{$type}.".($index + 1)." = $value";
+                $formattedSubjectAltNames[] = "{$type}.".($index + 1)." = $value";
             }
-            $altNamesSection = implode("\n", $altNames);
+            $formattedSubjectAltNamesSection = implode("\n", $formattedSubjectAltNames);
 
-            $basicConstraints = $isCaCertificate ? 'CA:TRUE' : 'CA:FALSE';
-            $keyUsage = $isCaCertificate ? 'keyCertSign, cRLSign' : 'digitalSignature, keyEncipherment';
-            $extendedKeyUsage = $isCaCertificate ? '' : 'extendedKeyUsage = serverAuth';
+            $basicConstraints = $isCaCertificate ? 'critical, CA:TRUE, pathlen:0' : 'critical, CA:FALSE';
+            $keyUsage = $isCaCertificate ? 'critical, keyCertSign, cRLSign' : 'critical, digitalSignature';
+            $authorityKeyIdentifierLine = $isCaCertificate ? '' : "authorityKeyIdentifier = critical,keyid,issuer\n";
 
             $config = <<<CONF
                 [req]
                 prompt = no
-                distinguished_name = req_distinguished_name
-                req_extensions = v3_req
+                distinguished_name = distinguished_name
+                req_extensions = req_ext
 
-                [req_distinguished_name]
-                C = $countryCode
-                ST = $state
-                O = $organization
+                [distinguished_name]
+                C = $countryName
+                ST = $stateName
+                O = $organizationName
                 CN = $commonName
+
+                [req_ext]
+                basicConstraints = $basicConstraints
+                keyUsage = $keyUsage
 
                 [v3_req]
                 basicConstraints = $basicConstraints
                 keyUsage = $keyUsage
-                $extendedKeyUsage
-                subjectAltName = @alt_names
+                subjectKeyIdentifier = critical,hash
+                {$authorityKeyIdentifierLine}
+                subjectAltName = critical,@subject_alt_names
 
-                [alt_names]
-                $altNamesSection
+                [subject_alt_names]
+                $formattedSubjectAltNamesSection
             CONF;
 
             $tempConfig = tmpfile();
@@ -103,13 +107,13 @@ class SslHelper
 
             $csr = openssl_csr_new([
                 'commonName' => $commonName,
-                'organizationName' => self::DEFAULT_ORGANIZATION_NAME,
-                'countryName' => self::DEFAULT_COUNTRY_CODE,
-                'stateOrProvinceName' => self::DEFAULT_STATE,
+                'organizationName' => $organizationName,
+                'countryName' => $countryName,
+                'stateOrProvinceName' => $stateName,
             ], $privateKey, [
                 'digest_alg' => 'sha512',
                 'config' => $tempConfigPath,
-                'encrypt_key' => false,
+                'req_extensions' => 'req_ext',
             ]);
 
             if ($csr === false) {
@@ -194,11 +198,11 @@ class SslHelper
                 ]);
             }
 
-            fclose($tempConfig);
-
             return $sslCertificate;
         } catch (\Throwable $e) {
             throw new \RuntimeException('SSL Certificate generation failed: '.$e->getMessage(), 0, $e);
+        } finally {
+            fclose($tempConfig);
         }
     }
 }
