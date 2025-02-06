@@ -143,6 +143,7 @@ class StartMariadb
                 $persistent_storages
             );
         }
+
         if (count($persistent_file_volumes) > 0) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
@@ -151,6 +152,21 @@ class StartMariadb
                 })->toArray()
             );
         }
+
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => '/data/coolify/ssl/coolify-ca.crt',
+                        'target' => '/etc/mysql/certs/ca.crt',
+                        'read_only' => true,
+                    ],
+                ]
+            );
+        }
+
         if (! is_null($this->database->mariadb_conf) || ! empty($this->database->mariadb_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
@@ -173,6 +189,7 @@ class StartMariadb
                 'mysqld',
                 '--ssl-cert=/etc/mysql/certs/server.crt',
                 '--ssl-key=/etc/mysql/certs/server.key',
+                '--ssl-ca=/etc/mysql/certs/ca.crt',
                 '--require-secure-transport=1',
             ];
         }
