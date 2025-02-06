@@ -10,7 +10,7 @@ class SslHelper
 {
     private const DEFAULT_ORGANIZATION_NAME = 'Coolify';
 
-    private const DEFAULT_COUNTRY_NAME = 'ZZ';
+    private const DEFAULT_COUNTRY_NAME = 'XX';
 
     private const DEFAULT_STATE_NAME = 'Default';
 
@@ -50,55 +50,65 @@ class SslHelper
                 if ($server) {
                     $ip = $server->getIp;
                     if ($ip) {
-                        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)) {
-                            $subjectAlternativeNames[] = "IP:$ip";
-                        } else {
-                            $subjectAlternativeNames[] = "DNS:$ip";
-                        }
+                        $type = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)
+                            ? 'IP'
+                            : 'DNS';
+                        $subjectAlternativeNames = array_unique(
+                            array_merge($subjectAlternativeNames, ["$type:$ip"])
+                        );
                     }
                 }
             }
 
-            $subjectAlternativeNames = array_unique(
-                array_merge(["DNS:$commonName"], $subjectAlternativeNames)
-            );
-
-            $formattedSubjectAltNames = [];
-            foreach ($subjectAlternativeNames as $index => $san) {
-                [$type, $value] = explode(':', $san, 2);
-                $formattedSubjectAltNames[] = "{$type}.".($index + 1)." = $value";
-            }
-            $formattedSubjectAltNamesSection = implode("\n", $formattedSubjectAltNames);
-
             $basicConstraints = $isCaCertificate ? 'critical, CA:TRUE, pathlen:0' : 'critical, CA:FALSE';
-            $keyUsage = $isCaCertificate ? 'critical, keyCertSign, cRLSign' : 'critical, digitalSignature';
-            $authorityKeyIdentifierLine = $isCaCertificate ? '' : "authorityKeyIdentifier = critical,keyid,issuer\n";
+            $keyUsage = $isCaCertificate ? 'critical, keyCertSign, cRLSign' : 'critical, digitalSignature, keyAgreement';
+
+            $subjectAltNameSection = '';
+            $extendedKeyUsageSection = '';
+
+            if (! $isCaCertificate) {
+                $extendedKeyUsageSection = "\nextendedKeyUsage = serverAuth";
+
+                $subjectAlternativeNames = array_values(
+                    array_unique(
+                        array_merge(["DNS:$commonName"], $subjectAlternativeNames)
+                    )
+                );
+
+                $formattedSubjectAltNames = array_map(
+                    function ($index, $san) {
+                        [$type, $value] = explode(':', $san, 2);
+
+                        return "{$type}.".($index + 1)." = $value";
+                    },
+                    array_keys($subjectAlternativeNames),
+                    $subjectAlternativeNames
+                );
+
+                $subjectAltNameSection = "subjectAltName = @subject_alt_names\n\n[ subject_alt_names ]\n"
+                    .implode("\n", $formattedSubjectAltNames);
+            }
 
             $config = <<<CONF
-                [req]
+                [ req ]
                 prompt = no
                 distinguished_name = distinguished_name
                 req_extensions = req_ext
 
-                [distinguished_name]
-                C = $countryName
-                ST = $stateName
-                O = $organizationName
+                [ distinguished_name ]
                 CN = $commonName
-
-                [req_ext]
+                
+                [ req_ext ]
                 basicConstraints = $basicConstraints
                 keyUsage = $keyUsage
+                {$extendedKeyUsageSection}
 
-                [v3_req]
+                [ v3_req ]
                 basicConstraints = $basicConstraints
                 keyUsage = $keyUsage
-                subjectKeyIdentifier = critical,hash
-                {$authorityKeyIdentifierLine}
-                subjectAltName = critical,@subject_alt_names
-
-                [subject_alt_names]
-                $formattedSubjectAltNamesSection
+                {$extendedKeyUsageSection}
+                subjectKeyIdentifier = hash
+                {$subjectAltNameSection}
             CONF;
 
             $tempConfig = tmpfile();
