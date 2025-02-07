@@ -57,12 +57,11 @@ class StartMysql
         } else {
             $this->commands[] = "echo 'Setting up SSL for this database.'";
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
-            $server = $this->database->destination->server;
-            $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
 
-            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())
-                ->where('resource_id', $this->database->id)
-                ->first();
+            $server = $this->database->destination->server;
+            $caCert = SslCertificate::where('server_id', $server->server_id)->where('is_ca_certificate', true)->first();
+
+            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())->where('resource_id', $this->database->id)->first();
 
             if (! $this->ssl_certificate) {
                 $this->commands[] = "echo 'No SSL certificate found, generating new SSL certificate for this database.'";

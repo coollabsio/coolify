@@ -47,10 +47,7 @@ class RegenerateSslCertJob implements ShouldQueue
 
         foreach ($certificates as $certificate) {
             try {
-                $caCert = SslCertificate::where('server_id', $certificate->server_id)
-                    ->where('resource_type', null)
-                    ->where('resource_id', null)
-                    ->first();
+                $caCert = SslCertificate::where('server_id', $certificate->server_id)->where('is_ca_certificate', true)->first();
 
                 SSLHelper::generateSslCertificate(
                     commonName: $certificate->common_name,
