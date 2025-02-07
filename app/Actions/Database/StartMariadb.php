@@ -59,7 +59,7 @@ class StartMariadb
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
 
             $server = $this->database->destination->server;
-            $caCert = SslCertificate::where('server_id', $server->server_id)->where('is_ca_certificate', true)->first();
+            $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
 
             $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())->where('resource_id', $this->database->id)->first();
 
