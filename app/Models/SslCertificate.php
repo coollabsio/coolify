@@ -10,6 +10,7 @@ class SslCertificate extends Model
         'ssl_certificate',
         'ssl_private_key',
         'configuration_dir',
+        'mount_path',
         'resource_type',
         'resource_id',
         'server_id',
