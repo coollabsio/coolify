@@ -12,6 +12,7 @@ on:
         - docker/coolify-realtime/Dockerfile
         - docker/testing-host/Dockerfile
         - templates/**
+        - CHANGELOG.md
 
 env:
   GITHUB_REGISTRY: ghcr.io

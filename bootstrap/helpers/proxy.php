@@ -149,6 +149,7 @@ function generate_default_proxy_configuration(Server $server)
             'coolify.proxy=true',
         ];
         $config = [
+            'name' => 'coolify-proxy',
             'networks' => $array_of_networks->toArray(),
             'services' => [
                 'traefik' => [
@@ -182,9 +183,9 @@ function generate_default_proxy_configuration(Server $server)
                         '--entrypoints.http.address=:80',
                         '--entrypoints.https.address=:443',
                         '--entrypoints.http.http.encodequerysemicolons=true',
-                        '--entryPoints.http.http2.maxConcurrentStreams=50',
+                        '--entryPoints.http.http2.maxConcurrentStreams=250',
                         '--entrypoints.https.http.encodequerysemicolons=true',
-                        '--entryPoints.https.http2.maxConcurrentStreams=50',
+                        '--entryPoints.https.http2.maxConcurrentStreams=250',
                         '--entrypoints.https.http3',
                         '--providers.file.directory=/traefik/dynamic/',
                         '--providers.file.watch=true',

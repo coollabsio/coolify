@@ -53,6 +53,7 @@ Special thanks to our biggest sponsors!
 * [SupaGuide](https://supa.guide/?ref=coolify.io) - A comprehensive resource hub offering guides and tutorials for web development using Supabase.
 * [GoldenVM](https://billing.goldenvm.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
 * [Tigris](https://tigrisdata.com/?ref=coolify.io) - A fully managed serverless object storage service compatible with Amazon S3 API. Offers high performance, scalability, and built-in search capabilities for efficient data management.
+* [Convex](https://convex.link/coolify.io) - Convex is the open-source reactive database for web app developers.
 * [Cloudify.ro](https://cloudify.ro/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
 * [Syntaxfm](https://syntax.fm/?ref=coolify.io) - Podcast for web developers.
 * [PFGlabs](https://pfglabs.com/?ref=coolify.io) - Build real project with Golang.

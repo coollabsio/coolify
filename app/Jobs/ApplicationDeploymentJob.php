@@ -253,6 +253,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         try {
+            // Make sure the private key is stored in the filesystem
+            $this->server->privateKey->storeInFileSystem();
+
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
 
