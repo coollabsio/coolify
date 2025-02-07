@@ -40,7 +40,6 @@ class General extends Component
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
         'database.enable_ssl' => 'boolean',
-        'database.ssl_mode' => 'nullable|string|in:PREFERRED,REQUIRED,VERIFY_CA,VERIFY_IDENTITY',
     ];
 
     protected $validationAttributes = [
@@ -57,7 +56,6 @@ class General extends Component
         'database.public_port' => 'Public Port',
         'database.custom_docker_run_options' => 'Custom Docker Options',
         'database.enable_ssl' => 'Enable SSL',
-        'database.ssl_mode' => 'SSL Mode',
     ];
 
     public function mount()
@@ -147,7 +145,6 @@ class General extends Component
     {
         try {
             $this->database->enable_ssl = $this->database->enable_ssl;
-            $this->database->ssl_mode = $this->database->ssl_mode;
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {

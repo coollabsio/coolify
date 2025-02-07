@@ -97,15 +97,6 @@
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
                 <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
-                @if($database->enable_ssl)
-                    <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode" instantSave="instantSaveSSL"
-                        helper="Choose the SSL verification mode for MariaDB connections">
-                        <option value="PREFERRED">PREFERRED</option>
-                        <option value="REQUIRED">REQUIRED</option>
-                        <option value="VERIFY_CA">VERIFY_CA</option>
-                        <option value="VERIFY_IDENTITY">VERIFY_IDENTITY</option>
-                    </x-forms.select>
-                @endif
             </div>
         </div>
         
