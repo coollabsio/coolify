@@ -165,6 +165,7 @@ class SslHelper
                 'resource_id' => $resourceId,
                 'server_id' => $serverId,
                 'configuration_dir' => $configurationDir,
+                'mount_path' => $mountPath,
                 'valid_until' => CarbonImmutable::now()->addDays($validityDays),
                 'is_ca_certificate' => $isCaCertificate,
                 'common_name' => $commonName,

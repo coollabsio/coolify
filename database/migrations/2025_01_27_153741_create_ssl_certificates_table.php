@@ -13,6 +13,7 @@ return new class extends Migration
             $table->text('ssl_certificate');
             $table->text('ssl_private_key');
             $table->text('configuration_dir')->nullable();
+            $table->text('mount_path')->nullable();
             $table->string('resource_type')->nullable();
             $table->unsignedBigInteger('resource_id')->nullable();
             $table->unsignedBigInteger('server_id');
