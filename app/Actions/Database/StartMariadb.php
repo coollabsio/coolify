@@ -159,7 +159,7 @@ class StartMariadb
                     [
                         'type' => 'bind',
                         'source' => '/data/coolify/ssl/coolify-ca.crt',
-                        'target' => '/etc/mysql/certs/ca.crt',
+                        'target' => '/etc/mysql/certs/coolify-ca.crt',
                         'read_only' => true,
                     ],
                 ]
@@ -188,7 +188,7 @@ class StartMariadb
                 'mysqld',
                 '--ssl-cert=/etc/mysql/certs/server.crt',
                 '--ssl-key=/etc/mysql/certs/server.key',
-                '--ssl-ca=/etc/mysql/certs/ca.crt',
+                '--ssl-ca=/etc/mysql/certs/coolify-ca.crt',
                 '--require-secure-transport=1',
             ];
         }
@@ -203,7 +203,7 @@ class StartMariadb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
         if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->mariadb_user}:{$this->database->mariadb_user} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
+            $this->commands[] = executeInDocker($this->database->uuid, 'chown mysql:mysql /etc/mysql/certs/server.crt /etc/mysql/certs/server.key');
         }
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
