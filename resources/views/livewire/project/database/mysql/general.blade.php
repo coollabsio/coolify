@@ -70,7 +70,7 @@
             <div class="flex items-center justify-between py-2">
                 <div class="flex items-center justify-between w-full">
                     <h3>SSL Configuration</h3>
-                    @if($database->enable_ssl)
+                    @if($database->enable_ssl && $certificateValidUntil)
                         <x-modal-confirmation
                             title="Regenerate SSL Certificates"
                             buttonTitle="Regenerate SSL Certificates"
