@@ -25,7 +25,8 @@ class SslHelper
         ?string $caKey = null,
         bool $isCaCertificate = false,
         ?string $configurationDir = null,
-        ?string $mountPath = null
+        ?string $mountPath = null,
+        bool $isPemKeyFileRequired = false,
     ): SslCertificate {
         $organizationName = self::DEFAULT_ORGANIZATION_NAME;
         $countryName = self::DEFAULT_COUNTRY_NAME;
@@ -67,7 +68,7 @@ class SslHelper
             $extendedKeyUsageSection = '';
 
             if (! $isCaCertificate) {
-                $extendedKeyUsageSection = "\nextendedKeyUsage = serverAuth";
+                $extendedKeyUsageSection = "\nextendedKeyUsage = serverAuth, clientAuth";
 
                 $subjectAlternativeNames = array_values(
                     array_unique(
@@ -181,31 +182,44 @@ class SslHelper
                         return in_array($storage->mount_path, [
                             $mountPath.'/server.crt',
                             $mountPath.'/server.key',
+                            $mountPath.'/server.pem',
                         ]);
                     })
                     ->each(function ($storage) {
                         $storage->delete();
                     });
 
-                $model->fileStorages()->create([
-                    'fs_path' => $configurationDir.'/ssl/server.crt',
-                    'mount_path' => $mountPath.'/server.crt',
-                    'content' => $certificateStr,
-                    'is_directory' => false,
-                    'chmod' => '644',
-                    'resource_type' => $resourceType,
-                    'resource_id' => $resourceId,
-                ]);
+                if ($isPemKeyFileRequired) {
+                    $model->fileStorages()->create([
+                        'fs_path' => $configurationDir.'/ssl/server.pem',
+                        'mount_path' => $mountPath.'/server.pem',
+                        'content' => $certificateStr."\n".$privateKeyStr,
+                        'is_directory' => false,
+                        'chmod' => '600',
+                        'resource_type' => $resourceType,
+                        'resource_id' => $resourceId,
+                    ]);
+                } else {
+                    $model->fileStorages()->create([
+                        'fs_path' => $configurationDir.'/ssl/server.crt',
+                        'mount_path' => $mountPath.'/server.crt',
+                        'content' => $certificateStr,
+                        'is_directory' => false,
+                        'chmod' => '644',
+                        'resource_type' => $resourceType,
+                        'resource_id' => $resourceId,
+                    ]);
 
-                $model->fileStorages()->create([
-                    'fs_path' => $configurationDir.'/ssl/server.key',
-                    'mount_path' => $mountPath.'/server.key',
-                    'content' => $privateKeyStr,
-                    'is_directory' => false,
-                    'chmod' => '600',
-                    'resource_type' => $resourceType,
-                    'resource_id' => $resourceId,
-                ]);
+                    $model->fileStorages()->create([
+                        'fs_path' => $configurationDir.'/ssl/server.key',
+                        'mount_path' => $mountPath.'/server.key',
+                        'content' => $privateKeyStr,
+                        'is_directory' => false,
+                        'chmod' => '600',
+                        'resource_type' => $resourceType,
+                        'resource_id' => $resourceId,
+                    ]);
+                }
             }
 
             return $sslCertificate;
