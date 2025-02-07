@@ -92,11 +92,11 @@
                     <x-forms.select id="database.ssl_mode" label="SSL Mode" 
                         wire:model.live="database.ssl_mode" instantSave="instantSaveSSL"
                         helper="Choose the SSL verification mode for MongoDB connections">
-                        <option value="allowSSL">allowSSL</option>
-                        <option value="preferSSL">preferSSL</option>
-                        <option value="requireSSL">requireSSL</option>
-                        <option value="verifyCA">verifyCA</option>
-                        <option value="verifyFull">verifyFull</option>
+                        <option value="allow">allow</option>
+                        <option value="prefer">prefer</option>
+                        <option value="require">require</option>
+                        <option value="verify-ca">verify-ca</option>
+                        <option value="verify-full">verify-full</option>
                     </x-forms.select>
                 @endif
             </div>

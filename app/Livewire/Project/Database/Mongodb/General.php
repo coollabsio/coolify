@@ -39,7 +39,7 @@ class General extends Component
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
         'database.enable_ssl' => 'boolean',
-        'database.ssl_mode' => 'nullable|string|in:allowSSL,preferSSL,requireSSL,verifyCA,verifyFull',
+        'database.ssl_mode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
     ];
 
     protected $validationAttributes = [
@@ -170,10 +170,7 @@ class General extends Component
                 return;
             }
 
-            $caCertificate = SslCertificate::where('server_id', $this->server->id)
-                ->where('resource_type', null)
-                ->where('resource_id', null)
-                ->first();
+            $caCert = SslCertificate::where('server_id', $existingCert->server_id)->where('is_ca_certificate', true)->first();
 
             SslHelper::generateSslCertificate(
                 commonName: $existingCert->common_name,
@@ -181,10 +178,10 @@ class General extends Component
                 resourceType: $existingCert->resource_type,
                 resourceId: $existingCert->resource_id,
                 serverId: $existingCert->server_id,
-                caCert: $caCertificate->ssl_certificate,
-                caKey: $caCertificate->ssl_private_key,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
-                mountPath: '/etc/mongo/certs',
+                mountPath: $existingCert->mount_path,
             );
 
             $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
