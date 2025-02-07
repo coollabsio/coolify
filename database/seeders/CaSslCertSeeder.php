@@ -13,9 +13,9 @@ class CaSslCertSeeder extends Seeder
     {
         Server::chunk(200, function ($servers) {
             foreach ($servers as $server) {
-                $existingCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+                $existingCaCert = SslCertificate::where('server_id', $server->server_id)->where('is_ca_certificate', true)->first();
 
-                if (! $existingCert) {
+                if (! $existingCaCert) {
                     $caCert = SslHelper::generateSslCertificate(
                         commonName: 'Coolify CA Certificate',
                         serverId: $server->id,
@@ -23,7 +23,7 @@ class CaSslCertSeeder extends Seeder
                         validityDays: 15 * 365
                     );
                 } else {
-                    $caCert = $existingCert;
+                    $caCert = $existingCaCert;
                 }
                 $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
 
@@ -31,7 +31,7 @@ class CaSslCertSeeder extends Seeder
                     "mkdir -p $caCertPath",
                     "chown -R 9999:root $caCertPath",
                     "chmod -R 700 $caCertPath",
-                    "rm -f $caCertPath/coolify-ca.crt",
+                    "rm -rf $caCertPath/coolify-ca.crt",
                     "echo '{$caCert->ssl_certificate}' > $caCertPath/coolify-ca.crt",
                     "chmod 644 $caCertPath/coolify-ca.crt",
                 ]);

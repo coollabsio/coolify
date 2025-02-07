@@ -49,10 +49,7 @@ class Advanced extends Component
 
     public function loadCaCertificate()
     {
-        $this->caCertificate = SslCertificate::where('server_id', $this->server->id)
-            ->where('resource_type', null)
-            ->where('resource_id', null)
-            ->first();
+        $this->caCertificate = SslCertificate::where('server_id', $this->server->server_id)->where('is_ca_certificate', true)->first();
 
         if ($this->caCertificate) {
             $this->certificateContent = $this->caCertificate->ssl_certificate;
@@ -129,7 +126,7 @@ class Advanced extends Component
             "mkdir -p $caCertPath",
             "chown -R 9999:root $caCertPath",
             "chmod -R 700 $caCertPath",
-            "rm -f $caCertPath/coolify-ca.crt",
+            "rm -rf $caCertPath/coolify-ca.crt",
             "echo '{$this->certificateContent}' > $caCertPath/coolify-ca.crt",
             "chmod 644 $caCertPath/coolify-ca.crt",
         ]);

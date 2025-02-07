@@ -20,10 +20,10 @@ class InstallDocker
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/installation#manually">documentation</a>.');
         }
 
-        if (! SslCertificate::where('server_id', $server->id)->exists()) {
+        if (! SslCertificate::where('server_id', $server->server_id)->where('is_ca_certificate', true)->exists()) {
             $serverCert = SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
-                serverId: $server->id,
+                serverId: $server->server_id,
                 isCaCertificate: true,
                 validityDays: 15 * 365
             );
@@ -33,6 +33,7 @@ class InstallDocker
                 "mkdir -p $caCertPath",
                 "chown -R 9999:root $caCertPath",
                 "chmod -R 700 $caCertPath",
+                "rm -rf $caCertPath/coolify-ca.crt",
                 "echo '{$serverCert->ssl_certificate}' > $caCertPath/coolify-ca.crt",
                 "chmod 644 $caCertPath/coolify-ca.crt",
             ]);
