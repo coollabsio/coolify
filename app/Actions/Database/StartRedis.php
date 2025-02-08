@@ -302,7 +302,7 @@ class StartRedis
                     '--tls-ca-cert-file /etc/redis/certs/coolify-ca.crt',
                     '--tls-auth-clients no',
                 ],
-                'verify-full' => [
+                'verify-ca' => [
                     '--tls-port 6380',
                     '--tls-cert-file /etc/redis/certs/server.crt',
                     '--tls-key-file /etc/redis/certs/server.key',

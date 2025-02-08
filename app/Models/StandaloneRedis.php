@@ -226,7 +226,7 @@ class StandaloneRedis extends BaseModel
                 $port = $this->enable_ssl ? 6380 : 6379;
                 $url = "{$scheme}://{$username_part}{$this->redis_password}@{$this->uuid}:{$port}/0";
 
-                if ($this->enable_ssl && $this->ssl_mode === 'verify-full') {
+                if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                     $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
                 }
 
@@ -245,7 +245,7 @@ class StandaloneRedis extends BaseModel
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $url = "{$scheme}://{$username_part}{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
 
-                    if ($this->enable_ssl && $this->ssl_mode === 'verify-full') {
+                    if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
                     }
 

@@ -47,7 +47,7 @@ class General extends Component
         'redis_username' => 'required',
         'redis_password' => 'required',
         'database.enable_ssl' => 'boolean',
-        'database.ssl_mode' => 'nullable|string|in:require,verify-full',
+        'database.ssl_mode' => 'nullable|string|in:require,verify-ca',
     ];
 
     protected $validationAttributes = [
