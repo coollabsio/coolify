@@ -1,0 +1,40 @@
+# documentation: https://hub.docker.com/_/teamspeak/
+# slogan: TeamSpeak offers the ideal voice communication for online gaming, education and training, internal business communication, and staying in touch with friends and family. Our primary focus is delivering a solution that is easy to use, with high security standards, excellent voice quality, and low system and bandwidth usage.
+# logo: svgs/teamspeak.svg
+# port: 9987
+
+services:
+  teamspeak:
+    image: 'teamspeak:latest'
+    restart: always
+    volumes:
+      -
+        type: bind
+        source: ./teamspeak
+        target: /var/ts3server
+        is_directory: true
+    ports:
+      - '9987:9987/udp'
+      - '10011:10011'
+      - '30033:30033'
+    environment:
+      TS3SERVER_DB_PLUGIN: ts3db_mariadb
+      TS3SERVER_DB_SQLCREATEPATH: create_mariadb
+      TS3SERVER_DB_HOST: mariadb
+      TS3SERVER_DB_USER: root
+      TS3SERVER_DB_PASSWORD: '${SERVICE_PASSWORD_DB}'
+      TS3SERVER_DB_NAME: teamspeak
+      TS3SERVER_DB_WAITUNTILREADY: 30
+      TS3SERVER_LICENSE: accept
+  mariadb:
+    image: 'mariadb:latest'
+    volumes:
+      -
+        type: bind
+        source: ./teamspeak-db
+        target: /var/lib/mysql
+        is_directory: true
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: '${SERVICE_PASSWORD_DB}'
+      MYSQL_DATABASE: teamspeak
