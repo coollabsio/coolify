@@ -39,7 +39,7 @@ class General extends Component
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
         'database.enable_ssl' => 'boolean',
-        'database.ssl_mode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
+        'database.ssl_mode' => 'nullable|string|in:allow,prefer,require,verify-full',
     ];
 
     protected $validationAttributes = [

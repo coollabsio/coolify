@@ -95,7 +95,6 @@
                         <option value="allow">allow</option>
                         <option value="prefer">prefer</option>
                         <option value="require">require</option>
-                        <option value="verify-ca">verify-ca</option>
                         <option value="verify-full">verify-full</option>
                     </x-forms.select>
                 @endif
