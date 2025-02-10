@@ -81,13 +81,6 @@
             @endif
             <div class="flex flex-col gap-2">
                 <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
-                @if($database->enable_ssl)
-                    <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode" instantSave="instantSaveSSL"
-                        helper="Choose the SSL verification mode for Redis connections">
-                        <option value="require">require</option>
-                        <option value="verify-ca">verify-ca</option>
-                    </x-forms.select>
-                @endif
             </div>
         </div>
         <div>

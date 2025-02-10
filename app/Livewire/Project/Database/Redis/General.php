@@ -47,7 +47,6 @@ class General extends Component
         'redis_username' => 'required',
         'redis_password' => 'required',
         'database.enable_ssl' => 'boolean',
-        'database.ssl_mode' => 'nullable|string|in:require,verify-ca',
     ];
 
     protected $validationAttributes = [
@@ -62,7 +61,6 @@ class General extends Component
         'redis_username' => 'Redis Username',
         'redis_password' => 'Redis Password',
         'database.enable_ssl' => 'Enable SSL',
-        'database.ssl_mode' => 'SSL Mode',
     ];
 
     public function mount()
@@ -155,7 +153,6 @@ class General extends Component
     {
         try {
             $this->database->enable_ssl = $this->database->enable_ssl;
-            $this->database->ssl_mode = $this->database->ssl_mode;
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {

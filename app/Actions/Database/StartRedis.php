@@ -98,22 +98,11 @@ class StartRedis
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => [
-                        'test' => $this->database->enable_ssl
-                            ? [
-                                'CMD-SHELL',
-                                'redis-cli',
-                                '--tls',
-                                '--cacert /etc/redis/certs/coolify-ca.crt',
-                                '--cert /etc/redis/certs/server.crt',
-                                '--key /etc/redis/certs/server.key',
-                                '-p 6380',
-                                'ping',
-                            ]
-                            : [
-                                'CMD-SHELL',
-                                'redis-cli',
-                                'ping',
-                            ],
+                        'test' => [
+                            'CMD-SHELL',
+                            'redis-cli',
+                            'ping',
+                        ],
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 10,
@@ -294,23 +283,13 @@ class StartRedis
         }
 
         if ($this->database->enable_ssl) {
-            $sslArgs = match ($this->database->ssl_mode) {
-                'require' => [
-                    '--tls-port 6380',
-                    '--tls-cert-file /etc/redis/certs/server.crt',
-                    '--tls-key-file /etc/redis/certs/server.key',
-                    '--tls-ca-cert-file /etc/redis/certs/coolify-ca.crt',
-                    '--tls-auth-clients no',
-                ],
-                'verify-ca' => [
-                    '--tls-port 6380',
-                    '--tls-cert-file /etc/redis/certs/server.crt',
-                    '--tls-key-file /etc/redis/certs/server.key',
-                    '--tls-ca-cert-file /etc/redis/certs/coolify-ca.crt',
-                    '--tls-auth-clients yes',
-                ],
-                default => []
-            };
+            $sslArgs = [
+                '--tls-port 6380',
+                '--tls-cert-file /etc/redis/certs/server.crt',
+                '--tls-key-file /etc/redis/certs/server.key',
+                '--tls-ca-cert-file /etc/redis/certs/coolify-ca.crt',
+                '--tls-auth-clients optional',
+            ];
         }
 
         if (! empty($sslArgs)) {
