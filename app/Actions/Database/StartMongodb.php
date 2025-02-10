@@ -52,8 +52,7 @@ class StartMongodb
                 ->get()
                 ->filter(function ($storage) {
                     return in_array($storage->mount_path, [
-                        '/etc/mongo/certs/server.crt',
-                        '/etc/mongo/certs/server.key',
+                        '/etc/mongo/certs/server.pem',
                     ]);
                 })
                 ->each(function ($storage) {
@@ -62,12 +61,11 @@ class StartMongodb
         } else {
             $this->commands[] = "echo 'Setting up SSL for this database.'";
             $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
-            $server = $this->database->destination->server;
 
-            $caCert = SslCertificate::where('server_id', $server->id)->firstOrFail();
-            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())
-                ->where('resource_id', $this->database->id)
-                ->first();
+            $server = $this->database->destination->server;
+            $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+
+            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())->where('resource_id', $this->database->id)->first();
 
             if (! $this->ssl_certificate) {
                 $this->commands[] = "echo 'No SSL certificate found, generating new SSL certificate for this database.'";
@@ -80,6 +78,7 @@ class StartMongodb
                     caKey: $caCert->ssl_private_key,
                     configurationDir: $this->configuration_dir,
                     mountPath: '/etc/mongo/certs',
+                    isPemKeyFileRequired: true,
                 );
             }
         }
@@ -188,6 +187,20 @@ class StartMongodb
             ]]
         );
 
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => '/data/coolify/ssl/coolify-ca.crt',
+                        'target' => '/etc/mongo/certs/ca.pem',
+                        'read_only' => true,
+                    ],
+                ]
+            );
+        }
+
         // Add custom docker run options
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
@@ -195,28 +208,35 @@ class StartMongodb
         if ($this->database->enable_ssl) {
             $commandParts = ['mongod'];
 
-            $commandParts[] = '--sslPEMKeyFile';
-            $commandParts[] = '/etc/mongo/certs/server.pem';
-            $commandParts[] = '--sslCAFile';
-            $commandParts[] = '/etc/mongo/certs/ca.pem';
-
             $sslConfig = match ($this->database->ssl_mode) {
-                'verifyCA' => [
-                    '--sslMode=requireSSL',
-                    '--tlsAllowInvalidCertificates=false',
+                'allow' => [
+                    '--tlsMode=allowTLS',
+                    '--tlsAllowConnectionsWithoutCertificates',
+                    '--tlsAllowInvalidHostnames',
                 ],
-                'verifyFull' => [
-                    '--sslMode=requireSSL',
-                    '--tlsAllowInvalidCertificates=false',
-                    '--tlsAllowInvalidHostnames=false',
+                'prefer' => [
+                    '--tlsMode=preferTLS',
+                    '--tlsAllowConnectionsWithoutCertificates',
+                    '--tlsAllowInvalidHostnames',
                 ],
-                'requireSSL' => ['--sslMode=requireSSL'],
-                'preferSSL' => ['--sslMode=preferSSL'],
-                'allowSSL' => ['--sslMode=allowSSL'],
-                default => []
+                'require' => [
+                    '--tlsMode=requireTLS',
+                    '--tlsAllowConnectionsWithoutCertificates',
+                    '--tlsAllowInvalidHostnames',
+                ],
+                'verify-full' => [
+                    '--tlsMode=requireTLS',
+                    '--tlsAllowInvalidHostnames',
+                ],
+                default => [],
             };
 
             $commandParts = [...$commandParts, ...$sslConfig];
+            $commandParts[] = '--tlsCAFile';
+            $commandParts[] = '/etc/mongo/certs/ca.pem';
+            $commandParts[] = '--tlsCertificateKeyFile';
+            $commandParts[] = '/etc/mongo/certs/server.pem';
+
             $docker_compose['services'][$container_name]['command'] = $commandParts;
         }
 
@@ -229,7 +249,7 @@ class StartMongodb
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         if ($this->database->enable_ssl) {
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->mongo_initdb_root_username}:{$this->database->mongo_initdb_root_username} /etc/mongo/certs/server.pem /etc/mongo/certs/ca.pem");
+            $this->commands[] = executeInDocker($this->database->uuid, 'chown mongodb:mongodb /etc/mongo/certs/server.pem');
         }
         $this->commands[] = "echo 'Database started.'";
 
