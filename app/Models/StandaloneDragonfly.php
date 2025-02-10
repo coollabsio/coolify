@@ -223,7 +223,17 @@ class StandaloneDragonfly extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "redis://:{$this->dragonfly_password}@{$this->uuid}:6379/0",
+            get: function () {
+                $scheme = $this->enable_ssl ? 'rediss' : 'redis';
+                $port = $this->enable_ssl ? 6380 : 6379;
+                $url = "{$scheme}://:{$this->dragonfly_password}@{$this->uuid}:{$port}/0";
+
+                if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
+                    $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
+                }
+
+                return $url;
+            }
         );
     }
 
@@ -232,7 +242,14 @@ class StandaloneDragonfly extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "redis://:{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $scheme = $this->enable_ssl ? 'rediss' : 'redis';
+                    $url = "{$scheme}://:{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+
+                    if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
+                        $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
+                    }
+
+                    return $url;
                 }
 
                 return null;
