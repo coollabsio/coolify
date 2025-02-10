@@ -32,7 +32,6 @@ class ApplicationSeeder extends Seeder
         Application::create([
             'name' => 'Dockerfile Example',
             'fqdn' => 'http://dockerfile.127.0.0.1.sslip.io',
-            'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
             'git_branch' => 'main',
             'base_directory' => '/dockerfile',

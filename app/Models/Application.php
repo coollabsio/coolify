@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
 use RuntimeException;
@@ -1668,33 +1667,191 @@ class Application extends BaseModel
 
     public function setConfig($config)
     {
-        $validator = Validator::make(['config' => $config], [
-            'config' => 'required|json',
-        ]);
-        if ($validator->fails()) {
-            throw new \Exception('Invalid JSON format');
-        }
-        $config = json_decode($config, true);
-
-        $deepValidator = Validator::make(['config' => $config], [
-            'config.build_pack' => 'required|string',
-            'config.base_directory' => 'required|string',
-            'config.publish_directory' => 'required|string',
-            'config.ports_exposes' => 'required|string',
-            'config.settings.is_static' => 'required|boolean',
-        ]);
-        if ($deepValidator->fails()) {
-            throw new \Exception('Invalid data');
-        }
-        $config = $deepValidator->validated()['config'];
-
+        // Config is already validated at this point
         try {
-            $settings = data_get($config, 'settings', []);
-            data_forget($config, 'settings');
-            $this->update($config);
-            $this->settings()->update($settings);
+            \DB::beginTransaction();
+
+            // Basic application data
+            $applicationData = [
+                'name' => data_get($config, 'name'),
+                'description' => data_get($config, 'description'),
+
+                // Build configuration
+                'build_pack' => data_get($config, 'build.build_pack'),
+                'static_image' => data_get($config, 'build.static_image'),
+                'base_directory' => data_get($config, 'build.base_directory'),
+                'publish_directory' => data_get($config, 'build.publish_directory'),
+                'install_command' => data_get($config, 'build.install_command'),
+                'build_command' => data_get($config, 'build.build_command'),
+                'start_command' => data_get($config, 'build.start_command'),
+                'watch_paths' => data_get($config, 'build.watch_paths'),
+
+                // Dockerfile settings
+                'dockerfile' => data_get($config, 'build.dockerfile.content'),
+                'dockerfile_location' => data_get($config, 'build.dockerfile.location'),
+                'dockerfile_target_build' => data_get($config, 'build.dockerfile.target_build'),
+
+                // Docker compose settings
+                'docker_compose' => data_get($config, 'build.docker_compose.content'),
+                'docker_compose_location' => data_get($config, 'build.docker_compose.location'),
+                'docker_compose_raw' => data_get($config, 'build.docker_compose.raw'),
+                'docker_compose_domains' => data_get($config, 'build.docker_compose.domains'),
+                'docker_compose_custom_start_command' => data_get($config, 'build.docker_compose.custom_start_command'),
+                'docker_compose_custom_build_command' => data_get($config, 'build.docker_compose.custom_build_command'),
+                'compose_parsing_version' => data_get($config, 'build.docker_compose.parsing_version'),
+
+                // Docker settings
+                'custom_docker_run_options' => data_get($config, 'build.docker.custom_options'),
+                'custom_labels' => data_get($config, 'build.docker.custom_labels'),
+
+                // Deployment commands
+                'pre_deployment_command' => data_get($config, 'deployment.pre_deployment.command'),
+                'pre_deployment_command_container' => data_get($config, 'deployment.pre_deployment.container'),
+                'post_deployment_command' => data_get($config, 'deployment.post_deployment.command'),
+                'post_deployment_command_container' => data_get($config, 'deployment.post_deployment.container'),
+
+                // Network configuration
+                'fqdn' => data_get($config, 'network.domains.fqdn'),
+                'redirect' => data_get($config, 'network.domains.redirect'),
+                'custom_nginx_configuration' => data_get($config, 'network.domains.custom_nginx_configuration'),
+                'ports_exposes' => data_get($config, 'network.ports.expose'),
+                'ports_mappings' => data_get($config, 'network.ports.mappings'),
+
+                // Source configuration
+                'git_repository' => data_get($config, 'source.git_repository'),
+                'git_branch' => data_get($config, 'source.git_branch'),
+                'git_commit_sha' => data_get($config, 'source.git_commit_sha'),
+                'repository_project_id' => data_get($config, 'source.repository_project_id'),
+
+                // Health check configuration
+                'health_check_enabled' => data_get($config, 'health_check.enabled'),
+                'health_check_path' => data_get($config, 'health_check.path'),
+                'health_check_port' => data_get($config, 'health_check.port'),
+                'health_check_host' => data_get($config, 'health_check.host'),
+                'health_check_method' => data_get($config, 'health_check.method'),
+                'health_check_return_code' => data_get($config, 'health_check.return_code'),
+                'health_check_scheme' => data_get($config, 'health_check.scheme'),
+                'health_check_response_text' => data_get($config, 'health_check.response_text'),
+                'health_check_interval' => data_get($config, 'health_check.interval'),
+                'health_check_timeout' => data_get($config, 'health_check.timeout'),
+                'health_check_retries' => data_get($config, 'health_check.retries'),
+                'health_check_start_period' => data_get($config, 'health_check.start_period'),
+
+                // Resource limits
+                'limits_memory' => data_get($config, 'resources.memory.limit'),
+                'limits_memory_swap' => data_get($config, 'resources.memory.swap'),
+                'limits_memory_swappiness' => data_get($config, 'resources.memory.swappiness'),
+                'limits_memory_reservation' => data_get($config, 'resources.memory.reservation'),
+                'limits_cpus' => data_get($config, 'resources.cpu.limit'),
+                'limits_cpuset' => data_get($config, 'resources.cpu.set'),
+                'limits_cpu_shares' => data_get($config, 'resources.cpu.shares'),
+
+                // Preview settings
+                'preview_url_template' => data_get($config, 'preview.url_template'),
+
+                // Webhook secrets
+                'manual_webhook_secret_github' => data_get($config, 'webhooks.secrets.github'),
+                'manual_webhook_secret_gitlab' => data_get($config, 'webhooks.secrets.gitlab'),
+                'manual_webhook_secret_bitbucket' => data_get($config, 'webhooks.secrets.bitbucket'),
+                'manual_webhook_secret_gitea' => data_get($config, 'webhooks.secrets.gitea'),
+            ];
+
+            // remove null values
+            $applicationData = array_filter($applicationData, function ($value) {
+                return $value !== null;
+            });
+
+            // Update application
+            $this->update($applicationData);
+
+            // Update settings
+            if ($settings = data_get($config, 'settings')) {
+                $dbSettings = [
+                    'is_auto_deploy_enabled' => data_get($settings, 'deployment.auto_deploy', false),
+                    'is_preview_deployments_enabled' => data_get($settings, 'deployment.preview_deployments', false),
+                    'is_preserve_repository_enabled' => data_get($settings, 'deployment.preserve_repository', false),
+                    'is_build_server_enabled' => data_get($settings, 'deployment.build_server', false),
+                    'is_debug_enabled' => data_get($settings, 'deployment.debug_mode', false),
+
+                    'is_git_lfs_enabled' => data_get($settings, 'git.lfs_enabled', false),
+                    'is_git_submodules_enabled' => data_get($settings, 'git.submodules_enabled', false),
+
+                    'connect_to_docker_network' => data_get($settings, 'docker.network.connect', false),
+                    'custom_internal_name' => data_get($settings, 'docker.network.custom_internal_name'),
+                    'is_consistent_container_name_enabled' => data_get($settings, 'docker.container.consistent_name', false),
+                    'is_container_label_escape_enabled' => data_get($settings, 'docker.container.label_escape', true),
+                    'is_container_label_readonly_enabled' => data_get($settings, 'docker.container.label_readonly', true),
+                    'disable_build_cache' => data_get($settings, 'docker.build.disable_cache', false),
+                    'is_raw_compose_deployment_enabled' => data_get($settings, 'docker.build.raw_compose_deployment', false),
+
+                    'is_gpu_enabled' => data_get($settings, 'gpu.enabled', false),
+                    'gpu_driver' => data_get($settings, 'gpu.driver', 'nvidia'),
+
+                    'is_log_drain_enabled' => data_get($settings, 'logging.drain_enabled', false),
+                    'is_include_timestamps' => data_get($settings, 'logging.include_timestamps', false),
+
+                    'is_env_sorting_enabled' => data_get($settings, 'environment.sort_variables', true),
+
+                    'is_force_https_enabled' => data_get($settings, 'proxy.force_https', true),
+                    'is_gzip_enabled' => data_get($settings, 'proxy.gzip', true),
+                    'is_stripprefix_enabled' => data_get($settings, 'proxy.stripprefix', true),
+
+                    'is_static' => data_get($settings, 'type.static', false),
+                ];
+
+                $this->settings()->update($dbSettings);
+            }
+
+            // Update environment variables
+            if ($envVars = data_get($config, 'environment_variables.production')) {
+                $this->environment_variables()->delete();
+                foreach ($envVars as $envVar) {
+                    $this->environment_variables()->create($envVar);
+                }
+            }
+
+            // Update preview environment variables
+            if ($previewEnvVars = data_get($config, 'environment_variables.preview')) {
+                $this->environment_variables_preview()->delete();
+                foreach ($previewEnvVars as $envVar) {
+                    $this->environment_variables_preview()->create($envVar);
+                }
+            }
+
+            // Update persistent storages
+            if ($persistentStorages = data_get($config, 'persistent_storages')) {
+                $this->persistentStorages()->delete();
+                foreach ($persistentStorages as $storage) {
+                    $this->persistentStorages()->create($storage);
+                }
+            }
+
+            // Update scheduled tasks
+            if ($scheduledTasks = data_get($config, 'scheduled_tasks')) {
+                $this->scheduled_tasks()->delete();
+                foreach ($scheduledTasks as $task) {
+                    $this->scheduled_tasks()->create([
+                        'name' => $task['name'],
+                        'command' => $task['command'],
+                        'frequency' => $task['frequency'],
+                        'enabled' => $task['enabled'],
+                    ]);
+                }
+            }
+
+            // Update tags
+            if ($tags = data_get($config, 'tags')) {
+                $this->tags()->detach();
+                foreach ($tags as $tag) {
+                    $tagModel = Tag::firstOrCreate(['name' => $tag]);
+                    $this->tags()->attach($tagModel->id);
+                }
+            }
+
+            \DB::commit();
         } catch (\Exception $e) {
-            throw new \Exception('Failed to update application settings');
+            \DB::rollBack();
+            throw new \Exception('Failed to update application configuration: '.$e->getMessage());
         }
     }
 }

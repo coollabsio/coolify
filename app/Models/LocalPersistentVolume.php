@@ -9,6 +9,22 @@ class LocalPersistentVolume extends Model
 {
     protected $guarded = [];
 
+    public static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (blank($model->name)) {
+                $model->name = $model->resource->uuid.'-'.str_replace('/', '-', $model->mount_path);
+            }
+        });
+    }
+
+    public function resource()
+    {
+        return $this->morphTo('resource');
+    }
+
     public function application()
     {
         return $this->morphTo('resource');
