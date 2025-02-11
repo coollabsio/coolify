@@ -7,9 +7,11 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class GithubPrivateRepository extends Component
 {
@@ -53,8 +55,7 @@ class GithubPrivateRepository extends Component
 
     public ?string $publish_directory = null;
 
-    // In case of docker compose
-    public ?string $base_directory = null;
+    public string $base_directory = '/';
 
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
@@ -64,6 +65,10 @@ class GithubPrivateRepository extends Component
     public $build_pack = 'nixpacks';
 
     public bool $show_is_static = true;
+
+    public ?string $coolify_config = null;
+
+    public bool $use_coolify_config = false;
 
     public function mount()
     {
@@ -82,6 +87,11 @@ class GithubPrivateRepository extends Component
                 $this->base_directory = '/'.$this->base_directory;
             }
         }
+        $this->getCoolifyConfig();
+    }
+    public function updatedSelectedBranchName()
+    {
+        $this->getCoolifyConfig();
     }
 
     public function updatedBuildPack()
@@ -94,7 +104,7 @@ class GithubPrivateRepository extends Component
             $this->is_static = false;
             $this->port = 80;
         } else {
-            $this->show_is_static = false;
+            $this->show_is_static = true;
             $this->is_static = false;
         }
     }
@@ -148,7 +158,19 @@ class GithubPrivateRepository extends Component
                 $this->loadBranchByPage();
             }
         }
-        $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
+        $main_branch = $this->branches->firstWhere('name', 'main');
+        $master_branch = $this->branches->firstWhere('name', 'master');
+        $this->selected_branch_name = $main_branch ? 'main' : ($master_branch ? 'master' : data_get($this->branches, '0.name', 'main'));
+        $this->getCoolifyConfig();
+    }
+
+    private function getCoolifyConfig()
+    {
+        try {
+            ['coolify_config' => $this->coolify_config] = $this->github_app->getCoolifyConfig($this->base_directory, $this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     protected function loadBranchByPage()
@@ -179,41 +201,99 @@ class GithubPrivateRepository extends Component
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
-            $application = Application::create([
-                'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
-                'repository_project_id' => $this->selected_repository_id,
-                'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
-                'git_branch' => $this->selected_branch_name,
-                'build_pack' => $this->build_pack,
-                'ports_exposes' => $this->port,
-                'publish_directory' => $this->publish_directory,
-                'environment_id' => $environment->id,
-                'destination_id' => $destination->id,
-                'destination_type' => $destination_class,
-                'source_id' => $this->github_app->id,
-                'source_type' => $this->github_app->getMorphClass(),
-            ]);
-            $application->settings->is_static = $this->is_static;
-            $application->settings->save();
+            if (filled($this->coolify_config) && $this->use_coolify_config) {
+                try {
+                    $config = json_decode($this->coolify_config, true);
+                    data_set($config, 'coolify.destination_uuid', $destination->uuid);
+                    data_set($config, 'coolify.project_uuid', $project->uuid);
+                    data_set($config, 'coolify.environment_uuid', $environment->uuid);
+                    data_set($config, 'source.git_repository', "{$this->selected_repository_owner}/{$this->selected_repository_repo}");
+                    data_set($config, 'source.git_branch', $this->selected_branch_name);
+                    $this->coolify_config = json_encode($config, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES);
+                    $config = configValidator($this->coolify_config);
+                    DB::beginTransaction();
 
-            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
-                $application->health_check_enabled = false;
+                    // Create and save the base application first
+                    $cuid = new Cuid2();
+                    $application = new Application([
+                        'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
+                        'repository_project_id' => $this->selected_repository_id,
+                        'description' => data_get($config, 'description'),
+                        'uuid' => $cuid,
+                        'environment_id' => $environment->id,
+                        'git_repository' => data_get($config, 'source.git_repository', "{$this->selected_repository_owner}/{$this->selected_repository_repo}"),
+                        'git_branch' => data_get($config, 'source.git_branch', $this->selected_branch_name),
+                        'build_pack' => data_get($config, 'build.build_pack', $this->build_pack),
+                        'ports_exposes' => data_get($config, 'network.ports.expose', $this->port),
+                        'destination_id' => $destination->id,
+                        'destination_type' => get_class($destination),
+                        'source_id' => $this->github_app->id,
+                        'source_type' => $this->github_app->getMorphClass(),
+                        'fqdn' => data_get($config, 'network.fqdn', generateFqdn($destination->server, $cuid)),
+                        'base_directory' => data_get($config, 'build.base_directory', $this->base_directory),
+                        'publish_directory' => data_get($config, 'build.publish_directory', $this->publish_directory),
+                    ]);
+
+                    $application->save();
+
+                    // Create default settings
+                    $application->settings()->create([]);
+
+                    // Now set the full configuration
+                    $application->setConfig($config);
+
+                    DB::commit();
+
+                    $this->dispatch('success', 'Application created successfully');
+
+                    // Redirect to the application page
+                    return redirect()->route('project.application.configuration', [
+                        'project_uuid' => $project->uuid,
+                        'environment_uuid' => $environment->uuid,
+                        'application_uuid' => $application->uuid,
+                    ]);
+                } catch (\Throwable $e) {
+                    DB::rollBack();
+                    throw $e;
+                }
+            } else {
+                $application = Application::create([
+                    'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
+                    'repository_project_id' => $this->selected_repository_id,
+                    'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
+                    'git_branch' => $this->selected_branch_name,
+                    'build_pack' => $this->build_pack,
+                    'ports_exposes' => $this->port,
+                    'base_directory' => $this->base_directory,
+                    'publish_directory' => $this->publish_directory,
+                    'environment_id' => $environment->id,
+                    'destination_id' => $destination->id,
+                    'destination_type' => $destination_class,
+                    'source_id' => $this->github_app->id,
+                    'source_type' => $this->github_app->getMorphClass(),
+                ]);
+                $application->settings->is_static = $this->is_static;
+                $application->settings->save();
+
+                if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                    $application->health_check_enabled = false;
+                }
+                if ($this->build_pack === 'dockercompose') {
+                    $application['docker_compose_location'] = $this->docker_compose_location;
+                    $application['base_directory'] = $this->base_directory;
+                }
+                $fqdn = generateFqdn($destination->server, $application->uuid);
+                $application->fqdn = $fqdn;
+
+                $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
+                $application->save();
+
+                return redirect()->route('project.application.configuration', [
+                    'application_uuid' => $application->uuid,
+                    'environment_uuid' => $environment->uuid,
+                    'project_uuid' => $project->uuid,
+                ]);
             }
-            if ($this->build_pack === 'dockercompose') {
-                $application['docker_compose_location'] = $this->docker_compose_location;
-                $application['base_directory'] = $this->base_directory;
-            }
-            $fqdn = generateFqdn($destination->server, $application->uuid);
-            $application->fqdn = $fqdn;
-
-            $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
-            $application->save();
-
-            return redirect()->route('project.application.configuration', [
-                'application_uuid' => $application->uuid,
-                'environment_uuid' => $environment->uuid,
-                'project_uuid' => $project->uuid,
-            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

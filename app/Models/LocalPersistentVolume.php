@@ -15,7 +15,8 @@ class LocalPersistentVolume extends Model
 
         static::creating(function ($model) {
             if (blank($model->name)) {
-                $model->name = $model->resource->uuid.'-'.str_replace('/', '-', $model->mount_path);
+                $name = $model->resource->uuid.str_replace('/', '-', $model->mount_path);
+                $model->name = $name;
             }
         });
     }

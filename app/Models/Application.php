@@ -1804,23 +1804,26 @@ class Application extends BaseModel
 
             // Update environment variables
             if ($envVars = data_get($config, 'environment_variables.production')) {
-                $this->environment_variables()->delete();
                 foreach ($envVars as $envVar) {
-                    $this->environment_variables()->create($envVar);
+                    $this->environment_variables()->create([
+                        ...$envVar,
+                        'is_preview' => false,
+                    ]);
                 }
             }
 
             // Update preview environment variables
             if ($previewEnvVars = data_get($config, 'environment_variables.preview')) {
-                $this->environment_variables_preview()->delete();
                 foreach ($previewEnvVars as $envVar) {
-                    $this->environment_variables_preview()->create($envVar);
+                    $this->environment_variables_preview()->create([
+                        ...$envVar,
+                        'is_preview' => true,
+                    ]);
                 }
             }
 
             // Update persistent storages
             if ($persistentStorages = data_get($config, 'persistent_storages')) {
-                $this->persistentStorages()->delete();
                 foreach ($persistentStorages as $storage) {
                     $this->persistentStorages()->create($storage);
                 }
@@ -1828,9 +1831,9 @@ class Application extends BaseModel
 
             // Update scheduled tasks
             if ($scheduledTasks = data_get($config, 'scheduled_tasks')) {
-                $this->scheduled_tasks()->delete();
                 foreach ($scheduledTasks as $task) {
                     $this->scheduled_tasks()->create([
+                        'team_id' => currentTeam()->id,
                         'name' => $task['name'],
                         'command' => $task['command'],
                         'frequency' => $task['frequency'],

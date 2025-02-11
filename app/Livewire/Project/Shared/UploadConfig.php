@@ -3,6 +3,8 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Application;
+use App\Models\Project;
+use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Facades\DB;
@@ -13,28 +15,54 @@ class UploadConfig extends Component
 {
     public $config;
 
+    public $project_uuid;
+
+    public $environment_uuid;
+
+    public $destination_uuid;
+
     public function mount()
     {
         if (isDev()) {
             $this->setExampleConfig('dockerfile');
         }
+        $this->project_uuid = request()->route('project_uuid');
+        $this->environment_uuid = request()->route('environment_uuid');
     }
 
     public function setExampleConfig(string $buildPack)
     {
+        $this->destination_uuid = Server::first()->destinations()->first()->uuid;
+
         switch ($buildPack) {
             case 'dockerfile':
                 $this->config = '{
     "name": "Example Application",
     "description": "This is an example application configuration",
     "coolify": {
-        "project_uuid": "eoc48g0wwsgw48csws8o8c4w",
-        "environment_uuid": "q8gs4w44kcs004ogg40cok0k",
-        "destination_uuid": "kg4wkc80w8gggso04c4sw40s"
+        "project_uuid": "'.$this->project_uuid.'",
+        "environment_uuid": "'.$this->environment_uuid.'",
+        "destination_uuid": "'.$this->destination_uuid.'"
     },
     "build": {
         "build_pack": "dockerfile",
-        "docker": {
+        "dockerfile": {
+            "content": "FROM nginx:latest"
+        }
+    },
+    "network": {
+        "ports": {
+            "expose": "80"
+        }
+    }
+}';
+            case 'dockerfile-without-coolify':
+                $this->config = '{
+    "name": "Example Application",
+    "description": "This is an example application configuration",
+    "build": {
+        "build_pack": "dockerfile",
+        "dockerfile": {
             "content": "FROM nginx:latest"
         }
     },
@@ -50,9 +78,9 @@ class UploadConfig extends Component
     "name": "Example Application",
     "description": "This is an example application configuration",
     "coolify": {
-        "project_uuid": "eoc48g0wwsgw48csws8o8c4w",
-        "environment_uuid": "q8gs4w44kcs004ogg40cok0k",
-        "destination_uuid": "kg4wkc80w8gggso04c4sw40s"
+        "project_uuid": "'.$this->project_uuid.'",
+        "environment_uuid": "'.$this->environment_uuid.'",
+        "destination_uuid": "'.$this->destination_uuid.'"
     },
     "source": {
         "git_repository": "https://github.com/coollabsio/coolify-examples",
@@ -69,17 +97,25 @@ class UploadConfig extends Component
     "name": "Example Application",
     "description": "This is an example application configuration",
     "coolify": {
-        "project_uuid": "eoc48g0wwsgw48csws8o8c4w",
-        "environment_uuid": "q8gs4w44kcs004ogg40cok0k",
-        "destination_uuid": "kg4wkc80w8gggso04c4sw40s"
+        "project_uuid": "'.$this->project_uuid.'",
+        "environment_uuid": "'.$this->environment_uuid.'",
+        "destination_uuid": "'.$this->destination_uuid.'"
     },
-     "source": {
+    "source": {
         "git_repository": "https://github.com/coollabsio/coolify-examples",
         "git_branch": "main"
     },
     "build": {
         "build_pack": "dockerfile",
         "base_directory": "/dockerfile"
+    },
+    "network": {
+        "domains": {
+            "fqdn": "http://dockerfile.127.0.0.1.sslip.io"
+        },
+        "ports": {
+            "expose": "80"
+        }
     },
     "environment_variables": {
         "production": [
@@ -107,6 +143,10 @@ class UploadConfig extends Component
             "command": "ls",
             "frequency": "daily"
         }
+    ],
+    "tags": [
+        "tag1",
+        "tag2"
     ]
 }';
                 break;
@@ -116,6 +156,24 @@ class UploadConfig extends Component
     public function uploadConfig()
     {
         try {
+            $config = json_decode($this->config, true);
+            $project_uuid = data_get($config, 'coolify.project_uuid', $this->project_uuid);
+            $environment_uuid = data_get($config, 'coolify.environment_uuid', $this->environment_uuid);
+            $destination_uuid = data_get($config, 'coolify.destination_uuid', $this->destination_uuid);
+
+            if (blank($destination_uuid)) {
+                if (Server::ownedByCurrentTeam()->count() == 1) {
+                    $destination_uuid = Server::ownedByCurrentTeam()->first()->uuid;
+                } else {
+                    throw new \Exception('No destination set.');
+                }
+            }
+            data_set($config, 'coolify.project_uuid', $project_uuid);
+            data_set($config, 'coolify.environment_uuid', $environment_uuid);
+            data_set($config, 'coolify.destination_uuid', $destination_uuid);
+
+            $this->config = json_encode($config, JSON_PRETTY_PRINT);
+
             $config = configValidator($this->config);
 
             // Get project and environment from config

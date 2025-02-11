@@ -133,7 +133,6 @@ function configValidator(string $config)
         throw new \Exception('Invalid JSON format');
     }
     $config = json_decode($config, true);
-
     $messages = [
         'config.coolify.project_uuid.required' => 'Project UUID is required (coolify.project_uuid) in the coolify configuration.',
         'config.coolify.environment_uuid.required' => 'Environment UUID is required (coolify.environment_uuid) in the coolify configuration.',
@@ -342,7 +341,7 @@ function configValidator(string $config)
 
     if ($deepValidator->fails()) {
         $errors = $deepValidator->errors()->all();
-        throw new \Exception('Configuration validation failed:'.PHP_EOL.'- '.implode(PHP_EOL.'- ', $errors));
+        throw new \Exception('Validation failed:'.PHP_EOL.'- '.implode(PHP_EOL.'- ', $errors));
     }
 
     // Custom validation for dockerfile content
@@ -352,7 +351,22 @@ function configValidator(string $config)
     $dockerfileContent = data_get($config, 'build.dockerfile.content');
 
     if ($buildPack === 'dockerfile' && ! $gitRepository && ! $gitBranch && ! $dockerfileContent) {
-        throw new \Exception('Configuration validation failed:'.PHP_EOL.'- When using dockerfile build pack without git repository and branch, the Dockerfile content is required (build.dockerfile.content)');
+        throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- When using dockerfile build pack without git repository and branch, the Dockerfile content is required (build.dockerfile.content)');
+    }
+
+    //validate domains
+    $domains = data_get($config, 'network.domains.fqdn');
+    if ($domains) {
+        $domains = explode(',', $domains);
+        foreach ($domains as $domain) {
+            if (!str_starts_with($domain, 'http://') && !str_starts_with($domain, 'https://')) {
+                throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- Domain must start with http:// or https://<br><br>Your domain: '.$domain);
+            }
+            $parsedDomain = parse_url($domain, PHP_URL_HOST);
+            if (!$parsedDomain || !filter_var($parsedDomain, FILTER_VALIDATE_DOMAIN)) {
+                throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- Invalid domain: '.$domain);
+            }
+        }
     }
 
     return $config;

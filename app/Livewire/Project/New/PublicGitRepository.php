@@ -10,8 +10,11 @@ use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 class PublicGitRepository extends Component
 {
@@ -27,11 +30,15 @@ class PublicGitRepository extends Component
 
     public bool $branchFound = false;
 
+    public ?string $coolify_config = null;
+
     public string $selectedBranch = 'main';
 
     public bool $isStatic = false;
 
     public bool $checkCoolifyConfig = true;
+
+    public bool $use_coolify_config = false;
 
     public ?string $publish_directory = null;
 
@@ -99,6 +106,7 @@ class PublicGitRepository extends Component
                 $this->base_directory = '/'.$this->base_directory;
             }
         }
+        $this->getCoolifyConfig();
     }
 
     public function updatedDockerComposeLocation()
@@ -121,7 +129,7 @@ class PublicGitRepository extends Component
             $this->isStatic = false;
             $this->port = 80;
         } else {
-            $this->show_is_static = false;
+            $this->show_is_static = true;
             $this->isStatic = false;
         }
     }
@@ -165,6 +173,7 @@ class PublicGitRepository extends Component
             $this->branchFound = false;
             $this->getGitSource();
             $this->getBranch();
+            $this->getCoolifyConfig();
             $this->selectedBranch = $this->git_branch;
         } catch (\Throwable $e) {
             if ($this->rate_limit_remaining == 0) {
@@ -230,6 +239,15 @@ class PublicGitRepository extends Component
         }
     }
 
+    private function getCoolifyConfig()
+    {
+        try {
+            ['coolify_config' => $this->coolify_config, 'rate_limit_reset' => $this->rate_limit_reset] = $this->git_source->getCoolifyConfig($this->base_directory, $this->git_repository, $this->git_branch);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function submit()
     {
         try {
@@ -249,7 +267,61 @@ class PublicGitRepository extends Component
 
             $project = Project::where('uuid', $project_uuid)->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
+            if (filled($this->coolify_config) && $this->use_coolify_config) {
+                try {
+                    $config = json_decode($this->coolify_config, true);
+                    data_set($config, 'coolify.destination_uuid', $destination->uuid);
+                    data_set($config, 'coolify.project_uuid', $project->uuid);
+                    data_set($config, 'coolify.environment_uuid', $environment->uuid);
+                    data_set($config, 'source.git_repository', "{$this->git_repository}");
+                    data_set($config, 'source.git_branch', $this->git_branch);
+                    $this->coolify_config = json_encode($config, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES);
+                    $config = configValidator($this->coolify_config);
+                    DB::beginTransaction();
 
+                    // Create and save the base application first
+                    $cuid = new Cuid2();
+                    $application = new Application([
+                        'name' => generate_application_name($this->git_repository, $this->git_branch),
+                        'description' => data_get($config, 'description'),
+                        'uuid' => $cuid,
+                        'environment_id' => $environment->id,
+                        'git_repository' => data_get($config, 'source.git_repository', "{$this->git_repository}"),
+                        'git_branch' => data_get($config, 'source.git_branch', $this->git_branch),
+                        'build_pack' => data_get($config, 'build.build_pack', $this->build_pack),
+                        'ports_exposes' => data_get($config, 'network.ports.expose', $this->port),
+                        'destination_id' => $destination->id,
+                        'destination_type' => get_class($destination),
+                        'source_id' => $this->git_source->id,
+                        'source_type' => $this->git_source->getMorphClass(),
+                        'fqdn' => data_get($config, 'network.fqdn', generateFqdn($destination->server, $cuid)),
+                        'base_directory' => data_get($config, 'build.base_directory', $this->base_directory),
+                        'publish_directory' => data_get($config, 'build.publish_directory', $this->publish_directory),
+                    ]);
+
+                    $application->save();
+
+                    // Create default settings
+                    $application->settings()->create([]);
+
+                    // Now set the full configuration
+                    $application->setConfig($config);
+
+                    DB::commit();
+
+                    $this->dispatch('success', 'Application created successfully');
+
+                    // Redirect to the application page
+                    return redirect()->route('project.application.configuration', [
+                        'project_uuid' => $project->uuid,
+                        'environment_uuid' => $environment->uuid,
+                        'application_uuid' => $application->uuid,
+                    ]);
+                } catch (\Throwable $e) {
+                    DB::rollBack();
+                    throw $e;
+                }
+            } else {
             if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
                 $server = $destination->server;
                 $new_service = [
@@ -333,6 +405,7 @@ class PublicGitRepository extends Component
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
+        }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
