@@ -39,18 +39,20 @@ class GithubApp extends BaseModel
     public static function public()
     {
         return GithubApp::where(function ($query) {
-            $query->where('team_id', currentTeam()->id)
-                ->where('is_public', true)
-                ->orWhere('is_system_wide', true);
+            $query->where(function ($q) {
+                $q->where('team_id', currentTeam()->id)
+                    ->orWhere('is_system_wide', true);
+            })->where('is_public', true);
         })->whereNotNull('app_id')->get();
     }
 
     public static function private()
     {
         return GithubApp::where(function ($query) {
-            $query->where('team_id', currentTeam()->id)
-                ->where('is_public', false)
-                ->orWhere('is_system_wide', true);
+            $query->where(function ($q) {
+                $q->where('team_id', currentTeam()->id)
+                    ->orWhere('is_system_wide', true);
+            })->where('is_public', false);
         })->whereNotNull('app_id')->get();
     }
 
