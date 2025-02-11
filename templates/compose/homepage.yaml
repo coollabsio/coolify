@@ -20,7 +20,7 @@ services:
         content: |
           ---
           # For configuration options and examples, please see:
-          # https://gethomepage.dev/latest/configs/bookmarks
+          # https://gethomepage.dev/configs/bookmarks
 
           - Developer:
               - Github:
@@ -53,7 +53,7 @@ services:
         content: |
           ---
           # For configuration options and examples, please see:
-          # https://gethomepage.dev/latest/configs/docker/
+          # https://gethomepage.dev/configs/docker/
 
           # my-docker:
           #   host: 127.0.0.1
@@ -75,7 +75,7 @@ services:
         content: |
           ---
           # For configuration options and examples, please see:
-          # https://gethomepage.dev/latest/configs/services
+          # https://gethomepage.dev/configs/services
 
           - My First Group:
               - My First Service:
@@ -98,7 +98,7 @@ services:
         content: |
           ---
           # For configuration options and examples, please see:
-          # https://gethomepage.dev/latest/configs/settings
+          # https://gethomepage.dev/configs/settings
 
           providers:
             openweathermap: openweathermapapikey
@@ -110,7 +110,7 @@ services:
         content: |
           ---
           # For configuration options and examples, please see:
-          # https://gethomepage.dev/latest/configs/service-widgets
+          # https://gethomepage.dev/widgets/services
 
           - resources:
               cpu: true
