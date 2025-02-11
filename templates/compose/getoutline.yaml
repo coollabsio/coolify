@@ -70,7 +70,7 @@ services:
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
       - SMTP_REPLY_EMAIL=${SMTP_REPLY_EMAIL}
       - SMTP_TLS_CIPHERS=${SMTP_TLS_CIPHERS}
-      - SMTP_SECURE=${SMTP_SECURE:}
+      - SMTP_SECURE=${SMTP_SECURE}
       - SMTP_NAME=${SMTP_NAME}
     healthcheck:
       disable: true
