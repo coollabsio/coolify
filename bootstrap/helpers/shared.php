@@ -440,11 +440,7 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
-    if (isDev()) {
-        $services = File::get(base_path('templates/service-templates.json'));
 
-        return collect(json_decode($services))->sortKeys();
-    }
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -2115,6 +2111,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $parsedServiceVariables->put($key, $value);
                     }
                 }
+                $parsedServiceVariables->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
 
                 // TODO: move this in a shared function
@@ -2645,7 +2642,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($value?->startsWith('$')) {
                     $foundEnv = EnvironmentVariable::where([
                         'key' => $key,
-                        'application_id' => $resource->id,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
                         'is_preview' => false,
                     ])->first();
                     $value = replaceVariables($value);
@@ -2653,7 +2651,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                         if (! is_null($command)) {
@@ -2676,7 +2675,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'key' => $key,
                                         'value' => $fqdn,
                                         'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -2687,7 +2687,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'key' => $key,
                                         'value' => $generatedValue,
                                         'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -2712,7 +2713,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                             'is_preview' => false,
                         ])->first();
                         if ($foundEnv) {
@@ -2722,7 +2724,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($foundEnv) {
                             $foundEnv->update([
                                 'key' => $key,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_build_time' => $isBuildTime,
                                 'value' => $defaultValue,
                             ]);
@@ -2731,7 +2734,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'key' => $key,
                                 'value' => $defaultValue,
                                 'is_build_time' => $isBuildTime,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -2872,7 +2876,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_forget($service, 'volumes.*.is_directory');
             data_forget($service, 'exclude_from_hc');
             data_set($service, 'environment', $serviceVariables->toArray());
-            updateCompose($service);
 
             return $service;
         });
@@ -3600,9 +3603,14 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
         }
 
+        // Add COOLIFY_RESOURCE_UUID to environment
+        if ($resource->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $coolifyEnvironments->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
+        }
+
         // Add COOLIFY_CONTAINER_NAME to environment
         if ($resource->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "\"{$containerName}\"");
+            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "{$containerName}");
         }
 
         if ($isApplication) {

@@ -43,7 +43,11 @@ class DockerImageParser
 
     public function getFullImageNameWithoutTag(): string
     {
-        return $this->registryUrl.'/'.$this->imageName;
+        if ($this->registryUrl) {
+            return $this->registryUrl.'/'.$this->imageName;
+        }
+
+        return $this->imageName;
     }
 
     public function getRegistryUrl(): string

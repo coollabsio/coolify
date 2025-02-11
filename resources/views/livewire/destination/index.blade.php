@@ -2,7 +2,7 @@
     <x-slot:title>
         Destinations | Coolify
     </x-slot>
-    <div class="flex items-start gap-2">
+    <div class="flex items-center gap-2">
         <h1>Destinations</h1>
         @if ($servers->count() > 0)
             <x-modal-input buttonTitle="+ Add" title="New Destination">
