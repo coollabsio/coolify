@@ -287,9 +287,11 @@ class StartKeydb
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
+                '--tls-port 6380',
                 '--tls-cert-file /etc/keydb/certs/server.crt',
                 '--tls-key-file /etc/keydb/certs/server.key',
                 '--tls-ca-cert-file /etc/keydb/certs/coolify-ca.crt',
+                '--tls-auth-clients optional',
             ];
             $command .= ' '.implode(' ', $sslArgs);
         }
