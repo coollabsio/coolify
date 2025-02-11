@@ -197,6 +197,7 @@ class StartDragonfly
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
+                '--tls',
                 '--tls_cert_file /etc/dragonfly/certs/server.crt',
                 '--tls_key_file /etc/dragonfly/certs/server.key',
                 '--tls_ca_cert_file /etc/dragonfly/certs/coolify-ca.crt',
