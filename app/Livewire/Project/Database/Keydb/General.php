@@ -57,7 +57,7 @@ class General extends Component
 
     public $certificateValidUntil = null;
 
-    #[Validate(['nullable', 'boolean'])]
+    #[Validate(['boolean'])]
     public bool $enable_ssl = false;
 
     public function getListeners()

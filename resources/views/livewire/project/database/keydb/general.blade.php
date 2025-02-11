@@ -80,7 +80,7 @@
                 </span>
             @endif
             <div class="flex flex-col gap-2">
-                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                <x-forms.checkbox id="enable_ssl" label="Enable SSL" wire:model.live="enable_ssl" instantSave="instantSaveSSL" />
             </div>
         </div>
         <div>
