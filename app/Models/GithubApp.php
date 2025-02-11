@@ -33,7 +33,10 @@ class GithubApp extends BaseModel
 
     public static function ownedByCurrentTeam()
     {
-        return GithubApp::whereTeamId(currentTeam()->id);
+        return GithubApp::where(function ($query) {
+            $query->where('team_id', currentTeam()->id)
+                ->orWhere('is_system_wide', true);
+        });
     }
 
     public static function public()
