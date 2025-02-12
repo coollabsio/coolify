@@ -35,7 +35,7 @@ class RouteServiceProvider extends ServiceProvider
                 ->group(base_path('routes/webhooks.php'));
 
             Route::middleware('web')
-                ->prefix('inertia')
+                ->prefix('next')
                 ->group(base_path('routes/inertia-web.php'));
 
             Route::middleware('web')

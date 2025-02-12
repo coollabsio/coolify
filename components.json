@@ -6,8 +6,8 @@
     "tailwind": {
         "config": "tailwind-inertia.config.js",
         "css": "resources/css/inertia.css",
-        "baseColor": "slate",
-        "cssVariables": true,
+        "baseColor": "neutral",
+        "cssVariables": false,
         "prefix": ""
     },
     "framework": "laravel",

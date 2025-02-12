@@ -50,11 +50,14 @@
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/apexcharts.js') }}"></script>
     @endauth --}}
+
     @inertiaHead
 
 </head>
 
+
 <body class="min-h-screen bg-background text-foreground">
+    @routes
     @inertia
 </body>
 

@@ -1,4 +1,5 @@
 <script setup lang=ts>
+import { Link } from '@inertiajs/vue3'
 import {
     Avatar,
     AvatarFallback,
@@ -72,6 +73,11 @@ import {
     Sparkles,
     SquareTerminal,
     Trash2,
+    Home,
+    Layers,
+    Server,
+    GitBranch,
+    Database,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
@@ -84,107 +90,42 @@ const data = {
     },
     teams: [
         {
-            name: 'Acme Inc',
+            name: 'coolLabs Technologies',
             logo: GalleryVerticalEnd,
-            plan: 'Enterprise',
+            plan: 'Root',
         },
-        {
-            name: 'Acme Corp.',
-            logo: AudioWaveform,
-            plan: 'Startup',
-        },
-        {
-            name: 'Evil Corp.',
-            logo: Command,
-            plan: 'Free',
-        },
+
     ],
     navMain: [
         {
-            title: 'Playground',
-            url: '#',
-            icon: SquareTerminal,
-            isActive: true,
-            items: [
-                {
-                    title: 'History',
-                    url: '#',
-                },
-                {
-                    title: 'Starred',
-                    url: '#',
-                },
-                {
-                    title: 'Settings',
-                    url: '#',
-                },
-            ],
+            title: 'Dashboard',
+            icon: Home,
+            url: '/next/',
         },
         {
-            title: 'Models',
-            url: '#',
-            icon: Bot,
-            items: [
-                {
-                    title: 'Genesis',
-                    url: '#',
-                },
-                {
-                    title: 'Explorer',
-                    url: '#',
-                },
-                {
-                    title: 'Quantum',
-                    url: '#',
-                },
-            ],
+            title: 'Projects',
+            icon: Layers,
+            url: '/next/projects',
         },
         {
-            title: 'Documentation',
-            url: '#',
-            icon: BookOpen,
-            items: [
-                {
-                    title: 'Introduction',
-                    url: '#',
-                },
-                {
-                    title: 'Get Started',
-                    url: '#',
-                },
-                {
-                    title: 'Tutorials',
-                    url: '#',
-                },
-                {
-                    title: 'Changelog',
-                    url: '#',
-                },
-            ],
+            title: 'Servers',
+            icon: Server,
+            url: '/next/servers',
+            isDisabled: true,
         },
         {
-            title: 'Settings',
-            url: '#',
-            icon: Settings2,
-            items: [
-                {
-                    title: 'General',
-                    url: '#',
-                },
-                {
-                    title: 'Team',
-                    url: '#',
-                },
-                {
-                    title: 'Billing',
-                    url: '#',
-                },
-                {
-                    title: 'Limits',
-                    url: '#',
-                },
-            ],
+            title: 'Git Sources',
+            icon: GitBranch,
+            url: '/next/git-sources',
+            isDisabled: true,
         },
+        {
+            title: 'S3 Storage',
+            icon: Database,
+            url: '/next/s3-storage',
+            isDisabled: true,
+        },
+
     ],
     projects: [
         {
@@ -214,7 +155,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 
 <template>
     <SidebarProvider>
-        <Sidebar collapsible="icon">
+        <Sidebar class="border-coolgray-200 border-r h-screen pt-4 px-4" collapsible="none">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
@@ -223,7 +164,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                                 <SidebarMenuButton size="lg"
                                     class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
                                     <div
-                                        class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                                        class="flex aspect-square  items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                                         <component :is="activeTeam.logo" class="size-4" />
                                     </div>
                                     <div class="grid flex-1 text-left text-sm leading-tight">
@@ -263,78 +204,22 @@ function setActiveTeam(team: typeof data.teams[number]) {
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Platform</SidebarGroupLabel>
                     <SidebarMenu>
-                        <Collapsible v-for="item in data.navMain" :key="item.title" as-child
-                            :default-open="item.isActive" class="group/collapsible">
+                        <div v-for="item in data.navMain" :key="item.title">
                             <SidebarMenuItem>
-                                <CollapsibleTrigger as-child>
-                                    <SidebarMenuButton :tooltip="item.title">
-                                        <component :is="item.icon" />
-                                        <span>{{ item.title }}</span>
-                                        <ChevronRight
-                                            class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                                    </SidebarMenuButton>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                    <SidebarMenuSub>
-                                        <SidebarMenuSubItem v-for="subItem in item.items" :key="subItem.title">
-                                            <SidebarMenuSubButton as-child>
-                                                <a :href="subItem.url">
-                                                    <span>{{ subItem.title }}</span>
-                                                </a>
-                                            </SidebarMenuSubButton>
-                                        </SidebarMenuSubItem>
-                                    </SidebarMenuSub>
-                                </CollapsibleContent>
-                            </SidebarMenuItem>
-                        </Collapsible>
-                    </SidebarMenu>
-                </SidebarGroup>
-                <SidebarGroup class="group-data-[collapsible=icon]:hidden">
-                    <SidebarGroupLabel>Projects</SidebarGroupLabel>
-                    <SidebarMenu>
-                        <SidebarMenuItem v-for="item in data.projects" :key="item.name">
-                            <SidebarMenuButton as-child>
-                                <a :href="item.url">
+                                <Link :href="item.isDisabled ? '#' : item.url">
+                                <SidebarMenuButton :tooltip="item.title" as="div"
+                                    :class="['hover:dark:bg-white/10', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
                                     <component :is="item.icon" />
-                                    <span>{{ item.name }}</span>
-                                </a>
-                            </SidebarMenuButton>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger as-child>
-                                    <SidebarMenuAction show-on-hover>
-                                        <MoreHorizontal />
-                                        <span class="sr-only">More</span>
-                                    </SidebarMenuAction>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent class="w-48 rounded-lg" side="bottom" align="end">
-                                    <DropdownMenuItem>
-                                        <Folder class="text-muted-foreground" />
-                                        <span>View Project</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Forward class="text-muted-foreground" />
-                                        <span>Share Project</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
-                                        <Trash2 class="text-muted-foreground" />
-                                        <span>Delete Project</span>
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton class="text-sidebar-foreground/70">
-                                <MoreHorizontal class="text-sidebar-foreground/70" />
-                                <span>More</span>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
+                                    <span>{{ item.title }}</span>
+                                </SidebarMenuButton>
+                                </Link>
+                            </SidebarMenuItem>
+                        </div>
                     </SidebarMenu>
                 </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter>
+            <!-- <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <DropdownMenu>
@@ -401,37 +286,18 @@ function setActiveTeam(team: typeof data.teams[number]) {
                         </DropdownMenu>
                     </SidebarMenuItem>
                 </SidebarMenu>
-            </SidebarFooter>
+            </SidebarFooter> -->
             <SidebarRail />
         </Sidebar>
         <SidebarInset>
             <header
-                class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                <div class="flex items-center gap-2 px-4">
-                    <SidebarTrigger class="-ml-1" />
-                    <Separator orientation="vertical" class="mr-2 h-4" />
-                    <Breadcrumb>
-                        <BreadcrumbList>
-                            <BreadcrumbItem class="hidden md:block">
-                                <BreadcrumbLink href="#">
-                                    Building Your Application
-                                </BreadcrumbLink>
-                            </BreadcrumbItem>
-                            <BreadcrumbSeparator class="hidden md:block" />
-                            <BreadcrumbItem>
-                                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-                            </BreadcrumbItem>
-                        </BreadcrumbList>
-                    </Breadcrumb>
-                </div>
+                class="flex shrink-0 p-4 pt-6 bg-background flex flex-col">
+                <h1 class="text-3xl font-bold"><slot name="title" /></h1>
+                <h3 class="text-sm text-muted-foreground"><slot name="subtitle" /></h3>
+                <!-- <SidebarTrigger class="-ml-1" /> -->
             </header>
-            <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
-                <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div class="aspect-video rounded-xl bg-muted/50" />
-                    <div class="aspect-video rounded-xl bg-muted/50" />
-                    <div class="aspect-video rounded-xl bg-muted/50" />
-                </div>
-                <div class="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+            <div class="flex flex-1 flex-col gap-4 p-4 pt-0 bg-background">
+                <slot />
             </div>
         </SidebarInset>
     </SidebarProvider>
