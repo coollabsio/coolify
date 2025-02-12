@@ -43,7 +43,7 @@ function coolify {
 }
 
 function coolify:root {
-    bash spin exec coolify sh
+    bash spin exec -u root coolify sh
 }
 function coolify:proxy {
     docker exec -ti coolify-proxy sh
@@ -54,7 +54,7 @@ function redis {
 }
 
 function vite {
-    bash spin exec vite bash
+    bash spin exec -u node vite sh
 }
 
 function tinker {

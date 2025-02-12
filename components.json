@@ -1,0 +1,18 @@
+{
+    "$schema": "https://shadcn-vue.com/schema.json",
+    "style": "default",
+    "typescript": true,
+    "tsConfigPath": "./tsconfig.json",
+    "tailwind": {
+        "config": "tailwind-inertia.config.js",
+        "css": "resources/css/inertia.css",
+        "baseColor": "slate",
+        "cssVariables": true,
+        "prefix": ""
+    },
+    "framework": "laravel",
+    "aliases": {
+        "components": "@/components",
+        "utils": "@/lib/utils"
+    }
+}

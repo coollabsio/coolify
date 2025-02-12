@@ -37,7 +37,7 @@ USER www-data
 FROM node:20-alpine AS static-assets
 
 WORKDIR /app
-COPY package*.json vite.config.js tailwind.config.js postcss.config.cjs ./
+COPY package*.json vite.config.js tailwind.config.js tailwind-inertia.config.js postcss.config.cjs ./
 RUN npm ci
 COPY . .
 RUN npm run build
