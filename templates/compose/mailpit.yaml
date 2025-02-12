@@ -9,6 +9,10 @@ services:
     image: axllent/mailpit
     ports:
       - 1025:1025
+      - 8025:8025
+    labels:
+      - 'traefik.http.services.mailpit.loadbalancer.server.port=8025'
+      - 'caddy_0.handle_path.1_reverse_proxy={{upstreams 8025}}'
     volumes:
       - "mailpit-data:/data"
       - type: bind
