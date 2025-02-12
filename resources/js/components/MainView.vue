@@ -1,12 +1,6 @@
 <script setup lang=ts>
 import { Link } from '@inertiajs/vue3'
 import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from '@/components/ui/avatar'
-
-import {
     Breadcrumb,
     BreadcrumbItem,
     BreadcrumbLink,
@@ -16,78 +10,50 @@ import {
 } from '@/components/ui/breadcrumb'
 
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuShortcut,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Separator } from '@/components/ui/separator'
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarGroup,
-    SidebarGroupLabel,
     SidebarHeader,
     SidebarInset,
     SidebarMenu,
-    SidebarMenuAction,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubButton,
-    SidebarMenuSubItem,
     SidebarProvider,
     SidebarRail,
     SidebarTrigger,
 } from '@/components/ui/sidebar'
 import {
-    AudioWaveform,
-    BadgeCheck,
-    Bell,
-    BookOpen,
-    Bot,
-    ChevronRight,
     ChevronsUpDown,
-    Command,
-    CreditCard,
-    Folder,
-    Forward,
-    Frame,
     GalleryVerticalEnd,
-    LogOut,
-    Map,
-    MoreHorizontal,
-    PieChart,
+    UsersRound,
     Plus,
-    Settings2,
-    Sparkles,
-    SquareTerminal,
-    Trash2,
     Home,
-    Layers,
-    Server,
-    GitBranch,
-    Database,
+    Settings,
+    Bell,
+    Tag,
+    Terminal,
+    ListCheck,
+    MessageCircleQuestion,
 } from 'lucide-vue-next'
-import { ref } from 'vue'
+import {  ref } from 'vue'
+import { Input } from '@/components/ui/input'
+import { useDebounceFn } from '@vueuse/core'
+import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 
-// This is sample data.
+const props = defineProps<{
+    breadcrumb?: CustomBreadcrumbItem[]
+}>()
+
 const data = {
-    user: {
-        name: 'shadcn',
-        email: 'm@example.com',
-        avatar: '/avatars/shadcn.jpg',
-    },
     teams: [
         {
             name: 'coolLabs Technologies',
@@ -103,50 +69,52 @@ const data = {
             url: '/next/',
         },
         {
-            title: 'Projects',
-            icon: Layers,
-            url: '/next/projects',
+            title: 'Notifications',
+            icon: Bell,
+            url: '/next/notifications',
         },
         {
-            title: 'Servers',
-            icon: Server,
-            url: '/next/servers',
-            isDisabled: true,
+            title: 'Tags',
+            icon: Tag,
+            url: '/next/tags',
         },
         {
-            title: 'Git Sources',
-            icon: GitBranch,
-            url: '/next/git-sources',
-            isDisabled: true,
+            title: 'Terminals',
+            icon: Terminal,
+            url: '/next/terminals',
         },
         {
-            title: 'S3 Storage',
-            icon: Database,
-            url: '/next/s3-storage',
-            isDisabled: true,
+            title: 'Settings',
+            icon: Settings,
+            url: '/next/settings',
+        },
+        {
+            title: 'Onboarding',
+            icon: ListCheck,
+            url: '/next/onboarding',
+        },
+        {
+            title: 'Feedback',
+            icon: MessageCircleQuestion,
+            url: '/next/feedback',
         },
 
-    ],
-    projects: [
-        {
-            name: 'Design Engineering',
-            url: '#',
-            icon: Frame,
-        },
-        {
-            name: 'Sales & Marketing',
-            url: '#',
-            icon: PieChart,
-        },
-        {
-            name: 'Travel',
-            url: '#',
-            icon: Map,
-        },
-    ],
+    ]
 }
 
 const activeTeam = ref(data.teams[0])
+const search = ref('')
+
+const emit = defineEmits(['search'])
+const debouncedSearch = useDebounceFn((value: string | number) => {
+    emit('search', String(value))
+}, 100)
+
+const defaultOpen = ref(true)
+const cookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('sidebar:state='))
+defaultOpen.value = cookie?.split('=')[1] == 'false' ? false : true
 
 function setActiveTeam(team: typeof data.teams[number]) {
     activeTeam.value = team
@@ -154,18 +122,18 @@ function setActiveTeam(team: typeof data.teams[number]) {
 </script>
 
 <template>
-    <SidebarProvider>
-        <Sidebar class="border-coolgray-200 border-r h-screen pt-4 px-4" collapsible="none">
+    <SidebarProvider :defaultOpen="defaultOpen">
+        <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <DropdownMenu>
                             <DropdownMenuTrigger as-child>
-                                <SidebarMenuButton size="lg"
-                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+                                <SidebarMenuButton
+                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mt-4">
                                     <div
                                         class="flex aspect-square  items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                                        <component :is="activeTeam.logo" class="size-4" />
+                                        <UsersRound class="size-4" />
                                     </div>
                                     <div class="grid flex-1 text-left text-sm leading-tight">
                                         <span class="truncate font-semibold">{{ activeTeam.name }}</span>
@@ -207,9 +175,9 @@ function setActiveTeam(team: typeof data.teams[number]) {
                     <SidebarMenu>
                         <div v-for="item in data.navMain" :key="item.title">
                             <SidebarMenuItem>
-                                <Link :href="item.isDisabled ? '#' : item.url">
+                                <Link :href="item.url">
                                 <SidebarMenuButton :tooltip="item.title" as="div"
-                                    :class="['hover:dark:bg-white/10', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
+                                    :class="['hover:dark:bg-white/10']">
                                     <component :is="item.icon" />
                                     <span>{{ item.title }}</span>
                                 </SidebarMenuButton>
@@ -290,11 +258,36 @@ function setActiveTeam(team: typeof data.teams[number]) {
             <SidebarRail />
         </Sidebar>
         <SidebarInset>
-            <header
-                class="flex shrink-0 p-4 pt-6 bg-background flex flex-col">
-                <h1 class="text-3xl font-bold"><slot name="title" /></h1>
-                <h3 class="text-sm text-muted-foreground"><slot name="subtitle" /></h3>
-                <!-- <SidebarTrigger class="-ml-1" /> -->
+            <header class="flex shrink-0 p-4 pt-6 bg-background flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center">
+                    <SidebarTrigger class="-ml-2 mr-2 "  />
+                    <Breadcrumb v-if="props.breadcrumb && props.breadcrumb.length > 0">
+                        <BreadcrumbList>
+                            <template v-for="(item, index) in props.breadcrumb" :key="index">
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink v-if="item.href" :href="item.href">
+                                        {{ item.label }}
+                                    </BreadcrumbLink>
+                                    <BreadcrumbPage v-else>
+                                        {{ item.label }}
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator v-if="index < props.breadcrumb.length - 1">
+                                </BreadcrumbSeparator>
+                            </template>
+                        </BreadcrumbList>
+                    </Breadcrumb>
+                </div>
+                    <Input size="xs" class="w-96" v-model="search" placeholder="Search"
+                        @update:model-value="debouncedSearch" />
+                </div>
+                <h1 class="text-3xl font-bold">
+                    <slot name="title" />
+                </h1>
+                <h3 class="text-sm text-muted-foreground">
+                    <slot name="subtitle" />
+                </h3>
             </header>
             <div class="flex flex-1 flex-col gap-4 p-4 pt-0 bg-background">
                 <slot />
