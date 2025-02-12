@@ -261,25 +261,25 @@ function setActiveTeam(team: typeof data.teams[number]) {
             <header class="flex shrink-0 p-4 pt-6 bg-background flex flex-col gap-2">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center">
-                    <SidebarTrigger class="-ml-2 mr-2 "  />
-                    <Breadcrumb v-if="props.breadcrumb && props.breadcrumb.length > 0">
-                        <BreadcrumbList>
-                            <template v-for="(item, index) in props.breadcrumb" :key="index">
-                                <BreadcrumbItem>
-                                    <BreadcrumbLink v-if="item.href" :href="item.href">
-                                        {{ item.label }}
-                                    </BreadcrumbLink>
-                                    <BreadcrumbPage v-else>
-                                        {{ item.label }}
-                                    </BreadcrumbPage>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator v-if="index < props.breadcrumb.length - 1">
-                                </BreadcrumbSeparator>
-                            </template>
-                        </BreadcrumbList>
-                    </Breadcrumb>
-                </div>
-                    <Input size="xs" class="w-96" v-model="search" placeholder="Search"
+                        <SidebarTrigger class="-ml-2 mr-2 "  />
+                        <Breadcrumb v-if="props.breadcrumb && props.breadcrumb.length > 0">
+                            <BreadcrumbList>
+                                <template v-for="(item, index) in props.breadcrumb" :key="index">
+                                    <BreadcrumbItem>
+                                        <BreadcrumbLink v-if="item.href" :href="item.href">
+                                            {{ item.label }}
+                                        </BreadcrumbLink>
+                                        <BreadcrumbPage v-else>
+                                            {{ item.label }}
+                                        </BreadcrumbPage>
+                                    </BreadcrumbItem>
+                                    <BreadcrumbSeparator v-if="index < props.breadcrumb.length - 1">
+                                    </BreadcrumbSeparator>
+                                </template>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
+                    <Input size="xs" class="w-48 lg:w-96" v-model="search" placeholder="Search"
                         @update:model-value="debouncedSearch" />
                 </div>
                 <h1 class="text-3xl font-bold">

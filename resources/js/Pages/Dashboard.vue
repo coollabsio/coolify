@@ -147,7 +147,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
         </div>
         <div v-else>
             <Tabs :default-value="currentTab" orientation="vertical">
-                <TabsList class="bg-transparent text-left">
+                <TabsList class="bg-card text-left">
                     <TabsTrigger value="projects" @click="saveCurrentTab('projects')">
                         Projects
                     </TabsTrigger>
