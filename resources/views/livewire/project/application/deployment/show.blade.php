@@ -108,16 +108,16 @@
                 <div id="logs" class="flex flex-col font-mono">
                     @forelse ($this->logLines as $line)
                         <div @class([
-                            'mt-2' => $line['command'] ?? false,
+                            'mt-2' => isset($line['command']) && $line['command'],
                             'flex gap-2 dark:hover:bg-coolgray-500 hover:bg-gray-100',
                         ])>
                             <span x-show="showTimestamps" class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
                             <span @class([
                                 'text-coollabs dark:text-warning' => $line['hidden'],
                                 'text-red-500' => $line['stderr'],
-                                'font-bold' => $line['command'] ?? false,
+                                'font-bold' => isset($line['command']) && $line['command'],
                                 'whitespace-pre-wrap',
-                            ])>{!! $line['line'] !!}</span>
+                            ])>{!! (isset($line['command']) && $line['command'] ? '[CMD]: ' : '') . trim($line['line']) !!}</span>
                         </div>
                     @empty
                         <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>
