@@ -53,13 +53,14 @@ class S3Storage extends BaseModel
                 $mail = new MailMessage;
                 $mail->subject('Coolify: S3 Storage Connection Error');
                 $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('storage.show', ['storage_uuid' => $this->uuid])]);
-                $users = collect([]);
-                $members = $this->team->members()->get();
-                foreach ($members as $user) {
-                    if ($user->isAdmin()) {
-                        $users->push($user);
-                    }
-                }
+
+                // Load the team with its members and their roles explicitly
+                $team = $this->team()->with(['members' => function ($query) {
+                    $query->withPivot('role');
+                }])->first();
+
+                // Get admins directly from the pivot relationship for this specific team
+                $users = $team->members()->wherePivotIn('role', ['admin', 'owner'])->get(['users.id', 'users.email']);
                 foreach ($users as $user) {
                     send_user_an_email($mail, $user->email);
                 }
