@@ -23,6 +23,11 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Rollback Coolify version to 4.0.0-beta.392
 
 ## [4.0.0-beta.391] - 2025-02-04
 
