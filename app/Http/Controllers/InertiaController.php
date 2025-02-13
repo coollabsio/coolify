@@ -11,7 +11,20 @@ class InertiaController extends Controller
     public function dashboard()
     {
         $servers = Server::isUsable()->get();
-
+        $projects = Project::ownedByCurrentTeam()->orderBy('created_at')->with('environments')->get();
+        $projects = $projects->map(function ($project) {
+            return [
+                'name' => $project->name,
+                'description' => $project->description,
+                'uuid' => $project->uuid,
+                'environments' => $project->environments()->get()->map(function ($environment) {
+                    return [
+                        'name' => $environment->name,
+                        'uuid' => $environment->uuid,
+                    ];
+                }),
+            ];
+        });
         $destinations = collect($servers)->flatMap(function ($server) {
             return $server->destinations();
         });
@@ -30,9 +43,8 @@ class InertiaController extends Controller
                 'uuid' => $server->uuid,
             ];
         });
-
         return Inertia::render('Dashboard', [
-            'projects' => Project::ownedByCurrentTeam()->orderBy('created_at')->get(['name', 'description', 'uuid']),
+            'projects' => $projects,
             // Should not add proxy
             'servers' => $servers,
             'sources' => currentTeam()->sources(),

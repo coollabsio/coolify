@@ -6,7 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ResourceBox from '@/components/ResourceBox.vue'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import MainView from '@/components/MainView.vue'
-
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from '@/components/ui/hover-card'
 
 import type { User } from '@/types/UserType'
 import type { Project } from '@/types/ProjectType'
@@ -111,7 +115,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
                     <div v-for="project in projects" :key="project.uuid">
                         <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
-                            :description="project.description" />
+                            :description="project.description" :environments="project.environments" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
                         <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
@@ -161,7 +165,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
                             <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
-                                :description="project.description" />
+                                :description="project.description" :environments="project.environments" />
                         </div>
                         <ResourceBox :new="true" type="project" :href="route('next_projects')" name="New Project" />
                     </div>
