@@ -497,6 +497,26 @@
         "minversion": "0.0.0",
         "port": "8443"
     },
+    "convex": {
+        "documentation": "https://docs.convex.dev/?utm_source=coolify.io",
+        "slogan": "Convex is the open-source reactive database for app developers.",
+        "compose": "c2VydmljZXM6CiAgYmFja2VuZDoKICAgIGltYWdlOiAnZ2hjci5pby9nZXQtY29udmV4L2NvbnZleC1iYWNrZW5kOjQ0OTlkZDRmZDdmMjE0ODY4N2E3Nzc0NTk5YzYxM2QwNTI5NTBmNDYnCiAgICB2b2x1bWVzOgogICAgICAtICdkYXRhOi9jb252ZXgvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9CQUNLRU5EXzMyMTAKICAgICAgLSAnSU5TVEFOQ0VfTkFNRT0ke0lOU1RBTkNFX05BTUU6LXNlbGYtaG9zdGVkLWNvbnZleH0nCiAgICAgIC0gJ0lOU1RBTkNFX1NFQ1JFVD0ke1NFUlZJQ0VfSEVYXzMyX1NFQ1JFVH0nCiAgICAgIC0gJ0NPTlZFWF9SRUxFQVNFX1ZFUlNJT05fREVWPSR7Q09OVkVYX1JFTEVBU0VfVkVSU0lPTl9ERVY6LX0nCiAgICAgIC0gJ0FDVElPTlNfVVNFUl9USU1FT1VUX1NFQ1M9JHtBQ1RJT05TX1VTRVJfVElNRU9VVF9TRUNTOi19JwogICAgICAtICdDT05WRVhfQ0xPVURfT1JJR0lOPSR7U0VSVklDRV9GUUROX0NPTlZFWF82NzkxfScKICAgICAgLSAnQ09OVkVYX1NJVEVfT1JJR0lOPSR7U0VSVklDRV9GUUROX0NPTlZFWF82NzkxfS9odHRwJwogICAgICAtICdEQVRBQkFTRV9VUkw9JHtEQVRBQkFTRV9VUkw6LX0nCiAgICAgIC0gJ0RJU0FCTEVfQkVBQ09OPSR7RElTQUJMRV9CRUFDT046LX0nCiAgICAgIC0gJ1JFREFDVF9MT0dTX1RPX0NMSUVOVD0ke1JFREFDVF9MT0dTX1RPX0NMSUVOVDotfScKICAgICAgLSAnQ09OVkVYX1NFTEZfSE9TVEVEX1VSTD0ke1NFUlZJQ0VfRlFETl9DT05WRVhfNjc5MX0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogJ2N1cmwgLWYgaHR0cDovLzEyNy4wLjAuMTozMjEwL3ZlcnNpb24nCiAgICAgIGludGVydmFsOiA1cwogICAgICBzdGFydF9wZXJpb2Q6IDVzCiAgZGFzaGJvYXJkOgogICAgaW1hZ2U6ICdnaGNyLmlvL2dldC1jb252ZXgvY29udmV4LWRhc2hib2FyZDo0NDk5ZGQ0ZmQ3ZjIxNDg2ODdhNzc3NDU5OWM2MTNkMDUyOTUwZjQ2JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0NPTlZFWF82NzkxCiAgICAgIC0gTkVYVF9QVUJMSUNfREVQTE9ZTUVOVF9VUkw9JFNFUlZJQ0VfRlFETl9CQUNLRU5EXzMyMTAKICAgIGRlcGVuZHNfb246CiAgICAgIGJhY2tlbmQ6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiAnd2dldCAtcU8tIGh0dHA6Ly8xMjcuMC4wLjE6Njc5MS8nCiAgICAgIGludGVydmFsOiA1cwogICAgICBzdGFydF9wZXJpb2Q6IDVzCg==",
+        "tags": [
+            "database",
+            "reactive",
+            "database",
+            "ai",
+            "agents",
+            "chatbot",
+            "api",
+            "team",
+            "bot",
+            "flows"
+        ],
+        "logo": "svgs/convex.svg",
+        "minversion": "0.0.0",
+        "port": "6791"
+    },
     "cryptgeon": {
         "documentation": "https://github.com/cupcakearmy/cryptgeon?utm_source=coolify.io",
         "slogan": "Secure note / file sharing service inspired by PrivNote.",
