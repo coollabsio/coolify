@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { Link, WhenVisible } from '@inertiajs/vue3'
-import MainView from '@/components/MainView.vue'
 import { ref, inject } from 'vue'
+import { Link } from '@inertiajs/vue3'
+import { Plus } from 'lucide-vue-next'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import ResourceBox from '@/components/ResourceBox.vue'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import MainView from '@/components/MainView.vue'
+
 
 import type { User } from '@/types/UserType'
 import type { Project } from '@/types/ProjectType'
@@ -56,10 +59,10 @@ function searchProjects(value: string) {
         destinations.value = props.destinations
         return
     }
-    projects.value = props.projects.filter(project => project.name.toLowerCase().includes(value.toLowerCase()) || project.description.toLowerCase().includes(value.toLowerCase()))
-    servers.value = props.servers.filter(server => server.name.toLowerCase().includes(value.toLowerCase()) || server.description.toLowerCase().includes(value.toLowerCase()))
-    sources.value = props.sources.filter(source => source.name.toLowerCase().includes(value.toLowerCase()) || source.description.toLowerCase().includes(value.toLowerCase()))
-    destinations.value = props.destinations.filter(destination => destination.name.toLowerCase().includes(value.toLowerCase() || destination.description.toLowerCase().includes(value.toLowerCase())))
+    projects.value = props.projects.filter(project => project.name.toLowerCase().includes(value.toLowerCase()))
+    servers.value = props.servers.filter(server => server.name.toLowerCase().includes(value.toLowerCase()))
+    sources.value = props.sources.filter(source => source.name.toLowerCase().includes(value.toLowerCase()))
+    destinations.value = props.destinations.filter(destination => destination.name.toLowerCase().includes(value.toLowerCase()))
 
 }
 
@@ -78,16 +81,16 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 
 <template>
     <MainView @search="searchProjects" :breadcrumb="breadcrumb">
-        <template #title>
-            Dashboard
-        </template>
-        <template #subtitle>Your self-hosted infrastructure.</template>
         <div v-if="search">
-            <Tabs :default-value="currentTab" class="pb-2 opacity-50">
+            <Tabs :default-value="currentTab" class="pb-2 opacity-30">
                 <ScrollArea>
-                    <TabsList>
+                    <TabsList
+                        class="dark:bg-transparent text-left xl:justify-start xl:items-start justify-center items-center  border-b border-border pb-2">
                         <TabsTrigger value="projects" disabled>
                             Projects
+                            <Button variant="outline" size="icon">
+                                <Plus />
+                            </Button>
                         </TabsTrigger>
                         <TabsTrigger value="servers" disabled>
                             Servers
@@ -106,39 +109,23 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 </ScrollArea>
             </Tabs>
 
-            <div v-if="projects.length > 0 || servers.length > 0 || sources.length > 0">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div v-if="projects.length > 0 || servers.length > 0 || sources.length > 0 || destinations.length > 0">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
                     <div v-for="project in projects" :key="project.uuid">
-                        <Link :href="route('projects')"
-                            class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                        <div class="text-sm font-bold text-foreground">{{ project.name }}</div>
-                        <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ project.description
-                            }}</p>
-                        </Link>
+                        <ResourceBox type="project" :href="route('projects')" :name="project.name"
+                            :description="project.description" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
-                        <Link :href="route('projects')"
-                            class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                        <div class="text-sm font-bold text-foreground">{{ server.name }}</div>
-                        <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ server.description
-                            }}</p>
-                        </Link>
+                        <ResourceBox type="server" :href="route('projects')" :name="server.name"
+                            :description="server.description" />
                     </div>
                     <div v-for="source in sources" :key="source.uuid">
-                        <Link :href="route('projects')"
-                            class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                        <div class="text-sm font-bold text-foreground">{{ source.name }}</div>
-                        <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ source.description
-                            }}</p>
-                        </Link>
+                        <ResourceBox type="source" :href="route('projects')" :name="source.name"
+                            :description="source.description" />
                     </div>
                     <div v-for="destination in destinations" :key="destination.uuid">
-                        <Link :href="route('projects')"
-                            class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                        <div class="text-sm font-bold text-foreground">{{ destination.name }}</div>
-                        <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ destination.description
-                            }}</p>
-                        </Link>
+                        <ResourceBox type="destination" :href="route('projects')" :name="destination.name"
+                            :description="destination.description" />
                     </div>
                 </div>
             </div>
@@ -147,10 +134,17 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
             </div>
         </div>
         <div v-else>
-            <Tabs :default-value="currentTab" orientation="vertical">
-                <TabsList class="bg-card text-left">
+            <Tabs :default-value="currentTab" orientation="vertical" class="w-full">
+                <TabsList
+                    class="dark:bg-transparent text-left xl:justify-start xl:items-start justify-center items-center border-b border-border pb-2">
                     <TabsTrigger value="projects" @click="saveCurrentTab('projects')">
                         Projects
+                        <!-- <div class="flex items-center gap-2">
+                            Projects
+                            <Link :href="route('projects')" class="hover:dark:bg-coollabs">
+                            <Plus :size="16" />
+                            </Link>
+                        </div> -->
                     </TabsTrigger>
                     <TabsTrigger value="servers" @click="saveCurrentTab('servers')">
                         Servers
@@ -166,63 +160,45 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="projects">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
                         <div v-for="project in projects" :key="project.uuid">
-                            <Link :href="route('projects')"
-                                class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                            <div class="text-sm font-bold text-foreground">{{ project.name }}</div>
-                            <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ project.description
-                                }}</p>
-                            </Link>
+                            <ResourceBox type="project" :href="route('projects')" :name="project.name"
+                                :description="project.description" />
                         </div>
+                        <ResourceBox :new="true" type="project" :href="route('projects')" name="New Project" />
                     </div>
                 </TabsContent>
                 <TabsContent value="servers">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
                         <div v-for="server in servers" :key="server.uuid">
-                            <Link :href="route('projects')"
-                                class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                            <div class="text-sm font-bold text-foreground">{{ server.name }}</div>
-                            <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ server.description
-                                }}</p>
-                            </Link>
+                            <ResourceBox type="server" :href="route('projects')" :name="server.name"
+                                :description="server.description" />
                         </div>
+                        <ResourceBox :new="true" type="server" :href="route('projects')" name="New Server" />
                     </div>
                 </TabsContent>
                 <TabsContent value="git-sources">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
                         <div v-for="source in sources" :key="source.uuid">
-                            <Link :href="route('projects')"
-                                class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                            <div class="text-sm font-bold text-foreground">{{ source.name }}</div>
-                            <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ source.description
-                                }}</p>
-                            </Link>
+                            <ResourceBox type="source" :href="route('projects')" :name="source.name"
+                                :description="source.description" />
                         </div>
+                        <ResourceBox :new="true" type="source" :href="route('projects')" name="New Source" />
                     </div>
                 </TabsContent>
                 <TabsContent value="destinations">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
                         <div v-for="destination in destinations" :key="destination.uuid">
-                            <Link :href="route('projects')"
-                                class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                            <div class="text-sm font-bold text-foreground">{{ destination.name }}</div>
-                            <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{
-                                destination.description
-                                }}</p>
-                            </Link>
+                            <ResourceBox type="destination" :href="route('projects')" :name="destination.name"
+                                :description="destination.description" />
                         </div>
+                        <ResourceBox :new="true" type="destination" :href="route('projects')" name="New Destination" />
                     </div>
                 </TabsContent>
                 <!-- <TabsContent value="keys">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
                         <div v-for="server in servers" :key="server.uuid">
-                            <Link :href="route('projects')"
-                                class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
-                            <div class="text-sm font-bold text-foreground">{{ server.name }}</div>
-                            <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ server.description
-                                }}</p>
-                            </Link>
+                            <ResourceBox :href="route('projects')" :name="server.name" :description="server.description" />
                         </div>
                     </div>
                 </TabsContent> -->

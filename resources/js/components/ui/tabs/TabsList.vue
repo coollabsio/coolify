@@ -6,20 +6,17 @@ import { computed, type HTMLAttributes } from 'vue'
 const props = defineProps<TabsListProps & { class?: HTMLAttributes['class'] }>()
 
 const delegatedProps = computed(() => {
-  const { class: _, ...delegated } = props
+    const { class: _, ...delegated } = props
 
-  return delegated
+    return delegated
 })
 </script>
 
 <template>
-  <TabsList
-    v-bind="delegatedProps"
-    :class="cn(
-      'inline-flex items-center justify-center rounded-md bg-neutral-100 p-1 text-neutral-500 dark:bg-neutral-800 dark:text-foreground',
-      props.class,
-    )"
-  >
-    <slot />
-  </TabsList>
+    <TabsList v-bind="delegatedProps" :class="cn(
+        'flex items-center justify-start rounded-md bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-foreground',
+        props.class,
+    )">
+        <slot />
+    </TabsList>
 </template>
