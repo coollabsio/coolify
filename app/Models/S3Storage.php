@@ -43,8 +43,18 @@ class S3Storage extends BaseModel
     public function testConnection(bool $shouldSave = false)
     {
         try {
-            set_s3_target($this);
-            Storage::disk('custom-s3')->files();
+            $disk = Storage::build([
+                'driver' => 's3',
+                'region' => $this['region'],
+                'key' => $this['key'],
+                'secret' => $this['secret'],
+                'bucket' => $this['bucket'],
+                'endpoint' => $this['endpoint'],
+                'use_path_style_endpoint' => true,
+            ]);
+            // Test the connection by listing files with ListObjectsV2 (S3)
+            $disk->files();
+
             $this->unusable_email_sent = false;
             $this->is_usable = true;
         } catch (\Throwable $e) {
