@@ -9,7 +9,7 @@ import type { Environment } from '@/types/EnvironmentType'
 
 const props = defineProps<{
     project: Project
-    environments: Environment[]
+    environment: Environment
 }>()
 
 const breadcrumb = ref<CustomBreadcrumbItem[]>([
@@ -20,6 +20,10 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
     {
         label: props.project.name,
         href: route('next_project', props.project.uuid)
+    },
+    {
+        label: props.environment.name,
+        href: route('next_environment', { project_uuid: props.project.uuid, environment_uuid: props.environment.uuid })
     }
 ])
 </script>
@@ -27,17 +31,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 <template>
     <MainView :breadcrumb="breadcrumb">
         <template #title>
-            {{ props.project.name }}
+            {{ props.environment.name }}
         </template>
-        <template #subtitle>
-            Select an environment.
-        </template>
-        <div class="resource-box-container md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
-            <div v-for="environment in props.environments" :key="environment.uuid">
-                <ResourceBox type="environment"
-                    :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: environment.uuid })"
-                    :name="environment.name" :description="environment.description" />
-            </div>
-        </div>
     </MainView>
 </template>

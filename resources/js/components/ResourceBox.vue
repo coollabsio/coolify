@@ -54,7 +54,7 @@ console.log(environments.value)
                 <h3 class="text-sm font-bold text-foreground pb-2 px-2">Environments</h3>
                 <div v-for="environment in environments" :key="environment.uuid" class="flex flex-col gap-2 text-xs">
                     <Link class="hover:dark:bg-coolgray-300 p-2 rounded-md flex gap-2 items-center"
-                        :href="route('next_project', environment.uuid)">
+                        :href="route('next_environment', { project_uuid: environment.project_uuid, environment_uuid: environment.uuid })">
                     <Earth :size="16" class="text-muted-foreground/60" />
                     {{ environment.name }}
                     </Link>

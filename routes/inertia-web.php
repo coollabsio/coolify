@@ -8,6 +8,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/projects', [InertiaController::class, 'projects'])->name('next_projects');
     Route::get('/projects/{project_uuid}', [InertiaController::class, 'project'])->name('next_project');
+    Route::get('/projects/{project_uuid}/environments/{environment_uuid}', [InertiaController::class, 'environment'])->name('next_environment');
 });
 
 Route::any('/{any}', function () {

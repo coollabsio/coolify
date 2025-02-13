@@ -21,6 +21,7 @@ class InertiaController extends Controller
                     return [
                         'name' => $environment->name,
                         'uuid' => $environment->uuid,
+                        'project_uuid' => $environment->project->uuid,
                     ];
                 }),
             ];
@@ -74,6 +75,22 @@ class InertiaController extends Controller
         return Inertia::render('Project', [
             'project' => $project,
             'environments' => $environments,
+        ]);
+    }
+
+    public function environment(string $project_uuid, string $environment_uuid)
+    {
+        $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->first();
+        if (!$project) {
+            return redirect()->route('projects');
+        }
+        $environment = $project->environments()->where('uuid', $environment_uuid)->first();
+        if (!$environment) {
+            return redirect()->route('project', $project_uuid);
+        }
+        return Inertia::render('Environment', [
+            'project' => $project,
+            'environment' => $environment,
         ]);
     }
 }
