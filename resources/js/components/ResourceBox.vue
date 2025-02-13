@@ -26,6 +26,7 @@ import {
     DrawerTrigger,
 } from '@/components/ui/drawer'
 import ResourceBoxLink from './ResourceBoxLink.vue';
+import { route } from '@/route'
 import { Environment } from '@/types/EnvironmentType';
 
 const props = defineProps<{
