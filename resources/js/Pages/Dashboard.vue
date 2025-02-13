@@ -28,7 +28,8 @@ const destinations = ref(props.destinations)
 const search = ref('')
 
 function capitalize(word: string) {
-    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    word = word.replace(/-/g, ' ')
+    return word.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 }
 
 function saveCurrentTab(tab: string) {
