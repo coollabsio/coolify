@@ -1,0 +1,42 @@
+<script setup lang="ts">
+import MainView from '@/components/MainView.vue'
+import ResourceBox from '@/components/ResourceBox.vue'
+import { ref } from 'vue'
+
+import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
+import type { Project } from '@/types/ProjectType'
+import type { Environment } from '@/types/EnvironmentType'
+
+const props = defineProps<{
+    project: Project
+    environments: Environment[]
+}>()
+
+const breadcrumb = ref<CustomBreadcrumbItem[]>([
+    {
+        label: 'Projects',
+        href: route('next_dashboard', { tab: 'projects' })
+    },
+    {
+        label: props.project.name,
+        href: route('next_project', props.project.uuid)
+    }
+])
+</script>
+
+<template>
+    <MainView :breadcrumb="breadcrumb">
+        <template #title>
+            {{ props.project.name }}
+        </template>
+        <template #subtitle>
+            Select an environment.
+        </template>
+        <div class="resource-box-container md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
+            <div v-for="environment in props.environments" :key="environment.uuid">
+                <ResourceBox type="environment" :href="route('next_project', environment.uuid)" :name="environment.name"
+                    :description="environment.description" />
+            </div>
+        </div>
+    </MainView>
+</template>

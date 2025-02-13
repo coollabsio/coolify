@@ -46,4 +46,22 @@ class InertiaController extends Controller
             'projects' => Project::ownedByCurrentTeam()->orderBy('created_at')->get(['name', 'description', 'uuid']),
         ]);
     }
+
+    public function project(string $project_uuid)
+    {
+        $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->first();
+        if (!$project) {
+            return redirect()->route('projects');
+        }
+
+        $environments = $project->environments()->get();
+        if ($environments->count() === 1) {
+            // $environment = $environments->first();
+            // return redirect()->route('project.environment', $environment->uuid);
+        }
+        return Inertia::render('Project', [
+            'project' => $project,
+            'environments' => $environments,
+        ]);
+    }
 }

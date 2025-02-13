@@ -86,3 +86,7 @@
         --sidebar-border-foreground: 210 20% 98%;
     }
 }
+
+.resource-box-container {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left;
+}

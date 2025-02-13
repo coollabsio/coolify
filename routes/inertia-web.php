@@ -4,9 +4,11 @@ use App\Http\Controllers\InertiaController;
 use App\Providers\RouteServiceProvider;
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/', [InertiaController::class, 'dashboard'])->name('dashboard');
-    Route::get('/projects', [InertiaController::class, 'projects'])->name('projects');
-})->name('dashboard');
+    Route::get('/', [InertiaController::class, 'dashboard'])->name('next_dashboard');
+
+    Route::get('/projects', [InertiaController::class, 'projects'])->name('next_projects');
+    Route::get('/projects/{project_uuid}', [InertiaController::class, 'project'])->name('next_project');
+});
 
 Route::any('/{any}', function () {
     if (auth()->user()) {

@@ -1,19 +1,17 @@
 <script lang="ts" setup>
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
-import { Primitive, type PrimitiveProps } from 'radix-vue'
+import { Link } from '@inertiajs/vue3'
 
-const props = withDefaults(defineProps<PrimitiveProps & { class?: HTMLAttributes['class'] }>(), {
-  as: 'a',
-})
+const props = defineProps<{
+    href: string
+    class?: HTMLAttributes['class']
+}>()
 </script>
 
 <template>
-  <Primitive
-    :as="as"
-    :as-child="asChild"
-    :class="cn('text-muted-foreground dark:hover:text-foreground', props.class)"
-  >
+    <Link prefetch :href="href"
+        :class="cn('text-muted-foreground dark:hover:text-foreground cursor-pointer', props.class)">
     <slot />
-  </Primitive>
+    </Link>
 </template>

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
-import { Server, GitBranch, Map, BriefcaseBusiness, Plus } from 'lucide-vue-next'
+import { Server, GitBranch, Map, BriefcaseBusiness, Plus, Earth } from 'lucide-vue-next'
 import { computed } from 'vue';
 
 const props = defineProps<{
-    type: 'project' | 'server' | 'source' | 'destination';
+    type: 'project' | 'server' | 'source' | 'destination' | 'environment';
     href: string;
     name: string;
     description?: string;
@@ -24,7 +24,7 @@ const isNew = computed(() => props.new)
             </div>
         </div>
     </div>
-    <Link v-else :href="href"
+    <Link prefetch v-else :href="href"
         class="flex rounded-r-xl bg-coolgray-100 border dark:border-black cursor-pointer h-24 group">
     <div class=" text-xs text-muted-foreground group-hover:dark:text-white font-bold h-full bg-coolgray-200 p-2
         group-hover:bg-coollabs rounded-l-xl transition-all">
@@ -32,6 +32,7 @@ const isNew = computed(() => props.new)
         <Server :size="20" v-else-if="type === 'server'" />
         <GitBranch :size="20" v-else-if="type === 'source'" />
         <Map :size="20" v-else-if="type === 'destination'" />
+        <Earth :size="20" v-else-if="type === 'environment'" />
     </div>
     <div class="flex flex-col p-2">
         <div class="text-sm font-bold text-foreground">{{ name }}</div>

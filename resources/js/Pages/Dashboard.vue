@@ -41,11 +41,11 @@ function saveCurrentTab(tab: string) {
     breadcrumb.value = [
         {
             label: 'Dashboard',
-            href: route('dashboard')
+            href: route('next_dashboard')
         },
         {
             label: capitalize(tab),
-            href: route('dashboard')
+            href: route('next_dashboard')
         }
     ]
 }
@@ -69,11 +69,11 @@ function searchProjects(value: string) {
 const breadcrumb = ref<CustomBreadcrumbItem[]>([
     {
         label: 'Dashboard',
-        href: route('dashboard')
+        href: route('next_dashboard')
     },
     {
         label: capitalize(currentTab.value),
-        href: route('dashboard')
+        href: route('next_dashboard')
     }
 ])
 
@@ -82,15 +82,13 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 <template>
     <MainView @search="searchProjects" :breadcrumb="breadcrumb">
         <div v-if="search">
-            <Tabs :default-value="currentTab" class="pb-2 opacity-30">
+            <Tabs :default-value="currentTab" class="py-2 opacity-30">
                 <ScrollArea>
                     <TabsList
-                        class="dark:bg-transparent text-left xl:justify-start xl:items-start justify-center items-center  border-b border-border pb-2">
+                        class="dark:bg-transparent text-left md:justify-start md:items-start justify-center items-center border-b border-border pb-2">
                         <TabsTrigger value="projects" disabled>
                             Projects
-                            <Button variant="outline" size="icon">
-                                <Plus />
-                            </Button>
+
                         </TabsTrigger>
                         <TabsTrigger value="servers" disabled>
                             Servers
@@ -112,20 +110,20 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
             <div v-if="projects.length > 0 || servers.length > 0 || sources.length > 0 || destinations.length > 0">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
                     <div v-for="project in projects" :key="project.uuid">
-                        <ResourceBox type="project" :href="route('projects')" :name="project.name"
+                        <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
                             :description="project.description" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
-                        <ResourceBox type="server" :href="route('projects')" :name="server.name"
+                        <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
                             :description="server.description" />
                     </div>
                     <div v-for="source in sources" :key="source.uuid">
-                        <ResourceBox type="source" :href="route('projects')" :name="source.name"
+                        <ResourceBox type="source" :href="route('next_project', source.uuid)" :name="source.name"
                             :description="source.description" />
                     </div>
                     <div v-for="destination in destinations" :key="destination.uuid">
-                        <ResourceBox type="destination" :href="route('projects')" :name="destination.name"
-                            :description="destination.description" />
+                        <ResourceBox type="destination" :href="route('next_project', destination.uuid)"
+                            :name="destination.name" :description="destination.description" />
                     </div>
                 </div>
             </div>
@@ -134,14 +132,14 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
             </div>
         </div>
         <div v-else>
-            <Tabs :default-value="currentTab" orientation="vertical" class="w-full">
+            <Tabs :default-value="currentTab" orientation="vertical" class="w-full pt-2">
                 <TabsList
-                    class="dark:bg-transparent text-left xl:justify-start xl:items-start justify-center items-center border-b border-border pb-2">
+                    class="dark:bg-transparent text-left md:justify-start md:items-start justify-center items-center border-b border-border pb-2">
                     <TabsTrigger value="projects" @click="saveCurrentTab('projects')">
                         Projects
                         <!-- <div class="flex items-center gap-2">
                             Projects
-                            <Link :href="route('projects')" class="hover:dark:bg-coollabs">
+                            <Link :href="route('next_projects')" class="hover:dark:bg-coollabs">
                             <Plus :size="16" />
                             </Link>
                         </div> -->
@@ -160,45 +158,46 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="projects">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
+                    <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
-                            <ResourceBox type="project" :href="route('projects')" :name="project.name"
+                            <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
                                 :description="project.description" />
                         </div>
-                        <ResourceBox :new="true" type="project" :href="route('projects')" name="New Project" />
+                        <ResourceBox :new="true" type="project" :href="route('next_projects')" name="New Project" />
                     </div>
                 </TabsContent>
                 <TabsContent value="servers">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
+                    <div class="resource-box-container">
                         <div v-for="server in servers" :key="server.uuid">
-                            <ResourceBox type="server" :href="route('projects')" :name="server.name"
+                            <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
                                 :description="server.description" />
                         </div>
-                        <ResourceBox :new="true" type="server" :href="route('projects')" name="New Server" />
+                        <ResourceBox :new="true" type="server" :href="route('next_projects')" name="New Server" />
                     </div>
                 </TabsContent>
                 <TabsContent value="git-sources">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
+                    <div class="resource-box-container">
                         <div v-for="source in sources" :key="source.uuid">
-                            <ResourceBox type="source" :href="route('projects')" :name="source.name"
+                            <ResourceBox type="source" :href="route('next_project', source.uuid)" :name="source.name"
                                 :description="source.description" />
                         </div>
-                        <ResourceBox :new="true" type="source" :href="route('projects')" name="New Source" />
+                        <ResourceBox :new="true" type="source" :href="route('next_projects')" name="New Source" />
                     </div>
                 </TabsContent>
                 <TabsContent value="destinations">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 text-left">
+                    <div class="resource-box-container">
                         <div v-for="destination in destinations" :key="destination.uuid">
-                            <ResourceBox type="destination" :href="route('projects')" :name="destination.name"
-                                :description="destination.description" />
+                            <ResourceBox type="destination" :href="route('next_project', destination.uuid)"
+                                :name="destination.name" :description="destination.description" />
                         </div>
-                        <ResourceBox :new="true" type="destination" :href="route('projects')" name="New Destination" />
+                        <ResourceBox :new="true" type="destination" :href="route('next_projects')"
+                            name="New Destination" />
                     </div>
                 </TabsContent>
                 <!-- <TabsContent value="keys">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
                         <div v-for="server in servers" :key="server.uuid">
-                            <ResourceBox :href="route('projects')" :name="server.name" :description="server.description" />
+                            <ResourceBox :href="route('next_projects')" :name="server.name" :description="server.description" />
                         </div>
                     </div>
                 </TabsContent> -->
