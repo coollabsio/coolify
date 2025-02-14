@@ -88,9 +88,99 @@ class InertiaController extends Controller
         if (!$environment) {
             return redirect()->route('project', $project_uuid);
         }
+
+        $applications = $environment->applications()->with([
+            'tags',
+            'additional_servers.settings',
+            'additional_networks',
+            'destination.server.settings',
+        ])->get()->sortBy('name');
+
+        $postgresqls = $environment->postgresqls()->get();
+        $redis = $environment->redis()->get();
+        $mongodbs = $environment->mongodbs()->get();
+        $mysqls = $environment->mysqls()->get();
+        $mariadbs = $environment->mariadbs()->get();
+        $keydbs = $environment->keydbs()->get();
+
+        $environment = $environment->loadCount([
+            'applications',
+            'redis',
+            'postgresqls',
+            'mysqls',
+            'keydbs',
+            'dragonflies',
+            'clickhouses',
+            'mariadbs',
+            'mongodbs',
+            'keydbs',
+            'services',
+        ]);
+
+        // Eager load all relationships for applications including nested ones
+        $applications = $applications->map(function ($application) {
+            $application->hrefLink = route('project.application.configuration', [
+                'project_uuid' => data_get($application, 'environment.project.uuid'),
+                'environment_uuid' => data_get($application, 'environment.uuid'),
+                'application_uuid' => data_get($application, 'uuid'),
+            ]);
+
+            return $application;
+        });
+
+        // Load all database resources in a single query per type
+        $databaseTypes = [
+            'postgresqls' => 'postgresqls',
+            'redis' => 'redis',
+            'mongodbs' => 'mongodbs',
+            'mysqls' => 'mysqls',
+            'mariadbs' => 'mariadbs',
+            'keydbs' => 'keydbs',
+            'dragonflies' => 'dragonflies',
+            'clickhouses' => 'clickhouses',
+        ];
+
+        foreach ($databaseTypes as $property => $relation) {
+            ${$property} = $environment->{$relation}()->with([
+                'tags',
+                'destination.server.settings',
+            ])->get()->sortBy('name');
+            ${$property} = ${$property}->map(function ($db) use ($project, $environment) {
+                $db->hrefLink = route('project.database.configuration', [
+                    'project_uuid' => $project->uuid,
+                    'database_uuid' => $db->uuid,
+                    'environment_uuid' => data_get($environment, 'uuid'),
+                ]);
+
+                return $db;
+            });
+        }
+
+        // Load services with their tags and server
+        $services = $environment->services()->with([
+            'tags',
+            'destination.server.settings',
+        ])->get()->sortBy('name');
+        $services = $services->map(function ($service) {
+            $service->hrefLink = route('project.service.configuration', [
+                'project_uuid' => data_get($service, 'environment.project.uuid'),
+                'environment_uuid' => data_get($service, 'environment.uuid'),
+                'service_uuid' => data_get($service, 'uuid'),
+            ]);
+
+            return $service;
+        });
         return Inertia::render('Environment', [
             'project' => $project,
             'environment' => $environment,
+            'applications' => $applications->values()->all(),
+            'services' => $services->values()->all(),
+            'postgresqls' => $postgresqls->values()->all(),
+            'redis' => $redis->values()->all(),
+            'mongodbs' => $mongodbs->values()->all(),
+            'mysqls' => $mysqls->values()->all(),
+            'mariadbs' => $mariadbs->values()->all(),
+            'keydbs' => $keydbs->values()->all(),
         ]);
     }
 }

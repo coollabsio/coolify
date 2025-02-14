@@ -33,6 +33,7 @@
         "radix-vue": "^1.9.13",
         "tailwind-merge": "^3.0.1",
         "tailwindcss-animate": "^1.0.7",
+        "vaul-vue": "^0.2.1",
         "vue": "^3.5.13",
         "ziggy-js": "^2.5.1"
     }

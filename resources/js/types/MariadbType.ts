@@ -1,0 +1,36 @@
+export interface Mariadb {
+    config_hash: string | null;
+    created_at: string;
+    custom_docker_run_options: string | null;
+    deleted_at: string | null;
+    description: string | null;
+    destination_id: number;
+    destination_type: string;
+    environment_id: number;
+    hrefLink: string;
+    id: number;
+    image: string;
+    is_include_timestamps: boolean;
+    is_log_drain_enabled: boolean;
+    is_public: boolean;
+    last_online_at: string;
+    limits_cpu_shares: number;
+    limits_cpus: string;
+    limits_cpuset: string | null;
+    limits_memory: string;
+    limits_memory_reservation: string;
+    limits_memory_swap: string;
+    limits_memory_swappiness: number;
+    mariadb_conf: string | null;
+    mariadb_database: string;
+    mariadb_password: string;
+    mariadb_root_password: string;
+    mariadb_user: string;
+    name: string;
+    ports_mappings: string | null;
+    public_port: number | null;
+    started_at: string | null;
+    status: string;
+    updated_at: string;
+    uuid: string;
+}

@@ -141,12 +141,6 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     class="dark:bg-transparent text-left md:justify-start md:items-start justify-center items-center border-b border-border pb-2">
                     <TabsTrigger value="projects" @click="saveCurrentTab('projects')">
                         Projects
-                        <!-- <div class="flex items-center gap-2">
-                            Projects
-                            <Link :href="route('next_projects')" class="hover:dark:bg-coollabs">
-                            <Plus :size="16" />
-                            </Link>
-                        </div> -->
                     </TabsTrigger>
                     <TabsTrigger value="servers" @click="saveCurrentTab('servers')">
                         Servers
