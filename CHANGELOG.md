@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(core)* Add error logging and cron parsing to docker/server schedules
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump Coolify version to 4.0.0-beta.393
+
+## [4.0.0-beta.392] - 2025-02-13
+
+### 🚀 Features
+
 - *(ui)* Add top padding to pricing plans view
 
 ### 🐛 Bug Fixes
