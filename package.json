@@ -23,7 +23,8 @@
         "@inertiajs/vue3": "^2.0.3",
         "@tailwindcss/forms": "0.5.10",
         "@tailwindcss/typography": "0.5.16",
-        "@vueuse/core": "^12.5.0",
+        "@vee-validate/zod": "^4.15.0",
+        "@vueuse/core": "^12.7.0",
         "@xterm/addon-fit": "^0.10.0",
         "@xterm/xterm": "^5.5.0",
         "class-variance-authority": "^0.7.1",
@@ -34,7 +35,9 @@
         "tailwind-merge": "^3.0.1",
         "tailwindcss-animate": "^1.0.7",
         "vaul-vue": "^0.2.1",
+        "vee-validate": "^4.15.0",
         "vue": "^3.5.13",
-        "ziggy-js": "^2.5.1"
+        "ziggy-js": "^2.5.1",
+        "zod": "^3.24.2"
     }
 }

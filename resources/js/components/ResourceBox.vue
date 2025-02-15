@@ -1,22 +1,14 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
-import { Server, GitBranch, Map, BriefcaseBusiness, Plus, Earth, Code, Database } from 'lucide-vue-next'
+import { Plus, Earth, Info } from 'lucide-vue-next'
 import { computed } from 'vue';
+import { AutoForm } from '@/components/ui/auto-form'
+import * as z from 'zod'
+import { toTypedSchema } from '@vee-validate/zod';
+import { useForm } from 'vee-validate';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Environment } from '@/types/EnvironmentType';
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-    Sheet,
-    SheetClose,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet'
 const props = defineProps<{
     type: 'project' | 'server' | 'source' | 'destination' | 'environment' | 'application' | 'postgresql' | 'service';
     href: string;
@@ -25,101 +17,81 @@ const props = defineProps<{
     new?: boolean;
     environments?: Environment[];
 }>();
-
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog'
+import ResourceBoxLink from './ResourceBoxLink.vue';
 const isNew = computed(() => props.new)
 const environments = computed(() => props.environments)
+
+const schema = z.object({
+    name: z.string().min(1, { message: 'Name is required' }).max(255, { message: 'Name must be less than 255 characters' }).describe('Name'),
+    description: z.string().max(255, { message: 'Description must be less than 255 characters' }).describe('Description').optional(),
+})
+const form = useForm({
+    validationSchema: toTypedSchema(schema),
+})
+function onSubmit(values: Record<string, any>) {
+    console.log(values)
+}
 </script>
 
 <template>
     <div v-if="isNew"
-        class="flex rounded-xl cursor-pointer h-24 hover:dark:border-coollabs  border border-transparent transition-all group">
-
-        <Sheet>
-            <SheetTrigger as-child>
+        class="flex rounded-xl cursor-pointer h-24 hover:dark:border-coollabs border border-transparent transition-all group">
+        <Dialog>
+            <DialogTrigger as-child>
                 <div class="flex gap-2 items-center justify-center w-full p-2">
                     <Plus :size="20" class="text-muted-foreground/60 group-hover:dark:text-white" />
                     <div class="text-sm font-bold text-muted-foreground/60 group-hover:dark:text-white">
                         New {{ type }}
                     </div>
                 </div>
-            </SheetTrigger>
-            <SheetContent>
-                <SheetHeader>
-                    <SheetTitle>New Project</SheetTitle>
-                    <SheetDescription>
-                        Create a new project.
-                    </SheetDescription>
-                </SheetHeader>
-                <div class="grid gap-4 py-4">
-                    <div class="grid grid-cols-4 items-center gap-4">
-                        <Label for="name" class="text-right">
-                            Name
-                        </Label>
-                        <Input id="name" default-value="Pedro Duarte" class="col-span-3" />
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>New {{ type }}</DialogTitle>
+                </DialogHeader>
+                <AutoForm class="space-y-2" :schema="schema" :form="form" @submit="onSubmit">
+                    <div class="flex gap-2 items-center p-2 bg-coollabs/50 border border-coollabs rounded-xl">
+                        <Info :size="16" class="text-muted-foreground group-hover:dark:text-white" />
+                        <div class="text-sm text-foreground ">
+                            This {{ type }} will have a default <span class="font-bold">production</span> environment.
+                        </div>
                     </div>
-                    <div class="grid grid-cols-4 items-center gap-4">
-                        <Label for="username" class="text-right">
-                            Description
-                        </Label>
-                        <Input id="username" default-value="@peduarte" class="col-span-3" />
-                    </div>
-                </div>
-                <SheetFooter>
-                    <SheetClose as-child>
-                        <Button type="submit">
-                            Save changes
+                    <div>
+                        <Button type="submit" class="mt-4">
+                            Create
                         </Button>
-                    </SheetClose>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                    </div>
+                </AutoForm>
+            </DialogContent>
+        </Dialog>
     </div>
     <div v-else>
         <HoverCard v-if="type === 'project' && environments" :open-delay="100" :close-delay="100">
             <HoverCardTrigger>
-                <Link prefetch :href="href"
-                    class="flex rounded-r-xl bg-coolgray-100 border dark:border-black cursor-pointer h-24 group">
-                <div class=" text-xs text-muted-foreground group-hover:dark:text-white font-bold h-full bg-coolgray-200 p-2
-            group-hover:bg-coollabs rounded-l-xl transition-all">
-                    <BriefcaseBusiness :size="20" v-if="type === 'project'" />
-                </div>
-                <div class="flex flex-col p-2">
-                    <div class="text-sm font-bold text-foreground">{{ name }}</div>
-                    <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ description
-                        }}</p>
-                </div>
-                </Link>
+                <ResourceBoxLink :type="type" :href="href" :name="name" :description="description" />
             </HoverCardTrigger>
-            <HoverCardContent class="w-64 p-2 rounded-xl dark:bg-coolgray-100 shadow-xl dark:border-black"
-                :side-offset="5" align="start">
+            <HoverCardContent class="w-64 p-2 rounded dark:bg-coolgray-100" :side-offset="5" align="start">
                 <h3 class="text-sm font-bold text-foreground pb-2 px-2">Environments</h3>
-                <div v-for="environment in environments" :key="environment.uuid" class="flex flex-col gap-2 text-xs">
-                    <Link class="hover:dark:bg-coolgray-300 p-2 rounded-md flex gap-2 items-center"
+                <div v-for="environment in environments" :key="environment.uuid"
+                    class="flex flex-col gap-2 text-xs group">
+                    <Link
+                        class="hover:dark:bg-coollabs p-2 rounded-xl flex gap-2 items-center text-muted-foreground hover:text-white"
                         :href="route('next_environment', { project_uuid: environment.project_uuid, environment_uuid: environment.uuid })">
-                    <Earth :size="16" class="text-muted-foreground/60" />
+                    <Earth :size="16" class="text-muted-foreground/40 group-hover:dark:text-white" />
                     {{ environment.name }}
                     </Link>
                 </div>
             </HoverCardContent>
         </HoverCard>
-        <Link v-else prefetch :href="href"
-            class="flex rounded-r-xl bg-coolgray-100 border dark:border-black cursor-pointer h-24 group">
-        <div class=" text-xs text-muted-foreground group-hover:dark:text-white font-bold h-full bg-coolgray-200 p-2
-            group-hover:bg-coollabs rounded-l-xl transition-all">
-            <BriefcaseBusiness :size="20" v-if="type === 'project'" />
-            <Server :size="20" v-else-if="type === 'server'" />
-            <GitBranch :size="20" v-else-if="type === 'source'" />
-            <Map :size="20" v-else-if="type === 'destination'" />
-            <Earth :size="20" v-else-if="type === 'environment'" />
-            <Code :size="20" v-else-if="type === 'application'" />
-            <Database :size="20" v-else-if="type === 'postgresql'" />
-            <Server :size="20" v-else-if="type === 'service'" />
+        <div v-else class="w-full rounded dark:bg-coolgray-100">
+            <ResourceBoxLink :type="type" :href="href" :name="name" :description="description" />
         </div>
-        <div class="flex flex-col p-2">
-            <div class="text-sm font-bold text-foreground">{{ name }}</div>
-            <p class="text-xs text-muted-foreground group-hover:dark:text-white font-bold">{{ description
-                }}</p>
-        </div>
-        </Link>
     </div>
 </template>

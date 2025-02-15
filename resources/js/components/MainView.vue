@@ -30,9 +30,7 @@ import {
     SidebarMenuItem,
     SidebarProvider,
     SidebarRail,
-    SidebarSeparator,
     SidebarFooter,
-
     SidebarTrigger,
 } from '@/components/ui/sidebar'
 import {
@@ -49,7 +47,6 @@ import {
     MessageCircleQuestion,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 const props = defineProps<{
     breadcrumb?: CustomBreadcrumbItem[]
@@ -71,18 +68,6 @@ const data = {
             url: '/next/',
         },
         {
-            title: 'Notifications',
-            icon: Bell,
-            url: '/next/notifications',
-            isDisabled: true,
-        },
-        {
-            title: 'Tags',
-            icon: Tag,
-            url: '/next/tags',
-            isDisabled: true,
-        },
-        {
             title: 'Terminal',
             icon: Terminal,
             url: '/next/terminal',
@@ -92,13 +77,6 @@ const data = {
             title: 'Settings',
             icon: Settings,
             url: '/next/settings',
-            isDisabled: true,
-        },
-        {
-            title: 'Onboarding',
-            icon: ListCheck,
-            url: '/next/onboarding',
-            isBottom: true,
             isDisabled: true,
         },
         {
@@ -125,7 +103,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 </script>
 
 <template>
-    <SidebarProvider :defaultOpen="defaultOpen">
+    <SidebarProvider :defaultOpen="defaultOpen" class="container mx-auto">
         <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
@@ -133,9 +111,8 @@ function setActiveTeam(team: typeof data.teams[number]) {
                         <DropdownMenu>
                             <DropdownMenuTrigger as-child>
                                 <SidebarMenuButton
-                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mt-4">
-                                    <div
-                                        class="flex aspect-square  items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mt-3 rounded-xl py-6 hover:dark:bg-coolgray-100">
+                                    <div class="flex aspect-square items-center justify-center rounded-lg ">
                                         <UsersRound class="size-4" />
                                     </div>
                                     <div class="grid flex-1 text-left text-sm leading-tight">
@@ -145,26 +122,26 @@ function setActiveTeam(team: typeof data.teams[number]) {
                                     <ChevronsUpDown class="ml-auto" />
                                 </SidebarMenuButton>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                            <DropdownMenuContent
+                                class="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-xl dark:bg-coolgray-100"
                                 align="start" side="bottom" :side-offset="4">
                                 <DropdownMenuLabel class="text-xs text-muted-foreground">
                                     Teams
                                 </DropdownMenuLabel>
-                                <DropdownMenuItem v-for="(team, index) in data.teams" :key="team.name" class="gap-2 p-2"
-                                    @click="setActiveTeam(team)">
-                                    <div class="flex size-6 items-center justify-center rounded-sm border">
+                                <DropdownMenuItem v-for="(team, index) in data.teams" :key="team.name"
+                                    class="gap-2 p-2 cursor-pointer rounded-xl" @click="setActiveTeam(team)">
+                                    <div class="flex size-6 items-center justify-center">
                                         <component :is="team.logo" class="size-4 shrink-0" />
                                     </div>
                                     {{ team.name }}
-                                    <DropdownMenuShortcut>⌘{{ index + 1 }}</DropdownMenuShortcut>
+                                    <!-- <DropdownMenuShortcut>⌘{{ index + 1 }}</DropdownMenuShortcut> -->
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem class="gap-2 p-2">
-                                    <div
-                                        class="flex size-6 items-center justify-center rounded-md border bg-background">
+                                <DropdownMenuItem class="gap-2 p-2 rounded-xl">
+                                    <div class="flex size-6 items-center justify-center">
                                         <Plus class="size-4" />
                                     </div>
-                                    <div class="font-medium text-muted-foreground">
+                                    <div class="font-medium text-foreground">
                                         Add team
                                     </div>
                                 </DropdownMenuItem>
@@ -180,7 +157,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                             <div v-for="item in data.navMain" :key="item.title">
                                 <SidebarMenuItem v-if="!item.isBottom">
                                     <Link :href="item.isDisabled ? '#' : item.url">
-                                    <SidebarMenuButton :tooltip="item.title" as="div"
+                                    <SidebarMenuButton :tooltip="item.title" as="div" class="rounded-xl"
                                         :class="['hover:dark:bg-white/10', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
                                         <component :is="item.icon" />
                                         <span>{{ item.title }}</span>
