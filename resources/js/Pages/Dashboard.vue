@@ -92,8 +92,9 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 <template>
     <MainView @search="searchProjects" :breadcrumb="breadcrumb">
         <div v-if="search">
-            <Tabs :default-value="currentTab" class="py-2 opacity-30 max-w-[100vw]">
-                <ScrollArea class="w-full max-w-[100vw]">
+            <Tabs :default-value="currentTab" orientation="vertical"
+                class="w-full pt-2 max-w-[calc(100vw-30px)] md:max-w-full">
+                <ScrollArea>
                     <TabsList
                         class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 border-b border-border">
                         <TabsTrigger value="projects" disabled>
@@ -121,7 +122,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                             Keys & Tokens
                         </TabsTrigger> -->
                     </TabsList>
-                    <ScrollBar orientation="horizontal" />
+                    <ScrollBar orientation="horizontal" class="h-1.5" />
                 </ScrollArea>
             </Tabs>
 
