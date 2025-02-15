@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
-import { Server, GitBranch, Map, BriefcaseBusiness, Plus, Earth, Code, Database } from 'lucide-vue-next'
-const props = defineProps<{
-    type: 'project' | 'server' | 'source' | 'destination' | 'environment' | 'application' | 'postgresql' | 'service';
+import { Server, GitBranch, Map, BriefcaseBusiness, Plus, Earth, Code, Database, Radiation } from 'lucide-vue-next'
+defineProps<{
+    type: 'project' | 'server' | 'source' | 'destination' | 'environment' | 'application' | 'standalone-postgresql' | 'standalone-mysql' | 'service';
     href: string;
     name: string;
     description?: string;
@@ -20,8 +20,8 @@ const props = defineProps<{
         <Map :size="20" v-else-if="type === 'destination'" />
         <Earth :size="20" v-else-if="type === 'environment'" />
         <Code :size="20" v-else-if="type === 'application'" />
-        <Database :size="20" v-else-if="type === 'postgresql'" />
-        <Server :size="20" v-else-if="type === 'service'" />
+        <Database :size="20" v-else-if="type.startsWith('standalone-')" />
+        <Radiation :size="20" v-else-if="type === 'service'" />
     </div>
     <div class="flex flex-col p-2">
         <div class="text-sm font-bold text-foreground">{{ name }}</div>

@@ -10,7 +10,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Environment } from '@/types/EnvironmentType';
 import { Button } from '@/components/ui/button'
 const props = defineProps<{
-    type: 'project' | 'server' | 'source' | 'destination' | 'environment' | 'application' | 'postgresql' | 'service';
+    type: 'project' | 'server' | 'source' | 'destination' | 'environment' | 'application' | 'standalone-postgresql' | 'standalone-mysql' | 'service';
     href: string;
     name: string;
     description?: string;

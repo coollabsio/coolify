@@ -158,7 +158,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                                 <SidebarMenuItem v-if="!item.isBottom">
                                     <Link :href="item.isDisabled ? '#' : item.url">
                                     <SidebarMenuButton :tooltip="item.title" as="div" class="rounded-xl"
-                                        :class="['hover:dark:bg-white/10', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
+                                        :class="['hover:dark:bg-coollabs', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
                                         <component :is="item.icon" />
                                         <span>{{ item.title }}</span>
                                     </SidebarMenuButton>

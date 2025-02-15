@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Models\Project;
 use App\Models\Server;
 use Inertia\Inertia;
@@ -26,17 +27,50 @@ class InertiaController extends Controller
                 }),
             ];
         });
-        $destinations = collect($servers)->flatMap(function ($server) {
-            return $server->destinations();
-        });
-        $destinations = $destinations->map(function ($destination) {
+        $applications = Application::ownedByCurrentTeam()->orderBy('created_at')->get();
+        $applications = $applications->map(function ($application) {
             return [
-                'name' => $destination->name,
-                'description' => $destination->description,
-                'uuid' => $destination->uuid,
-                'type' => get_class($destination),
+                'name' => $application->name,
+                'description' => $application->description,
+                'uuid' => $application->uuid,
             ];
         });
+
+        $databases = collect($servers)->flatMap(function ($server) {
+            return $server->databases();
+        });
+        $databases = $databases->map(function ($database) {
+            return [
+                'name' => $database->name,
+                'description' => $database->description,
+                'uuid' => $database->uuid,
+                'type' => $database->type(),
+            ];
+        });
+
+        $services = collect($servers)->flatMap(function ($server) {
+            return $server->services()->get();
+        });
+        $services = $services->map(function ($service) {
+            return [
+                'name' => $service->name,
+                'description' => $service->description,
+                'uuid' => $service->uuid,
+                'type' => $service->type(),
+            ];
+        });
+
+        // $destinations = collect($servers)->flatMap(function ($server) {
+        //     return $server->destinations();
+        // });
+        // $destinations = $destinations->map(function ($destination) {
+        //     return [
+        //         'name' => $destination->name,
+        //         'description' => $destination->description,
+        //         'uuid' => $destination->uuid,
+        //         'type' => get_class($destination),
+        //     ];
+        // });
         $servers = $servers->map(function ($server) {
             return [
                 'name' => $server->name,
@@ -44,12 +78,16 @@ class InertiaController extends Controller
                 'uuid' => $server->uuid,
             ];
         });
+
         return Inertia::render('Dashboard', [
             'projects' => $projects,
             // Should not add proxy
             'servers' => $servers,
-            'sources' => currentTeam()->sources(),
-            'destinations' => $destinations,
+            'applications' => $applications,
+            'databases' => $databases,
+            'services' => $services,
+            // 'sources' => currentTeam()->sources(),
+            // 'destinations' => $destinations,
         ]);
     }
 
@@ -63,7 +101,7 @@ class InertiaController extends Controller
     public function project(string $project_uuid)
     {
         $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('projects');
         }
 
@@ -72,6 +110,7 @@ class InertiaController extends Controller
             // $environment = $environments->first();
             // return redirect()->route('project.environment', $environment->uuid);
         }
+
         return Inertia::render('Project', [
             'project' => $project,
             'environments' => $environments,
@@ -81,11 +120,11 @@ class InertiaController extends Controller
     public function environment(string $project_uuid, string $environment_uuid)
     {
         $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->first();
-        if (!$project) {
+        if (! $project) {
             return redirect()->route('projects');
         }
         $environment = $project->environments()->where('uuid', $environment_uuid)->first();
-        if (!$environment) {
+        if (! $environment) {
             return redirect()->route('project', $project_uuid);
         }
 
@@ -170,6 +209,7 @@ class InertiaController extends Controller
 
             return $service;
         });
+
         return Inertia::render('Environment', [
             'project' => $project,
             'environment' => $environment,
