@@ -138,6 +138,7 @@ class All extends Component
     private function handleBulkSubmit()
     {
         $variables = parseEnvFormatToArray($this->variables);
+
         $this->deleteRemovedVariables(false, $variables);
         $this->updateOrCreateVariables(false, $variables);
 
@@ -189,6 +190,9 @@ class All extends Component
     private function updateOrCreateVariables($isPreview, $variables)
     {
         foreach ($variables as $key => $value) {
+            if (str($key)->startsWith('SERVICE_FQDN') || str($key)->startsWith('SERVICE_URL')) {
+                continue;
+            }
             $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
             $found = $this->resource->$method()->where('key', $key)->first();
 

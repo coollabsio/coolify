@@ -1,0 +1,41 @@
+# documentation: https://www.bugsink.com/docs/
+# slogan: Self-hosted Error Tracking
+# tags: python, error-tracking, django, mysql
+# logo: svgs/bugsink.svg
+# port: 8000
+services:
+  mysql:
+    image: 'mysql:latest'
+    restart: unless-stopped
+    environment:
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}'
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE:-bugsink}'
+      - 'MYSQL_USER=${SERVICE_USER_BUGSINK}'
+      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_BUGSINK}'
+    volumes:
+      - 'my-datavolume:/var/lib/mysql'
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - '-h'
+        - 127.0.0.1
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  web:
+    image: bugsink/bugsink
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_64_BUGSINK
+      - 'CREATE_SUPERUSER=admin:${SERVICE_PASSWORD_BUGSINK}'
+      - SERVICE_FQDN_BUGSINK_8000
+      - 'BASE_URL=${SERVICE_FQDN_BUGSINK_8000}'
+      - 'DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}'
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  my-datavolume:
