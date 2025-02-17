@@ -2,26 +2,23 @@
 # slogan: A Standalone persistent world hosted on your own domain!
 # tags: ThreeJS,NODE,Hyperfy,Metaverse,Self-Hosted
 # logo: svgs/hyperfy.svg
-# port: 3011
-version: '3.8'
+# port: 3000
 
 services:
   hyperfy:
-    image: howieduhzit/hyperfy-docker:main
-
-    ports:
-      - "8080:80"
-      - "8443:443"
-      - "3011:3011"
-    volumes:
-      - ./data:/app/data
-      - ./logs:/var/log/nginx
+    image: howieduhzit/hyperfy:latest
     environment:
-      - NODE_ENV=production
-      - PORT=3011
-      - PUBLIC_WS_URL=$PUBLIC_WS_URL
-      - PUBLIC_API_URL=$PUBLIC_API_URL
-      - PUBLIC_ASSETS_URL=$PUBLIC_ASSETS_URL
-      
-      
-    restart: unless-stopped 
+      - SERVICE_FQDN_HYPERFY_3000
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - ADMIN_CODE=${SERVICE_PASSWORD_ADMIN}
+      - PUBLIC_WS_URL=${SERVICE_FQDN_HYPERFY}/ws
+      - PUBLIC_API_URL=${SERVICE_FQDN_HYPERFY}/api
+      - PUBLIC_ASSETS_URL=${SERVICE_FQDN_HYPERFY}/assets
+      - SAVE_INTERVAL=${SAVE_INTERVAL:-60}
+      - WORLD=${WORLD:-world}
+      - PUBLIC_MAX_UPLOAD_SIZE=${PUBLIC_MAX_UPLOAD_SIZE:-32}
+    volumes:
+      - type: bind
+        source: ./${WORLD}
+        target: /app/${WORLD}
+        is_directory: true
