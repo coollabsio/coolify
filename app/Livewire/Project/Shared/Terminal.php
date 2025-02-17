@@ -9,6 +9,8 @@ use Livewire\Component;
 
 class Terminal extends Component
 {
+    public bool $hasShell = true;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -21,6 +23,21 @@ class Terminal extends Component
     public function closeTerminal()
     {
         $this->dispatch('reloadWindow');
+    }
+
+    private function checkShellAvailability(Server $server, string $container): bool
+    {
+        $escapedContainer = escapeshellarg($container);
+        try {
+            instant_remote_process([
+                "docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
+                "docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
+            ], $server);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     #[On('send-terminal-command')]
@@ -37,6 +54,12 @@ class Terminal extends Component
             // Verify container exists and belongs to the user's team
             $status = getContainerStatus($server, $identifier);
             if ($status !== 'running') {
+                return;
+            }
+
+            // Check shell availability
+            $this->hasShell = $this->checkShellAvailability($server, $identifier);
+            if (! $this->hasShell) {
                 return;
             }
 

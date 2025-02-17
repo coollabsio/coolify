@@ -79,8 +79,8 @@ class BackupFailed extends CustomEmailNotification
         $title = 'Database backup failed';
         $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
 
-        $description .= "\n\n**Frequency:** {$this->frequency}";
-        $description .= "\n\n**Error Output:**\n{$this->output}";
+        $description .= "\n\n*Frequency:* {$this->frequency}";
+        $description .= "\n\n*Error Output:* {$this->output}";
 
         return new SlackMessage(
             title: $title,

@@ -254,6 +254,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         try {
+            // Make sure the private key is stored in the filesystem
+            $this->server->privateKey->storeInFileSystem();
+
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
 
@@ -946,8 +949,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
+                }
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
@@ -1005,8 +1011,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
+                }
                 if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME=\"{$this->container_name}\"");
+                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
@@ -1168,7 +1177,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry('Rolling update started.');
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "docker stack deploy --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}"),
+                    executeInDocker($this->deployment_uuid, "docker stack deploy --detach=true --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}"),
                 ],
             );
             $this->application_deployment_queue->addLogEntry('Rolling update completed.');
@@ -2298,7 +2307,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             if ($this->use_build_server) {
                 $this->execute_remote_command(
-                    ["{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --build -d", 'hidden' => true],
+                    ["{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --pull always --build -d", 'hidden' => true],
                 );
             } else {
                 $this->execute_remote_command(

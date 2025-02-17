@@ -78,7 +78,7 @@ class ServiceDatabase extends BaseModel
     public function databaseType()
     {
         $image = str($this->image)->before(':');
-        if ($image->value() === 'postgres') {
+        if ($image->contains('postgres') || $image->contains('postgis')) {
             $image = 'postgresql';
         }
 

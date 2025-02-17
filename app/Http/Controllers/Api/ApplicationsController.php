@@ -1388,6 +1388,108 @@ class ApplicationsController extends Controller
         return response()->json($this->removeSensitiveData($application));
     }
 
+    #[OA\Get(
+        summary: 'Get application logs.',
+        description: 'Get application logs by UUID.',
+        path: '/applications/{uuid}/logs',
+        operationId: 'get-application-logs-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    format: 'int32',
+                    default: 100,
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get application logs by UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'logs' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function logs_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+
+        if ($containers->count() == 0) {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
+        }
+
+        $container = $containers->first();
+
+        $status = getContainerStatus($application->destination->server, $container['Names']);
+        if ($status !== 'running') {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
+        }
+
+        $lines = $request->query->get('lines', 100) ?: 100;
+        $logs = getContainerLogs($application->destination->server, $container['ID'], $lines);
+
+        return response()->json([
+            'logs' => $logs,
+        ]);
+    }
+
     #[OA\Delete(
         summary: 'Delete',
         description: 'Delete application by UUID.',
@@ -1681,7 +1783,8 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $domains = $request->domains;
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        $requestHasDomains = $request->has('domains');
+        if ($requestHasDomains && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
@@ -1743,7 +1846,7 @@ class ApplicationsController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->all();
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        if ($requestHasDomains && $server->isProxyShouldRun()) {
             data_set($data, 'fqdn', $domains);
         }
 
