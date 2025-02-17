@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
 
     return {
         server: {
+            cors: true,
             watch: {
                 ignored: [
                     "**/dev_*_data/**",

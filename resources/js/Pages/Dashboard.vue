@@ -99,10 +99,10 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 <template>
     <MainView @search="searchProjects" :breadcrumb="breadcrumb">
         <div v-if="search">
-            <Tabs :default-value="currentTab" class="py-2 opacity-30">
-                <ScrollArea>
+            <Tabs :default-value="currentTab" class="py-2 opacity-30 max-w-[100vw]">
+                <ScrollArea class="w-full max-w-[100vw]">
                     <TabsList
-                        class="dark:bg-transparent text-left md:justify-start md:items-start justify-center items-center border-b border-border pb-2">
+                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 border-b border-border">
                         <TabsTrigger value="projects" disabled>
                             Projects
                         </TabsTrigger>
@@ -173,30 +173,32 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
             </div>
         </div>
         <div v-else>
-            <Tabs :default-value="currentTab" orientation="vertical" class="w-full pt-2">
-                <TabsList
-                    class="dark:bg-transparent text-left md:justify-start md:items-start justify-center items-center border-b border-border pb-2">
-                    <TabsTrigger value="projects" @click="saveCurrentTab('projects')"
-                        class="rounded-xl dark:data-[state=active]:bg-coollabs">
-                        Projects
-                    </TabsTrigger>
-                    <TabsTrigger value="servers" @click="saveCurrentTab('servers')"
-                        class="rounded-xl dark:data-[state=active]:bg-coollabs">
-                        Servers
-                    </TabsTrigger>
-                    <TabsTrigger value="applications" @click="saveCurrentTab('applications')"
-                        class="rounded-xl dark:data-[state=active]:bg-coollabs">
-                        Applications
-                    </TabsTrigger>
-                    <TabsTrigger value="databases" @click="saveCurrentTab('databases')"
-                        class="rounded-xl dark:data-[state=active]:bg-coollabs">
-                        Databases
-                    </TabsTrigger>
-                    <TabsTrigger value="services" @click="saveCurrentTab('services')"
-                        class="rounded-xl dark:data-[state=active]:bg-coollabs">
-                        Services
-                    </TabsTrigger>
-                    <!-- <TabsTrigger value="git-sources" @click="saveCurrentTab('git-sources')" class="rounded-xl">
+            <Tabs :default-value="currentTab" orientation="vertical"
+                class="w-full pt-2 max-w-[calc(100vw-30px)] md:max-w-full">
+                <ScrollArea>
+                    <TabsList
+                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 md:border-b border-border mb-2">
+                        <TabsTrigger value="projects" @click="saveCurrentTab('projects')"
+                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            Projects
+                        </TabsTrigger>
+                        <TabsTrigger value="servers" @click="saveCurrentTab('servers')"
+                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            Servers
+                        </TabsTrigger>
+                        <TabsTrigger value="applications" @click="saveCurrentTab('applications')"
+                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            Applications
+                        </TabsTrigger>
+                        <TabsTrigger value="databases" @click="saveCurrentTab('databases')"
+                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            Databases
+                        </TabsTrigger>
+                        <TabsTrigger value="services" @click="saveCurrentTab('services')"
+                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            Services
+                        </TabsTrigger>
+                        <!-- <TabsTrigger value="git-sources" @click="saveCurrentTab('git-sources')" class="rounded-xl">
                         Git Sources
                     </TabsTrigger>
                     <TabsTrigger value="destinations" @click="saveCurrentTab('destinations')" class="rounded-xl">
@@ -205,7 +207,9 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     <TabsTrigger value="keys" @click="saveCurrentTab('keys')" class="rounded-xl">
                         Keys & Tokens
                     </TabsTrigger> -->
-                </TabsList>
+                    </TabsList>
+                    <ScrollBar orientation="horizontal" class="h-1.5" />
+                </ScrollArea>
                 <TabsContent value="projects" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
