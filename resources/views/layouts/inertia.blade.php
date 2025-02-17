@@ -7,7 +7,6 @@
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#ffffff" />
     <meta name="Description" content="Coolify: An open-source & self-hostable Heroku / Netlify / Vercel alternative" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@coolifyio" />
     <meta name="twitter:title" content="Coolify" />
