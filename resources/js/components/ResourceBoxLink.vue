@@ -11,7 +11,7 @@ defineProps<{
 </script>
 
 <template>
-    <Link :href="href" class="flex rounded-xl bg-coolgray-300 cursor-pointer h-24 group">
+    <Link prefetch :href="href" class="flex rounded-xl bg-coolgray-300 cursor-pointer h-24 group">
     <div class="text-xs text-muted-foreground group-hover:dark:text-white font-bold h-full bg-coolgray-200 p-2
                     group-hover:bg-coollabs rounded-xl transition-all">
         <BriefcaseBusiness :size="20" v-if="type === 'project'" />

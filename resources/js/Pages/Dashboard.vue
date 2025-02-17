@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, inject } from 'vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ResourceBox from '@/components/ResourceBox.vue'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
@@ -10,6 +10,8 @@ import type { Project } from '@/types/ProjectType'
 import type { Server } from '@/types/ServerType'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import { Application } from '@/types/ApplicationType'
+
+const route = inject('route');
 
 const props = defineProps<{
     user: User,
@@ -127,7 +129,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 class="bg-coolgray-100 p-2 rounded-xl">
                 <div class="resource-box-container">
                     <div v-for="project in projects" :key="project.uuid">
-                        <ResourceBox type="project" :href="`/next/projects/${project.uuid}`" :name="project.name"
+                        <ResourceBox type="project" :href="`/next/project/${project.uuid}`" :name="project.name"
                             :description="project.description" :environments="project.environments" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
@@ -204,8 +206,9 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="projects" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
-                            <ResourceBox type="project" :href="`/next/projects/${project.uuid}`" :name="project.name"
-                                :description="project.description" :environments="project.environments" />
+                            <ResourceBox type="project" :href="route('next_project', project.uuid, false)"
+                                :name="project.name" :description="project.description"
+                                :environments="project.environments" />
                         </div>
                         <ResourceBox :new="true" type="project" :href="`/next/projects`" name="New Project" />
                     </div>
