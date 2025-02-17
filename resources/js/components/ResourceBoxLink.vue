@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
-import { Server, GitBranch, Map, BriefcaseBusiness, Plus, Earth, Code, Database, Radiation } from 'lucide-vue-next'
+import { Server, GitBranch, Map, BriefcaseBusiness, Earth, Code, Database, Radiation } from 'lucide-vue-next'
 defineProps<{
     type: 'project' | 'server' | 'source' | 'destination' | 'environment' | 'application' | 'standalone-postgresql' | 'standalone-mysql' | 'service';
     href: string;
@@ -26,7 +26,7 @@ defineProps<{
     <div class="flex flex-col p-2">
         <div class="text-sm font-bold text-foreground">{{ name }}</div>
         <p class="text-xs text-muted-foreground">{{ description
-            }}</p>
+        }}</p>
     </div>
     </Link>
 </template>

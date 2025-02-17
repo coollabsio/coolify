@@ -12,7 +12,7 @@ import {
 } from 'radix-vue'
 import { computed, type HTMLAttributes } from 'vue'
 
-const props = defineProps<DialogContentProps & { class?: HTMLAttributes['class'] }>()
+const props = defineProps<DialogContentProps & { class?: HTMLAttributes['class'], hideClose?: boolean }>()
 const emits = defineEmits<DialogContentEmits>()
 
 const delegatedProps = computed(() => {
@@ -34,7 +34,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     )">
       <slot />
 
-      <DialogClose
+      <DialogClose v-if="!props.hideClose"
         class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-neutral-950 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-500 dark:ring-offset-neutral-950 dark:focus:ring-neutral-300 dark:data-[state=open]:bg-neutral-800 dark:data-[state=open]:text-neutral-400">
         <X class="w-4 h-4" />
         <span class="sr-only">Close</span>
