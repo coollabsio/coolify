@@ -127,34 +127,34 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 class="bg-coolgray-100 p-2 rounded-xl">
                 <div class="resource-box-container">
                     <div v-for="project in projects" :key="project.uuid">
-                        <ResourceBox type="project" :href="`/next/project/${project.uuid}`" :name="project.name"
+                        <ResourceBox type="project" :href="`/next/projects/${project.uuid}`" :name="project.name"
                             :description="project.description" :environments="project.environments" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
-                        <ResourceBox type="server" :href="`/next/project/${server.uuid}`" :name="server.name"
+                        <ResourceBox type="server" :href="`/next/projects/${server.uuid}`" :name="server.name"
                             :description="server.description" />
                     </div>
                     <div v-for="application in applications" :key="application.uuid">
-                        <ResourceBox type="application" :href="`/next/project/${application.uuid}`"
+                        <ResourceBox type="application" :href="`/next/projects/${application.uuid}`"
                             :name="application.name" :description="application.description" />
                     </div>
                     <div v-for="database in databases" :key="database.uuid">
-                        <ResourceBox :type="database.type" :href="`/next/project/${database.uuid}`"
+                        <ResourceBox :type="database.type" :href="`/next/projects/${database.uuid}`"
                             :name="database.name" :description="database.description" />
 
                         <!-- <ResourceBox :new="true" type="postgresql" :href="`/next/projects`" name="New Database" /> -->
                     </div>
                     <div v-for="service in services" :key="service.uuid">
-                        <ResourceBox type="service" :href="`/next/project/${service.uuid}`" :name="service.name"
+                        <ResourceBox type="service" :href="`/next/projects/${service.uuid}`" :name="service.name"
                             :description="service.description" />
                     </div>
 
                     <!-- <div v-for="source in sources" :key="source.uuid">
-                        <ResourceBox type="source" :href="`/next/project/${source.uuid}`" :name="source.name"
+                        <ResourceBox type="source" :href="`/next/projects/${source.uuid}`" :name="source.name"
                             :description="source.description" />
                     </div>
                     <div v-for="destination in destinations" :key="destination.uuid">
-                        <ResourceBox type="destination" :href="`/next/project/${destination.uuid}`"
+                        <ResourceBox type="destination" :href="`/next/projects/${destination.uuid}`"
                             :name="destination.name" :description="destination.description" />
                     </div> -->
                 </div>
@@ -204,7 +204,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="projects" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
-                            <ResourceBox type="project" :href="`/next/project/${project.uuid}`" :name="project.name"
+                            <ResourceBox type="project" :href="`/next/projects/${project.uuid}`" :name="project.name"
                                 :description="project.description" :environments="project.environments" />
                         </div>
                         <ResourceBox :new="true" type="project" :href="`/next/projects`" name="New Project" />
@@ -213,7 +213,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="servers" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="server in servers" :key="server.uuid">
-                            <ResourceBox type="server" :href="`/next/project/${server.uuid}`" :name="server.name"
+                            <ResourceBox type="server" :href="`/next/projects/${server.uuid}`" :name="server.name"
                                 :description="server.description" />
                         </div>
                         <ResourceBox :new="true" type="server" :href="`/next/projects`" name="New Server" />
@@ -222,7 +222,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="applications" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="application in applications" :key="application.uuid">
-                            <ResourceBox type="application" :href="`/next/project/${application.uuid}`"
+                            <ResourceBox type="application" :href="`/next/projects/${application.uuid}`"
                                 :name="application.name" :description="application.description" />
                         </div>
                         <ResourceBox :new="true" type="application" :href="`/next/projects`" name="New Application" />
@@ -231,7 +231,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="databases" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="database in databases" :key="database.uuid">
-                            <ResourceBox :type="database.type" :href="`/next/project/${database.uuid}`"
+                            <ResourceBox :type="database.type" :href="`/next/projects/${database.uuid}`"
                                 :name="database.name" :description="database.description" />
                         </div>
                         <!-- <ResourceBox :new="true" type="postgresql" :href="`/next/projects`" name="New Database" /> -->
@@ -240,7 +240,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="services" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="service in services" :key="service.uuid">
-                            <ResourceBox type="service" :href="`/next/project/${service.uuid}`" :name="service.name"
+                            <ResourceBox type="service" :href="`/next/projects/${service.uuid}`" :name="service.name"
                                 :description="service.description" />
 
                         </div>
@@ -250,7 +250,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <!-- <TabsContent value="git-sources" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="source in sources" :key="source.uuid">
-                            <ResourceBox type="source" :href="`/next/project/${source.uuid}`" :name="source.name"
+                            <ResourceBox type="source" :href="`/next/projects/${source.uuid}`" :name="source.name"
                                 :description="source.description" />
                         </div>
                         <ResourceBox :new="true" type="source" :href="`/next/projects`" name="New Source" />
@@ -259,7 +259,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="destinations" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="destination in destinations" :key="destination.uuid">
-                            <ResourceBox type="destination" :href="`/next/project/${destination.uuid}`"
+                            <ResourceBox type="destination" :href="`/next/projects/${destination.uuid}`"
                                 :name="destination.name" :description="destination.description" />
                         </div>
                         <ResourceBox :new="true" type="destination" :href="`/next/projects`"
