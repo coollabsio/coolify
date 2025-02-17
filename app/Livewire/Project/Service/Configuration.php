@@ -32,7 +32,7 @@ class Configuration extends Component
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
             'check_status',
-            'refresh' => '$refresh',
+            'refreshStatus' => '$refresh',
         ];
     }
 
@@ -99,7 +99,7 @@ class Configuration extends Component
             $this->service->databases->each(function ($database) {
                 $database->refresh();
             });
-            $this->dispatch('refresh');
+            $this->dispatch('refreshStatus');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

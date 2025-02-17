@@ -39,7 +39,7 @@
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10s="check_status">
+                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10000ms="check_status">
                     @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500 ' => str(
