@@ -12,6 +12,7 @@ import { Redis } from '@/types/RedisType'
 import { Mongodb } from '@/types/MongodbType'
 import { Mysql } from '@/types/MysqlType'
 import { Mariadb } from '@/types/MariadbType'
+import { route } from '@/route'
 
 const props = defineProps<{
     project: Project
@@ -77,7 +78,7 @@ const searchResources = (value: string) => {
                 <h3 class="text-sm font-bold text-foreground">Databases</h3>
             </div>
             <div v-for="postgresql in postgresqls" :key="postgresql.uuid">
-                <ResourceBox type="postgresql" :href="postgresql.hrefLink" :name="postgresql.name"
+                <ResourceBox type="standalone-postgresql" :href="postgresql.hrefLink" :name="postgresql.name"
                     :description="postgresql.description" />
             </div>
 

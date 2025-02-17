@@ -4,6 +4,7 @@ import { ref } from 'vue'
 
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import type { Project } from '@/types/ProjectType'
+import { route } from '@/route'
 
 const props = defineProps<{
     projects: Project[]

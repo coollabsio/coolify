@@ -1,6 +1,7 @@
 import { createApp, h } from 'vue'
 import { ZiggyVue } from 'ziggy-js';
 import { createInertiaApp } from '@inertiajs/vue3'
+import { route } from './route'
 
 createInertiaApp({
     progress: {
@@ -12,9 +13,10 @@ createInertiaApp({
         return pages[`./Pages/${name}.vue`]
     },
     setup({ el, App, props, plugin }) {
-        createApp({ render: () => h(App, props) })
-            .use(ZiggyVue)
-            .use(plugin)
-            .mount(el)
+        const app = createApp({ render: () => h(App, props) })
+        app.use(ZiggyVue)
+        app.use(plugin)
+        app.provide('route', route)
+        app.mount(el)
     },
 })

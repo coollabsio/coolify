@@ -2,6 +2,7 @@
 import MainView from '@/components/MainView.vue'
 import ResourceBox from '@/components/ResourceBox.vue'
 import { ref } from 'vue'
+import { route } from '@/route'
 
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import type { Project } from '@/types/ProjectType'

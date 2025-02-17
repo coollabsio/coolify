@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, inject } from 'vue'
+import { ref } from 'vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import ResourceBox from '@/components/ResourceBox.vue'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
@@ -11,7 +11,7 @@ import type { Server } from '@/types/ServerType'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import { Application } from '@/types/ApplicationType'
 
-const route = inject('route');
+import { route } from '@/route'
 
 const props = defineProps<{
     user: User,
@@ -45,11 +45,11 @@ function saveCurrentTab(tab: string) {
     breadcrumb.value = [
         {
             label: 'Dashboard',
-            href: '/next/dashboard'
+            href: route('next_dashboard')
         },
         {
             label: capitalize(tab),
-            href: '/next/dashboard'
+            href: route('next_dashboard')
         }
     ]
 }
@@ -79,11 +79,11 @@ function searchProjects(value: string) {
 const breadcrumb = ref<CustomBreadcrumbItem[]>([
     {
         label: 'Dashboard',
-        href: '/next/dashboard'
+        href: route('next_dashboard')
     },
     {
         label: capitalize(currentTab.value),
-        href: '/next/dashboard'
+        href: route('next_dashboard')
     }
 ])
 
@@ -129,34 +129,34 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 class="bg-coolgray-100 p-2 rounded-xl">
                 <div class="resource-box-container">
                     <div v-for="project in projects" :key="project.uuid">
-                        <ResourceBox type="project" :href="`/next/project/${project.uuid}`" :name="project.name"
+                        <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
                             :description="project.description" :environments="project.environments" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
-                        <ResourceBox type="server" :href="`/next/projects/${server.uuid}`" :name="server.name"
+                        <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
                             :description="server.description" />
                     </div>
                     <div v-for="application in applications" :key="application.uuid">
-                        <ResourceBox type="application" :href="`/next/projects/${application.uuid}`"
+                        <ResourceBox type="application" :href="route('next_project', application.uuid)"
                             :name="application.name" :description="application.description" />
                     </div>
                     <div v-for="database in databases" :key="database.uuid">
-                        <ResourceBox :type="database.type" :href="`/next/projects/${database.uuid}`"
+                        <ResourceBox :type="database.type" :href="route('next_project', database.uuid)"
                             :name="database.name" :description="database.description" />
 
-                        <!-- <ResourceBox :new="true" type="postgresql" :href="`/next/projects`" name="New Database" /> -->
+                        <!-- <ResourceBox :new="true" type="postgresql" :href="route('projects')" name="New Database" /> -->
                     </div>
                     <div v-for="service in services" :key="service.uuid">
-                        <ResourceBox type="service" :href="`/next/projects/${service.uuid}`" :name="service.name"
+                        <ResourceBox type="service" :href="route('next_project', service.uuid)" :name="service.name"
                             :description="service.description" />
                     </div>
 
                     <!-- <div v-for="source in sources" :key="source.uuid">
-                        <ResourceBox type="source" :href="`/next/projects/${source.uuid}`" :name="source.name"
+                        <ResourceBox type="source" :href="route('next_project', source.uuid)" :name="source.name"
                             :description="source.description" />
                     </div>
                     <div v-for="destination in destinations" :key="destination.uuid">
-                        <ResourceBox type="destination" :href="`/next/projects/${destination.uuid}`"
+                        <ResourceBox type="destination" :href="route('next_project', destination.uuid)"
                             :name="destination.name" :description="destination.description" />
                     </div> -->
                 </div>
@@ -206,73 +206,73 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="projects" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
-                            <ResourceBox type="project" :href="route('next_project', project.uuid, false)"
-                                :name="project.name" :description="project.description"
-                                :environments="project.environments" />
+                            <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
+                                :description="project.description" :environments="project.environments" />
                         </div>
-                        <ResourceBox :new="true" type="project" :href="`/next/projects`" name="New Project" />
+                        <ResourceBox :new="true" type="project" :href="route('next_projects')" name="New Project" />
                     </div>
                 </TabsContent>
                 <TabsContent value="servers" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="server in servers" :key="server.uuid">
-                            <ResourceBox type="server" :href="`/next/projects/${server.uuid}`" :name="server.name"
+                            <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
                                 :description="server.description" />
                         </div>
-                        <ResourceBox :new="true" type="server" :href="`/next/projects`" name="New Server" />
+                        <ResourceBox :new="true" type="server" :href="route('next_projects')" name="New Server" />
                     </div>
                 </TabsContent>
                 <TabsContent value="applications" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="application in applications" :key="application.uuid">
-                            <ResourceBox type="application" :href="`/next/projects/${application.uuid}`"
+                            <ResourceBox type="application" :href="route('next_project', application.uuid)"
                                 :name="application.name" :description="application.description" />
                         </div>
-                        <ResourceBox :new="true" type="application" :href="`/next/projects`" name="New Application" />
+                        <ResourceBox :new="true" type="application" :href="route('next_projects')"
+                            name="New Application" />
                     </div>
                 </TabsContent>
                 <TabsContent value="databases" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="database in databases" :key="database.uuid">
-                            <ResourceBox :type="database.type" :href="`/next/projects/${database.uuid}`"
+                            <ResourceBox :type="database.type" :href="route('next_project', database.uuid)"
                                 :name="database.name" :description="database.description" />
                         </div>
-                        <!-- <ResourceBox :new="true" type="postgresql" :href="`/next/projects`" name="New Database" /> -->
+                        <!-- <ResourceBox :new="true" type="postgresql" :href="route('next_projects')" name="New Database" /> -->
                     </div>
                 </TabsContent>
                 <TabsContent value="services" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="service in services" :key="service.uuid">
-                            <ResourceBox type="service" :href="`/next/projects/${service.uuid}`" :name="service.name"
+                            <ResourceBox type="service" :href="route('next_project', service.uuid)" :name="service.name"
                                 :description="service.description" />
 
                         </div>
-                        <!-- <ResourceBox :new="true" type="postgresql" :href="`/next/projects`" name="New Database" /> -->
+                        <!-- <ResourceBox :new="true" type="postgresql" :href="route('next_projects')" name="New Database" /> -->
                     </div>
                 </TabsContent>
                 <!-- <TabsContent value="git-sources" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="source in sources" :key="source.uuid">
-                            <ResourceBox type="source" :href="`/next/projects/${source.uuid}`" :name="source.name"
+                            <ResourceBox type="source" :href="route('next_project', source.uuid)" :name="source.name"
                                 :description="source.description" />
                         </div>
-                        <ResourceBox :new="true" type="source" :href="`/next/projects`" name="New Source" />
+                        <ResourceBox :new="true" type="source" :href="route('next_projects')" name="New Source" />
                     </div>
                 </TabsContent>
                 <TabsContent value="destinations" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="destination in destinations" :key="destination.uuid">
-                            <ResourceBox type="destination" :href="`/next/projects/${destination.uuid}`"
+                            <ResourceBox type="destination" :href="route('next_project', destination.uuid)"
                                 :name="destination.name" :description="destination.description" />
                         </div>
-                        <ResourceBox :new="true" type="destination" :href="`/next/projects`"
+                        <ResourceBox :new="true" type="destination" :href="route('next_projects')"
                             name="New Destination" />
                     </div>
                 </TabsContent> -->
                 <!-- <TabsContent value="keys" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
                         <div v-for="server in servers" :key="server.uuid">
-                            <ResourceBox :href="`/next/projects`" :name="server.name" :description="server.description" />
+                            <ResourceBox :href="route('next_projects')" :name="server.name" :description="server.description" />
                         </div>
                     </div>
                 </TabsContent> -->
