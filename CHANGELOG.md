@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(core)* Update service status refresh event handling
+- *(ui)* Adjust polling intervals for database and service status checks
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump Coolify version to 4.0.0-beta.394
+
+## [4.0.0-beta.393] - 2025-02-15
+
 ### 🚀 Features
 
 - *(core)* Add error logging and cron parsing to docker/server schedules
