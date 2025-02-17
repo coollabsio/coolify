@@ -65,8 +65,7 @@ function handleClose() {
 
 <template>
     <UseTemplate>
-        <AutoForm class="space-y-2 py-4" :class="isDesktop ? '' : 'p-4'" :schema="schema" :form="form"
-            @submit="onSubmit">
+        <AutoForm class="space-y-2" :class="isDesktop ? '' : 'p-4'" :schema="schema" :form="form" @submit="onSubmit">
             <div class="flex gap-2 items-center p-2 bg-primary/50 border border-primary rounded-xl">
                 <Info :size="16" class="text-muted-foreground group-hover:dark:text-white" />
                 <div class="text-sm text-foreground">
@@ -74,7 +73,7 @@ function handleClose() {
                 </div>
             </div>
             <DialogFooter>
-                <div class="flex justify-between gap-2 w-full">
+                <div class="flex justify-between gap-2 w-full pt-6">
                     <DialogClose as-child>
                         <Button type="button" variant="secondary" @click="handleClose">
                             Cancel
