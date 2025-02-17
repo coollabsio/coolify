@@ -25,7 +25,6 @@ const props = defineProps<{
     mysqls: Mysql[]
     mariadbs: Mariadb[]
 }>()
-console.log(props)
 const applications = ref(props.applications)
 const services = ref(props.services)
 const postgresqls = ref(props.postgresqls)
