@@ -96,7 +96,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 class="w-full pt-2 max-w-[calc(100vw-30px)] md:max-w-full">
                 <ScrollArea>
                     <TabsList
-                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 border-b border-border">
+                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 md:border-b border-border mb-2">
                         <TabsTrigger value="projects" disabled>
                             Projects
                         </TabsTrigger>
@@ -127,7 +127,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
             </Tabs>
 
             <div v-if="projects.length > 0 || servers.length > 0 || applications.length > 0 || databases.length > 0 || services.length > 0"
-                class="bg-coolgray-100 p-2 rounded-xl">
+                class="bg-coolgray-100 p-2 rounded-xl mt-2">
                 <div class="resource-box-container">
                     <div v-for="project in projects" :key="project.uuid">
                         <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
@@ -144,22 +144,11 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     <div v-for="database in databases" :key="database.uuid">
                         <ResourceBox :type="database.type" :href="route('next_project', database.uuid)"
                             :name="database.name" :description="database.description" />
-
-                        <!-- <ResourceBox :new="true" type="postgresql" :href="route('projects')" name="New Database" /> -->
                     </div>
                     <div v-for="service in services" :key="service.uuid">
                         <ResourceBox type="service" :href="route('next_project', service.uuid)" :name="service.name"
                             :description="service.description" />
                     </div>
-
-                    <!-- <div v-for="source in sources" :key="source.uuid">
-                        <ResourceBox type="source" :href="route('next_project', source.uuid)" :name="source.name"
-                            :description="source.description" />
-                    </div>
-                    <div v-for="destination in destinations" :key="destination.uuid">
-                        <ResourceBox type="destination" :href="route('next_project', destination.uuid)"
-                            :name="destination.name" :description="destination.description" />
-                    </div> -->
                 </div>
             </div>
             <div v-else>
@@ -192,15 +181,6 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                             class="rounded-xl dark:data-[state=active]:bg-coollabs">
                             Services
                         </TabsTrigger>
-                        <!-- <TabsTrigger value="git-sources" @click="saveCurrentTab('git-sources')" class="rounded-xl">
-                        Git Sources
-                    </TabsTrigger>
-                    <TabsTrigger value="destinations" @click="saveCurrentTab('destinations')" class="rounded-xl">
-                        Destinations
-                    </TabsTrigger>
-                    <TabsTrigger value="keys" @click="saveCurrentTab('keys')" class="rounded-xl">
-                        Keys & Tokens
-                    </TabsTrigger> -->
                     </TabsList>
                     <ScrollBar orientation="horizontal" class="h-1.5" />
                 </ScrollArea>
