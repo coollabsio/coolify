@@ -26,7 +26,7 @@ defineProps<{
     <div class="flex flex-col p-2">
         <div class="text-sm font-bold text-foreground">{{ name }}</div>
         <p class="text-xs text-muted-foreground">{{ description
-        }}</p>
+            }}</p>
     </div>
     </Link>
 </template>
