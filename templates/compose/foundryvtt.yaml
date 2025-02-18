@@ -39,12 +39,17 @@ services:
     - FOUNDRY_MINIFY_STATIC_FILES=${FOUNDRY_MINIFY_STATIC_FILES:-true}
     # The world ID to startup at system start.
     - FOUNDRY_WORLD=${FOUNDRY_WORLD}
+    # Optional telemetry.
     - FOUNDRY_TELEMETRY=${FOUNDRY_TELEMETRY:-false}
+    # The timezone to use for the server.
     - TIMEZONE=${TIMEZONE:-UTC}
     # Set a path to cache downloads of the Foundry distribution archive and speed up subsequent container startups.
     - CONTAINER_CACHE=/data/container_cache
     volumes:
-    - foundryvtt-data:/data
+      - type: bind
+        source: ${FOUNDRY_DATA:-/data/foundryvtt}
+        target: /data
+        is_directory: true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:30000"]
       timeout: 5s
