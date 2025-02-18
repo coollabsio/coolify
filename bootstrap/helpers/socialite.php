@@ -29,6 +29,18 @@ function get_socialite_provider(string $provider)
         return Socialite::driver('authentik')->setConfig($authentik_config);
     }
 
+    if ($provider == 'google') {
+        $google_config = new \SocialiteProviders\Manager\Config(
+            $oauth_setting->client_id,
+            $oauth_setting->client_secret,
+            $oauth_setting->redirect_uri
+        );
+
+        return Socialite::driver('google')
+            ->setConfig($google_config)
+            ->with(['hd' => $oauth_setting->tenant]);
+    }
+
     $config = [
         'client_id' => $oauth_setting->client_id,
         'client_secret' => $oauth_setting->client_secret,
@@ -39,7 +51,6 @@ function get_socialite_provider(string $provider)
         'bitbucket' => \Laravel\Socialite\Two\BitbucketProvider::class,
         'github' => \Laravel\Socialite\Two\GithubProvider::class,
         'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
-        'google' => \Laravel\Socialite\Two\GoogleProvider::class,
         'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
     ];
 

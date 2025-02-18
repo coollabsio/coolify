@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- *(core)* Add error logging and cron parsing to docker/server schedules
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump Coolify version to 4.0.0-beta.393
+
+## [4.0.0-beta.392] - 2025-02-13
+
+### 🚀 Features
+
+- *(ui)* Add top padding to pricing plans view
+
+### 🐛 Bug Fixes
+
+- Pull latest image from registry when using build server
+- *(deployment)* Improve server selection for deployment cancellation
+- *(deployment)* Improve log line rendering and formatting
+- *(s3-storage)* Optimize team admin notification query
+- *(core)* Improve connection testing with dynamic disk configuration for s3 backups
+
+### 🚜 Refactor
+
+- Use pull flag on docker compose up
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Rollback Coolify version to 4.0.0-beta.392
+
 ## [4.0.0-beta.391] - 2025-02-04
 
 ### 🚀 Features
@@ -13,6 +54,11 @@ All notable changes to this project will be documented in this file.
 - *(changelog)* Add git cliff for automatic changelog generation
 - *(workflows)* Improve changelog generation and workflows
 - *(ui)* Add periodic status checking for services
+- *(deployment)* Ensure private key is stored in filesystem before deployment
+- *(slack)* Show message title in notification previews (#5063)
+- *(i18n)* Add Arabic translations (#4991)
+- *(i18n)* Add French translations (#4992)
+- *(services)* Update `service-templates.json`
 
 ### 🐛 Bug Fixes
 
@@ -22,6 +68,17 @@ All notable changes to this project will be documented in this file.
 - *(ui)* Simplify service templates loading logic
 - *(ui)* Align title and add button vertically in various views
 - Handle pullrequest:updated for reliable preview deployments
+- *(ui)* Fix typo on team page (#5105)
+- Cal.com documentation link give 404 (#5070)
+- *(slack)* Notification settings URL in `HighDiskUsage` message (#5071)
+- *(ui)* Correct typo in Storage delete dialog (#5061)
+- *(lang)* Add missing italian translations (#5057)
+- *(service)* Improve duplicati.yaml (#4971)
+- *(service)* Links in homepage service (#5002)
+- *(service)* Added SMTP credentials to getoutline yaml template file (#5011)
+- *(service)* Added `KEY` Variable to Beszel Template (#5021)
+- *(cloudflare-tunnels)* Dead links to docs (#5104)
+- System-wide GitHub apps (#5114)
 
 ### 🚜 Refactor
 
@@ -31,12 +88,16 @@ All notable changes to this project will be documented in this file.
 
 - *(services)* Reword nitropage url and slogan
 - *(readme)* Add Convex to special sponsors section
+- Update changelog
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(config)* Increase default PHP memory limit to 256M
 - Add openapi response
 - *(workflows)* Make naming more clear and remove unused code
+- Bump Coolify version to 4.0.0-beta.392/393
+- *(ci)* Update changelog generation workflow to target 'next' branch
+- *(ci)* Update changelog generation workflow to target main branch
 
 ## [4.0.0-beta.390] - 2025-01-28
 
