@@ -130,7 +130,7 @@ function handleClose() {
                 <h3 class="text-sm font-bold text-foreground pb-2 px-2">Environments</h3>
                 <div v-for="environment in environments" :key="environment.uuid"
                     class="flex flex-col gap-2 text-xs group">
-                    <Link
+                    <Link prefetch
                         class="hover:dark:bg-primary p-2 rounded-xl flex gap-2 items-center text-muted-foreground hover:text-white"
                         :href="route('next_environment', { project_uuid: environment.project_uuid, environment_uuid: environment.uuid })">
                     <Earth :size="16" class="text-muted-foreground/40 group-hover:dark:text-white" />
