@@ -79,10 +79,22 @@ class Github extends Controller
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                $full_name = data_get($payload, 'repository.full_name');
+                $tag = data_get($payload, 'release.tag_name');
+                $branch = data_get($payload, 'release.target_commitish');
+            }
             if (! $branch) {
                 return response('Nothing to do. No branch found in the request.');
             }
             $applications = Application::where('git_repository', 'like', "%$full_name%");
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get();
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
+                }
+            }
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
@@ -224,6 +236,31 @@ class Github extends Controller
                         }
                     }
                 }
+                if ($x_github_event === 'release' && $action === 'published') {
+                    if ($application->isDeployable()) {
+                        $deployment_uuid = new Cuid2;
+                        queue_application_deployment(
+                            application: $application,
+                            deployment_uuid: $deployment_uuid,
+                            force_rebuild: false,
+                            commit: $tag,
+                            is_webhook: true,
+                        );
+                        $return_payloads->push([
+                            'status' => 'success',
+                            'message' => 'Release deployment queued.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                        ]);
+                    } else {
+                        $return_payloads->push([
+                            'status' => 'failed',
+                            'message' => 'Deployments disabled.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                        ]);
+                    }
+                }
             }
 
             return response($return_payloads);
@@ -309,10 +346,22 @@ class Github extends Controller
                 $branch = data_get($payload, 'pull_request.head.ref');
                 $base_branch = data_get($payload, 'pull_request.base.ref');
             }
+            if ($x_github_event === 'release') {
+                $action = data_get($payload, 'action');
+                $id = data_get($payload, 'repository.id');
+                $tag = data_get($payload, 'release.tag_name');
+                $branch = data_get($payload, 'release.target_commitish');
+            }
             if (! $id || ! $branch) {
                 return response('Nothing to do. No id or branch found.');
             }
             $applications = Application::where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
+            if ($x_github_event === 'release') {
+                $applications = $applications->where('git_branch', $branch)->get();
+                if ($applications->isEmpty()) {
+                    return response("Nothing to do. No applications found with branch '$branch'.");
+                }
+            }
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
@@ -438,6 +487,31 @@ class Github extends Controller
                                 'message' => 'No preview deployment found.',
                             ]);
                         }
+                    }
+                }
+                if ($x_github_event === 'release' && $action === 'published') {
+                    if ($application->isDeployable()) {
+                        $deployment_uuid = new Cuid2;
+                        queue_application_deployment(
+                            application: $application,
+                            deployment_uuid: $deployment_uuid,
+                            force_rebuild: false,
+                            commit: $tag,
+                            is_webhook: true,
+                        );
+                        $return_payloads->push([
+                            'status' => 'success',
+                            'message' => 'Release deployment queued.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                        ]);
+                    } else {
+                        $return_payloads->push([
+                            'status' => 'failed',
+                            'message' => 'Deployments disabled.',
+                            'application_uuid' => $application->uuid,
+                            'application_name' => $application->name,
+                        ]);
                     }
                 }
             }
