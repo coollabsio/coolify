@@ -1,6 +1,7 @@
 import { createApp, h } from 'vue'
 import { ZiggyVue } from 'ziggy-js';
 import { createInertiaApp } from '@inertiajs/vue3'
+import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
 import { route } from './route'
 
 createInertiaApp({
@@ -16,6 +17,7 @@ createInertiaApp({
         const app = createApp({ render: () => h(App, props) })
         app.use(ZiggyVue)
         app.use(plugin)
+        app.use(autoAnimatePlugin)
         app.provide('route', route)
         app.mount(el)
     },

@@ -103,7 +103,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 </script>
 
 <template>
-    <SidebarProvider :defaultOpen="defaultOpen" class="md:container md:mx-auto">
+    <SidebarProvider :defaultOpen="defaultOpen" class="xl:container xl:mx-auto">
         <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>

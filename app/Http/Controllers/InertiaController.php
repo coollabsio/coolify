@@ -11,7 +11,7 @@ class InertiaController extends Controller
 {
     public function dashboard()
     {
-        $servers = Server::isUsable()->get();
+        $servers = Server::ownedByCurrentTeam()->get();
         $projects = Project::ownedByCurrentTeam()->orderBy('created_at')->with('environments')->get();
         $projects = $projects->map(function ($project) {
             return [
@@ -191,6 +191,18 @@ class InertiaController extends Controller
             'mysqls' => $mysqls->values()->all(),
             'mariadbs' => $mariadbs->values()->all(),
             'keydbs' => $keydbs->values()->all(),
+        ]);
+    }
+
+    public function server(string $server_uuid)
+    {
+        $server = Server::ownedByCurrentTeam()->where('uuid', $server_uuid)->first();
+        if (! $server) {
+            return redirect()->route('servers');
+        }
+
+        return Inertia::render('Server/Show', [
+            'server' => $server,
         ]);
     }
 }

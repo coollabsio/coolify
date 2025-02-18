@@ -196,7 +196,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 <TabsContent value="servers" class="bg-coolgray-100 p-2 rounded-xl">
                     <div class="resource-box-container">
                         <div v-for="server in servers" :key="server.uuid">
-                            <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
+                            <ResourceBox type="server" :href="route('next_server', server.uuid)" :name="server.name"
                                 :description="server.description" />
                         </div>
                         <ResourceBox :new="true" type="server" :href="route('next_projects')" name="New Server" />
