@@ -14,7 +14,7 @@
     </div>
 
     <div class="flex flex-col gap-2">
-        @forelse ($team->environment_variables->sort()->sortBy('key') as $env)
+        @forelse ($team->environmentVariables->sort()->sortBy('key') as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" type="team" />
         @empty

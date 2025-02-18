@@ -11,7 +11,7 @@ use Spatie\Url\Url;
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
 {
     $application_id = $application->id;
-    $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
+    $deployment_link = Url::fromString($application->href_link."/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
     $server_id = $application->destination->server->id;
     $server_name = $application->destination->server->name;

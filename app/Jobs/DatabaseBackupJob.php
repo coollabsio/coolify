@@ -81,10 +81,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server = $this->database->destination->server;
                 $this->s3 = $this->backup->s3;
             }
-            if (is_null($this->server)) {
+            if (blank($this->server)) {
                 throw new \Exception('Server not found?!');
             }
-            if (is_null($this->database)) {
+            if (blank($this->database)) {
                 throw new \Exception('Database not found?!');
             }
 
@@ -467,7 +467,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     private function upload_to_s3(): void
     {
         try {
-            if (is_null($this->s3)) {
+            if (blank($this->s3)) {
                 return;
             }
             $key = $this->s3->key;

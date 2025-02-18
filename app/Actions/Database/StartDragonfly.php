@@ -70,7 +70,7 @@ class StartDragonfly
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {

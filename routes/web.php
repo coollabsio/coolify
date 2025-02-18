@@ -293,20 +293,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/download/backup/{executionId}', function () {
         try {
             $team = auth()->user()->currentTeam();
-            if (is_null($team)) {
+            if (blank($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();
             $execution_team_id = $execution->scheduledDatabaseBackup->database->team()?->id;
             if ($team->id !== 0) {
-                if (is_null($execution_team_id)) {
+                if (blank($execution_team_id)) {
                     return response()->json(['message' => 'Team not found.'], 404);
                 }
                 if ($team->id !== $execution_team_id) {
                     return response()->json(['message' => 'Permission denied.'], 403);
                 }
-                if (is_null($execution)) {
+                if (blank($execution)) {
                     return response()->json(['message' => 'Backup not found.'], 404);
                 }
             }
@@ -335,7 +335,7 @@ Route::middleware(['auth'])->group(function () {
                     ob_end_clean();
                 }
                 $stream = $disk->readStream($filename);
-                if ($stream === false || is_null($stream)) {
+                if ($stream === false || blank($stream)) {
                     abort(500, 'Failed to open stream for the requested file.');
                 }
                 while (! feof($stream)) {

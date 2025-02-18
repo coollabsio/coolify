@@ -11,6 +11,7 @@ use App\Traits\HasNotificationSettings;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Auth;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -54,8 +55,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->pushoverNotificationSettings()->create();
         });
 
-        static::saving(function ($team) {
-            if (auth()->user()?->isMember()) {
+        static::saving(function () {
+            if (Auth::user()?->isMember()) {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
@@ -73,7 +74,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             foreach ($tags as $tag) {
                 $tag->delete();
             }
-            $shared_variables = $team->environment_variables();
+            $shared_variables = $team->environmentVariables();
             foreach ($shared_variables as $shared_variable) {
                 $shared_variable->delete();
             }
@@ -157,7 +158,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function getRecipients($notification)
     {
         $recipients = data_get($notification, 'emails', null);
-        if (is_null($recipients)) {
+        if (blank($recipients)) {
             return $this->members()->pluck('email')->toArray();
         }
 
@@ -195,7 +196,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         }
     }
 
-    public function environment_variables()
+    public function environmentVariables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
     }

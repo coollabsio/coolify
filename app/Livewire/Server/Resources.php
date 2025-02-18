@@ -86,7 +86,7 @@ class Resources extends Component
         $this->parameters = get_route_parameters();
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
-            if (is_null($this->server)) {
+            if (blank($this->server)) {
                 return redirect()->route('server.index');
             }
             $this->loadManagedContainers();

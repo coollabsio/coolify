@@ -27,7 +27,7 @@ class Show extends Component
     public function setPrivateKey($privateKeyId)
     {
         $ownedPrivateKey = PrivateKey::ownedByCurrentTeam()->find($privateKeyId);
-        if (is_null($ownedPrivateKey)) {
+        if (blank($ownedPrivateKey)) {
             $this->dispatch('error', 'You are not allowed to use this private key.');
 
             return;

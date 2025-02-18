@@ -7,7 +7,7 @@ export interface Redis {
     destination_id: number;
     destination_type: string;
     environment_id: number;
-    hrefLink: string;
+    href_link: string;
     id: number;
     image: string;
     is_include_timestamps: boolean;

@@ -17,7 +17,7 @@
                     <x-git-icon class="dark:text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
                     <div class="text-left group-hover:dark:text-white">
                         <div class="box-title">{{ $source->name }}</div>
-                        @if (is_null($source->app_id))
+                        @if (blank($source->app_id))
                             <span class="box-description !text-error ">Configuration is not finished.</span>
                         @endif
                     </div>
@@ -29,7 +29,7 @@
                     <x-git-icon class="dark:text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
                     <div class="text-left group-hover:dark:text-white">
                         <div>{{ $source->name }}</div>
-                        @if (is_null($source->app_id))
+                        @if (blank($source->app_id))
                             <span class="text-error">Configuration is not finished</span>
                         @endif
                     </div>

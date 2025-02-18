@@ -30,11 +30,8 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
         <template #title>
             {{ props.project.name }}
         </template>
-        <template #subtitle>
-            Select an environment.
-        </template>
         <div class="resource-box-container md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
-            <div v-for="environment in props.environments" :key="environment.uuid">
+            <div v-for="environment in environments" :key="environment.uuid">
                 <ResourceBox type="environment"
                     :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: environment.uuid })"
                     :name="environment.name" :description="environment.description" />

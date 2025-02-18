@@ -138,7 +138,7 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
 
 function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
 {
-    if (is_null($application_deployment_queue)) {
+    if (blank($application_deployment_queue)) {
         return collect([]);
     }
     $application = Application::find(data_get($application_deployment_queue, 'application_id'));
@@ -168,7 +168,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         ->reduce(function ($deploymentLogLines, $logItem) use ($seenCommands) {
             $command = data_get($logItem, 'command');
             $isStderr = data_get($logItem, 'type') === 'stderr';
-            $isNewCommand = ! is_null($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
+            $isNewCommand = filled($command) && ! $seenCommands->first(function ($seenCommand) use ($logItem) {
                 return data_get($seenCommand, 'command') === data_get($logItem, 'command') && data_get($seenCommand, 'batch') === data_get($logItem, 'batch');
             });
 
@@ -211,7 +211,7 @@ function remove_iip($text)
 
 function refresh_server_connection(?PrivateKey $private_key = null)
 {
-    if (is_null($private_key)) {
+    if (blank($private_key)) {
         return;
     }
     foreach ($private_key->servers as $server) {

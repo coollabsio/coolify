@@ -70,14 +70,14 @@ const searchResources = (value: string) => {
                 <h3 class="text-sm font-bold text-foreground">Applications</h3>
             </div>
             <div v-for="application in applications" :key="application.uuid">
-                <ResourceBox type="application" :href="application.hrefLink" :name="application.name"
+                <ResourceBox type="application" :href="application.href_link" :name="application.name"
                     :description="application.description" />
             </div>
             <div class="col-span-full" v-if="postgresqls.length > 0">
                 <h3 class="text-sm font-bold text-foreground">Databases</h3>
             </div>
             <div v-for="postgresql in postgresqls" :key="postgresql.uuid">
-                <ResourceBox type="standalone-postgresql" :href="postgresql.hrefLink" :name="postgresql.name"
+                <ResourceBox type="standalone-postgresql" :href="postgresql.href_link" :name="postgresql.name"
                     :description="postgresql.description" />
             </div>
 
@@ -85,7 +85,7 @@ const searchResources = (value: string) => {
                 <h3 class="text-sm font-bold text-foreground">Services</h3>
             </div>
             <div v-for="service in services" :key="service.uuid">
-                <ResourceBox type="service" :href="service.hrefLink" :name="service.name"
+                <ResourceBox type="service" :href="service.href_link" :name="service.name"
                     :description="service.description" />
             </div>
         </div>

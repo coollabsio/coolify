@@ -135,11 +135,13 @@ class General extends Component
     public function mount()
     {
         try {
-            $this->parsedServices = $this->application->parse();
-            if (is_null($this->parsedServices) || empty($this->parsedServices)) {
-                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->parsedServices = $this->application->parse();
+                if (is_null($this->parsedServices) || empty($this->parsedServices)) {
+                    $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
-                return;
+                    return;
+                }
             }
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
@@ -164,7 +166,7 @@ class General extends Component
             $this->dispatch('info', 'Loading docker compose file.');
         }
 
-        if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
+        if (str($this->application->status)->startsWith('running') && blank($this->application->config_hash)) {
             $this->dispatch('configurationChanged');
         }
     }
@@ -204,7 +206,7 @@ class General extends Component
             // $this->application->refresh();
 
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
-            if (is_null($this->parsedServices)) {
+            if (blank($this->parsedServices)) {
                 $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
                 return;

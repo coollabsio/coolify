@@ -120,7 +120,7 @@ class Github extends Controller
                 if ($x_github_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                        if ($is_watch_path_triggered || is_null($application->watch_paths)) {
+                        if ($is_watch_path_triggered || blank($application->watch_paths)) {
                             $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,
@@ -271,7 +271,7 @@ class Github extends Controller
                 return response('pong');
             }
             $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
-            if (is_null($github_app)) {
+            if (blank($github_app)) {
                 return response('Nothing to do. No GitHub App found.');
             }
             $webhook_secret = data_get($github_app, 'webhook_secret');
@@ -340,7 +340,7 @@ class Github extends Controller
                 if ($x_github_event === 'push') {
                     if ($application->isDeployable()) {
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
-                        if ($is_watch_path_triggered || is_null($application->watch_paths)) {
+                        if ($is_watch_path_triggered || blank($application->watch_paths)) {
                             $deployment_uuid = new Cuid2;
                             queue_application_deployment(
                                 application: $application,

@@ -61,7 +61,7 @@ class TeamController extends Controller
     public function teams(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $teams = auth()->user()->teams->sortBy('id');
@@ -110,12 +110,12 @@ class TeamController extends Controller
     {
         $id = $request->id;
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
-        if (is_null($team)) {
+        if (blank($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
         $team = $this->removeSensitiveData($team);
@@ -168,12 +168,12 @@ class TeamController extends Controller
     {
         $id = $request->id;
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
-        if (is_null($team)) {
+        if (blank($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
         $members = $team->members;
@@ -213,7 +213,7 @@ class TeamController extends Controller
     public function current_team(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $team = auth()->user()->currentTeam();
@@ -258,7 +258,7 @@ class TeamController extends Controller
     public function current_team_members(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $team = auth()->user()->currentTeam();

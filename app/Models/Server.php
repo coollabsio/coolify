@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -716,7 +717,7 @@ $schema://$host {
         $status = data_get($sentinel_found, '0.State.Status', 'exited');
         if ($status === 'running') {
             $containers = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/containers"'], $this, false);
-            if (is_null($containers)) {
+            if (blank($containers)) {
                 return collect([]);
             }
             $containers = data_get(json_decode($containers, true), 'containers', []);
@@ -1042,7 +1043,7 @@ $schema://$host {
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
 
-        \Log::debug('Server reachability check', [
+        Log::debug('Server reachability check', [
             'server_id' => $this->id,
             'is_reachable' => $isReachable,
             'notification_sent' => $unreachableNotificationSent,
@@ -1054,7 +1055,7 @@ $schema://$host {
             $this->save();
 
             if ($unreachableNotificationSent === true) {
-                \Log::debug('Server is now reachable, sending notification', [
+                Log::debug('Server is now reachable, sending notification', [
                     'server_id' => $this->id,
                 ]);
                 $this->sendReachableNotification();
@@ -1064,7 +1065,7 @@ $schema://$host {
         }
 
         $this->increment('unreachable_count');
-        \Log::debug('Incremented unreachable count', [
+        Log::debug('Incremented unreachable count', [
             'server_id' => $this->id,
             'new_count' => $this->unreachable_count,
         ]);
@@ -1072,7 +1073,7 @@ $schema://$host {
         if ($this->unreachable_count === 1) {
             $this->settings->is_reachable = true;
             $this->settings->save();
-            \Log::debug('First unreachable attempt, marking as reachable', [
+            Log::debug('First unreachable attempt, marking as reachable', [
                 'server_id' => $this->id,
             ]);
 
@@ -1083,7 +1084,7 @@ $schema://$host {
             $failedChecks = 0;
             for ($i = 0; $i < 3; $i++) {
                 $status = $this->serverStatus();
-                \Log::debug('Additional reachability check', [
+                Log::debug('Additional reachability check', [
                     'server_id' => $this->id,
                     'attempt' => $i + 1,
                     'status' => $status,
@@ -1095,7 +1096,7 @@ $schema://$host {
             }
 
             if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                \Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
+                Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
                     'server_id' => $this->id,
                 ]);
                 $this->sendUnreachableNotification();
@@ -1157,7 +1158,7 @@ $schema://$host {
     public function validateDockerEngine($throwError = false)
     {
         $dockerBinary = instant_remote_process(['command -v docker'], $this, false, no_sudo: true);
-        if (is_null($dockerBinary)) {
+        if (blank($dockerBinary)) {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
@@ -1187,7 +1188,7 @@ $schema://$host {
     public function validateDockerCompose($throwError = false)
     {
         $dockerCompose = instant_remote_process(['docker compose version'], $this, false);
-        if (is_null($dockerCompose)) {
+        if (blank($dockerCompose)) {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
@@ -1224,7 +1225,7 @@ $schema://$host {
         $dockerVersionJson = json_decode($dockerVersionRaw, true);
         $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-        if (is_null($dockerVersion)) {
+        if (blank($dockerVersion)) {
             $this->settings->is_usable = false;
             $this->settings->save();
 

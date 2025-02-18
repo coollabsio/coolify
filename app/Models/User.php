@@ -181,7 +181,7 @@ class User extends Authenticatable implements SendsEmail
     {
         $found_root_team = Auth::user()->teams->filter(function ($team) {
             if ($team->id == 0) {
-                if (! Auth::user()->isAdmin()) {
+                if (! $this->isAdmin()) {
                     return false;
                 }
 
@@ -197,7 +197,7 @@ class User extends Authenticatable implements SendsEmail
     public function currentTeam()
     {
         return Cache::remember('team:'.Auth::id(), 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
+            if (blank(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
                 return Auth::user()->teams[0];
             }
 

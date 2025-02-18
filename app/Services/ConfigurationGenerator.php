@@ -125,7 +125,7 @@ class ConfigurationGenerator
     protected function getEnvironmentVariables(): array
     {
         $variables = collect([]);
-        foreach ($this->resource->environment_variables as $env) {
+        foreach ($this->resource->environmentVariables as $env) {
             $variables->push([
                 'key' => $env->key,
                 'value' => $env->value,
@@ -141,7 +141,7 @@ class ConfigurationGenerator
     protected function getPreviewEnvironmentVariables(): array
     {
         $variables = collect([]);
-        foreach ($this->resource->environment_variables_preview as $env) {
+        foreach ($this->resource->environmentVariablesPreview as $env) {
             $variables->push([
                 'key' => $env->key,
                 'value' => $env->value,

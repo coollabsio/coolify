@@ -56,7 +56,7 @@ class ServerCheck
                     // ServerStorageCheckJob::dispatch($this->server);
                 }
 
-                if (is_null($this->containers)) {
+                if (blank($this->containers)) {
                     return 'No containers found.';
                 }
 
@@ -231,7 +231,7 @@ class ServerCheck
                 }
             } else {
                 // Database
-                if (is_null($this->databases)) {
+                if (blank($this->databases)) {
                     $this->databases = $this->server->databases();
                 }
                 $database = $this->databases->where('uuid', $uuid)->first();

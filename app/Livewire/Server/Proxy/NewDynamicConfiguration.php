@@ -39,10 +39,10 @@ class NewDynamicConfiguration extends Component
             if (data_get($this->parameters, 'server_uuid')) {
                 $this->server = Server::ownedByCurrentTeam()->whereUuid(data_get($this->parameters, 'server_uuid'))->first();
             }
-            if (! is_null($this->server_id)) {
+            if (filled($this->server_id)) {
                 $this->server = Server::ownedByCurrentTeam()->whereId($this->server_id)->first();
             }
-            if (is_null($this->server)) {
+            if (blank($this->server)) {
                 return redirect()->route('server.index');
             }
             $proxy_type = $this->server->proxyType();

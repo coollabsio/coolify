@@ -111,7 +111,7 @@ class Previews extends Component
             if ($this->application->build_pack === 'dockercompose') {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (! $found && ! is_null($pull_request_html_url)) {
+                if (! $found && filled($pull_request_html_url)) {
                     $found = ApplicationPreview::create([
                         'application_id' => $this->application->id,
                         'pull_request_id' => $pull_request_id,
@@ -124,7 +124,7 @@ class Previews extends Component
             } else {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (! $found && ! is_null($pull_request_html_url)) {
+                if (! $found && filled($pull_request_html_url)) {
                     $found = ApplicationPreview::create([
                         'application_id' => $this->application->id,
                         'pull_request_id' => $pull_request_id,
@@ -152,7 +152,7 @@ class Previews extends Component
         try {
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (! $found && ! is_null($pull_request_html_url)) {
+            if (! $found && filled($pull_request_html_url)) {
                 ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,

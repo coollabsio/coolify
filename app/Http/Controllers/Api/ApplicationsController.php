@@ -86,7 +86,7 @@ class ApplicationsController extends Controller
     public function applications(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $projects = Project::where('team_id', $teamId)->get();
@@ -712,7 +712,7 @@ class ApplicationsController extends Controller
     {
         $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration'];
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -758,7 +758,7 @@ class ApplicationsController extends Controller
         $isStatic = $request->is_static;
         $customNginxConfiguration = $request->custom_nginx_configuration;
 
-        if (! is_null($customNginxConfiguration)) {
+        if (filled($customNginxConfiguration)) {
             if (! isBase64Encoded($customNginxConfiguration)) {
                 return response()->json([
                     'message' => 'Validation failed.',
@@ -1373,7 +1373,7 @@ class ApplicationsController extends Controller
     public function application_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -1453,7 +1453,7 @@ class ApplicationsController extends Controller
     public function logs_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -1549,7 +1549,7 @@ class ApplicationsController extends Controller
     {
         $teamId = getTeamIdFromToken();
         $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -1693,7 +1693,7 @@ class ApplicationsController extends Controller
     public function update_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -1923,7 +1923,7 @@ class ApplicationsController extends Controller
     public function envs(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -1933,7 +1933,7 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
-        $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
+        $envs = $application->environmentVariables->sortBy('id')->merge($application->environmentVariablesPreview->sortBy('id'));
 
         $envs = $envs->map(function ($env) {
             $env->makeHidden([
@@ -2032,7 +2032,7 @@ class ApplicationsController extends Controller
         $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
         $teamId = getTeamIdFromToken();
 
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -2076,7 +2076,7 @@ class ApplicationsController extends Controller
         $is_literal = $request->is_literal ?? false;
         $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $key)->first();
+            $env = $application->environmentVariablesPreview->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -2103,7 +2103,7 @@ class ApplicationsController extends Controller
                 ], 404);
             }
         } else {
-            $env = $application->environment_variables->where('key', $key)->first();
+            $env = $application->environmentVariables->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
                 if ($env->is_build_time != $is_build_time) {
@@ -2221,7 +2221,7 @@ class ApplicationsController extends Controller
     {
         $teamId = getTeamIdFromToken();
 
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -2270,7 +2270,7 @@ class ApplicationsController extends Controller
             $is_shown_once = $item->get('is_shown_once') ?? false;
             $key = str($item->get('key'))->trim()->replace(' ', '_')->value;
             if ($is_preview) {
-                $env = $application->environment_variables_preview->where('key', $key)->first();
+                $env = $application->environmentVariablesPreview->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2287,7 +2287,7 @@ class ApplicationsController extends Controller
                     }
                     $env->save();
                 } else {
-                    $env = $application->environment_variables()->create([
+                    $env = $application->environmentVariables()->create([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
@@ -2300,7 +2300,7 @@ class ApplicationsController extends Controller
                     ]);
                 }
             } else {
-                $env = $application->environment_variables->where('key', $key)->first();
+                $env = $application->environmentVariables->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
                     if ($env->is_build_time != $is_build_time) {
@@ -2317,7 +2317,7 @@ class ApplicationsController extends Controller
                     }
                     $env->save();
                 } else {
-                    $env = $application->environment_variables()->create([
+                    $env = $application->environmentVariables()->create([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
@@ -2411,7 +2411,7 @@ class ApplicationsController extends Controller
         $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
         $teamId = getTeamIdFromToken();
 
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -2449,13 +2449,13 @@ class ApplicationsController extends Controller
         $key = str($request->key)->trim()->replace(' ', '_')->value;
 
         if ($is_preview) {
-            $env = $application->environment_variables_preview->where('key', $key)->first();
+            $env = $application->environmentVariablesPreview->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
                 ], 409);
             } else {
-                $env = $application->environment_variables()->create([
+                $env = $application->environmentVariables()->create([
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
@@ -2472,13 +2472,13 @@ class ApplicationsController extends Controller
                 ])->setStatusCode(201);
             }
         } else {
-            $env = $application->environment_variables->where('key', $key)->first();
+            $env = $application->environmentVariables->where('key', $key)->first();
             if ($env) {
                 return response()->json([
                     'message' => 'Environment variable already exists. Use PATCH request to update it.',
                 ], 409);
             } else {
-                $env = $application->environment_variables()->create([
+                $env = $application->environmentVariables()->create([
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
@@ -2565,7 +2565,7 @@ class ApplicationsController extends Controller
     public function delete_env_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
@@ -2664,7 +2664,7 @@ class ApplicationsController extends Controller
     public function action_deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $force = $request->query->get('force') ?? false;
@@ -2751,7 +2751,7 @@ class ApplicationsController extends Controller
     public function action_stop(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -2827,7 +2827,7 @@ class ApplicationsController extends Controller
     public function action_restart(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -2926,7 +2926,7 @@ class ApplicationsController extends Controller
         // TODO: Need to review this from security perspective, to not allow arbitrary command execution
         $allowedFields = ['command'];
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');

@@ -57,7 +57,7 @@ class StripeProcessJob implements ShouldQueue
                     break;
                 case 'checkout.session.completed':
                     $clientReferenceId = data_get($data, 'client_reference_id');
-                    if (is_null($clientReferenceId)) {
+                    if (blank($clientReferenceId)) {
                         send_internal_notification('Checkout session completed without client reference id.');
                         break;
                     }

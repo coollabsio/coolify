@@ -69,7 +69,7 @@
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap hover:underline">
                                                             <a class=""
-                                                                href="{{ $resource->link() }}">{{ $resource->name }}
+                                                                href="{{ $resource->href_link }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">

@@ -51,7 +51,7 @@ class BackupExecutions extends Component
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
-        if (is_null($execution)) {
+        if (blank($execution)) {
             $this->dispatch('error', 'Backup execution not found.');
 
             return;

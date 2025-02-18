@@ -90,7 +90,7 @@ class StackForm extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            if (is_null($this->service->config_hash)) {
+            if (blank($this->service->config_hash)) {
                 $this->service->isConfigurationChanged(true);
             } else {
                 $this->dispatch('configurationChanged');

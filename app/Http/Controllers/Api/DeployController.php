@@ -61,7 +61,7 @@ class DeployController extends Controller
     public function deployments(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $servers = Server::whereTeamId($teamId)->get();
@@ -114,7 +114,7 @@ class DeployController extends Controller
     public function deployment_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -191,7 +191,7 @@ class DeployController extends Controller
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
         }
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if ($tags) {

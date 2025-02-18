@@ -260,7 +260,7 @@ class Select extends Component
                 $this->setServer($server);
             }
         }
-        if (! is_null($this->server)) {
+        if (filled($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
                 return $this->setServer($foundServer);

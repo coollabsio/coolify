@@ -239,7 +239,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
         $environment_variables = data_get($resource, 'environment_variables');
         $type = $resource->serviceType();
     }
-    if (is_null($server) || is_null($type)) {
+    if (blank($server) || blank($type)) {
         return collect([]);
     }
     $variables = collect($environment_variables);
@@ -249,7 +249,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
 
-            if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
+            if (blank($MINIO_BROWSER_REDIRECT_URL) || blank($MINIO_SERVER_URL)) {
                 return collect([]);
             }
 
@@ -272,7 +272,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
             $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
             $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
 
-            if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
+            if (blank($LOGTO_ENDPOINT) || blank($LOGTO_ADMIN_ENDPOINT)) {
                 return collect([]);
             }
 
@@ -314,10 +314,10 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if (! $is_stripprefix_enabled) {
             $handle = 'handle';
         }
-        if (is_null($port) && ! is_null($onlyPort)) {
+        if (blank($port) && filled($onlyPort)) {
             $port = $onlyPort;
         }
-        if (is_null($port) && $predefinedPort) {
+        if (blank($port) && filled($predefinedPort)) {
             $port = $predefinedPort;
         }
         $labels->push("caddy_{$loop}={$schema}://{$host}");
@@ -380,7 +380,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $path = $url->getPath();
             $schema = $url->getScheme();
             $port = $url->getPort();
-            if (is_null($port) && ! is_null($onlyPort)) {
+            if (blank($port) && filled($onlyPort)) {
                 $port = $onlyPort;
             }
             $http_label = "http-{$loop}-{$uuid}";
@@ -671,7 +671,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
 
 function isDatabaseImage(?string $image = null)
 {
-    if (is_null($image)) {
+    if (blank($image)) {
         return false;
     }
     $image = str($image);
@@ -761,7 +761,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             });
             $compose_options->put($mapping[$option], $ulimits);
         } elseif ($option === '--shm-size') {
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+            if (filled($value)) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -769,7 +769,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 'driver' => 'nvidia',
                 'capabilities' => ['gpu'],
             ];
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+            if (filled($value)) {
                 if (str($value[0]) != 'all') {
                     if (str($value[0])->contains(',')) {
                         $payload['device_ids'] = str($value[0])->explode(',')->toArray();
@@ -830,26 +830,26 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
     return 'OK';
-    try {
-        $uuid = Str::random(10);
-        $server = Server::findOrFail($server_id);
-        $base64_compose = base64_encode($compose);
-        $output = instant_remote_process([
-            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "docker compose -f /tmp/{$uuid}.yml config",
-        ], $server);
-        ray($output);
+    // try {
+    //     $uuid = Str::random(10);
+    //     $server = Server::findOrFail($server_id);
+    //     $base64_compose = base64_encode($compose);
+    //     $output = instant_remote_process([
+    //         "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
+    //         "docker compose -f /tmp/{$uuid}.yml config",
+    //     ], $server);
+    //     ray($output);
 
-        return 'OK';
-    } catch (\Throwable $e) {
-        ray($e);
+    //     return 'OK';
+    // } catch (\Throwable $e) {
+    //     ray($e);
 
-        return $e->getMessage();
-    } finally {
-        instant_remote_process([
-            "rm /tmp/{$uuid}.yml",
-        ], $server);
-    }
+    //     return $e->getMessage();
+    // } finally {
+    //     instant_remote_process([
+    //         "rm /tmp/{$uuid}.yml",
+    //     ], $server);
+    // }
 }
 
 function getContainerLogs(Server $server, string $container_id, int $lines = 100): string

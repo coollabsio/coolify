@@ -15,7 +15,7 @@ class StartProxy
     public function handle(Server $server, bool $async = true, bool $force = false): string|Activity
     {
         $proxyType = $server->proxyType();
-        if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
+        if ((blank($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
             return 'OK';
         }
         $commands = collect([]);

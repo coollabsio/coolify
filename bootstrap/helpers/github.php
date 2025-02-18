@@ -73,7 +73,7 @@ function generateGithubJwt(GithubApp $source)
 
 function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', ?array $data = null, bool $throwError = true)
 {
-    if (is_null($source)) {
+    if (blank($source)) {
         throw new \Exception('Source is required for API calls');
     }
 

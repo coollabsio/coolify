@@ -46,7 +46,7 @@ class Service extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['server_status', 'status'];
+    protected $appends = ['server_status', 'status', 'href_link'];
 
     protected static function booted()
     {
@@ -54,6 +54,19 @@ class Service extends BaseModel
             $service->compose_parsing_version = self::$parserVersion;
             $service->save();
         });
+    }
+
+    protected function getHrefLinkAttribute()
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.service.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
+                'service_uuid' => data_get($this, 'uuid'),
+            ]);
+        }
+
+        return null;
     }
 
     public function isConfigurationChanged(bool $save = false)
@@ -71,7 +84,7 @@ class Service extends BaseModel
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
         $newConfigHash = $images.$domains.$images.$storages;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= json_encode($this->environmentVariables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -197,7 +210,7 @@ class Service extends BaseModel
         }
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -295,7 +308,7 @@ class Service extends BaseModel
             switch ($image) {
                 case $image->contains('castopod'):
                     $data = collect([]);
-                    $disable_https = $this->environment_variables()->where('key', 'CP_DISABLE_HTTPS')->first();
+                    $disable_https = $this->environmentVariables()->where('key', 'CP_DISABLE_HTTPS')->first();
                     if ($disable_https) {
                         $data = $data->merge([
                             'Disable HTTPS' => [
@@ -310,8 +323,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('label-studio'):
                     $data = collect([]);
-                    $username = $this->environment_variables()->where('key', 'LABEL_STUDIO_USERNAME')->first();
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LABELSTUDIO')->first();
+                    $username = $this->environmentVariables()->where('key', 'LABEL_STUDIO_USERNAME')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_LABELSTUDIO')->first();
                     if ($username) {
                         $data = $data->merge([
                             'Username' => [
@@ -335,8 +348,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('litellm'):
                     $data = collect([]);
-                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_UI')->first();
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UI')->first();
+                    $username = $this->environmentVariables()->where('key', 'SERVICE_USER_UI')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_UI')->first();
                     if ($username) {
                         $data = $data->merge([
                             'Username' => [
@@ -360,7 +373,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('langfuse'):
                     $data = collect([]);
-                    $email = $this->environment_variables()->where('key', 'LANGFUSE_INIT_USER_EMAIL')->first();
+                    $email = $this->environmentVariables()->where('key', 'LANGFUSE_INIT_USER_EMAIL')->first();
                     if ($email) {
                         $data = $data->merge([
                             'Admin Email' => [
@@ -370,7 +383,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LANGFUSE')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_LANGFUSE')->first();
                     if ($password) {
                         $data = $data->merge([
                             'Admin Password' => [
@@ -385,7 +398,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('invoiceninja'):
                     $data = collect([]);
-                    $email = $this->environment_variables()->where('key', 'IN_USER_EMAIL')->first();
+                    $email = $this->environmentVariables()->where('key', 'IN_USER_EMAIL')->first();
                     $data = $data->merge([
                         'Email' => [
                             'key' => data_get($email, 'key'),
@@ -393,7 +406,7 @@ class Service extends BaseModel
                             'rules' => 'required|email',
                         ],
                     ]);
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_INVOICENINJAUSER')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_INVOICENINJAUSER')->first();
                     $data = $data->merge([
                         'Password' => [
                             'key' => data_get($password, 'key'),
@@ -406,7 +419,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('argilla'):
                     $data = collect([]);
-                    $api_key = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
+                    $api_key = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
                     $data = $data->merge([
                         'API Key' => [
                             'key' => data_get($api_key, 'key'),
@@ -423,7 +436,7 @@ class Service extends BaseModel
                             'rules' => 'required',
                         ],
                     ]);
-                    $username = $this->environment_variables()->where('key', 'ARGILLA_USERNAME')->first();
+                    $username = $this->environmentVariables()->where('key', 'ARGILLA_USERNAME')->first();
                     $data = $data->merge([
                         'Username' => [
                             'key' => data_get($username, 'key'),
@@ -431,7 +444,7 @@ class Service extends BaseModel
                             'rules' => 'required',
                         ],
                     ]);
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ARGILLA')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_ARGILLA')->first();
                     $data = $data->merge([
                         'Password' => [
                             'key' => data_get($password, 'key'),
@@ -444,9 +457,9 @@ class Service extends BaseModel
                     break;
                 case $image->contains('rabbitmq'):
                     $data = collect([]);
-                    $host_port = $this->environment_variables()->where('key', 'PORT')->first();
-                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_RABBITMQ')->first();
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_RABBITMQ')->first();
+                    $host_port = $this->environmentVariables()->where('key', 'PORT')->first();
+                    $username = $this->environmentVariables()->where('key', 'SERVICE_USER_RABBITMQ')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_RABBITMQ')->first();
                     if ($host_port) {
                         $data = $data->merge([
                             'Host Port Binding' => [
@@ -479,7 +492,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('tolgee'):
                     $data = collect([]);
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
                     $data = $data->merge([
                         'Admin User' => [
                             'key' => 'TOLGEE_AUTHENTICATION_INITIAL_USERNAME',
@@ -502,8 +515,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('logto'):
                     $data = collect([]);
-                    $logto_endpoint = $this->environment_variables()->where('key', 'LOGTO_ENDPOINT')->first();
-                    $logto_admin_endpoint = $this->environment_variables()->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
+                    $logto_endpoint = $this->environmentVariables()->where('key', 'LOGTO_ENDPOINT')->first();
+                    $logto_admin_endpoint = $this->environmentVariables()->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
                     if ($logto_endpoint) {
                         $data = $data->merge([
                             'Endpoint' => [
@@ -526,7 +539,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('unleash-server'):
                     $data = collect([]);
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();
                     $data = $data->merge([
                         'Admin User' => [
                             'key' => 'SERVICE_USER_UNLEASH',
@@ -549,7 +562,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('grafana'):
                     $data = collect([]);
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
                         'Admin User' => [
                             'key' => 'GF_SECURITY_ADMIN_USER',
@@ -572,8 +585,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('directus'):
                     $data = collect([]);
-                    $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    $admin_email = $this->environmentVariables()->where('key', 'ADMIN_EMAIL')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
 
                     if ($admin_email) {
                         $data = $data->merge([
@@ -598,8 +611,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('kong'):
                     $data = collect([]);
-                    $dashboard_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
-                    $dashboard_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    $dashboard_user = $this->environmentVariables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    $dashboard_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
                     if ($dashboard_user) {
                         $data = $data->merge([
                             'Dashboard User' => [
@@ -622,15 +635,15 @@ class Service extends BaseModel
                     $fields->put('Supabase', $data->toArray());
                 case $image->contains('minio'):
                     $data = collect([]);
-                    $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
-                    $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
-                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_MINIO')->first();
-                    if (is_null($admin_user)) {
-                        $admin_user = $this->environment_variables()->where('key', 'MINIO_ROOT_USER')->first();
+                    $console_url = $this->environmentVariables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
+                    $s3_api_url = $this->environmentVariables()->where('key', 'MINIO_SERVER_URL')->first();
+                    $admin_user = $this->environmentVariables()->where('key', 'SERVICE_USER_MINIO')->first();
+                    if (blank($admin_user)) {
+                        $admin_user = $this->environmentVariables()->where('key', 'MINIO_ROOT_USER')->first();
                     }
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_MINIO')->first();
-                    if (is_null($admin_password)) {
-                        $admin_password = $this->environment_variables()->where('key', 'MINIO_ROOT_PASSWORD')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_MINIO')->first();
+                    if (blank($admin_password)) {
+                        $admin_password = $this->environmentVariables()->where('key', 'MINIO_ROOT_PASSWORD')->first();
                     }
 
                     if ($console_url) {
@@ -675,8 +688,8 @@ class Service extends BaseModel
                     break;
                 case $image->contains('weblate'):
                     $data = collect([]);
-                    $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_WEBLATE')->first();
+                    $admin_email = $this->environmentVariables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_WEBLATE')->first();
 
                     if ($admin_email) {
                         $data = $data->merge([
@@ -701,7 +714,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('meilisearch'):
                     $data = collect([]);
-                    $SERVICE_PASSWORD_MEILISEARCH = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_MEILISEARCH')->first();
+                    $SERVICE_PASSWORD_MEILISEARCH = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_MEILISEARCH')->first();
                     if ($SERVICE_PASSWORD_MEILISEARCH) {
                         $data = $data->merge([
                             'API Key' => [
@@ -715,12 +728,12 @@ class Service extends BaseModel
                     break;
                 case $image->contains('ghost'):
                     $data = collect([]);
-                    $MAIL_OPTIONS_AUTH_PASS = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
-                    $MAIL_OPTIONS_AUTH_USER = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_USER')->first();
-                    $MAIL_OPTIONS_SECURE = $this->environment_variables()->where('key', 'MAIL_OPTIONS_SECURE')->first();
-                    $MAIL_OPTIONS_PORT = $this->environment_variables()->where('key', 'MAIL_OPTIONS_PORT')->first();
-                    $MAIL_OPTIONS_SERVICE = $this->environment_variables()->where('key', 'MAIL_OPTIONS_SERVICE')->first();
-                    $MAIL_OPTIONS_HOST = $this->environment_variables()->where('key', 'MAIL_OPTIONS_HOST')->first();
+                    $MAIL_OPTIONS_AUTH_PASS = $this->environmentVariables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
+                    $MAIL_OPTIONS_AUTH_USER = $this->environmentVariables()->where('key', 'MAIL_OPTIONS_AUTH_USER')->first();
+                    $MAIL_OPTIONS_SECURE = $this->environmentVariables()->where('key', 'MAIL_OPTIONS_SECURE')->first();
+                    $MAIL_OPTIONS_PORT = $this->environmentVariables()->where('key', 'MAIL_OPTIONS_PORT')->first();
+                    $MAIL_OPTIONS_SERVICE = $this->environmentVariables()->where('key', 'MAIL_OPTIONS_SERVICE')->first();
+                    $MAIL_OPTIONS_HOST = $this->environmentVariables()->where('key', 'MAIL_OPTIONS_HOST')->first();
                     if ($MAIL_OPTIONS_AUTH_PASS) {
                         $data = $data->merge([
                             'Mail Password' => [
@@ -777,12 +790,12 @@ class Service extends BaseModel
                 case $image->contains('vaultwarden'):
                     $data = collect([]);
 
-                    $DATABASE_URL = $this->environment_variables()->where('key', 'DATABASE_URL')->first();
-                    $ADMIN_TOKEN = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_ADMIN')->first();
-                    $SIGNUP_ALLOWED = $this->environment_variables()->where('key', 'SIGNUP_ALLOWED')->first();
-                    $PUSH_ENABLED = $this->environment_variables()->where('key', 'PUSH_ENABLED')->first();
-                    $PUSH_INSTALLATION_ID = $this->environment_variables()->where('key', 'PUSH_SERVICE_ID')->first();
-                    $PUSH_INSTALLATION_KEY = $this->environment_variables()->where('key', 'PUSH_SERVICE_KEY')->first();
+                    $DATABASE_URL = $this->environmentVariables()->where('key', 'DATABASE_URL')->first();
+                    $ADMIN_TOKEN = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_64_ADMIN')->first();
+                    $SIGNUP_ALLOWED = $this->environmentVariables()->where('key', 'SIGNUP_ALLOWED')->first();
+                    $PUSH_ENABLED = $this->environmentVariables()->where('key', 'PUSH_ENABLED')->first();
+                    $PUSH_INSTALLATION_ID = $this->environmentVariables()->where('key', 'PUSH_SERVICE_ID')->first();
+                    $PUSH_INSTALLATION_KEY = $this->environmentVariables()->where('key', 'PUSH_SERVICE_KEY')->first();
 
                     if ($DATABASE_URL) {
                         $data = $data->merge([
@@ -841,7 +854,7 @@ class Service extends BaseModel
                     $fields->put('Vaultwarden', $data);
                     break;
                 case $image->contains('gitlab/gitlab'):
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GITLAB')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_GITLAB')->first();
                     $data = collect([]);
                     if ($password) {
                         $data = $data->merge([
@@ -866,7 +879,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('code-server'):
                     $data = collect([]);
-                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_PASSWORDCODESERVER')->first();
+                    $password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_64_PASSWORDCODESERVER')->first();
                     if ($password) {
                         $data = $data->merge([
                             'Password' => [
@@ -877,7 +890,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $sudoPassword = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SUDOCODESERVER')->first();
+                    $sudoPassword = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_SUDOCODESERVER')->first();
                     if ($sudoPassword) {
                         $data = $data->merge([
                             'Sudo Password' => [
@@ -892,7 +905,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('elestio/strapi'):
                     $data = collect([]);
-                    $license = $this->environment_variables()->where('key', 'STRAPI_LICENSE')->first();
+                    $license = $this->environmentVariables()->where('key', 'STRAPI_LICENSE')->first();
                     if ($license) {
                         $data = $data->merge([
                             'License' => [
@@ -901,7 +914,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $nodeEnv = $this->environment_variables()->where('key', 'NODE_ENV')->first();
+                    $nodeEnv = $this->environmentVariables()->where('key', 'NODE_ENV')->first();
                     if ($nodeEnv) {
                         $data = $data->merge([
                             'Node Environment' => [
@@ -915,11 +928,11 @@ class Service extends BaseModel
                     break;
                 default:
                     $data = collect([]);
-                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    $admin_user = $this->environmentVariables()->where('key', 'SERVICE_USER_ADMIN')->first();
                     // Chaskiq
-                    $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
+                    $admin_email = $this->environmentVariables()->where('key', 'ADMIN_EMAIL')->first();
 
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    $admin_password = $this->environmentVariables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
                     if ($admin_user) {
                         $data = $data->merge([
                             'User' => [
@@ -965,9 +978,9 @@ class Service extends BaseModel
                     $userVariables = ['SERVICE_USER_POSTGRES', 'SERVICE_USER_POSTGRESQL'];
                     $passwordVariables = ['SERVICE_PASSWORD_POSTGRES', 'SERVICE_PASSWORD_POSTGRESQL'];
                     $dbNameVariables = ['POSTGRESQL_DATABASE', 'POSTGRES_DB'];
-                    $postgres_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
-                    $postgres_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
-                    $postgres_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
+                    $postgres_user = $this->environmentVariables()->whereIn('key', $userVariables)->first();
+                    $postgres_password = $this->environmentVariables()->whereIn('key', $passwordVariables)->first();
+                    $postgres_db_name = $this->environmentVariables()->whereIn('key', $dbNameVariables)->first();
                     $data = collect([]);
                     if ($postgres_user) {
                         $data = $data->merge([
@@ -1004,10 +1017,10 @@ class Service extends BaseModel
                     $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD', 'SERVICE_PASSWORD_64_MYSQL'];
                     $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT', 'SERVICE_PASSWORD_64_MYSQLROOT'];
                     $dbNameVariables = ['MYSQL_DATABASE'];
-                    $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
-                    $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
-                    $mysql_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
-                    $mysql_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
+                    $mysql_user = $this->environmentVariables()->whereIn('key', $userVariables)->first();
+                    $mysql_password = $this->environmentVariables()->whereIn('key', $passwordVariables)->first();
+                    $mysql_root_password = $this->environmentVariables()->whereIn('key', $rootPasswordVariables)->first();
+                    $mysql_db_name = $this->environmentVariables()->whereIn('key', $dbNameVariables)->first();
                     $data = collect([]);
                     if ($mysql_user) {
                         $data = $data->merge([
@@ -1055,10 +1068,10 @@ class Service extends BaseModel
                     $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS', 'MYSQL_ROOT_PASSWORD'];
                     $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA', 'MYSQL_DATABASE'];
 
-                    $mariadb_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
-                    $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
-                    $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
-                    $mariadb_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
+                    $mariadb_user = $this->environmentVariables()->whereIn('key', $userVariables)->first();
+                    $mariadb_password = $this->environmentVariables()->whereIn('key', $passwordVariables)->first();
+                    $mariadb_root_password = $this->environmentVariables()->whereIn('key', $rootPasswordVariables)->first();
+                    $mariadb_db_name = $this->environmentVariables()->whereIn('key', $dbNameVariables)->first();
                     $data = collect([]);
 
                     if ($mariadb_user) {
@@ -1108,7 +1121,7 @@ class Service extends BaseModel
                 $extraFields = collect($extraFields)->map(function ($field) {
                     if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
                         $searchValue = str($field['value'])->after('$')->value;
-                        $newValue = $this->environment_variables()->where('key', $searchValue)->first();
+                        $newValue = $this->environmentVariables()->where('key', $searchValue)->first();
                         if ($newValue) {
                             $field['value'] = $newValue->value;
                         }
@@ -1129,12 +1142,12 @@ class Service extends BaseModel
         foreach ($fields as $field) {
             $key = data_get($field, 'key');
             $value = data_get($field, 'value');
-            $found = $this->environment_variables()->where('key', $key)->first();
+            $found = $this->environmentVariables()->where('key', $key)->first();
             if ($found) {
                 $found->value = $value;
                 $found->save();
             } else {
-                $this->environment_variables()->create([
+                $this->environmentVariables()->create([
                     'key' => $key,
                     'value' => $value,
                     'is_build_time' => false,
@@ -1144,19 +1157,6 @@ class Service extends BaseModel
                 ]);
             }
         }
-    }
-
-    public function link()
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            return route('project.service.configuration', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'service_uuid' => data_get($this, 'uuid'),
-            ]);
-        }
-
-        return null;
     }
 
     public function taskLink($task_uuid)
@@ -1251,13 +1251,13 @@ class Service extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
-    public function environment_variables()
+    public function environmentVariables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->orderBy('key', 'asc');
     }
 
-    public function environment_variables_preview()
+    public function environmentVariablesPreview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
@@ -1287,7 +1287,7 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
         $commands[] = 'rm -f .env || true';
 
-        $envs_from_coolify = $this->environment_variables()->get();
+        $envs_from_coolify = $this->environmentVariables()->get();
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
                 return 1;
@@ -1341,7 +1341,7 @@ class Service extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                $envs = $this->environment_variables()->where('is_required', true)->get();
+                $envs = $this->environmentVariables()->where('is_required', true)->get();
                 foreach ($envs as $env) {
                     if ($env->is_really_required) {
                         return false;

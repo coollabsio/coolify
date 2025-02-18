@@ -24,7 +24,7 @@ class Environment extends BaseModel
     protected static function booted()
     {
         static::deleting(function ($environment) {
-            $shared_variables = $environment->environment_variables();
+            $shared_variables = $environment->environmentVariables();
             foreach ($shared_variables as $shared_variable) {
                 $shared_variable->delete();
             }
@@ -45,7 +45,7 @@ class Environment extends BaseModel
             $this->services()->count() == 0;
     }
 
-    public function environment_variables()
+    public function environmentVariables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class);
     }

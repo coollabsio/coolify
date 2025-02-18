@@ -251,7 +251,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
             <SidebarRail />
         </Sidebar>
         <SidebarInset>
-            <header class="flex shrink-0 pb-2 pt-6 bg-background pr-4 flex flex-col gap-2">
+            <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center">
                         <SidebarTrigger class="-ml-2 mr-2 " />

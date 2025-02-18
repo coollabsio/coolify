@@ -71,15 +71,6 @@ class Index extends Component
             'destination.server.settings',
             'settings',
         ])->get()->sortBy('name');
-        $this->applications = $this->applications->map(function ($application) {
-            $application->hrefLink = route('project.application.configuration', [
-                'project_uuid' => data_get($application, 'environment.project.uuid'),
-                'environment_uuid' => data_get($application, 'environment.uuid'),
-                'application_uuid' => data_get($application, 'uuid'),
-            ]);
-
-            return $application;
-        });
 
         // Load all database resources in a single query per type
         $databaseTypes = [
@@ -98,15 +89,6 @@ class Index extends Component
                 'tags',
                 'destination.server.settings',
             ])->get()->sortBy('name');
-            $this->{$property} = $this->{$property}->map(function ($db) {
-                $db->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => $this->project->uuid,
-                    'database_uuid' => $db->uuid,
-                    'environment_uuid' => data_get($this->environment, 'uuid'),
-                ]);
-
-                return $db;
-            });
         }
 
         // Load services with their tags and server
@@ -114,15 +96,6 @@ class Index extends Component
             'tags',
             'destination.server.settings',
         ])->get()->sortBy('name');
-        $this->services = $this->services->map(function ($service) {
-            $service->hrefLink = route('project.service.configuration', [
-                'project_uuid' => data_get($service, 'environment.project.uuid'),
-                'environment_uuid' => data_get($service, 'environment.uuid'),
-                'service_uuid' => data_get($service, 'uuid'),
-            ]);
-
-            return $service;
-        });
     }
 
     public function render()

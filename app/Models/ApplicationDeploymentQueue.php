@@ -77,7 +77,7 @@ class ApplicationDeploymentQueue extends Model
 
     public function commitMessage()
     {
-        if (empty($this->commit_message) || is_null($this->commit_message)) {
+        if (blank($this->commit_message)) {
             return null;
         }
 

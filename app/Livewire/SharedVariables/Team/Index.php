@@ -14,11 +14,11 @@ class Index extends Component
     public function saveKey($data)
     {
         try {
-            $found = $this->team->environment_variables()->where('key', $data['key'])->first();
+            $found = $this->team->environmentVariables()->where('key', $data['key'])->first();
             if ($found) {
                 throw new \Exception('Variable already exists.');
             }
-            $this->team->environment_variables()->create([
+            $this->team->environmentVariables()->create([
                 'key' => $data['key'],
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],

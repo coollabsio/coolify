@@ -72,7 +72,7 @@ class StartKeydb
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -92,7 +92,7 @@ class StartKeydb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->keydb_conf) || ! empty($this->database->keydb_conf)) {
+        if (filled($this->database->keydb_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/keydb.conf',
@@ -168,7 +168,7 @@ class StartKeydb
 
     private function add_custom_keydb()
     {
-        if (is_null($this->database->keydb_conf) || empty($this->database->keydb_conf)) {
+        if (blank($this->database->keydb_conf)) {
             return;
         }
         $filename = 'keydb.conf';

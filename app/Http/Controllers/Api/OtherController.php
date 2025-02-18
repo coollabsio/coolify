@@ -80,7 +80,7 @@ class OtherController extends Controller
     public function enable_api(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {
@@ -132,7 +132,7 @@ class OtherController extends Controller
     public function disable_api(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if ($teamId !== '0') {

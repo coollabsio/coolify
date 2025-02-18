@@ -94,7 +94,7 @@ class Controller extends BaseController
                 } else {
                     $team = $user->teams()->first();
                 }
-                if (is_null(data_get($user, 'email_verified_at'))) {
+                if (blank(data_get($user, 'email_verified_at'))) {
                     $user->email_verified_at = now();
                     $user->save();
                 }
@@ -148,7 +148,7 @@ class Controller extends BaseController
     {
         $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
         $user = User::whereEmail($invitation->email)->firstOrFail();
-        if (is_null(Auth::user())) {
+        if (blank(Auth::user())) {
             return redirect()->route('login');
         }
         if (Auth::id() !== $user->id) {

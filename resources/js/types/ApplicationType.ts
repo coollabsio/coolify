@@ -44,7 +44,7 @@ export interface Application {
     health_check_scheme: string;
     health_check_start_period: number;
     health_check_timeout: number;
-    hrefLink: string;
+    href_link: string;
     id: number;
     install_command: string | null;
     last_online_at: string;

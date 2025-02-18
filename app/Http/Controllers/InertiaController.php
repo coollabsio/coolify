@@ -155,18 +155,6 @@ class InertiaController extends Controller
             'keydbs',
             'services',
         ]);
-
-        // Eager load all relationships for applications including nested ones
-        $applications = $applications->map(function ($application) {
-            $application->hrefLink = route('project.application.configuration', [
-                'project_uuid' => data_get($application, 'environment.project.uuid'),
-                'environment_uuid' => data_get($application, 'environment.uuid'),
-                'application_uuid' => data_get($application, 'uuid'),
-            ]);
-
-            return $application;
-        });
-
         // Load all database resources in a single query per type
         $databaseTypes = [
             'postgresqls' => 'postgresqls',
@@ -184,15 +172,6 @@ class InertiaController extends Controller
                 'tags',
                 'destination.server.settings',
             ])->get()->sortBy('name');
-            ${$property} = ${$property}->map(function ($db) use ($project, $environment) {
-                $db->hrefLink = route('project.database.configuration', [
-                    'project_uuid' => $project->uuid,
-                    'database_uuid' => $db->uuid,
-                    'environment_uuid' => data_get($environment, 'uuid'),
-                ]);
-
-                return $db;
-            });
         }
 
         // Load services with their tags and server
@@ -200,15 +179,6 @@ class InertiaController extends Controller
             'tags',
             'destination.server.settings',
         ])->get()->sortBy('name');
-        $services = $services->map(function ($service) {
-            $service->hrefLink = route('project.service.configuration', [
-                'project_uuid' => data_get($service, 'environment.project.uuid'),
-                'environment_uuid' => data_get($service, 'environment.uuid'),
-                'service_uuid' => data_get($service, 'uuid'),
-            ]);
-
-            return $service;
-        });
 
         return Inertia::render('Environment', [
             'project' => $project,

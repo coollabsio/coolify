@@ -10,20 +10,20 @@
                 wire:navigate href="{{ route('project.application.deployment.index', $parameters) }}">
                 <button>Deployments</button>
             </a>
-            <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.logs', $parameters) }}">
+            <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}" wire:navigate
+                href="{{ route('project.application.logs', $parameters) }}">
                 <button>Logs</button>
             </a>
             @if (!$application->destination->server->isSwarm())
                 <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                 href="{{ route('project.application.command', $parameters) }}">
+                    href="{{ route('project.application.command', $parameters) }}">
                     <button>Terminal</button>
                 </a>
             @endif
             <x-applications.links :application="$application" />
         </nav>
         <div class="flex flex-wrap gap-2 items-center">
-            @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
+            @if ($application->build_pack === 'dockercompose' && blank($application->docker_compose_raw))
                 <div>Please load a Compose file.</div>
             @else
                 @if (!$application->destination->server->isSwarm())

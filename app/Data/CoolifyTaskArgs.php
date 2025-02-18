@@ -23,7 +23,7 @@ class CoolifyTaskArgs extends Data
         public $call_event_on_finish = null,
         public $call_event_data = null
     ) {
-        if (is_null($status)) {
+        if (blank($status)) {
             $this->status = ProcessStatus::QUEUED->value;
         }
     }

@@ -34,7 +34,7 @@ class Configuration extends Component
         $this->database = $database;
         $this->project = $project;
         $this->environment = $environment;
-        if (str($this->database->status)->startsWith('running') && is_null($this->database->config_hash)) {
+        if (str($this->database->status)->startsWith('running') && blank($this->database->config_hash)) {
             $this->database->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
         }

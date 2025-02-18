@@ -7,7 +7,7 @@ export interface Postgresql {
     destination_id: number;
     destination_type: string;
     environment_id: number;
-    hrefLink: string;
+    href_link: string;
     id: number;
     image: string;
     init_scripts: string | null;

@@ -63,7 +63,7 @@ class NewActivityMonitor extends Component
 
                     return;
                 }
-                if (! is_null($this->eventData)) {
+                if (filled($this->eventData)) {
                     $this->dispatch($this->eventToDispatch, $this->eventData);
                 } else {
                     $this->dispatch($this->eventToDispatch);

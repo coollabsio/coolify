@@ -53,7 +53,7 @@ class CleanupStuckedResources extends Command
         try {
             $applicationsDeploymentQueue = ApplicationDeploymentQueue::get();
             foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
-                if (is_null($applicationDeploymentQueue->application)) {
+                if (blank($applicationDeploymentQueue->application)) {
                     echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";
                     $applicationDeploymentQueue->delete();
                 }

@@ -42,7 +42,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             if (! $this->server->isSwarmWorker() && ! $this->server->isBuildServer()) {
                 ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
-                if (is_null($this->containers)) {
+                if (blank($this->containers)) {
                     return 'No containers found.';
                 }
                 GetContainersStatus::run($this->server, $this->containers, $containerReplicates);

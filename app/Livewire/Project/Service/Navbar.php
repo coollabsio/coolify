@@ -27,7 +27,7 @@ class Navbar extends Component
 
     public function mount()
     {
-        if (str($this->service->status)->contains('running') && is_null($this->service->config_hash)) {
+        if (str($this->service->status)->contains('running') && blank($this->service->config_hash)) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
         }
@@ -47,7 +47,7 @@ class Navbar extends Component
     public function serviceStarted()
     {
         // $this->dispatch('success', 'Service status changed.');
-        if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
+        if (blank($this->service->config_hash) || $this->service->isConfigurationChanged()) {
             $this->service->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
         } else {

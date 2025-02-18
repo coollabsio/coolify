@@ -113,7 +113,7 @@ class Application extends BaseModel
 
     protected $guarded = [];
 
-    protected $appends = ['server_status'];
+    protected $appends = ['server_status', 'href_link'];
 
     protected static function booted()
     {
@@ -169,8 +169,8 @@ class Application extends BaseModel
             $application->update(['fqdn' => null]);
             $application->settings()->delete();
             $application->persistentStorages()->delete();
-            $application->environment_variables()->delete();
-            $application->environment_variables_preview()->delete();
+            $application->environmentVariables()->delete();
+            $application->environmentVariablesPreview()->delete();
             foreach ($application->scheduled_tasks as $task) {
                 $task->delete();
             }
@@ -180,6 +180,19 @@ class Application extends BaseModel
                 $deployment->delete();
             }
         });
+    }
+
+    public function getHrefLinkAttribute()
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.application.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
+                'application_uuid' => data_get($this, 'uuid'),
+            ]);
+        }
+
+        return null;
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)
@@ -245,7 +258,7 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -254,7 +267,7 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_volumes(?Collection $persistentStorages)
+    public function deleteVolumes(?Collection $persistentStorages)
     {
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
@@ -322,19 +335,6 @@ class Application extends BaseModel
         return data_get($this, 'settings.is_gzip_enabled', true);
     }
 
-    public function link()
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            return route('project.application.configuration', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'application_uuid' => data_get($this, 'uuid'),
-            ]);
-        }
-
-        return null;
-    }
-
     public function taskLink($task_uuid)
     {
         if (data_get($this, 'environment.project.uuid')) {
@@ -392,7 +392,7 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                if (filled($this->source?->html_url) && filled($this->git_repository) && filled($this->git_branch)) {
                     if (str($this->git_repository)->contains('bitbucket')) {
                         return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}";
                     }
@@ -419,7 +419,7 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                if (filled($this->source?->html_url) && filled($this->git_repository) && filled($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
                 }
                 // Convert the SSH URL to HTTPS URL
@@ -438,7 +438,7 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
+                if (filled($this->source?->html_url) && filled($this->git_repository) && filled($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
                 // Convert the SSH URL to HTTPS URL
@@ -455,7 +455,7 @@ class Application extends BaseModel
 
     public function gitCommitLink($link): string
     {
-        if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
+        if (filled(data_get($this, 'source.html_url')) && filled(data_get($this, 'git_repository')) && filled(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
                 return "{$this->source->html_url}/{$this->git_repository}/commits/{$link}";
             }
@@ -486,7 +486,7 @@ class Application extends BaseModel
     {
         return Attribute::make(
             set: function ($value) {
-                if (is_null($value) || $value === '') {
+                if (blank($value)) {
                     return '/Dockerfile';
                 } else {
                     if ($value !== '/') {
@@ -503,7 +503,7 @@ class Application extends BaseModel
     {
         return Attribute::make(
             set: function ($value) {
-                if (is_null($value) || $value === '') {
+                if (blank($value)) {
                     return '/docker-compose.yaml';
                 } else {
                     if ($value !== '/') {
@@ -533,7 +533,7 @@ class Application extends BaseModel
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
+            get: fn () => blank($this->ports_mappings)
                 ? []
                 : explode(',', $this->ports_mappings),
 
@@ -659,7 +659,7 @@ class Application extends BaseModel
     public function portsExposesArray(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->ports_exposes)
+            get: fn () => blank($this->ports_exposes)
                 ? []
                 : explode(',', $this->ports_exposes)
         );
@@ -697,14 +697,14 @@ class Application extends BaseModel
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
     }
 
-    public function environment_variables()
+    public function environmentVariables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
             ->orderBy('key', 'asc');
     }
 
-    public function runtime_environment_variables()
+    public function runtimeEnvironmentVariables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
@@ -726,7 +726,7 @@ class Application extends BaseModel
             ->where('key', 'like', 'NIXPACKS_%');
     }
 
-    public function environment_variables_preview()
+    public function environmentVariablesPreview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
@@ -904,9 +904,9 @@ class Application extends BaseModel
     {
         $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+            $newConfigHash .= json_encode($this->environmentVariables()->get('value')->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get('value')->sort());
+            $newConfigHash .= json_encode($this->environmentVariablesPreview->get('value')->sort());
         }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1029,7 +1029,7 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'deploy_key') {
             $fullRepoUrl = $customRepository;
             $private_key = data_get($this, 'private_key.private_key');
-            if (is_null($private_key)) {
+            if (blank($private_key)) {
                 throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
             }
             $private_key = base64_encode($private_key);
@@ -1151,7 +1151,7 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'deploy_key') {
             $fullRepoUrl = $customRepository;
             $private_key = data_get($this, 'private_key.private_key');
-            if (is_null($private_key)) {
+            if (blank($private_key)) {
                 throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
             }
             $private_key = base64_encode($private_key);
@@ -1326,9 +1326,9 @@ class Application extends BaseModel
             return newParser($this, $pull_request_id, $preview_id);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
-        } else {
-            return collect([]);
         }
+
+        return collect([]);
     }
 
     public function loadComposeFile($isInit = false)
@@ -1458,7 +1458,7 @@ class Application extends BaseModel
     public function fqdns(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->fqdn)
+            get: fn () => blank($this->fqdn)
                 ? []
                 : explode(',', $this->fqdn),
         );
@@ -1488,7 +1488,7 @@ class Application extends BaseModel
 
     public function isWatchPathsTriggered(Collection $modified_files): bool
     {
-        if (is_null($this->watch_paths)) {
+        if (blank($this->watch_paths)) {
             return false;
         }
         $watch_paths = collect(explode("\n", $this->watch_paths));
@@ -1558,7 +1558,7 @@ class Application extends BaseModel
     public function generate_preview_fqdn(int $pull_request_id)
     {
         $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pull_request_id);
-        if (is_null(data_get($preview, 'fqdn')) && $this->fqdn) {
+        if (blank(data_get($preview, 'fqdn')) && $this->fqdn) {
             if (str($this->fqdn)->contains(',')) {
                 $url = Url::fromString(str($this->fqdn)->explode(',')[0]);
                 $preview_fqdn = getFqdnWithoutPort(str($this->fqdn)->explode(',')[0]);

@@ -37,7 +37,7 @@ class ResourceLimits extends Component
             if (! $this->resource->limits_memory_swap) {
                 $this->resource->limits_memory_swap = '0';
             }
-            if (is_null($this->resource->limits_memory_swappiness)) {
+            if (blank($this->resource->limits_memory_swappiness)) {
                 $this->resource->limits_memory_swappiness = '60';
             }
             if (! $this->resource->limits_memory_reservation) {
@@ -49,7 +49,7 @@ class ResourceLimits extends Component
             if ($this->resource->limits_cpuset === '') {
                 $this->resource->limits_cpuset = null;
             }
-            if (is_null($this->resource->limits_cpu_shares)) {
+            if (blank($this->resource->limits_cpu_shares)) {
                 $this->resource->limits_cpu_shares = 1024;
             }
             $this->validate();

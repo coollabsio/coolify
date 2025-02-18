@@ -14,7 +14,7 @@ function isSubscriptionActive()
     }
     $subscription = $team?->subscription;
 
-    if (is_null($subscription)) {
+    if (blank($subscription)) {
         return false;
     }
     if (isStripe()) {

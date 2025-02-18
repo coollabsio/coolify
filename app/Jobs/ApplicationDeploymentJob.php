@@ -19,6 +19,7 @@ use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -259,7 +260,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
 
-            if (! is_null($allContainers)) {
+            if (filled($allContainers)) {
                 $allContainers = format_docker_command_output_to_json($allContainers);
                 $ips = collect([]);
                 if (count($allContainers) > 0) {
@@ -478,7 +479,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
             $this->save_environment_variables();
-            if (! is_null($this->env_filename)) {
+            if (filled($this->env_filename)) {
                 $services = collect(data_get($composeFile, 'services', []));
                 $services = $services->map(function ($service, $name) {
                     $service['env_file'] = [$this->env_filename];
@@ -487,7 +488,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 });
                 $composeFile['services'] = $services->toArray();
             }
-            if (is_null($composeFile)) {
+            if (blank($composeFile)) {
                 $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
 
@@ -896,45 +897,45 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $sort = $this->application->settings->is_env_sorting_enabled;
         if ($sort) {
-            $sorted_environment_variables = $this->application->environment_variables->sortBy('key');
-            $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('key');
+            $sorted_environment_variables = $this->application->environmentVariables->sortBy('key');
+            $sorted_environment_variables_preview = $this->application->environmentVariablesPreview->sortBy('key');
         } else {
-            $sorted_environment_variables = $this->application->environment_variables->sortBy('id');
-            $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('id');
+            $sorted_environment_variables = $this->application->environmentVariables->sortBy('id');
+            $sorted_environment_variables_preview = $this->application->environmentVariablesPreview->sortBy('id');
         }
         $ports = $this->application->main_port();
         if ($this->pull_request_id !== 0) {
             $this->env_filename = ".env-pr-$this->pull_request_id";
             // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (! is_null($this->commit)) {
+            if ($this->application->environmentVariablesPreview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                if (filled($this->commit)) {
                     $envs->push("SOURCE_COMMIT={$this->commit}");
                 } else {
                     $envs->push('SOURCE_COMMIT=unknown');
                 }
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+            if ($this->application->environmentVariablesPreview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
                 $envs->push("COOLIFY_FQDN={$this->preview->fqdn}");
                 $envs->push("COOLIFY_DOMAIN_URL={$this->preview->fqdn}");
             }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
+            if ($this->application->environmentVariablesPreview->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
                 $envs->push("COOLIFY_URL={$url}");
                 $envs->push("COOLIFY_DOMAIN_FQDN={$url}");
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                if ($this->application->environmentVariablesPreview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                if ($this->application->environmentVariablesPreview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
                     $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
                 }
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                if ($this->application->environmentVariablesPreview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
                     $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables_preview);
+            add_coolify_default_environment_variables($this->application, $envs, $this->application->environmentVariablesPreview);
 
             foreach ($sorted_environment_variables_preview as $env) {
                 $real_value = $env->real_value;
@@ -951,32 +952,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                if ($this->application->environmentVariablesPreview->where('key', 'PORT')->isEmpty()) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
             // Add HOST if not exists
-            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
+            if ($this->application->environmentVariablesPreview->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
         } else {
             $this->env_filename = '.env';
             // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (! is_null($this->commit)) {
+            if ($this->application->environmentVariables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                if (filled($this->commit)) {
                     $envs->push("SOURCE_COMMIT={$this->commit}");
                 } else {
                     $envs->push('SOURCE_COMMIT=unknown');
                 }
             }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+            if ($this->application->environmentVariables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $envs->push("COOLIFY_URL={$this->application->fqdn}");
                 } else {
                     $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
                 }
             }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
+            if ($this->application->environmentVariables->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
                 if ((int) $this->application->compose_parsing_version >= 3) {
                     $envs->push("COOLIFY_FQDN={$url}");
@@ -985,18 +986,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
-                if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                if ($this->application->environmentVariables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
                     $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
                 }
-                if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                if ($this->application->environmentVariables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
                     $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
                 }
-                if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                if ($this->application->environmentVariables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
                     $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
                 }
             }
 
-            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables);
+            add_coolify_default_environment_variables($this->application, $envs, $this->application->environmentVariables);
 
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
@@ -1013,12 +1014,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
+                if ($this->application->environmentVariables->where('key', 'PORT')->isEmpty()) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
             // Add HOST if not exists
-            if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
+            if ($this->application->environmentVariables->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
         }
@@ -1622,13 +1623,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                if (! is_null($env->real_value)) {
+                if (filled($env->real_value)) {
                     $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
                 }
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                if (! is_null($env->real_value)) {
+                if (filled($env->real_value)) {
                     $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
                 }
             }
@@ -1643,13 +1644,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_args->put('SOURCE_COMMIT', $this->commit);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                if (! is_null($env->real_value)) {
+                if (filled($env->real_value)) {
                     $this->env_args->put($env->key, $env->real_value);
                 }
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                if (! is_null($env->real_value)) {
+                if (filled($env->real_value)) {
                     $this->env_args->put($env->key, $env->real_value);
                 }
             }
@@ -1752,7 +1753,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             ],
         ];
-        if (! is_null($this->env_filename)) {
+        if (filled($this->env_filename)) {
             $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
         }
         $docker_compose['services'][$this->container_name]['healthcheck'] = [
@@ -1766,7 +1767,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'start_period' => $this->application->health_check_start_period.'s',
         ];
 
-        if (! is_null($this->application->limits_cpuset)) {
+        if (filled($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
         }
         if ($this->server->isSwarm()) {

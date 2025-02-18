@@ -79,7 +79,7 @@ class StartMongodb
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -99,7 +99,7 @@ class StartMongodb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->mongo_conf) || ! empty($this->database->mongo_conf)) {
+        if (filled($this->database->mongo_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/mongod.conf',
@@ -191,7 +191,7 @@ class StartMongodb
 
     private function add_custom_mongo_conf()
     {
-        if (is_null($this->database->mongo_conf) || empty($this->database->mongo_conf)) {
+        if (filled($this->database->mongo_conf)) {
             return;
         }
         $filename = 'mongod.conf';

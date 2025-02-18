@@ -12,7 +12,7 @@ function collectProxyDockerNetworksByServer(Server $server)
         return collect();
     }
     $proxyType = $server->proxyType();
-    if (is_null($proxyType) || $proxyType === 'NONE') {
+    if (blank($proxyType) || $proxyType === 'NONE') {
         return collect();
     }
     $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);

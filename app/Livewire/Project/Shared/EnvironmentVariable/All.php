@@ -50,12 +50,12 @@ class All extends Component
     public function sortEnvironmentVariables()
     {
         if ($this->is_env_sorting_enabled === false) {
-            if ($this->resource->environment_variables) {
-                $this->resource->environment_variables = $this->resource->environment_variables->sortBy('order')->values();
+            if ($this->resource->environmentVariables) {
+                $this->resource->environmentVariables = $this->resource->environmentVariables->sortBy('order')->values();
             }
 
-            if ($this->resource->environment_variables_preview) {
-                $this->resource->environment_variables_preview = $this->resource->environment_variables_preview->sortBy('order')->values();
+            if ($this->resource->environmentVariablesPreview) {
+                $this->resource->environmentVariablesPreview = $this->resource->environmentVariablesPreview->sortBy('order')->values();
             }
         }
 
@@ -64,9 +64,9 @@ class All extends Component
 
     public function getDevView()
     {
-        $this->variables = $this->formatEnvironmentVariables($this->resource->environment_variables);
+        $this->variables = $this->formatEnvironmentVariables($this->resource->environmentVariables);
         if ($this->showPreview) {
-            $this->variablesPreview = $this->formatEnvironmentVariables($this->resource->environment_variables_preview);
+            $this->variablesPreview = $this->formatEnvironmentVariables($this->resource->environmentVariablesPreview);
         }
     }
 
@@ -113,7 +113,7 @@ class All extends Component
         $variables = parseEnvFormatToArray($this->variables);
         $order = 1;
         foreach ($variables as $key => $value) {
-            $env = $this->resource->environment_variables()->where('key', $key)->first();
+            $env = $this->resource->environmentVariables()->where('key', $key)->first();
             if ($env) {
                 $env->order = $order;
                 $env->save();
@@ -125,7 +125,7 @@ class All extends Component
             $previewVariables = parseEnvFormatToArray($this->variablesPreview);
             $order = 1;
             foreach ($previewVariables as $key => $value) {
-                $env = $this->resource->environment_variables_preview()->where('key', $key)->first();
+                $env = $this->resource->environmentVariablesPreview()->where('key', $key)->first();
                 if ($env) {
                     $env->order = $order;
                     $env->save();
@@ -153,14 +153,14 @@ class All extends Component
 
     private function handleSingleSubmit($data)
     {
-        $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
+        $found = $this->resource->environmentVariables()->where('key', $data['key'])->first();
         if ($found) {
             $this->dispatch('error', 'Environment variable already exists.');
 
             return;
         }
 
-        $maxOrder = $this->resource->environment_variables()->max('order') ?? 0;
+        $maxOrder = $this->resource->environmentVariables()->max('order') ?? 0;
         $environment = $this->createEnvironmentVariable($data);
         $environment->order = $maxOrder + 1;
         $environment->save();

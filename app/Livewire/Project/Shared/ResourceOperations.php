@@ -12,6 +12,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -166,7 +167,7 @@ class ResourceOperations extends Component
                             no_questions_asked: true
                         );
                     } catch (\Exception $e) {
-                        \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                        Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                     }
                 }
             }
@@ -183,9 +184,9 @@ class ResourceOperations extends Component
                 $newStorage->save();
             }
 
-            $environmentVaribles = $this->resource->environment_variables()->get();
-            foreach ($environmentVaribles as $environmentVarible) {
-                $newEnvironmentVariable = $environmentVarible->replicate([
+            $environmentVariables = $this->resource->environmentVariables()->get();
+            foreach ($environmentVariables as $environmentVariable) {
+                $newEnvironmentVariable = $environmentVariable->replicate([
                     'id',
                     'created_at',
                     'updated_at',
@@ -284,7 +285,7 @@ class ResourceOperations extends Component
 
                         StartDatabase::dispatch($this->resource);
                     } catch (\Exception $e) {
-                        \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                        Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                     }
                 }
             }
@@ -317,13 +318,13 @@ class ResourceOperations extends Component
                 $newBackup->save();
             }
 
-            $environmentVaribles = $this->resource->environment_variables()->get();
-            foreach ($environmentVaribles as $environmentVarible) {
+            $environmentVariables = $this->resource->environmentVariables()->get();
+            foreach ($environmentVariables as $environmentVariable) {
                 $payload = [
                     'resourceable_id' => $new_resource->id,
                     'resourceable_type' => $new_resource->getMorphClass(),
                 ];
-                $newEnvironmentVariable = $environmentVarible->replicate([
+                $newEnvironmentVariable = $environmentVariable->replicate([
                     'id',
                     'created_at',
                     'updated_at',
@@ -373,7 +374,7 @@ class ResourceOperations extends Component
                 $newTask->save();
             }
 
-            $environmentVariables = $this->resource->environment_variables()->get();
+            $environmentVariables = $this->resource->environmentVariables()->get();
             foreach ($environmentVariables as $environmentVariable) {
                 $newEnvironmentVariable = $environmentVariable->replicate([
                     'id',
@@ -422,7 +423,7 @@ class ResourceOperations extends Component
 
                             StartService::dispatch($application);
                         } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                         }
                     }
                 }
@@ -464,7 +465,7 @@ class ResourceOperations extends Component
 
                             StartService::dispatch($database->service);
                         } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                         }
                     }
                 }
