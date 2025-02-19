@@ -42,9 +42,7 @@ class StartMongodb
         if (! $this->database->enable_ssl) {
             $this->commands[] = "rm -rf $this->configuration_dir/ssl";
 
-            SslCertificate::where('resource_type', $this->database->getMorphClass())
-                ->where('resource_id', $this->database->id)
-                ->delete();
+            $this->database->sslCertificates()->delete();
 
             $this->database->fileStorages()
                 ->where('resource_type', $this->database->getMorphClass())
@@ -65,7 +63,7 @@ class StartMongodb
             $server = $this->database->destination->server;
             $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
 
-            $this->ssl_certificate = SslCertificate::where('resource_type', $this->database->getMorphClass())->where('resource_id', $this->database->id)->first();
+            $this->ssl_certificate = $this->database->sslCertificates()->first();
 
             if (! $this->ssl_certificate) {
                 $this->commands[] = "echo 'No SSL certificate found, generating new SSL certificate for this database.'";

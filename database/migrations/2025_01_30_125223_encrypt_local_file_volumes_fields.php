@@ -19,18 +19,21 @@ return new class extends Migration
         });
 
         if (DB::table('local_file_volumes')->exists()) {
-            $volumes = DB::table('local_file_volumes')->get();
-            foreach ($volumes as $volume) {
-                try {
-                    DB::table('local_file_volumes')->where('id', $volume->id)->update([
-                        'fs_path' => $volume->fs_path ? Crypt::encryptString($volume->fs_path) : null,
-                        'mount_path' => $volume->mount_path ? Crypt::encryptString($volume->mount_path) : null,
-                        'content' => $volume->content ? Crypt::encryptString($volume->content) : null,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Error encrypting local file volume fields: '.$e->getMessage());
-                }
-            }
+            DB::table('local_file_volumes')
+                ->orderBy('id')
+                ->chunk(100, function ($volumes) {
+                    foreach ($volumes as $volume) {
+                        try {
+                            DB::table('local_file_volumes')->where('id', $volume->id)->update([
+                                'fs_path' => $volume->fs_path ? Crypt::encryptString($volume->fs_path) : null,
+                                'mount_path' => $volume->mount_path ? Crypt::encryptString($volume->mount_path) : null,
+                                'content' => $volume->content ? Crypt::encryptString($volume->content) : null,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::error('Error encrypting local file volume fields: '.$e->getMessage());
+                        }
+                    }
+                });
         }
     }
 
@@ -46,18 +49,21 @@ return new class extends Migration
         });
 
         if (DB::table('local_file_volumes')->exists()) {
-            $volumes = DB::table('local_file_volumes')->get();
-            foreach ($volumes as $volume) {
-                try {
-                    DB::table('local_file_volumes')->where('id', $volume->id)->update([
-                        'fs_path' => $volume->fs_path ? Crypt::decryptString($volume->fs_path) : null,
-                        'mount_path' => $volume->mount_path ? Crypt::decryptString($volume->mount_path) : null,
-                        'content' => $volume->content ? Crypt::decryptString($volume->content) : null,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Error decrypting local file volume fields: '.$e->getMessage());
-                }
-            }
+            DB::table('local_file_volumes')
+                ->orderBy('id')
+                ->chunk(100, function ($volumes) {
+                    foreach ($volumes as $volume) {
+                        try {
+                            DB::table('local_file_volumes')->where('id', $volume->id)->update([
+                                'fs_path' => $volume->fs_path ? Crypt::decryptString($volume->fs_path) : null,
+                                'mount_path' => $volume->mount_path ? Crypt::decryptString($volume->mount_path) : null,
+                                'content' => $volume->content ? Crypt::decryptString($volume->content) : null,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::error('Error decrypting local file volume fields: '.$e->getMessage());
+                        }
+                    }
+                });
         }
     }
 };

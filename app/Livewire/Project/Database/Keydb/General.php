@@ -8,6 +8,7 @@ use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\SslCertificate;
 use App\Models\StandaloneKeydb;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Validate;
@@ -55,7 +56,7 @@ class General extends Component
     #[Validate(['nullable', 'boolean'])]
     public bool $isLogDrainEnabled = false;
 
-    public $certificateValidUntil = null;
+    public ?Carbon $certificateValidUntil = null;
 
     #[Validate(['boolean'])]
     public bool $enable_ssl = false;
@@ -75,9 +76,7 @@ class General extends Component
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
 
-            $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
-                ->where('resource_id', $this->database->id)
-                ->first();
+            $existingCert = $this->database->sslCertificates()->first();
 
             if ($existingCert) {
                 $this->certificateValidUntil = $existingCert->valid_until;
@@ -210,10 +209,7 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
-            $existingCert = SslCertificate::where('resource_type', $this->database->getMorphClass())
-                ->where('resource_id', $this->database->id)
-                ->where('server_id', $this->server->id)
-                ->first();
+            $existingCert = $this->database->sslCertificates()->first();
 
             if (! $existingCert) {
                 $this->dispatch('error', 'No existing SSL certificate found for this database.');

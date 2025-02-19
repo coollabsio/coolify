@@ -17,6 +17,10 @@ class RegenerateSslCertJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 3;
+
+    public $backoff = 60;
+
     public function __construct(
         protected ?Team $team = null,
         protected ?int $server_id = null,
@@ -37,17 +41,13 @@ class RegenerateSslCertJob implements ShouldQueue
 
         $query->where('is_ca_certificate', false);
 
-        $certificates = $query->get();
-
-        if ($certificates->isEmpty()) {
-            return;
-        }
-
         $regenerated = collect();
 
-        foreach ($certificates as $certificate) {
+        $query->cursor()->each(function ($certificate) use ($regenerated) {
             try {
-                $caCert = SslCertificate::where('server_id', $certificate->server_id)->where('is_ca_certificate', true)->first();
+                $caCert = SslCertificate::where('server_id', $certificate->server_id)
+                    ->where('is_ca_certificate', true)
+                    ->first();
 
                 SSLHelper::generateSslCertificate(
                     commonName: $certificate->common_name,
@@ -64,7 +64,7 @@ class RegenerateSslCertJob implements ShouldQueue
             } catch (\Exception $e) {
                 Log::error('Failed to regenerate SSL certificate: '.$e->getMessage());
             }
-        }
+        });
 
         if ($regenerated->isNotEmpty()) {
             $this->team?->notify(new SslExpirationNotification($regenerated));

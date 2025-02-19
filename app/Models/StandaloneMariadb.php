@@ -218,7 +218,12 @@ class StandaloneMariadb extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "mysql://{$this->mariadb_user}:{$this->mariadb_password}@{$this->uuid}:3306/{$this->mariadb_database}",
+            get: function () {
+                $encodedUser = rawurlencode($this->mariadb_user);
+                $encodedPass = rawurlencode($this->mariadb_password);
+
+                return "mysql://{$encodedUser}:{$encodedPass}@{$this->uuid}:3306/{$this->mariadb_database}";
+            },
         );
     }
 
@@ -227,7 +232,10 @@ class StandaloneMariadb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "mysql://{$this->mariadb_user}:{$this->mariadb_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mariadb_database}";
+                    $encodedUser = rawurlencode($this->mariadb_user);
+                    $encodedPass = rawurlencode($this->mariadb_password);
+
+                    return "mysql://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mariadb_database}";
                 }
 
                 return null;

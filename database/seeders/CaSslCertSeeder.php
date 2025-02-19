@@ -20,7 +20,7 @@ class CaSslCertSeeder extends Seeder
                         commonName: 'Coolify CA Certificate',
                         serverId: $server->id,
                         isCaCertificate: true,
-                        validityDays: 15 * 365
+                        validityDays: 10 * 365
                     );
                 } else {
                     $caCert = $existingCaCert;

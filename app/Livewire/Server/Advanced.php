@@ -6,6 +6,7 @@ use App\Helpers\SslHelper;
 use App\Jobs\RegenerateSslCertJob;
 use App\Models\Server;
 use App\Models\SslCertificate;
+use Carbon\Carbon;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -19,7 +20,7 @@ class Advanced extends Component
 
     public $certificateContent = '';
 
-    public $certificateValidUntil = null;
+    public ?Carbon $certificateValidUntil = null;
 
     public array $parameters = [];
 
@@ -99,7 +100,7 @@ class Advanced extends Component
                 commonName: 'Coolify CA Certificate',
                 serverId: $this->server->id,
                 isCaCertificate: true,
-                validityDays: 15 * 365
+                validityDays: 10 * 365
             );
 
             $this->loadCaCertificate();

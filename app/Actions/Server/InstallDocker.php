@@ -25,7 +25,7 @@ class InstallDocker
                 commonName: 'Coolify CA Certificate',
                 serverId: $server->id,
                 isCaCertificate: true,
-                validityDays: 15 * 365
+                validityDays: 10 * 365
             );
             $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
 

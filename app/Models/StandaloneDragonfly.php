@@ -226,7 +226,8 @@ class StandaloneDragonfly extends BaseModel
             get: function () {
                 $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                 $port = $this->enable_ssl ? 6380 : 6379;
-                $url = "{$scheme}://:{$this->dragonfly_password}@{$this->uuid}:{$port}/0";
+                $encodedPass = rawurlencode($this->dragonfly_password);
+                $url = "{$scheme}://:{$encodedPass}@{$this->uuid}:{$port}/0";
 
                 if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                     $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
@@ -243,7 +244,8 @@ class StandaloneDragonfly extends BaseModel
             get: function () {
                 if ($this->is_public && $this->public_port) {
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
-                    $url = "{$scheme}://:{$this->dragonfly_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $encodedPass = rawurlencode($this->dragonfly_password);
+                    $url = "{$scheme}://:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';

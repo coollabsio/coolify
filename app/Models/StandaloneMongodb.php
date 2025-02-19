@@ -244,13 +244,14 @@ class StandaloneMongodb extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $url = "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true";
+                $encodedUser = rawurlencode($this->mongo_initdb_root_username);
+                $encodedPass = rawurlencode($this->mongo_initdb_root_password);
+                $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->uuid}:27017/?directConnection=true";
                 if ($this->enable_ssl) {
                     $url .= '&tls=true';
                     if (in_array($this->ssl_mode, ['verify-full'])) {
                         $url .= '&tlsCAFile=/etc/ssl/certs/coolify-ca.crt';
                     }
-
                 }
 
                 return $url;
@@ -263,7 +264,9 @@ class StandaloneMongodb extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    $url = "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+                    $encodedUser = rawurlencode($this->mongo_initdb_root_username);
+                    $encodedPass = rawurlencode($this->mongo_initdb_root_password);
+                    $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
                         $url .= '&tls=true';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
