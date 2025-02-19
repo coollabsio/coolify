@@ -66,12 +66,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($this->deleteVolumes && $this->resource->type() !== 'service') {
-                $this->resource?->delete_volumes($persistentStorages);
+                $this->resource->delete_volumes($persistentStorages);
+                $this->resource->persistentStorages()->delete();
             }
-            if ($this->deleteConfigurations) {
-                $this->resource?->delete_configurations();
-            }
-
             $isDatabase = $this->resource instanceof StandalonePostgresql
                 || $this->resource instanceof StandaloneRedis
                 || $this->resource instanceof StandaloneMongodb
@@ -80,6 +77,18 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 || $this->resource instanceof StandaloneKeydb
                 || $this->resource instanceof StandaloneDragonfly
                 || $this->resource instanceof StandaloneClickhouse;
+
+            if ($this->deleteConfigurations) {
+                $this->resource->delete_configurations(); // rename to FileStorages
+                $this->resource->fileStorages()->delete();
+            }
+            if ($isDatabase) {
+                $this->resource->sslCertificates()->delete();
+                $this->resource->scheduledBackups()->delete();
+                $this->resource->environment_variables()->delete();
+                $this->resource->tags()->detach();
+            }
+
             $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
             if (($this->dockerCleanup || $isDatabase) && $server) {
                 CleanupDocker::dispatch($server, true);
