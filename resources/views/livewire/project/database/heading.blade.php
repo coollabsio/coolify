@@ -1,4 +1,4 @@
-<nav wire:poll.5000ms="check_status">
+<nav wire:poll.10000ms="check_status">
     <x-resources.breadcrumbs :resource="$database" :parameters="$parameters" />
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Database Startup</x-slot:title>
