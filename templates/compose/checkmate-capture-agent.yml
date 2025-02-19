@@ -1,0 +1,13 @@
+# documentation: https://github.com/bluewave-labs/capture
+# slogan: An open source hardware monitoring agent
+# tags: monitoring,server,uptime,healthcheck
+# logo: svgs/checkmate.png
+
+services:
+  capture:
+    image: 'ghcr.io/bluewave-labs/capture:latest'
+    environment:
+      - 'API_SECRET=${SERVICE_PASSWORD_CHECKMATEAPI}'
+      - SERVICE_FQDN_CHECKMATEAPI_59232
+    volumes:
+      - '/etc/os-release:/etc/os-release:ro'
