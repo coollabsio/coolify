@@ -4,9 +4,7 @@ namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Model;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Environment Variable model',
@@ -14,9 +12,8 @@ use Visus\Cuid2\Cuid2;
     properties: [
         'id' => ['type' => 'integer'],
         'uuid' => ['type' => 'string'],
-        'application_id' => ['type' => 'integer'],
-        'service_id' => ['type' => 'integer'],
-        'database_id' => ['type' => 'integer'],
+        'resourceable_type' => ['type' => 'string'],
+        'resourceable_id' => ['type' => 'integer'],
         'is_build_time' => ['type' => 'boolean'],
         'is_literal' => ['type' => 'boolean'],
         'is_multiline' => ['type' => 'boolean'],
@@ -31,7 +28,7 @@ use Visus\Cuid2\Cuid2;
         'updated_at' => ['type' => 'string'],
     ]
 )]
-class EnvironmentVariable extends Model
+class EnvironmentVariable extends BaseModel
 {
     protected $guarded = [];
 
@@ -42,29 +39,32 @@ class EnvironmentVariable extends Model
         'is_multiline' => 'boolean',
         'is_preview' => 'boolean',
         'version' => 'string',
+        'resourceable_type' => 'string',
+        'resourceable_id' => 'integer',
     ];
 
     protected $appends = ['real_value', 'is_shared', 'is_really_required'];
 
     protected static function booted()
     {
-        static::creating(function (Model $model) {
-            if (! $model->uuid) {
-                $model->uuid = (string) new Cuid2;
-            }
-        });
         static::created(function (EnvironmentVariable $environment_variable) {
-            if ($environment_variable->application_id && ! $environment_variable->is_preview) {
-                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
+            if ($environment_variable->resourceable_type === Application::class && ! $environment_variable->is_preview) {
+                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)
+                    ->where('resourceable_type', Application::class)
+                    ->where('resourceable_id', $environment_variable->resourceable_id)
+                    ->where('is_preview', true)
+                    ->first();
+
                 if (! $found) {
-                    $application = Application::find($environment_variable->application_id);
-                    if ($application->build_pack !== 'dockerfile') {
+                    $application = Application::find($environment_variable->resourceable_id);
+                    if ($application && $application->build_pack !== 'dockerfile') {
                         ModelsEnvironmentVariable::create([
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,
                             'is_build_time' => $environment_variable->is_build_time,
                             'is_multiline' => $environment_variable->is_multiline ?? false,
-                            'application_id' => $environment_variable->application_id,
+                            'resourceable_type' => Application::class,
+                            'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
                         ]);
                     }
@@ -74,6 +74,7 @@ class EnvironmentVariable extends Model
                 'version' => config('constants.coolify.version'),
             ]);
         });
+
         static::saving(function (EnvironmentVariable $environmentVariable) {
             $environmentVariable->updateIsShared();
         });
@@ -92,43 +93,32 @@ class EnvironmentVariable extends Model
         );
     }
 
+    /**
+     * Get the parent resourceable model.
+     */
+    public function resourceable()
+    {
+        return $this->morphTo();
+    }
+
     public function resource()
     {
-        $resource = null;
-        if ($this->application_id) {
-            $resource = Application::find($this->application_id);
-        } elseif ($this->service_id) {
-            $resource = Service::find($this->service_id);
-        } elseif ($this->standalone_postgresql_id) {
-            $resource = StandalonePostgresql::find($this->standalone_postgresql_id);
-        } elseif ($this->standalone_redis_id) {
-            $resource = StandaloneRedis::find($this->standalone_redis_id);
-        } elseif ($this->standalone_mongodb_id) {
-            $resource = StandaloneMongodb::find($this->standalone_mongodb_id);
-        } elseif ($this->standalone_mysql_id) {
-            $resource = StandaloneMysql::find($this->standalone_mysql_id);
-        } elseif ($this->standalone_mariadb_id) {
-            $resource = StandaloneMariadb::find($this->standalone_mariadb_id);
-        } elseif ($this->standalone_keydb_id) {
-            $resource = StandaloneKeydb::find($this->standalone_keydb_id);
-        } elseif ($this->standalone_dragonfly_id) {
-            $resource = StandaloneDragonfly::find($this->standalone_dragonfly_id);
-        } elseif ($this->standalone_clickhouse_id) {
-            $resource = StandaloneClickhouse::find($this->standalone_clickhouse_id);
-        }
-
-        return $resource;
+        return $this->resourceable;
     }
 
     public function realValue(): Attribute
     {
-        $resource = $this->resource();
-
         return Attribute::make(
-            get: function () use ($resource) {
-                $env = $this->get_real_environment_variables($this->value, $resource);
+            get: function () {
+                if (! $this->relationLoaded('resourceable')) {
+                    $this->load('resourceable');
+                }
+                $resource = $this->resourceable;
+                if (! $resource) {
+                    return null;
+                }
 
-                return data_get($env, 'value', $env);
+                return $this->get_real_environment_variables($this->value, $resource);
             }
         );
     }
@@ -164,7 +154,6 @@ class EnvironmentVariable extends Model
         if ($sharedEnvsFound->isEmpty()) {
             return $environment_variable;
         }
-
         foreach ($sharedEnvsFound as $sharedEnv) {
             $type = str($sharedEnv)->match('/(.*?)\./');
             if (! collect(SHARED_VARIABLE_TYPES)->contains($type)) {

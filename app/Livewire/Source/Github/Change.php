@@ -76,7 +76,7 @@ class Change extends Component
     // Need administration:read:write permission
     // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
 
-    //     $github_access_token = generate_github_installation_token($this->github_app);
+    //     $github_access_token = generateGithubInstallationToken($this->github_app);
     //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
     //     $runners_by_repository = collect([]);
     //     $repositories = $repositories->json()['repositories'];
@@ -130,14 +130,14 @@ class Change extends Component
                 } else {
                     $parameters = data_get(session('from'), 'parameters');
                     $back = data_get(session('from'), 'back');
-                    $environment_name = data_get($parameters, 'environment_name');
+                    $environment_uuid = data_get($parameters, 'environment_uuid');
                     $project_uuid = data_get($parameters, 'project_uuid');
                     $type = data_get($parameters, 'type');
                     $destination = data_get($parameters, 'destination');
                     session()->forget('from');
 
                     return redirect()->route($back, [
-                        'environment_name' => $environment_name,
+                        'environment_uuid' => $environment_uuid,
                         'project_uuid' => $project_uuid,
                         'type' => $type,
                         'destination' => $destination,

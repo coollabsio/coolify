@@ -23,6 +23,8 @@ class Select extends Component
 
     public Collection|null|Server $servers;
 
+    public bool $onlyBuildServerAvailable = false;
+
     public ?Collection $standaloneDockers;
 
     public ?Collection $swarmDockers;
@@ -61,7 +63,7 @@ class Select extends Component
         }
         $projectUuid = data_get($this->parameters, 'project_uuid');
         $this->environments = Project::whereUuid($projectUuid)->first()->environments;
-        $this->selectedEnvironment = data_get($this->parameters, 'environment_name');
+        $this->selectedEnvironment = data_get($this->parameters, 'environment_uuid');
     }
 
     public function render()
@@ -73,23 +75,13 @@ class Select extends Component
     {
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->selectedEnvironment,
+            'environment_uuid' => $this->selectedEnvironment,
         ]);
     }
 
-    // public function addExistingPostgresql()
-    // {
-    //     try {
-    //         instantCommand("psql {$this->existingPostgresqlUrl} -c 'SELECT 1'");
-    //         $this->dispatch('success', 'Successfully connected to the database.');
-    //     } catch (\Throwable $e) {
-    //         return handleError($e, $this);
-    //     }
-    // }
-
     public function loadServices()
     {
-        $services = get_service_templates(true);
+        $services = get_service_templates();
         $services = collect($services)->map(function ($service, $key) {
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);
@@ -308,7 +300,7 @@ class Select extends Component
 
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->parameters['environment_name'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
@@ -323,7 +315,7 @@ class Select extends Component
         } else {
             return redirect()->route('project.resource.create', [
                 'project_uuid' => $this->parameters['project_uuid'],
-                'environment_name' => $this->parameters['environment_name'],
+                'environment_uuid' => $this->parameters['environment_uuid'],
                 'type' => $this->type,
                 'destination' => $this->destination_uuid,
                 'server_id' => $this->server_id,
@@ -335,5 +327,11 @@ class Select extends Component
     {
         $this->servers = Server::isUsable()->get()->sortBy('name');
         $this->allServers = $this->servers;
+
+        if ($this->allServers && $this->allServers->isNotEmpty()) {
+            $this->onlyBuildServerAvailable = $this->allServers->every(function ($server) {
+                return $server->isBuildServer();
+            });
+        }
     }
 }

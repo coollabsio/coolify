@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use OpenApi\Attributes as OA;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Project model',
@@ -24,8 +25,6 @@ class Project extends BaseModel
 {
     protected $guarded = [];
 
-    protected $appends = ['default_environment'];
-
     public static function ownedByCurrentTeam()
     {
         return Project::whereTeamId(currentTeam()->id)->orderByRaw('LOWER(name)');
@@ -40,6 +39,7 @@ class Project extends BaseModel
             Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
+                'uuid' => (string) new Cuid2,
             ]);
         });
         static::deleting(function ($project) {
@@ -141,17 +141,15 @@ class Project extends BaseModel
         return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
     }
 
-    public function getDefaultEnvironmentAttribute()
+    public function navigateTo()
     {
-        $default = $this->environments()->where('name', 'production')->first();
-        if ($default) {
-            return $default->name;
-        }
-        $default = $this->environments()->get();
-        if ($default->count() > 0) {
-            return $default->sortBy('created_at')->first()->name;
+        if ($this->environments->count() === 1) {
+            return route('project.resource.index', [
+                'project_uuid' => $this->uuid,
+                'environment_uuid' => $this->environments->first()->uuid,
+            ]);
         }
 
-        return null;
+        return route('project.show', ['project_uuid' => $this->uuid]);
     }
 }

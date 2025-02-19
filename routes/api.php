@@ -29,6 +29,7 @@ Route::group([
     'middleware' => ['auth:sanctum', ApiAllowed::class, 'api.sensitive'],
     'prefix' => 'v1',
 ], function () {
+
     Route::get('/version', [OtherController::class, 'version'])->middleware(['api.ability:read']);
 
     Route::get('/teams', [TeamController::class, 'teams'])->middleware(['api.ability:read']);
@@ -39,7 +40,7 @@ Route::group([
 
     Route::get('/projects', [ProjectController::class, 'projects'])->middleware(['api.ability:read']);
     Route::get('/projects/{uuid}', [ProjectController::class, 'project_by_uuid'])->middleware(['api.ability:read']);
-    Route::get('/projects/{uuid}/{environment_name}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
+    Route::get('/projects/{uuid}/{environment_name_or_uuid}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
 
     Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:read']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
@@ -87,6 +88,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
     // Route::post('/applications/{uuid}/execute', [ApplicationsController::class, 'execute_command_by_uuid'])->middleware(['ability:write']);
+    Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
 
     Route::match(['get', 'post'], '/applications/{uuid}/start', [ApplicationsController::class, 'action_deploy'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/applications/{uuid}/restart', [ApplicationsController::class, 'action_restart'])->middleware(['api.ability:write']);
@@ -137,13 +139,29 @@ Route::group([
             return response()->json(['message' => 'Unauthorized'], 401);
         }
         $naked_token = str_replace('Bearer ', '', $token);
-        $decrypted = decrypt($naked_token);
-        $decrypted_token = json_decode($decrypted, true);
+        try {
+            $decrypted = decrypt($naked_token);
+            $decrypted_token = json_decode($decrypted, true);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Invalid token'], 401);
+        }
         $server_uuid = data_get($decrypted_token, 'server_uuid');
+        if (! $server_uuid) {
+            return response()->json(['message' => 'Invalid token'], 401);
+        }
         $server = Server::where('uuid', $server_uuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found'], 404);
         }
+
+        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        if ($server->isFunctional() === false) {
+            return response()->json(['message' => 'Server is not functional'], 401);
+        }
+
         if ($server->settings->sentinel_token !== $naked_token) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -159,22 +177,3 @@ Route::group([
 Route::any('/{any}', function () {
     return response()->json(['message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
 })->where('any', '.*');
-
-// Route::middleware(['throttle:5'])->group(function () {
-//     Route::get('/unsubscribe/{token}', function () {
-//         try {
-//             $token = request()->token;
-//             $email = decrypt($token);
-//             if (!User::whereEmail($email)->exists()) {
-//                 return redirect(RouteServiceProvider::HOME);
-//             }
-//             if (User::whereEmail($email)->first()->marketing_emails === false) {
-//                 return 'You have already unsubscribed from marketing emails.';
-//             }
-//             User::whereEmail($email)->update(['marketing_emails' => false]);
-//             return 'You have been unsubscribed from marketing emails.';
-//         } catch (\Throwable $e) {
-//             return 'Something went wrong. Please try again or contact support.';
-//         }
-//     })->name('unsubscribe.marketing.emails');
-// });

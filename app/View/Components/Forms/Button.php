@@ -15,7 +15,8 @@ class Button extends Component
         public bool $disabled = false,
         public bool $noStyle = false,
         public ?string $modalId = null,
-        public string $defaultClass = 'button'
+        public string $defaultClass = 'button',
+        public bool $showLoadingIndicator = true,
     ) {
         if ($this->noStyle) {
             $this->defaultClass = '';

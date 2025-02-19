@@ -40,8 +40,26 @@ class BackupEdit extends Component
     #[Validate(['required', 'string'])]
     public string $frequency = '';
 
-    #[Validate(['required', 'integer', 'min:1'])]
-    public int $numberOfBackupsLocally = 1;
+    #[Validate(['string'])]
+    public string $timezone = '';
+
+    #[Validate(['required', 'integer'])]
+    public int $databaseBackupRetentionAmountLocally = 0;
+
+    #[Validate(['required', 'integer'])]
+    public ?int $databaseBackupRetentionDaysLocally = 0;
+
+    #[Validate(['required', 'numeric', 'min:0'])]
+    public ?float $databaseBackupRetentionMaxStorageLocally = 0;
+
+    #[Validate(['required', 'integer'])]
+    public ?int $databaseBackupRetentionAmountS3 = 0;
+
+    #[Validate(['required', 'integer'])]
+    public ?int $databaseBackupRetentionDaysS3 = 0;
+
+    #[Validate(['required', 'numeric', 'min:0'])]
+    public ?float $databaseBackupRetentionMaxStorageS3 = 0;
 
     #[Validate(['required', 'boolean'])]
     public bool $saveS3 = false;
@@ -68,19 +86,30 @@ class BackupEdit extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
-            $this->customValidate();
             $this->backup->enabled = $this->backupEnabled;
             $this->backup->frequency = $this->frequency;
-            $this->backup->number_of_backups_locally = $this->numberOfBackupsLocally;
+            $this->backup->database_backup_retention_amount_locally = $this->databaseBackupRetentionAmountLocally;
+            $this->backup->database_backup_retention_days_locally = $this->databaseBackupRetentionDaysLocally;
+            $this->backup->database_backup_retention_max_storage_locally = $this->databaseBackupRetentionMaxStorageLocally;
+            $this->backup->database_backup_retention_amount_s3 = $this->databaseBackupRetentionAmountS3;
+            $this->backup->database_backup_retention_days_s3 = $this->databaseBackupRetentionDaysS3;
+            $this->backup->database_backup_retention_max_storage_s3 = $this->databaseBackupRetentionMaxStorageS3;
             $this->backup->save_s3 = $this->saveS3;
             $this->backup->s3_storage_id = $this->s3StorageId;
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
+            $this->customValidate();
             $this->backup->save();
         } else {
             $this->backupEnabled = $this->backup->enabled;
             $this->frequency = $this->backup->frequency;
-            $this->numberOfBackupsLocally = $this->backup->number_of_backups_locally;
+            $this->timezone = data_get($this->backup->server(), 'settings.server_timezone', 'Instance timezone');
+            $this->databaseBackupRetentionAmountLocally = $this->backup->database_backup_retention_amount_locally;
+            $this->databaseBackupRetentionDaysLocally = $this->backup->database_backup_retention_days_locally;
+            $this->databaseBackupRetentionMaxStorageLocally = $this->backup->database_backup_retention_max_storage_locally;
+            $this->databaseBackupRetentionAmountS3 = $this->backup->database_backup_retention_amount_s3;
+            $this->databaseBackupRetentionDaysS3 = $this->backup->database_backup_retention_days_s3;
+            $this->databaseBackupRetentionMaxStorageS3 = $this->backup->database_backup_retention_max_storage_s3;
             $this->saveS3 = $this->backup->save_s3;
             $this->s3StorageId = $this->backup->s3_storage_id;
             $this->databasesToBackup = $this->backup->databases_to_backup;
@@ -99,11 +128,29 @@ class BackupEdit extends Component
         }
 
         try {
-            if ($this->delete_associated_backups_locally) {
-                $this->deleteAssociatedBackupsLocally();
+            $server = null;
+            if ($this->backup->database instanceof \App\Models\ServiceDatabase) {
+                $server = $this->backup->database->service->destination->server;
+            } elseif ($this->backup->database->destination && $this->backup->database->destination->server) {
+                $server = $this->backup->database->destination->server;
             }
-            if ($this->delete_associated_backups_s3) {
-                $this->deleteAssociatedBackupsS3();
+
+            $filenames = $this->backup->executions()
+                ->whereNotNull('filename')
+                ->where('filename', '!=', '')
+                ->where('scheduled_database_backup_id', $this->backup->id)
+                ->pluck('filename')
+                ->filter()
+                ->all();
+
+            if (! empty($filenames)) {
+                if ($this->delete_associated_backups_locally && $server) {
+                    deleteBackupsLocally($filenames, $server);
+                }
+
+                if ($this->delete_associated_backups_s3 && $this->backup->s3) {
+                    deleteBackupsS3($filenames, $this->backup->s3);
+                }
             }
 
             $this->backup->delete();
@@ -119,7 +166,9 @@ class BackupEdit extends Component
             } else {
                 return redirect()->route('project.database.backup.index', $this->parameters);
             }
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
+
             return handleError($e, $this);
         }
     }
@@ -156,63 +205,12 @@ class BackupEdit extends Component
         }
     }
 
-    private function deleteAssociatedBackupsLocally()
-    {
-        $executions = $this->backup->executions;
-        $backupFolder = null;
-
-        foreach ($executions as $execution) {
-            if ($this->backup->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $server = $this->backup->database->service->destination->server;
-            } else {
-                $server = $this->backup->database->destination->server;
-            }
-
-            if (! $backupFolder) {
-                $backupFolder = dirname($execution->filename);
-            }
-
-            delete_backup_locally($execution->filename, $server);
-            $execution->delete();
-        }
-
-        if (str($backupFolder)->isNotEmpty()) {
-            $this->deleteEmptyBackupFolder($backupFolder, $server);
-        }
-    }
-
-    private function deleteAssociatedBackupsS3()
-    {
-        //Add function to delete backups from S3
-    }
-
-    private function deleteAssociatedBackupsSftp()
-    {
-        //Add function to delete backups from SFTP
-    }
-
-    private function deleteEmptyBackupFolder($folderPath, $server)
-    {
-        $checkEmpty = instant_remote_process(["[ -z \"$(ls -A '$folderPath')\" ] && echo 'empty' || echo 'not empty'"], $server);
-
-        if (trim($checkEmpty) === 'empty') {
-            instant_remote_process(["rmdir '$folderPath'"], $server);
-
-            $parentFolder = dirname($folderPath);
-            $checkParentEmpty = instant_remote_process(["[ -z \"$(ls -A '$parentFolder')\" ] && echo 'empty' || echo 'not empty'"], $server);
-
-            if (trim($checkParentEmpty) === 'empty') {
-                instant_remote_process(["rmdir '$parentFolder'"], $server);
-            }
-        }
-    }
-
     public function render()
     {
         return view('livewire.project.database.backup-edit', [
             'checkboxes' => [
                 ['id' => 'delete_associated_backups_locally', 'label' => __('database.delete_backups_locally')],
-                // ['id' => 'delete_associated_backups_s3', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected S3 Storage.']
+                ['id' => 'delete_associated_backups_s3', 'label' => 'All backups will be permanently deleted (associated with this backup job) from the selected S3 Storage.'],
                 // ['id' => 'delete_associated_backups_sftp', 'label' => 'All backups associated with this backup job from this database will be permanently deleted from the selected SFTP Storage.']
             ],
         ]);

@@ -93,7 +93,7 @@ class ContainerRestarted extends CustomEmailNotification
         $description = "A resource ({$this->name}) has been restarted automatically on {$this->server->name}";
 
         if ($this->url) {
-            $description .= "\n**Resource URL:** {$this->url}";
+            $description .= "\n*Resource URL:* {$this->url}";
         }
 
         return new SlackMessage(

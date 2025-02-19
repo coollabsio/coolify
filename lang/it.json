@@ -1,10 +1,12 @@
 {
     "auth.login": "Accedi",
+    "auth.login.authentik": "Accedi con Authentik",
     "auth.login.azure": "Accedi con Microsoft",
     "auth.login.bitbucket": "Accedi con Bitbucket",
     "auth.login.github": "Accedi con GitHub",
     "auth.login.gitlab": "Accedi con Gitlab",
     "auth.login.google": "Accedi con Google",
+    "auth.login.infomaniak": "Accedi con Infomaniak",
     "auth.already_registered": "Già registrato?",
     "auth.confirm_password": "Conferma password",
     "auth.forgot_password": "Password dimenticata",
@@ -26,5 +28,13 @@
     "input.code": "Codice monouso",
     "input.recovery_code": "Codice di recupero",
     "button.save": "Salva",
-    "repository.url": "<span class='text-helper'>Esempi</span><br>Per i repository pubblici, utilizza <span class='text-helper'>https://...</span>.<br>Per i repository privati, utilizza <span class='text-helper'>git@...</span>.<br><br>https://github.com/coollabsio/coolify-examples verrà selezionato il branch <span class='text-helper'>main</span><br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify verrà selezionato il branch <span class='text-helper'>nodejs-fastify</span>.<br>https://gitea.com/sedlav/expressjs.git verrà selezionato il branch <span class='text-helper'>main</span>.<br>https://gitlab.com/andrasbacsai/nodejs-example.git verrà selezionato il branch <span class='text-helper'>main</span>."
+    "repository.url": "<span class='text-helper'>Esempi</span><br>Per i repository pubblici, utilizza <span class='text-helper'>https://...</span>.<br>Per i repository privati, utilizza <span class='text-helper'>git@...</span>.<br><br>https://github.com/coollabsio/coolify-examples verrà selezionato il branch <span class='text-helper'>main</span><br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify verrà selezionato il branch <span class='text-helper'>nodejs-fastify</span>.<br>https://gitea.com/sedlav/expressjs.git verrà selezionato il branch <span class='text-helper'>main</span>.<br>https://gitlab.com/andrasbacsai/nodejs-example.git verrà selezionato il branch <span class='text-helper'>main</span>.",
+    "service.stop": "Questo servizio verrà arrestato.",
+    "resource.docker_cleanup": "Esegui pulizia Docker (rimuove immagini non utilizzate e cache del builder).",
+    "resource.non_persistent": "Tutti i dati non persistenti verranno eliminati.",
+    "resource.delete_volumes": "Elimina definitivamente tutti i volumi associati a questa risorsa.",
+    "resource.delete_connected_networks": "Elimina definitivamente tutte le reti non predefinite associate a questa risorsa.",
+    "resource.delete_configurations": "Elimina definitivamente tutti i file di configurazione dal server.",
+    "database.delete_backups_locally": "Tutti i backup verranno eliminati definitivamente dall'archiviazione locale.",
+    "warning.sslipdomain": "La tua configurazione è stata salvata, ma il dominio sslip con https <span class='dark:text-red-500 text-red-500 font-bold'>NON</span> è raccomandato, poiché i server di Let's Encrypt con questo dominio pubblico hanno limitazioni di frequenza (la convalida del certificato SSL fallirà). <br><br>Utilizza invece il tuo dominio personale."
 }

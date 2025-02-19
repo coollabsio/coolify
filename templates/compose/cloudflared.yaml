@@ -11,3 +11,8 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       - 'TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}'
+    healthcheck:
+      test: ["CMD", "cloudflared", "--version"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

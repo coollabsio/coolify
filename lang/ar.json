@@ -1,10 +1,12 @@
 {
     "auth.login": "تسجيل الدخول",
+    "auth.login.authentik": "تسجيل الدخول باستخدام Authentik",
     "auth.login.azure": "تسجيل الدخول باستخدام Microsoft",
     "auth.login.bitbucket": "تسجيل الدخول باستخدام Bitbucket",
     "auth.login.github": "تسجيل الدخول باستخدام GitHub",
     "auth.login.gitlab": "تسجيل الدخول باستخدام Gitlab",
     "auth.login.google": "تسجيل الدخول باستخدام Google",
+    "auth.login.infomaniak": "تسجيل الدخول باستخدام Infomaniak",
     "auth.already_registered": "هل سبق لك التسجيل؟",
     "auth.confirm_password": "تأكيد كلمة المرور",
     "auth.forgot_password": "نسيت كلمة المرور",
@@ -33,5 +35,6 @@
     "resource.delete_volumes": "حذف جميع المجلدات والملفات المرتبطة بهذا المورد بشكل دائم.",
     "resource.delete_connected_networks": "حذف جميع الشبكات غير المحددة مسبقًا والمرتبطة بهذا المورد بشكل دائم.",
     "resource.delete_configurations": "حذف جميع ملفات التعريف من الخادم بشكل دائم.",
-    "database.delete_backups_locally": "حذف كافة النسخ الاحتياطية نهائيًا من التخزين المحلي."
+    "database.delete_backups_locally": "حذف كافة النسخ الاحتياطية نهائيًا من التخزين المحلي.",
+    "warning.sslipdomain": "تم حفظ ملفات التعريف الخاصة بك، ولكن استخدام نطاق sslip مع https <span class='dark:text-red-500 text-red-500 font-bold'>غير</span> مستحسن، لأن خوادم Let's Encrypt مع هذا النطاق العام محدودة المعدل (ستفشل عملية التحقق من شهادة SSL). <br><br>استخدم نطاقك الخاص بدلاً من ذلك."
 }

@@ -116,7 +116,7 @@
                                 }, 5000)
                             } else {
                                 this.currentStatus =
-                                    "Waiting for Coolify to come back from dead..."
+                                    "Waiting for Coolify to come back from the dead..."
                             }
                         })
                 }, 2000);

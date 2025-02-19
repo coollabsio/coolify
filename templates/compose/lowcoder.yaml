@@ -1,0 +1,21 @@
+# documentation: https://docs.lowcoder.cloud/
+# slogan: Lowcoder (forked from OpenBlocks) is a self-hosted, open-source, low-code platform for building internal tools.
+# tags: lowcoder,openblocks,low,code,platform,open,source,low,code
+# logo: svgs/lowcoder.svg
+# port: 3000
+
+services:
+  lowcoder:
+    image: lowcoderorg/lowcoder-ce
+    environment:
+      - SERVICE_FQDN_LOWCODER_3000
+      - LOWCODER_EMAIL_SIGNUP_ENABLED=${LOWCODER_EMAIL_SIGNUP_ENABLED:-true}
+      - LOWCODER_DB_ENCRYPTION_PASSWORD=${SERVICE_PASSWORD_ENCRYPTION}
+      - LOWCODER_DB_ENCRYPTION_SALT=${SERVICE_PASSWORD_SALT}
+    volumes:
+      - lowcoder_data:/lowcoder-stacks
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

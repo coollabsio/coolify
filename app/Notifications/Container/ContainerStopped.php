@@ -87,14 +87,13 @@ class ContainerStopped extends CustomEmailNotification
         );
     }
 
-
     public function toSlack(): SlackMessage
     {
         $title = 'Resource stopped';
         $description = "A resource ({$this->name}) has been stopped unexpectedly on {$this->server->name}";
 
         if ($this->url) {
-            $description .= "\n**Resource URL:** {$this->url}";
+            $description .= "\n*Resource URL:* {$this->url}";
         }
 
         return new SlackMessage(

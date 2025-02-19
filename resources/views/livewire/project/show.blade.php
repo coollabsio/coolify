@@ -17,18 +17,19 @@
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($project->environments->sortBy('created_at') as $environment)
-            <div class="gap-2 border border-transparent cursor-pointer box group" x-data
-                x-on:click="goto('{{ $project->uuid }}','{{ $environment->name }}')">
+            <div class="gap-2 border border-transparent box group">
                 <div class="flex flex-1 mx-6">
                     <a class="flex flex-col justify-center flex-1"
-                        href="{{ route('project.resource.index', [$project->uuid, $environment->name]) }}">
+                        wire:navigate
+                        href="{{ route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
                         <div class="font-bold dark:text-white"> {{ $environment->name }}</div>
                         <div class="description">
                             {{ $environment->description }}</div>
                     </a>
                     <div class="flex items-center justify-center gap-2 text-xs">
                         <a class="font-bold hover:underline"
-                            href="{{ route('project.environment.edit', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => $environment->name]) }}">
+                            wire:navigate
+                            href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
                             Settings
                         </a>
                     </div>
@@ -37,10 +38,5 @@
         @empty
             <p>No environments found.</p>
         @endforelse
-        <script>
-            function goto(projectUuid, environmentName) {
-                window.location.href = '/project/' + projectUuid + '/' + environmentName;
-            }
-        </script>
     </div>
 </div>

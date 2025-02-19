@@ -9,6 +9,7 @@
     <div class="flex flex-col gap-2">
         @forelse ($projects as $project)
             <a class="box group"
+                wire:navigate
                 href="{{ route('shared-variables.project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
                 <div class="flex flex-col justify-center mx-6 ">
                     <div class="box-title">{{ $project->name }}</div>

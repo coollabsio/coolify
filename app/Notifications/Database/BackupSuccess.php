@@ -63,7 +63,6 @@ class BackupSuccess extends CustomEmailNotification
         ];
     }
 
-
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
@@ -73,13 +72,12 @@ class BackupSuccess extends CustomEmailNotification
         );
     }
 
-
     public function toSlack(): SlackMessage
     {
         $title = 'Database backup successful';
         $description = "Database backup for {$this->name} (db:{$this->database_name}) was successful.";
 
-        $description .= "\n\n**Frequency:** {$this->frequency}";
+        $description .= "\n\n*Frequency:* {$this->frequency}";
 
         return new SlackMessage(
             title: $title,

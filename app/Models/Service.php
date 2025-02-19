@@ -1050,10 +1050,11 @@ class Service extends BaseModel
                     $fields->put('MySQL', $data->toArray());
                     break;
                 case $image->contains('mariadb'):
-                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER', 'SERVICE_USER_MYSQL', 'MYSQL_USER'];
+                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', 'SERVICE_USER_MYSQL', 'MYSQL_USER'];
                     $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS', 'MYSQL_PASSWORD'];
                     $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS', 'MYSQL_ROOT_PASSWORD'];
                     $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA', 'MYSQL_DATABASE'];
+
                     $mariadb_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
@@ -1102,6 +1103,23 @@ class Service extends BaseModel
                     break;
             }
         }
+        $fields = collect($fields)->map(function ($extraFields) {
+            if (is_array($extraFields)) {
+                $extraFields = collect($extraFields)->map(function ($field) {
+                    if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
+                        $searchValue = str($field['value'])->after('$')->value;
+                        $newValue = $this->environment_variables()->where('key', $searchValue)->first();
+                        if ($newValue) {
+                            $field['value'] = $newValue->value;
+                        }
+                    }
+
+                    return $field;
+                });
+            }
+
+            return $extraFields;
+        });
 
         return $fields;
     }
@@ -1120,7 +1138,8 @@ class Service extends BaseModel
                     'key' => $key,
                     'value' => $value,
                     'is_build_time' => false,
-                    'service_id' => $this->id,
+                    'resourceable_id' => $this->id,
+                    'resourceable_type' => $this->getMorphClass(),
                     'is_preview' => false,
                 ]);
             }
@@ -1132,7 +1151,7 @@ class Service extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.service.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'service_uuid' => data_get($this, 'uuid'),
             ]);
         }
@@ -1145,7 +1164,7 @@ class Service extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             $route = route('project.service.scheduled-tasks', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'service_uuid' => data_get($this, 'uuid'),
                 'task_uuid' => $task_uuid,
             ]);
@@ -1232,14 +1251,17 @@ class Service extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
-    public function environment_variables(): HasMany
+    public function environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderBy('key', 'asc');
     }
 
-    public function environment_variables_preview(): HasMany
+    public function environment_variables_preview()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->where('is_preview', true)
+            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
     }
 
     public function workdir()

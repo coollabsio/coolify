@@ -28,13 +28,13 @@ class StartProxy
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
         $server->save();
-        if ($server->isSwarm()) {
+        if ($server->isSwarmManager()) {
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
                 "cd $proxy_path",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Starting coolify-proxy.'",
-                'docker stack deploy -c docker-compose.yml coolify-proxy',
+                'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
@@ -57,7 +57,7 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
                 "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --remove-orphans',
+                'docker compose up -d',
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));
