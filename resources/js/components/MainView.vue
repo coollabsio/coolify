@@ -48,6 +48,8 @@ import {
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
+
+import { Toaster } from '@/components/ui/sonner'
 const props = defineProps<{
     breadcrumb?: CustomBreadcrumbItem[]
 }>()
@@ -103,6 +105,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 </script>
 
 <template>
+    <Toaster position="top-right" richColors closeButton theme="dark" />
     <SidebarProvider :defaultOpen="defaultOpen" class="xl:container xl:mx-auto">
         <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
@@ -250,7 +253,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
-        <SidebarInset>
+        <SidebarInset class="dark:bg-background bg-background">
             <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center">
@@ -274,16 +277,16 @@ function setActiveTeam(team: typeof data.teams[number]) {
                     </div>
                     <Search @search="(value) => $emit('search', value)" />
                 </div>
-                <h1 class="text-3xl font-bold">
+                <h1 class="text-3xl font-bold pt-4">
                     <slot name="title" />
                 </h1>
                 <h3 class="text-sm text-muted-foreground">
                     <slot name="subtitle" />
                 </h3>
             </header>
-            <div class="flex flex-1 flex-col gap-4 bg-background">
+            <main class="flex flex-1 flex-col gap-4 mt-10 mb-24">
                 <slot />
-            </div>
+            </main>
         </SidebarInset>
     </SidebarProvider>
 </template>

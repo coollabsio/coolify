@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Application;
 use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InertiaController extends Controller
@@ -59,18 +60,6 @@ class InertiaController extends Controller
                 'type' => $service->type(),
             ];
         });
-
-        // $destinations = collect($servers)->flatMap(function ($server) {
-        //     return $server->destinations();
-        // });
-        // $destinations = $destinations->map(function ($destination) {
-        //     return [
-        //         'name' => $destination->name,
-        //         'description' => $destination->description,
-        //         'uuid' => $destination->uuid,
-        //         'type' => get_class($destination),
-        //     ];
-        // });
         $servers = $servers->map(function ($server) {
             return [
                 'name' => $server->name,
@@ -86,14 +75,12 @@ class InertiaController extends Controller
             'applications' => $applications,
             'databases' => $databases,
             'services' => $services,
-            // 'sources' => currentTeam()->sources(),
-            // 'destinations' => $destinations,
         ]);
     }
 
     public function projects()
     {
-        return Inertia::render('Projects', [
+        return Inertia::render('Projects/Index', [
             'projects' => Project::ownedByCurrentTeam()->orderBy('created_at')->get(['name', 'description', 'uuid']),
         ]);
     }
@@ -111,7 +98,7 @@ class InertiaController extends Controller
             // return redirect()->route('project.environment', $environment->uuid);
         }
 
-        return Inertia::render('Project', [
+        return Inertia::render('Projects/Project', [
             'project' => $project,
             'environments' => $environments,
         ]);
@@ -194,6 +181,22 @@ class InertiaController extends Controller
         ]);
     }
 
+    public function servers()
+    {
+        $servers = Server::ownedByCurrentTeam()->orderBy('created_at')->get();
+        $servers = $servers->map(function ($server) {
+            return [
+                'name' => $server->name,
+                'description' => $server->description,
+                'uuid' => $server->uuid,
+            ];
+        });
+
+        return Inertia::render('Servers/Index', [
+            'servers' => $servers,
+        ]);
+    }
+
     public function server(string $server_uuid)
     {
         $server = Server::ownedByCurrentTeam()->where('uuid', $server_uuid)->first();
@@ -201,8 +204,23 @@ class InertiaController extends Controller
             return redirect()->route('servers');
         }
 
-        return Inertia::render('Server/Show', [
+        $server->settings = $server->settings->only(['wildcard_domain', 'server_timezone']);
+        $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
+
+        return Inertia::render('Servers/Server', [
             'server' => $server,
         ]);
+    }
+
+    public function storeServer(string $server_uuid, Request $request)
+    {
+        $server = Server::ownedByCurrentTeam()->where('uuid', $server_uuid)->first();
+        if (! $server) {
+            return redirect()->route('servers');
+        }
+        $server->update($request->only(['name', 'description']));
+        $server->settings->update($request->only(['wildcard_domain', 'server_timezone']));
+
+        return to_route('next_server', $server_uuid);
     }
 }

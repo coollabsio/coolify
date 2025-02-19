@@ -12,13 +12,8 @@ const { toggleSidebar, state } = useSidebar()
 </script>
 
 <template>
-  <Button
-    data-sidebar="trigger"
-    variant="ghost"
-    size="icon"
-    :class="cn('h-7 w-7', props.class)"
-    @click="toggleSidebar"
-  >
+  <Button data-sidebar="trigger" variant="ghost" size="icon"
+    :class="cn('h-7 w-7 rounded-none text-muted-foreground', props.class)" @click="toggleSidebar">
     <div v-if="state === 'expanded'">
       <PanelRightOpen />
     </div>

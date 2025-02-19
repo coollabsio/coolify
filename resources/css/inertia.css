@@ -83,9 +83,32 @@
         --sidebar-accent-foreground: 210 20% 98%;
         --sidebar-border: 0 0% 13%;
         --sidebar-border-foreground: 210 20% 98%;
+
+
+
     }
 }
 
 .resource-box-container {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-2 text-left;
+}
+
+
+[type='text']:focus,
+input:where(:not([type])):focus,
+[type='email']:focus,
+[type='url']:focus,
+[type='password']:focus,
+[type='number']:focus,
+[type='date']:focus,
+[type='datetime-local']:focus,
+[type='month']:focus,
+[type='search']:focus,
+[type='tel']:focus,
+[type='time']:focus,
+[type='week']:focus,
+[multiple]:focus,
+textarea:focus,
+select:focus {
+    @apply border-t-primary ring-0 dark:outline-none !important;
 }

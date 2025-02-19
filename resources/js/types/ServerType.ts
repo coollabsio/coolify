@@ -90,3 +90,8 @@ export interface Server {
     uuid: string;
     validation_logs: null;
 }
+
+export interface ServerSettings {
+    wildcard_domain: string;
+    server_timezone: string;
+}

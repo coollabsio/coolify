@@ -11,8 +11,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects/{project_uuid}', [InertiaController::class, 'project'])->name('next_project');
     Route::get('/projects/{project_uuid}/environments/{environment_uuid}', [InertiaController::class, 'environment'])->name('next_environment');
 
-    // Route::get('/servers', [InertiaController::class, 'servers'])->name('next_servers');
+    Route::get('/servers', [InertiaController::class, 'servers'])->name('next_servers');
     Route::get('/servers/{server_uuid}', [InertiaController::class, 'server'])->name('next_server');
+    Route::post('/servers/{server_uuid}', [InertiaController::class, 'storeServer'])->name('next_store_server');
 });
 
 Route::any('/{any}', function () {
