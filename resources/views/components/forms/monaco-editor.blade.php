@@ -57,7 +57,8 @@
                         language: '{{ $language }}',
                         domReadOnly: '{{ $readonly ?? false }}',
                         contextmenu: '!{{ $readonly ?? false }}',
-                        renderLineHighlight: '{{ $readonly ?? false }} ? none : all'
+                        renderLineHighlight: '{{ $readonly ?? false }} ? none : all',
+                        stickyScroll: { enabled: false }
                     });
         
                     const observer = new MutationObserver((mutations) => {
