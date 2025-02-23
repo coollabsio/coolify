@@ -23,8 +23,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      db-migration:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
   redis:
     image: "redis:7"
     volumes:
@@ -53,17 +53,3 @@ services:
       interval: 5s
       timeout: 10s
       retries: 10
-  db-migration:
-    exclude_from_hc: true
-    image: "infisical/infisical:latest-postgres"
-    depends_on:
-      db:
-        condition: service_healthy
-    command: "npm run migration:latest"
-    restart: on-failure
-    environment:
-      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DB:-infisical}
-      - DB_CONNECTION_URI=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-infisical}
-      - REDIS_URL=redis://redis:6379
