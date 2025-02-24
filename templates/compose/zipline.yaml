@@ -12,6 +12,7 @@ services:
       - CORE_RETURN_HTTPS=${CORE_RETURN_HTTPS:-false}
       - CORE_SECRET=${SERVICE_PASSWORD_64_ZIPLINE}
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres/${POSTGRES_DB:-zipline-db}
+      - CORE_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres/${POSTGRES_DB:-zipline-db}
       - CORE_LOGGER=${CORE_LOGGER:-true}
       # Default credentials are "administrator" and "password"
     volumes:
