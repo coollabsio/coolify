@@ -7,7 +7,7 @@ services:
   orangehrm:
     image: 'orangehrm/orangehrm:latest'
     environment:
-      - SERVICE_FQDN_ORANGEHRM
+      - SERVICE_FQDN_ORANGEHRM_80
       - ORANGEHRM_DATABASE_HOST=mariadb
       - ORANGEHRM_DATABASE_USER=${SERVICE_USER_ORANGEHRM}
       - ORANGEHRM_DATABASE_PASSWORD=${SERVICE_PASSWORD_ORANGEHRM}
@@ -28,7 +28,7 @@ services:
       timeout: 10s
       retries: 10
   mariadb:
-    image: 'mariadb:10.2'
+    image: 'mariadb:10.11'
     restart: unless-stopped
     volumes:
       - 'mariadb-data:/var/lib/mysql'
