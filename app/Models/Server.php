@@ -1341,4 +1341,11 @@ $schema://$host {
             throw new \Exception('Invalid proxy type.');
         }
     }
+
+    public function isEmpty()
+    {
+        return $this->applications()->count() == 0 &&
+            $this->databases()->count() == 0 &&
+            $this->services()->count() == 0;
+    }
 }
