@@ -61,7 +61,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.5'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.6'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
