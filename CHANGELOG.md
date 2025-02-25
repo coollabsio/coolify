@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(core)* Prevent using servers with existing resources as build servers
+- *(ui)* Add textarea switching option in service compose editor
+
+### 🐛 Bug Fixes
+
+- *(service)* Update Fider service template healthcheck command
+- *(core)* Improve server selection error handling in Docker component
+- *(core)* Add server functionality check before dispatching container status
+- *(ui)* Disable sticky scroll in Monaco editor
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump Coolify version to 4.0.0-beta.395
+
+## [4.0.0-beta.394] - 2025-02-17
+
 ### 🐛 Bug Fixes
 
 - *(core)* Update service status refresh event handling
