@@ -132,12 +132,12 @@
         <h4 class="py-4">Confirmation Settings</h4>
 
         @if ($disable_two_step_confirmation)
-            <div class="md:w-96 pb-4">
+            <div class="md:w-96 pb-4" wire:key="two-step-confirmation-enabled">
                 <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation"
                     helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
             </div>
         @else
-            <div class="md:w-96 pb-4">
+            <div class="md:w-96 pb-4" wire:key="two-step-confirmation-disabled">
                 <x-modal-confirmation title="Disable Two Step Confirmation?"
                     buttonTitle="Disable Two Step Confirmation" isErrorButton submitAction="toggleTwoStepConfirmation"
                     :actions="[
