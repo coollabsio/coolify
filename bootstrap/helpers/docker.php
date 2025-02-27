@@ -834,9 +834,12 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
-    $uuid = Str::random(10);
+    $uuid = Str::random(18);
+    $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
-        $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+        if (! $server) {
+            throw new \Exception('Server not found');
+        }
         $base64_compose = base64_encode($compose);
         instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
@@ -848,6 +851,12 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         return 'OK';
     } catch (\Throwable $e) {
         return $e->getMessage();
+    } finally {
+        if (filled($server)) {
+            instant_remote_process([
+                "rm /tmp/{$uuid}.yml",
+            ], $server, throwError: false);
+        }
     }
 }
 
