@@ -12,7 +12,7 @@ services:
       - SERVICE_FQDN_RYOT_8000
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
       - SERVER_ADMIN_ACCESS_TOKEN=$SERVICE_PASSWORD_64_RYOT
-      - TZ=Europe/Amsterdam
+      - TZ=${TZ:-Europe/Amsterdam}
     depends_on:
       postgresql:
         condition: service_healthy
@@ -30,7 +30,7 @@ services:
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_DB=${POSTGRES_DB:-ryot}
-      - TZ=Europe/Amsterdam
+      - TZ=${TZ:-Europe/Amsterdam}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
