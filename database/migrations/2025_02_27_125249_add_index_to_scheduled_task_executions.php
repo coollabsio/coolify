@@ -14,6 +14,13 @@ return new class extends Migration
         Schema::table('scheduled_task_executions', function (Blueprint $table) {
             $table->index(['scheduled_task_id', 'created_at'], 'scheduled_task_executions_task_id_created_at_index');
         });
+
+        Schema::table('scheduled_database_backup_executions', function (Blueprint $table) {
+            $table->index(
+                ['scheduled_database_backup_id', 'created_at'],
+                'scheduled_db_backup_executions_backup_id_created_at_index'
+            );
+        });
     }
 
     /**
@@ -23,6 +30,9 @@ return new class extends Migration
     {
         Schema::table('scheduled_task_executions', function (Blueprint $table) {
             $table->dropIndex('scheduled_task_executions_task_id_created_at_index');
+        });
+        Schema::table('scheduled_database_backup_executions', function (Blueprint $table) {
+            $table->dropIndex('scheduled_db_backup_executions_backup_id_created_at_index');
         });
     }
 };
