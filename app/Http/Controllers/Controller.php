@@ -54,7 +54,7 @@ class Controller extends BaseController
                 'email' => Str::lower($arrayOfRequest['email']),
             ]);
             $type = set_transanctional_email_settings();
-            if (! $type) {
+            if (blank($type)) {
                 return response()->json(['message' => 'Transactional emails are not active'], 400);
             }
             $request->validate([Fortify::email() => 'required|email']);
