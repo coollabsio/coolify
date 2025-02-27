@@ -1207,7 +1207,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->application->custom_healthcheck_found) {
                 $this->application_deployment_queue->addLogEntry('Custom healthcheck found, skipping default healthcheck.');
             }
-            // ray('New container name: ', $this->container_name);
             if ($this->container_name) {
                 $counter = 1;
                 $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
@@ -1410,7 +1409,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 continue;
             }
-            // ray('Deploying to additional destination: ', $server->name);
             $deployment_uuid = new Cuid2;
             queue_application_deployment(
                 deployment_uuid: $deployment_uuid,

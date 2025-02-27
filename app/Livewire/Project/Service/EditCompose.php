@@ -39,6 +39,16 @@ class EditCompose extends Component
         $this->service = Service::find($this->serviceId);
     }
 
+    public function validateCompose()
+    {
+        $isValid = validateComposeFile($this->service->docker_compose_raw, $this->service->server_id);
+        if ($isValid !== 'OK') {
+            $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
+        } else {
+            $this->dispatch('success', 'Docker compose is valid.');
+        }
+    }
+
     public function saveEditedCompose()
     {
         $this->dispatch('info', 'Saving new docker compose...');

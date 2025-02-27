@@ -800,7 +800,6 @@ function parseEnvVariable(Str|string $value)
             } else {
                 // SERVICE_BASE64_64_UMAMI
                 $command = $value->after('SERVICE_')->beforeLast('_');
-                ray($command);
             }
         }
     }
@@ -952,7 +951,6 @@ function validate_dns_entry(string $fqdn, Server $server)
     $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            ray("Checking $host on $dns_server");
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
@@ -961,13 +959,10 @@ function validate_dns_entry(string $fqdn, Server $server)
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
                         if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
-                            ray("Found match in Cloudflare IPs: $match");
                             $found_matching_ip = true;
                             break;
                         }
                         if ($result->getData() === $ip) {
-                            ray($host.' has IP address '.$result->getData());
-                            ray($result->getString());
                             $found_matching_ip = true;
                             break;
                         }
@@ -977,7 +972,6 @@ function validate_dns_entry(string $fqdn, Server $server)
         } catch (\Exception) {
         }
     }
-    ray("Found match: $found_matching_ip");
 
     return $found_matching_ip;
 }
@@ -1331,7 +1325,6 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
                 $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                 if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
                     // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                    ray('setting isDirectory to true');
                     $isDirectory = true;
                 }
             }
@@ -1483,6 +1476,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
+                $serviceLabels = convertToKeyValueCollection($serviceLabels);
                 $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
@@ -1499,7 +1493,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $serviceLabels->push("$removedLabelName=$removedLabel");
                     }
                 }
-
                 $containerName = "$serviceName-{$resource->uuid}";
 
                 // Decide if the service is a database
@@ -1662,7 +1655,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             if (is_null($isDirectory) && is_null($content)) {
                                 // if isDirectory is not set & content is also not set, we assume it is a directory
-                                ray('setting isDirectory to true');
                                 $isDirectory = true;
                             }
                         }
@@ -2013,7 +2005,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
-                                    $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                                    $proxyLabels = fqdnLabelsForTraefik(
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
                                         is_force_https_enabled: true,
@@ -2022,10 +2014,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image')
-                                    ));
+                                    );
+                                    $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
+
                                     break;
                                 case ProxyTypes::CADDY->value:
-                                    $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                                    $proxyLabels = fqdnLabelsForCaddy(
                                         network: $resource->destination->network,
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
@@ -2035,11 +2029,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image')
-                                    ));
+                                    );
+                                    $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
+
                                     break;
                             }
                         } else {
-                            $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                            $proxyLabels = fqdnLabelsForTraefik(
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
                                 is_force_https_enabled: true,
@@ -2048,8 +2044,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image')
-                            ));
-                            $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                            );
+                            $proxyLabels = fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
@@ -2059,7 +2055,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image')
-                            ));
+                            );
+                            $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
                         }
                     }
                 }
@@ -2208,6 +2205,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $serviceVariables = collect(data_get($service, 'environment', []));
             $serviceDependencies = collect(data_get($service, 'depends_on', []));
             $serviceLabels = collect(data_get($service, 'labels', []));
+            $serviceLabels = convertToKeyValueCollection($serviceLabels);
             $serviceBuildVariables = collect(data_get($service, 'build.args', []));
             $serviceVariables = $serviceVariables->merge($serviceBuildVariables);
             if ($serviceLabels->count() > 0) {
@@ -2529,9 +2527,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
             }
-            if ($collectedPorts->count() > 0) {
-                ray($collectedPorts->implode(','));
-            }
             $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                 return $value == $definedNetwork;
             });
@@ -2784,48 +2779,46 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
-                                    $serviceLabels = $serviceLabels->merge(
-                                        fqdnLabelsForTraefik(
-                                            uuid: $resource->uuid,
-                                            domains: $fqdns,
-                                            serviceLabels: $serviceLabels,
-                                            generate_unique_uuid: $resource->build_pack === 'dockercompose',
-                                            image: data_get($service, 'image'),
-                                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
-                                            is_gzip_enabled: $resource->isGzipEnabled(),
-                                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
-                                        )
+                                    $proxyLabels = fqdnLabelsForTraefik(
+                                        uuid: $resource->uuid,
+                                        domains: $fqdns,
+                                        serviceLabels: $serviceLabels,
+                                        generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                                        image: data_get($service, 'image'),
+                                        is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                        is_gzip_enabled: $resource->isGzipEnabled(),
+                                        is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     );
+                                    $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
+
                                     break;
                                 case ProxyTypes::CADDY->value:
-                                    $serviceLabels = $serviceLabels->merge(
-                                        fqdnLabelsForCaddy(
-                                            network: $resource->destination->network,
-                                            uuid: $resource->uuid,
-                                            domains: $fqdns,
-                                            serviceLabels: $serviceLabels,
-                                            image: data_get($service, 'image'),
-                                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
-                                            is_gzip_enabled: $resource->isGzipEnabled(),
-                                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
-                                        )
+                                    $proxyLabels = fqdnLabelsForCaddy(
+                                        network: $resource->destination->network,
+                                        uuid: $resource->uuid,
+                                        domains: $fqdns,
+                                        serviceLabels: $serviceLabels,
+                                        image: data_get($service, 'image'),
+                                        is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                        is_gzip_enabled: $resource->isGzipEnabled(),
+                                        is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     );
+                                    $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
+
                                     break;
                             }
                         } else {
-                            $serviceLabels = $serviceLabels->merge(
-                                fqdnLabelsForTraefik(
-                                    uuid: $resource->uuid,
-                                    domains: $fqdns,
-                                    serviceLabels: $serviceLabels,
-                                    generate_unique_uuid: $resource->build_pack === 'dockercompose',
-                                    image: data_get($service, 'image'),
-                                    is_force_https_enabled: $resource->isForceHttpsEnabled(),
-                                    is_gzip_enabled: $resource->isGzipEnabled(),
-                                    is_stripprefix_enabled: $resource->isStripprefixEnabled(),
-                                )
+                            $proxyLabels = fqdnLabelsForTraefik(
+                                uuid: $resource->uuid,
+                                domains: $fqdns,
+                                serviceLabels: $serviceLabels,
+                                generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                                image: data_get($service, 'image'),
+                                is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                is_gzip_enabled: $resource->isGzipEnabled(),
+                                is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                             );
-                            $serviceLabels = $serviceLabels->merge(
+                            $proxyLabels =
                                 fqdnLabelsForCaddy(
                                     network: $resource->destination->network,
                                     uuid: $resource->uuid,
@@ -2835,8 +2828,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
-                                )
-                            );
+                                );
+                            $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
                         }
                     }
                 }
@@ -2851,7 +2844,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 pull_request_id: $pull_request_id,
                 type: 'application'
             );
-            $serviceLabels = $serviceLabels->merge($defaultLabels);
+            $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($defaultLabels));
 
             if ($server->isLogDrainEnabled()) {
                 if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
@@ -2956,7 +2949,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
-    // ray()->clearAll();
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -3016,7 +3008,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $environment = $environment->merge($buildArgs);
 
             // convert environment variables to one format
-            $environment = convertComposeEnvironmentToArray($environment);
+            $environment = convertToKeyValueCollection($environment);
 
             // Add Coolify defined environments
             $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
@@ -3192,12 +3184,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $use_network_mode = data_get($service, 'network_mode') !== null;
         $depends_on = collect(data_get($service, 'depends_on', []));
         $labels = collect(data_get($service, 'labels', []));
+        $labels = convertToKeyValueCollection($labels);
         $environment = collect(data_get($service, 'environment', []));
         $ports = collect(data_get($service, 'ports', []));
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
 
-        $environment = convertComposeEnvironmentToArray($environment);
+        $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
         $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
@@ -3704,7 +3697,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 return $value;
             });
         }
-        $serviceLabels = $labels->merge($defaultLabels);
+        $serviceLabels = $labels->merge(convertToKeyValueCollection($defaultLabels));
         if ($serviceLabels->count() > 0) {
             if ($isApplication) {
                 $isContainerLabelEscapeEnabled = data_get($resource, 'settings.is_container_label_escape_enabled');
@@ -3736,7 +3729,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                        $proxyLabels = fqdnLabelsForTraefik(
                             uuid: $uuid,
                             domains: $fqdns,
                             is_force_https_enabled: true,
@@ -3745,10 +3738,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image
-                        ));
+                        );
+                        $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
                         break;
                     case ProxyTypes::CADDY->value:
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                        $proxyLabels = fqdnLabelsForCaddy(
                             network: $network,
                             uuid: $uuid,
                             domains: $fqdns,
@@ -3759,11 +3753,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             service_name: $serviceName,
                             image: $image,
                             predefinedPort: $predefinedPort
-                        ));
+                        );
+                        $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
+
                         break;
                 }
             } else {
-                $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                $proxyLabels = fqdnLabelsForTraefik(
                     uuid: $uuid,
                     domains: $fqdns,
                     is_force_https_enabled: true,
@@ -3772,8 +3768,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image
-                ));
-                $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                );
+                $proxyLabels = $proxyLabels->merge(fqdnLabelsForCaddy(
                     network: $network,
                     uuid: $uuid,
                     domains: $fqdns,
@@ -3785,6 +3781,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     image: $image,
                     predefinedPort: $predefinedPort
                 ));
+                $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
             }
         }
         if ($isService) {
@@ -3934,7 +3931,7 @@ function add_coolify_default_environment_variables(StandaloneRedis|StandalonePos
     }
 }
 
-function convertComposeEnvironmentToArray($environment)
+function convertToKeyValueCollection($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {

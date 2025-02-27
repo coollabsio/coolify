@@ -1291,11 +1291,6 @@ class ApplicationsController extends Controller
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
-            // $isValid = validateComposeFile($dockerComposeRaw, $server_id);
-            // if ($isValid !== 'OK') {
-            //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
-            // }
-
             $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());

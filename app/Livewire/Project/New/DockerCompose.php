@@ -52,12 +52,6 @@ class DockerCompose extends Component
                 'dockerComposeRaw' => 'required',
             ]);
             $this->dockerComposeRaw = Yaml::dump(Yaml::parse($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-
-            $isValid = validateComposeFile($this->dockerComposeRaw, $server_id);
-            if ($isValid !== 'OK') {
-                return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
-            }
-
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
