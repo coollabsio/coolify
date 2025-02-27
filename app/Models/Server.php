@@ -438,10 +438,6 @@ class Server extends BaseModel
                     "mkdir -p $dynamic_config_path",
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
-
-                if (config('app.env') === 'local') {
-                    // ray($yaml);
-                }
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
@@ -971,10 +967,8 @@ $schema://$host {
             }
         });
         if ($supported->count() === 1) {
-            // ray('supported');
             return str($supported->first());
         } else {
-            // ray('not supported');
             return false;
         }
     }

@@ -569,7 +569,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             if ($shouldGenerateLabelsExactly) {
                 switch ($application->destination->server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
-                        $labels = $labels->merge(fqdnLabelsForTraefik(
+                        $proxyLabels = fqdnLabelsForTraefik(
                             uuid: $appUuid,
                             domains: $domains,
                             onlyPort: $onlyPort,
@@ -577,10 +577,11 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect
-                        ));
+                        );
+                        $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
                         break;
                     case ProxyTypes::CADDY->value:
-                        $labels = $labels->merge(fqdnLabelsForCaddy(
+                        $proxyLabels = fqdnLabelsForCaddy(
                             network: $application->destination->network,
                             uuid: $appUuid,
                             domains: $domains,
@@ -589,11 +590,12 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect
-                        ));
+                        );
+                        $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
                         break;
                 }
             } else {
-                $labels = $labels->merge(fqdnLabelsForTraefik(
+                $proxyLabels = fqdnLabelsForTraefik(
                     uuid: $appUuid,
                     domains: $domains,
                     onlyPort: $onlyPort,
@@ -601,8 +603,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect
-                ));
-                $labels = $labels->merge(fqdnLabelsForCaddy(
+                );
+                $proxyLabels = fqdnLabelsForCaddy(
                     network: $application->destination->network,
                     uuid: $appUuid,
                     domains: $domains,
@@ -611,7 +613,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect
-                ));
+                );
+                $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
             }
         }
     } else {
@@ -624,17 +627,18 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         if ($shouldGenerateLabelsExactly) {
             switch ($application->destination->server->proxyType()) {
                 case ProxyTypes::TRAEFIK->value:
-                    $labels = $labels->merge(fqdnLabelsForTraefik(
+                    $proxyLabels = fqdnLabelsForTraefik(
                         uuid: $appUuid,
                         domains: $domains,
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled()
-                    ));
+                    );
+                    $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
                     break;
                 case ProxyTypes::CADDY->value:
-                    $labels = $labels->merge(fqdnLabelsForCaddy(
+                    $proxyLabels = fqdnLabelsForCaddy(
                         network: $application->destination->network,
                         uuid: $appUuid,
                         domains: $domains,
@@ -642,19 +646,20 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled()
-                    ));
+                    );
+                    $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
                     break;
             }
         } else {
-            $labels = $labels->merge(fqdnLabelsForTraefik(
+            $proxyLabels = fqdnLabelsForTraefik(
                 uuid: $appUuid,
                 domains: $domains,
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled()
-            ));
-            $labels = $labels->merge(fqdnLabelsForCaddy(
+            );
+            $proxyLabels = fqdnLabelsForCaddy(
                 network: $application->destination->network,
                 uuid: $appUuid,
                 domains: $domains,
@@ -662,7 +667,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled()
-            ));
+            );
+            $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
         }
     }
 
@@ -778,7 +784,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                     }
                 }
             }
-            ray($payload);
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
@@ -829,27 +834,21 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
-    return 'OK';
-    // try {
-    //     $uuid = Str::random(10);
-    //     $server = Server::findOrFail($server_id);
-    //     $base64_compose = base64_encode($compose);
-    //     $output = instant_remote_process([
-    //         "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-    //         "docker compose -f /tmp/{$uuid}.yml config",
-    //     ], $server);
-    //     ray($output);
+    $uuid = Str::random(10);
+    try {
+        $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
+        $base64_compose = base64_encode($compose);
+        instant_remote_process([
+            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
+            "chmod 600 /tmp/{$uuid}.yml",
+            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
+            "rm /tmp/{$uuid}.yml",
+        ], $server);
 
-    //     return 'OK';
-    // } catch (\Throwable $e) {
-    //     ray($e);
-
-    //     return $e->getMessage();
-    // } finally {
-    //     instant_remote_process([
-    //         "rm /tmp/{$uuid}.yml",
-    //     ], $server);
-    // }
+        return 'OK';
+    } catch (\Throwable $e) {
+        return $e->getMessage();
+    }
 }
 
 function getContainerLogs(Server $server, string $container_id, int $lines = 100): string

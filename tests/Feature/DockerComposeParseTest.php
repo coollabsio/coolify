@@ -358,7 +358,7 @@ use Symfony\Component\Yaml\Yaml;
 //     expect($output)->toContain('Docker version');
 // });
 
-// test('ConvertComposeEnvironmentToArray', function () {
+// test('convertToKeyValueCollection', function () {
 //     ray()->clearAll();
 //     $yaml = '
 // services:
@@ -374,9 +374,9 @@ use Symfony\Component\Yaml\Yaml;
 //       - POSTGRES_DB: activepieces
 // ';
 //     $parsedYaml = Yaml::parse($yaml);
-//     $output = convertComposeEnvironmentToArray($parsedYaml['services']['activepieces']['environment']);
-//     $output2 = convertComposeEnvironmentToArray($parsedYaml['services']['activepieces2']['environment']);
-//     $dboutput = convertComposeEnvironmentToArray($parsedYaml['services']['postgres']['environment']);
+//     $output = convertToKeyValueCollection($parsedYaml['services']['activepieces']['environment']);
+//     $output2 = convertToKeyValueCollection($parsedYaml['services']['activepieces2']['environment']);
+//     $dboutput = convertToKeyValueCollection($parsedYaml['services']['postgres']['environment']);
 //     ray($output);
 //     ray($output2);
 //     ray($dboutput);
