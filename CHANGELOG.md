@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(billing)* Handle 'past_due' subscription status in Stripe processing
+- *(revert)* Label parsing
+- *(helpers)* Initialize command variable in parseCommandFromMagicEnvVariable
+
+## [4.0.0-beta.396] - 2025-02-28
+
 ### 🚀 Features
 
 - *(ui)* Add wire:key to two-step confirmation settings
@@ -38,6 +46,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 
 ### ⚙️ Miscellaneous Tasks
