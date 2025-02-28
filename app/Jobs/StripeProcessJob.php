@@ -217,7 +217,7 @@ class StripeProcessJob implements ShouldQueue
                         'stripe_plan_id' => $planId,
                         'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                     ]);
-                    if ($status === 'paused' || $status === 'incomplete_expired') {
+                    if ($status === 'paused' || $status === 'incomplete_expired' || $status === 'past_due') {
                         if ($subscription->stripe_subscription_id === $subscriptionId) {
                             $subscription->update([
                                 'stripe_invoice_paid' => false,
