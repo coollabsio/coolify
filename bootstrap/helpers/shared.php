@@ -748,6 +748,7 @@ function parseCommandFromMagicEnvVariable(Str|string $key): Stringable
 {
     $value = str($key);
     $count = substr_count($value->value(), '_');
+    $command = null;
     if ($count === 2) {
         if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
             // SERVICE_FQDN_UMAMI
