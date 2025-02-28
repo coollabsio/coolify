@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\DockerRegistry;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -13,10 +14,16 @@ use Visus\Cuid2\Cuid2;
 class DockerImage extends Component
 {
     public string $dockerImage = '';
-
+    public bool $useCustomRegistry = false;
+    public array $selectedRegistries = [];
     public array $parameters;
-
     public array $query;
+
+    protected $rules = [
+        'dockerImage' => 'required|string',
+        'selectedRegistries' => 'required_if:useCustomRegistry,true|array',
+        'selectedRegistries.*' => 'exists:docker_registries,id'
+    ];
 
     public function mount()
     {
@@ -28,6 +35,8 @@ class DockerImage extends Component
     {
         $this->validate([
             'dockerImage' => 'required',
+            'selectedRegistries' => 'required_if:useCustomRegistry,true|array',
+            'selectedRegistries.*' => 'exists:docker_registries,id'
         ]);
 
         $parser = new DockerImageParser;
@@ -46,7 +55,7 @@ class DockerImage extends Component
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
         $application = Application::create([
-            'name' => 'docker-image-'.new Cuid2,
+            'name' => 'docker-image-' . new Cuid2,
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',
@@ -58,11 +67,17 @@ class DockerImage extends Component
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
             'health_check_enabled' => false,
+            'docker_use_custom_registry' => $this->useCustomRegistry,
         ]);
 
+        if ($this->useCustomRegistry && !empty($this->selectedRegistries)) {
+            $application->registries()->sync($this->selectedRegistries);
+        }
+
+        error_log($application->uuid);
         $fqdn = generateFqdn($destination->server, $application->uuid);
         $application->update([
-            'name' => 'docker-image-'.$application->uuid,
+            'name' => 'docker-image-' . $application->uuid,
             'fqdn' => $fqdn,
         ]);
 
@@ -75,6 +90,8 @@ class DockerImage extends Component
 
     public function render()
     {
-        return view('livewire.project.new.docker-image');
+        return view('livewire.project.new.docker-image', [
+            'registries' => DockerRegistry::all()
+        ]);
     }
 }
