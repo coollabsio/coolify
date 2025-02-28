@@ -2274,7 +2274,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             } else {
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), 'hidden' => true],
+                    [executeInDocker($this->deployment_uuid, "{$this->coolify_variables} docker compose --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --pull always --build -d"), 'hidden' => true],
                 );
             }
         }
