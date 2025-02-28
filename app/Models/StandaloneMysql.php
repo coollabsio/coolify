@@ -169,6 +169,11 @@ class StandaloneMysql extends BaseModel
         return data_get($this, 'environment.project.team');
     }
 
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
@@ -219,7 +224,19 @@ class StandaloneMysql extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}",
+            get: function () {
+                $encodedUser = rawurlencode($this->mysql_user);
+                $encodedPass = rawurlencode($this->mysql_password);
+                $url = "mysql://{$encodedUser}:{$encodedPass}@{$this->uuid}:3306/{$this->mysql_database}";
+                if ($this->enable_ssl) {
+                    $url .= "?ssl-mode={$this->ssl_mode}";
+                    if (in_array($this->ssl_mode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {
+                        $url .= '&ssl-ca=/etc/ssl/certs/coolify-ca.crt';
+                    }
+                }
+
+                return $url;
+            },
         );
     }
 
@@ -228,7 +245,17 @@ class StandaloneMysql extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
+                    $encodedUser = rawurlencode($this->mysql_user);
+                    $encodedPass = rawurlencode($this->mysql_password);
+                    $url = "mysql://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
+                    if ($this->enable_ssl) {
+                        $url .= "?ssl-mode={$this->ssl_mode}";
+                        if (in_array($this->ssl_mode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {
+                            $url .= '&ssl-ca=/etc/ssl/certs/coolify-ca.crt';
+                        }
+                    }
+
+                    return $url;
                 }
 
                 return null;
