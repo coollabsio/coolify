@@ -58,7 +58,7 @@
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                 class="flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
                 :class="fullscreen ? '' : 'min-h-14 max-h-[40rem] border border-dotted rounded'">
-                <div :class="fullscreen ? 'fixed' : 'absolute'" class="top-2 right-3">
+                <div :class="fullscreen ? 'fixed' : 'absolute'" class="top-2 right-5">
                     <div class="flex justify-end gap-4 fixed -translate-x-full">
                         <button title="Toggle timestamps" x-on:click="showTimestamps = !showTimestamps">
                             <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
@@ -108,16 +108,16 @@
                 <div id="logs" class="flex flex-col font-mono">
                     @forelse ($this->logLines as $line)
                         <div @class([
-                            'mt-2' => $line['command'] ?? false,
+                            'mt-2' => isset($line['command']) && $line['command'],
                             'flex gap-2 dark:hover:bg-coolgray-500 hover:bg-gray-100',
                         ])>
                             <span x-show="showTimestamps" class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
                             <span @class([
                                 'text-coollabs dark:text-warning' => $line['hidden'],
                                 'text-red-500' => $line['stderr'],
-                                'font-bold' => $line['command'] ?? false,
+                                'font-bold' => isset($line['command']) && $line['command'],
                                 'whitespace-pre-wrap',
-                            ])>{!! $line['line'] !!}</span>
+                            ])>{!! (isset($line['command']) && $line['command'] ? '[CMD]: ' : '') . trim($line['line']) !!}</span>
                         </div>
                     @empty
                         <span class="font-mono text-neutral-400 mb-2">No logs yet.</span>

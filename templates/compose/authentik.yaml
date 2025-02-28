@@ -6,7 +6,7 @@
 
 services:
   authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.8.0}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.2.0}
     restart: unless-stopped
     command: server
     environment:
@@ -35,7 +35,7 @@ services:
       redis:
         condition: service_healthy
   authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2024.8.0}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.2.0}
     restart: unless-stopped
     command: worker
     environment:

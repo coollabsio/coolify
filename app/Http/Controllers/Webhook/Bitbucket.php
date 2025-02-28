@@ -37,7 +37,7 @@ class Bitbucket extends Controller
             $headers = $request->headers->all();
             $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', '');
             $x_bitbucket_event = data_get($headers, 'x-event-key.0', '');
-            $handled_events = collect(['repo:push', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
+            $handled_events = collect(['repo:push', 'pullrequest:updated', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
             if (! $handled_events->contains($x_bitbucket_event)) {
                 return response([
                     'status' => 'failed',
@@ -48,6 +48,7 @@ class Bitbucket extends Controller
                 $branch = data_get($payload, 'push.changes.0.new.name');
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = data_get($payload, 'push.changes.0.new.target.hash');
+
                 if (! $branch) {
                     return response([
                         'status' => 'failed',
@@ -55,7 +56,7 @@ class Bitbucket extends Controller
                     ]);
                 }
             }
-            if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
+            if ($x_bitbucket_event === 'pullrequest:updated' || $x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
                 $branch = data_get($payload, 'pullrequest.destination.branch.name');
                 $base_branch = data_get($payload, 'pullrequest.source.branch.name');
                 $full_name = data_get($payload, 'repository.full_name');
@@ -119,7 +120,7 @@ class Bitbucket extends Controller
                         ]);
                     }
                 }
-                if ($x_bitbucket_event === 'pullrequest:created') {
+                if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:updated') {
                     if ($application->isPRDeployable()) {
                         $deployment_uuid = new Cuid2;
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();

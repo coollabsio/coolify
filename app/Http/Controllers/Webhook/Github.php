@@ -208,7 +208,6 @@ class Github extends Controller
                         if ($found) {
                             $found->delete();
                             $container_name = generateApplicationContainerName($application, $pull_request_id);
-                            // ray('Stopping container: ' . $container_name);
                             instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
                             $return_payloads->push([
                                 'application' => $application->name,

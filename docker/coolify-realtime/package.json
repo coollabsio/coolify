@@ -4,10 +4,10 @@
     "dependencies": {
         "@xterm/addon-fit": "0.10.0",
         "@xterm/xterm": "5.5.0",
-        "cookie": "1.0.1",
-        "axios": "1.7.7",
-        "dotenv": "16.4.5",
+        "cookie": "1.0.2",
+        "axios": "1.7.9",
+        "dotenv": "16.4.7",
         "node-pty": "1.0.0",
-        "ws": "8.18.0"
+        "ws": "8.18.1"
     }
 }

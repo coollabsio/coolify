@@ -35,7 +35,7 @@
                             </div>
                             <div class="flex items-center justify-center gap-2 text-xs font-bold">
                                 @if ($project->environments->first())
-                                    <a class="hover:underline" wire:click.stop
+                                    <a class="hover:underline" wire:navigate wire:click.stop
                                         href="{{ route('project.resource.create', [
                                             'project_uuid' => $project->uuid,
                                             'environment_uuid' => $project->environments->first()->uuid,
@@ -43,7 +43,7 @@
                                         <span class="p-2 font-bold">+ Add Resource</span>
                                     </a>
                                 @endif
-                                <a class="hover:underline" wire:click.stop
+                                <a class="hover:underline" wire:navigate wire:click.stop
                                     href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                     Settings
                                 </a>
@@ -59,7 +59,8 @@
                     <x-modal-input buttonTitle="Add" title="New Project">
                         <livewire:project.add-empty />
                     </x-modal-input> your first project or
-                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a> page.
+                    go to the <a class="underline dark:text-white" wire:navigate
+                        href="{{ route('onboarding') }}">onboarding</a> page.
                 </div>
             </div>
         @endif
@@ -70,7 +71,7 @@
         @if ($servers->count() > 0)
             <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
                 @foreach ($servers as $server)
-                    <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
+                    <a wire:navigate href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                         @class([
                             'gap-2 border cursor-pointer box group',
                             'border-transparent' => $server->settings->is_reachable,
@@ -107,7 +108,8 @@
                             <livewire:security.private-key.create from="server" />
                         </x-modal-input> a private key
                         or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                        go to the <a class="underline dark:text-white" wire:navigate
+                            href="{{ route('onboarding') }}">onboarding</a>
                         page.
                     </div>
                 </div>
@@ -119,7 +121,8 @@
                             <livewire:server.create />
                         </x-modal-input> your first server
                         or
-                        go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                        go to the <a class="underline dark:text-white" wire:navigate
+                            href="{{ route('onboarding') }}">onboarding</a>
                         page.
                     </div>
                 </div>
@@ -144,11 +147,12 @@
                     <h4 class="pb-2">{{ $serverName }}</h4>
                     <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                         @foreach ($deployments as $deployment)
-                            <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
-                                'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                                'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                                'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-                            ])>
+                            <a wire:navigate href="{{ data_get($deployment, 'deployment_url') }}"
+                                @class([
+                                    'gap-2 cursor-pointer box group border-l-2 border-dotted',
+                                    'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
+                                    'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+                                ])>
                                 <div class="flex flex-col justify-center mx-6">
                                     <div class="box-title">
                                         {{ data_get($deployment, 'application_name') }}

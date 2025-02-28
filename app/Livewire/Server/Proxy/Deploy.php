@@ -105,7 +105,6 @@ class Deploy extends Component
 
             $startTime = Carbon::now()->getTimestamp();
             while ($process->running()) {
-                ray('running');
                 if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
                     $this->forceStopContainer($containerName);
                     break;

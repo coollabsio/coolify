@@ -5,13 +5,14 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            {{--
-            <x-forms.button wire:click="downloadConfig">
+
+            {{-- <x-forms.button wire:click="downloadConfig">
                 Download Config
-            <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
+            </x-forms.button> --}}
+            {{-- <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
                 <livewire:project.shared.upload-config :applicationId="$application->id" />
-            </x-modal-input>
- --}}
+            </x-modal-input> --}}
+
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
@@ -70,27 +71,50 @@
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
-
-                    <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn" label="Domains"
-                        helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
-                    <x-forms.button wire:click="getWildcardDomain">Generate Domain
-                    </x-forms.button>
+                    @if ($application->settings->is_container_label_readonly_enabled == false)
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn"
+                            label="Domains" readonly
+                            helper="Readonly labels are disabled. You can set the domains in the labels section." />
+                    @else
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn"
+                            label="Domains"
+                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
+                        <x-forms.button wire:click="getWildcardDomain">Generate Domain
+                        </x-forms.button>
+                    @endif
                 </div>
                 <div class="flex items-end gap-2">
-                    <x-forms.select label="Direction" id="application.redirect" required
-                        helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
-                        <option value="both">Allow www & non-www.</option>
-                        <option value="www">Redirect to www.</option>
-                        <option value="non-www">Redirect to non-www.</option>
-                    </x-forms.select>
-                    <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
-                        submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']" confirmationText="{{ $application->fqdn . '/' }}"
-                        confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
-                        shortConfirmationLabel="Application URL" :confirmWithPassword="false" step2ButtonText="Set Direction">
-                        <x-slot:customButton>
-                            <div class="w-[7.2rem]">Set Direction</div>
-                        </x-slot:customButton>
-                    </x-modal-confirmation>
+                    @if ($application->settings->is_container_label_readonly_enabled == false)
+                        @if ($application->redirect === 'both')
+                            <x-forms.input label="Direction" value="Allow www & non-www." readonly
+                                helper="Readonly labels are disabled. You can set the direction in the labels section." />
+                        @elseif ($application->redirect === 'www')
+                            <x-forms.input label="Direction" value="Redirect to www." readonly
+                                helper="Readonly labels are disabled. You can set the direction in the labels section." />
+                        @elseif ($application->redirect === 'non-www')
+                            <x-forms.input label="Direction" value="Redirect to non-www." readonly
+                                helper="Readonly labels are disabled. You can set the direction in the labels section." />
+                        @endif
+                    @else
+                        <x-forms.select label="Direction" id="application.redirect" required
+                            helper="You must need to add www and non-www as an A DNS record. Make sure the www domain is added under Domains.">
+                            <option value="both">Allow www & non-www.</option>
+                            <option value="www">Redirect to www.</option>
+                            <option value="non-www">Redirect to non-www.</option>
+                        </x-forms.select>
+                        @if ($application->settings->is_container_label_readonly_enabled)
+                            <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
+                                submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']"
+                                confirmationText="{{ $application->fqdn . '/' }}"
+                                confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
+                                shortConfirmationLabel="Application URL" :confirmWithPassword="false"
+                                step2ButtonText="Set Direction">
+                                <x-slot:customButton>
+                                    <div class="w-[7.2rem]">Set Direction</div>
+                                </x-slot:customButton>
+                            </x-modal-confirmation>
+                        @endif
+                    @endif
                 </div>
             @endif
 
@@ -267,25 +291,27 @@
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"
-                        helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
-                        useMonacoEditor />
+                        helper="You need to modify the docker compose file in the git repository."
+                        monacoEditorLanguage="yaml" useMonacoEditor />
                 @else
                     @if ((int) $application->compose_parsing_version >= 3)
                         <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
-                            label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
+                            label="Docker Compose Content (raw)"
+                            helper="You need to modify the docker compose file in the git repository."
                             monacoEditorLanguage="yaml" useMonacoEditor />
                     @endif
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
-                        label="Docker Compose Content" helper="You need to modify the docker compose file."
+                        label="Docker Compose Content"
+                        helper="You need to modify the docker compose file in the git repository."
                         monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
                 <div class="w-96">
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
-                    <x-forms.checkbox label="Readonly labels"
-                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
-                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
+                    {{-- <x-forms.checkbox label="Readonly labels"
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
+                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox> --}}
                 </div>
             @endif
             @if ($application->dockerfile)
@@ -298,9 +324,15 @@
                     @if ($application->settings->is_static || $application->build_pack === 'static')
                         <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
                     @else
-                        <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes"
-                            required
-                            helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
+                        @if ($application->settings->is_container_label_readonly_enabled === false)
+                            <x-forms.input placeholder="3000,3001" id="application.ports_exposes"
+                                label="Ports Exposes" readonly
+                                helper="Readonly labels are disabled. You can set the ports manually in the labels section." />
+                        @else
+                            <x-forms.input placeholder="3000,3001" id="application.ports_exposes"
+                                label="Ports Exposes" required
+                                helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
+                        @endif
                     @endif
                     @if (!$application->destination->server->isSwarm())
                         <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
@@ -308,15 +340,20 @@
                     @endif
                 </div>
 
-                <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
-                    monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
+                @if ($application->settings->is_container_label_readonly_enabled)
+                    <x-forms.textarea readonly disabled label="Container Labels" rows="15" id="customLabels"
+                        monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
+                @else
+                    <x-forms.textarea label="Container Labels" rows="15" id="customLabels"
+                        monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
+                @endif
                 <div class="w-96">
+                    <x-forms.checkbox label="Readonly labels"
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
+                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
-                    <x-forms.checkbox label="Readonly labels"
-                        helper="If you know what are you doing, you can enable this to edit the labels directly. Coolify won't update labels automatically. <br><br>Be careful, it could break the proxy configuration after you restart the container."
-                        id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                 </div>
                 <x-modal-confirmation title="Confirm Labels Reset to Coolify Defaults?"
                     buttonTitle="Reset Labels to Defaults" buttonFullWidth submitAction="resetDefaultLabels(true)"

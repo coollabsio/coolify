@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Services\ConfigurationGenerator;
+use App\Traits\HasConfiguration;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -105,7 +107,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasConfiguration, HasFactory, SoftDeletes;
 
     private static $parserVersion = '4';
 
@@ -999,7 +1001,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $base_command = "{$base_command} {$this->source->html_url}/{$customRepository}";
                 } else {
-                    $github_access_token = generate_github_installation_token($this->source);
+                    $github_access_token = generateGithubInstallationToken($this->source);
 
                     if ($exec_in_docker) {
                         $base_command = "{$base_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
@@ -1111,7 +1113,7 @@ class Application extends BaseModel
                         $commands->push($git_clone_command);
                     }
                 } else {
-                    $github_access_token = generate_github_installation_token($this->source);
+                    $github_access_token = generateGithubInstallationToken($this->source);
                     if ($exec_in_docker) {
                         $git_clone_command = "{$git_clone_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git {$baseDir}";
                         $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
@@ -1640,35 +1642,28 @@ class Application extends BaseModel
         }
     }
 
+    public function getLimits(): array
+    {
+        return [
+            'limits_memory' => $this->limits_memory,
+            'limits_memory_swap' => $this->limits_memory_swap,
+            'limits_memory_swappiness' => $this->limits_memory_swappiness,
+            'limits_memory_reservation' => $this->limits_memory_reservation,
+            'limits_cpus' => $this->limits_cpus,
+            'limits_cpuset' => $this->limits_cpuset,
+            'limits_cpu_shares' => $this->limits_cpu_shares,
+        ];
+    }
+
     public function generateConfig($is_json = false)
     {
-        $config = collect([]);
-        if ($this->build_pack = 'nixpacks') {
-            $config = collect([
-                'build_pack' => 'nixpacks',
-                'docker_registry_image_name' => $this->docker_registry_image_name,
-                'docker_registry_image_tag' => $this->docker_registry_image_tag,
-                'install_command' => $this->install_command,
-                'build_command' => $this->build_command,
-                'start_command' => $this->start_command,
-                'base_directory' => $this->base_directory,
-                'publish_directory' => $this->publish_directory,
-                'custom_docker_run_options' => $this->custom_docker_run_options,
-                'ports_exposes' => $this->ports_exposes,
-                'ports_mappings' => $this->ports_mapping,
-                'settings' => collect([
-                    'is_static' => $this->settings->is_static,
-                ]),
-            ]);
-        }
-        $config = $config->filter(function ($value) {
-            return str($value)->isNotEmpty();
-        });
+        $generator = new ConfigurationGenerator($this);
+
         if ($is_json) {
-            return json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            return $generator->toJson();
         }
 
-        return $config;
+        return $generator->toArray();
     }
 
     public function setConfig($config)

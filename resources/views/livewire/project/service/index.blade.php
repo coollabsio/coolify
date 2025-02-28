@@ -4,15 +4,16 @@
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item"
                 class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
-                href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
+                wire:navigate href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
                 <button><- Back</button>
             </a>
             <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'; if(window.location.search) window.location.search = ''"
-                href="#">General</a>
+                wire:navigate href="#">General</a>
             @if ($serviceDatabase?->isBackupSolutionAvailable())
                 <a :class="activeTab === 'backups' && 'menu-item-active'" class="menu-item"
-                    @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
+                    @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'"
+                    wire:navigate href="#backups">Backups</a>
             @endif
         </div>
         <div class="w-full">

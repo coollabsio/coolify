@@ -7,6 +7,12 @@
         <x-forms.input helper="If empty, your GitHub user will be used."
             placeholder="If empty, your GitHub user will be used." id="organization" label="Organization (on GitHub)" />
     </div>
+    @if (!isCloud())
+        <div class="w-48">
+            <x-forms.checkbox id="is_system_wide" label="System Wide"
+                helper="If checked, this GitHub App will be available for everyone in this Coolify instance." />
+        </div>
+    @endif
     <div x-data="{
         activeAccordion: '',
         setActiveAccordion(id) {
@@ -17,7 +23,7 @@
             <button @click="setActiveAccordion(id)"
                 class="flex items-center justify-between w-full px-1 py-2 text-left select-none hover:dark:text-white hover:bg-white/5"
                 type="button">
-                <h4>Advanced</h4>
+                <h4>Self-hosted / Enterprise GitHub</h4>
                 <svg class="w-4 h-4 duration-200 ease-out" :class="{ 'rotate-180': activeAccordion == id }"
                     viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -25,7 +31,6 @@
                 </svg>
             </button>
             <div x-show="activeAccordion==id" x-collapse x-cloak class="px-2">
-                <div class="py-2">Self-hosted / Enterprise GitHub details.</div>
                 <div class="flex flex-col gap-2 pt-0 opacity-70">
                     <div class="flex gap-2">
                         <x-forms.input id="html_url" label="HTML Url" required />
@@ -40,9 +45,7 @@
         </div>
     </div>
 
-    @if (!isCloud())
-        <x-forms.checkbox id="is_system_wide" label="System Wide" />
-    @endif
+
     <x-forms.button class="mt-4" type="submit">
         Continue
     </x-forms.button>

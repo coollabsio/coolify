@@ -6,7 +6,7 @@
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
                         <x-forms.button type="submit">Save</x-forms.button>
-                        <a href="{{ get_installation_path($github_app) }}">
+                        <a href="{{ getInstallationPath($github_app) }}">
                             <x-forms.button>
                                 Update Repositories
                                 <x-external-link />
@@ -14,31 +14,18 @@
                         </a>
                     @endif
                     @if ($applications->count() > 0)
-                        <x-modal-confirmation
-                        title="Confirm GitHub App Deletion?"
-                        isErrorButton
-                        buttonTitle="Delete"
-                        submitAction="delete"
-                        :actions="['The selected GitHub App will be permanently deleted.']"
-                        confirmationText="{{ data_get($github_app, 'name') }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                        shortConfirmationLabel="GitHub App Name"
-                        :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete"
-                        />
+                        <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                            submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                            shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                            step2ButtonText="Permanently Delete" />
                     @else
-                        <x-modal-confirmation
-                        title="Confirm GitHub App Deletion?"
-                        isErrorButton
-                        buttonTitle="Delete"
-                        submitAction="delete"
-                        :actions="['The selected GitHub App will be permanently deleted.']"
-                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                        shortConfirmationLabel="GitHub App Name"
-                        confirmationText="{{ data_get($github_app, 'name') }}"
-                        :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete"
-                        />
+                        <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                            submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
+                            confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                            shortConfirmationLabel="GitHub App Name"
+                            confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
+                            step2ButtonText="Permanently Delete" />
                     @endif
                 </div>
             </div>
@@ -52,7 +39,7 @@
                     </svg>
                     <span>You must complete this step before you can use this source!</span>
                 </div>
-                <a class="items-center justify-center box" href="{{ get_installation_path($github_app) }}">
+                <a class="items-center justify-center box" href="{{ getInstallationPath($github_app) }}">
                     Install Repositories on GitHub
                 </a>
             @else
@@ -106,7 +93,7 @@
                     <div class="flex items-end gap-2 ">
                         <h2 class="pt-4">Permissions</h2>
                         <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
-                        <a href="{{ get_permissions_path($github_app) }}">
+                        <a href="{{ getPermissionsPath($github_app) }}">
                             <x-forms.button>
                                 Update
                                 <x-external-link />
@@ -135,7 +122,7 @@
                         <div class="flex gap-2">
                             <h2>Resources</h2>
                         </div>
-                        <div class="pb-4 title">Here you can find all resources that are used by this source.</div>
+                        <div class="pb-4 title">Here you can find all resources that are using this source.</div>
                     </div>
                     <div class="flex flex-col">
                         <div class="flex flex-col">
@@ -166,7 +153,7 @@
                                                             {{ data_get($resource, 'environment.name') }}
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap"><a
-                                                                class=""
+                                                                class="" wire:navigate
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>
@@ -189,21 +176,13 @@
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-modal-confirmation
-                title="Confirm GitHub App Deletion?"
-                isErrorButton
-                buttonTitle="Delete"
-                submitAction="delete"
-                :actions="['The selected GitHub App will be permanently deleted.']"
-                confirmationText="{{ data_get($github_app, 'name') }}"
-                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                shortConfirmationLabel="GitHub App Name"
-                :confirmWithPassword="false"
-                step2ButtonText="Permanently Delete"
-                />
+                <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                    submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                    shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
             </div>
         </div>
-        <div class="mb-10 rounded alert-error">
+        <div class=" pb-5 rounded alert-error">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -212,15 +191,7 @@
             <span>You must complete this step before you can use this source!</span>
         </div>
         <div class="flex flex-col">
-            <div class="flex gap-2">
-                <h2>Register a GitHub App</h2>
-                <x-forms.button class="bg-coollabs hover:bg-coollabs-100"
-                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
-                    Register Now
-                </x-forms.button>
-            </div>
-            <div>You need to register a GitHub App before using this source.</div>
-            <div class="py-10">
+            <div class="pb-10">
                 @if (!isCloud() || isDev())
                     <div class="flex items-end gap-2">
                         <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
@@ -238,8 +209,22 @@
                                 <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
                             @endif
                         </x-forms.select>
+                        <x-forms.button isHighlighted
+                            x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                            Register Now
+                        </x-forms.button>
                     </div>
+                @else
+                    <div class="flex gap-2">
+                        <h2>Register a GitHub App</h2>
+                        <x-forms.button isHighlighted
+                            x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                            Register Now
+                        </x-forms.button>
+                    </div>
+                    <div>You need to register a GitHub App before using this source.</div>
                 @endif
+
                 <div class="flex flex-col gap-2 pt-4 w-96">
                     <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
                         helper="Contents: read<br>Metadata: read<br>Email: read" />

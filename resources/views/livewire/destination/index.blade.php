@@ -2,7 +2,7 @@
     <x-slot:title>
         Destinations | Coolify
     </x-slot>
-    <div class="flex items-start gap-2">
+    <div class="flex items-center gap-2">
         <h1>Destinations</h1>
         @if ($servers->count() > 0)
             <x-modal-input buttonTitle="+ Add" title="New Destination">
@@ -15,7 +15,7 @@
         @forelse ($servers as $server)
             @forelse ($server->destinations() as $destination)
                 @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-                    <a class="box group"
+                    <a class="box group" wire:navigate
                         href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                         <div class="flex flex-col mx-6">
                             <div class="box-title">{{ $destination->name }}</div>
@@ -24,7 +24,7 @@
                     </a>
                 @endif
                 @if ($destination->getMorphClass() === 'App\Models\SwarmDocker')
-                    <a class="box group"
+                    <a class="box group" wire:navigate
                         href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                         <div class="flex flex-col mx-6">
                             <div class="box-title">{{ $destination->name }}</div>

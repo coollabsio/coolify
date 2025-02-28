@@ -43,8 +43,10 @@ class Heading extends Component
 
     public function check_status($showNotification = false)
     {
-        GetContainersStatus::run($this->database->destination->server);
-        $this->database->refresh();
+        if ($this->database->destination->server->isFunctional()) {
+            GetContainersStatus::dispatch($this->database->destination->server);
+        }
+
         if ($showNotification) {
             $this->dispatch('success', 'Database status updated.');
         }

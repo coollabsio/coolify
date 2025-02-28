@@ -221,7 +221,7 @@ EOD;
                 case \App\Models\StandaloneMongodb::class:
                     $restoreCommand = $this->mongodbRestoreCommand;
                     if ($this->dumpAll === false) {
-                        $restoreCommand .= " {$tmpPath}";
+                        $restoreCommand .= "{$tmpPath}";
                     }
                     break;
             }
