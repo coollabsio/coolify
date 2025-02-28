@@ -2045,6 +2045,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 service_name: $serviceName,
                                 image: data_get($service, 'image')
                             );
+                            $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
                             $proxyLabels = fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
                                 uuid: $resource->uuid,
@@ -2818,6 +2819,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $resource->isGzipEnabled(),
                                 is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                             );
+                            $serviceLabels = $serviceLabels->merge(convertToKeyValueCollection($proxyLabels));
                             $proxyLabels =
                                 fqdnLabelsForCaddy(
                                     network: $resource->destination->network,

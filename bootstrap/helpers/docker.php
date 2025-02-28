@@ -604,6 +604,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect
                 );
+                $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
                 $proxyLabels = fqdnLabelsForCaddy(
                     network: $application->destination->network,
                     uuid: $appUuid,
@@ -659,6 +660,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled()
             );
+            $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
             $proxyLabels = fqdnLabelsForCaddy(
                 network: $application->destination->network,
                 uuid: $appUuid,
@@ -671,6 +673,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $labels = $labels->merge(convertToKeyValueCollection($proxyLabels));
         }
     }
+    $labels = $labels->map(function ($value, $key) {
+        return "$key=$value";
+    })->values();
 
     return $labels->all();
 }
