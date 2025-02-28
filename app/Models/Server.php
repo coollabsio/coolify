@@ -25,6 +25,7 @@ use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Server model',
@@ -102,11 +103,13 @@ class Server extends BaseModel
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    StandaloneDocker::create([
+                    $standaloneDocker = new StandaloneDocker([
                         'name' => 'coolify',
+                        'uuid' => (string) new Cuid2,
                         'network' => 'coolify',
                         'server_id' => $server->id,
                     ]);
+                    $standaloneDocker->saveQuietly();
                 }
             }
             if (! isset($server->proxy->redirect_enabled)) {
@@ -704,22 +707,6 @@ $schema://$host {
             'containers' => collect($containers) ?? collect([]),
             'containerReplicates' => collect($containerReplicates) ?? collect([]),
         ];
-    }
-
-    public function getContainersWithSentinel(): Collection
-    {
-        $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
-        $sentinel_found = json_decode($sentinel_found, true);
-        $status = data_get($sentinel_found, '0.State.Status', 'exited');
-        if ($status === 'running') {
-            $containers = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/containers"'], $this, false);
-            if (blank($containers)) {
-                return collect([]);
-            }
-            $containers = data_get(json_decode($containers, true), 'containers', []);
-
-            return collect($containers);
-        }
     }
 
     public function loadAllContainers(): Collection
