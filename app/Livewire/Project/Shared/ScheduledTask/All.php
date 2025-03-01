@@ -4,19 +4,21 @@ namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class All extends Component
 {
+    #[Locked]
     public $resource;
+
+    #[Locked]
+    public array $parameters;
 
     public Collection $containerNames;
 
     public ?string $variables = null;
-
-    public array $parameters;
-
-    protected $listeners = ['refreshTasks', 'saveScheduledTask' => 'submit'];
 
     public function mount()
     {
@@ -35,37 +37,10 @@ class All extends Component
         }
     }
 
+    #[On('refreshTasks')]
     public function refreshTasks()
     {
         $this->resource->refresh();
     }
 
-    public function submit($data)
-    {
-        try {
-            $task = new ScheduledTask;
-            $task->name = $data['name'];
-            $task->command = $data['command'];
-            $task->frequency = $data['frequency'];
-            $task->container = $data['container'];
-            $task->team_id = currentTeam()->id;
-
-            switch ($this->resource->type()) {
-                case 'application':
-                    $task->application_id = $this->resource->id;
-                    break;
-                case 'standalone-postgresql':
-                    $task->standalone_postgresql_id = $this->resource->id;
-                    break;
-                case 'service':
-                    $task->service_id = $this->resource->id;
-                    break;
-            }
-            $task->save();
-            $this->refreshTasks();
-            $this->dispatch('success', 'Scheduled task added.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
 }
