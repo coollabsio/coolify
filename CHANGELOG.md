@@ -4,11 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(billing)* Add Stripe past due subscription status tracking
+- *(ui)* Add past due subscription warning banner
+
+### 🐛 Bug Fixes
+
+- *(billing)* Restrict Stripe subscription status update to 'active' only
+
+### 💼 Other
+
+- Bump Coolify to 4.0.0-beta.398
+
+### 🚜 Refactor
+
+- *(billing)* Enhance Stripe subscription status handling and notifications
+
+## [4.0.0-beta.397] - 2025-02-28
+
 ### 🐛 Bug Fixes
 
 - *(billing)* Handle 'past_due' subscription status in Stripe processing
 - *(revert)* Label parsing
 - *(helpers)* Initialize command variable in parseCommandFromMagicEnvVariable
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.396] - 2025-02-28
 
