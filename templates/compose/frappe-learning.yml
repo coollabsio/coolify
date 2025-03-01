@@ -1,0 +1,296 @@
+# documentation: https://docs.frappe.io/learning
+# slogan: Easy to Use, 100% Open Source Learning Management System.
+# tags: lms, self-hosted, dashboard
+# logo: svgs/frappe-learning.svg
+# port: 8080
+
+name: frappe-learning
+version: '3.8'
+
+x-frappe-app-image: &frappe-app-image ghcr.io/frappe/lms:stable
+x-frappe-app-common: &frappe-app-common
+  image: *frappe-app-image
+  platform: linux/amd64
+  pull_policy: missing
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+x-depends-on-configurator:
+  depends_on:
+    configurator:
+      condition: service_completed_successfully
+
+services:
+  backend:
+    <<: *frappe-app-common
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+        required: true
+    networks:
+      default: null
+    healthcheck:
+      test:
+        - CMD
+        - wait-for-it
+        - '0.0.0.0:8000'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+  db:
+    command:
+      - '--character-set-server=utf8mb4'
+      - '--collation-server=utf8mb4_unicode_ci'
+      - '--skip-character-set-client-handshake'
+      - '--skip-innodb-read-only-compressed'
+    environment:
+      MYSQL_ROOT_PASSWORD: $SERVICE_PASSWORD_MYSQLROOT
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mysqladmin ping -h localhost --password=$SERVICE_PASSWORD_MYSQLROOT'
+      interval: 1s
+      retries: 20
+    image: 'mariadb:10.6'
+    networks:
+      default: null
+    volumes:
+      -
+        type: volume
+        source: db-data
+        target: /var/lib/mysql
+        volume: {  }
+  redis-cache:
+    image: 'redis:6.2-alpine'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    networks:
+      default: null
+    volumes:
+      -
+        type: volume
+        source: redis-cache-data
+        target: /data
+        volume: {  }
+  redis-queue:
+    image: 'redis:6.2-alpine'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    networks:
+      default: null
+    volumes:
+      -
+        type: volume
+        source: redis-queue-data
+        target: /data
+        volume: {  }
+  configurator:
+    <<: *frappe-app-common
+    restart: 'no'
+    exclude_from_hc: true
+    command:
+      - |
+        ls -1 apps > sites/apps.txt; bench set-config -g db_host $$DB_HOST; bench set-config -gp db_port $$DB_PORT; bench set-config -g redis_cache "redis://$$REDIS_CACHE"; bench set-config -g redis_queue "redis://$$REDIS_QUEUE"; bench set-config -g redis_socketio "redis://$$REDIS_QUEUE"; bench set-config -gp socketio_port $$SOCKETIO_PORT;
+    depends_on:
+      db:
+        condition: service_healthy
+        required: true
+      redis-cache:
+        condition: service_started
+        required: true
+      redis-queue:
+        condition: service_started
+        required: true
+    entrypoint:
+      - bash
+      - '-c'
+    environment:
+      DB_HOST: db
+      DB_PORT: '3306'
+      REDIS_CACHE: 'redis-cache:6379'
+      REDIS_QUEUE: 'redis-queue:6379'
+      SOCKETIO_PORT: '9000'
+    networks:
+      default: null
+  scheduler:
+    <<: *frappe-app-common
+    healthcheck:
+      test:
+        - CMD
+        - wait-for-it
+        - 'redis-queue:6379'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    command:
+      - bench
+      - schedule
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+        required: true
+    labels:
+      - ofelia.enabled=true
+      - 'ofelia.job-exec.datecron.command="bench --site all backup"'
+      - "ofelia.job-exec.datecron.schedule='@every 6h'"
+      - ofelia.job-exec.datecron.user=frappe
+    networks:
+      default: null
+  queue-long:
+    <<: *frappe-app-common
+    command:
+      - bench
+      - worker
+      - '--queue'
+      - 'long,default,short'
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+        required: true
+    healthcheck:
+      test:
+        - CMD
+        - wait-for-it
+        - 'redis-queue:6379'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    networks:
+      default: null
+  queue-short:
+    <<: *frappe-app-common
+    command:
+      - bench
+      - worker
+      - '--queue'
+      - 'short,default'
+    healthcheck:
+      test:
+        - CMD
+        - wait-for-it
+        - 'redis-queue:6379'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+        required: true
+    networks:
+      default: null
+  websocket:
+    <<: *frappe-app-common
+    healthcheck:
+      test:
+        - CMD
+        - wait-for-it
+        - '0.0.0.0:9000'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+        required: true
+    networks:
+      default: null
+    environment:
+      - FRAPPE_SITE=frontend
+  frontend:
+    <<: *frappe-app-common
+    command:
+      - nginx-entrypoint.sh
+    healthcheck:
+      test:
+        - CMD
+        - wait-for-it
+        - '0.0.0.0:8080'
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    depends_on:
+      backend:
+        condition: service_started
+        required: true
+      websocket:
+        condition: service_started
+        required: true
+    environment:
+      - SERVICE_FQDN_FRAPPESITE_8080
+      - 'BACKEND=backend:8000'
+      - CLIENT_MAX_BODY_SIZE=50m
+      - FRAPPE_SITE_NAME_HEADER=frontend
+      - 'PROXY_READ_TIMEOUT="120"'
+      - 'SOCKETIO=websocket:9000'
+      - UPSTREAM_REAL_IP_ADDRESS=127.0.0.1
+      - UPSTREAM_REAL_IP_HEADER=X-Forwarded-For
+      - 'UPSTREAM_REAL_IP_RECURSIVE="off"'
+    networks:
+      default: null
+  create-site:
+    <<: *frappe-app-common
+    exclude_from_hc: true
+    restart: 'no'
+    environment:
+      ADMIN_PASS: $SERVICE_PASSWORD_ADMINPASS
+    networks:
+      default: null
+    deploy:
+      restart_policy:
+        condition: none
+    volumes:
+      - 'sites:/home/frappe/frappe-bench/sites'
+      - 'logs:/home/frappe/frappe-bench/logs'
+    entrypoint:
+      - bash
+      - '-c'
+    command:
+      - |
+        wait-for-it -t 120 db:3306; wait-for-it -t 120 redis-cache:6379; wait-for-it -t 120 redis-queue:6379; export start=`date +%s`; until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".db_host // empty"` ]] && \
+          [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".redis_cache // empty"` ]] && \
+          [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".redis_queue // empty"` ]];
+        do
+          echo "Waiting for sites/common_site_config.json to be created";
+          sleep 5;
+          if (( `date +%s`-start > 120 )); then
+            echo "could not find sites/common_site_config.json with required keys";
+            exit 1
+          fi
+        done; echo "sites/common_site_config.json found"; bench new-site --mariadb-user-host-login-scope='%' --admin-password=$$ADMIN_PASS --db-root-username=root --db-root-password=$SERVICE_PASSWORD_MYSQLROOT --install-app lms --set-default frontend;
+  migrate-site:
+    <<: *frappe-app-common
+    exclude_from_hc: true
+    restart: 'no'
+    networks:
+      default: null
+    environment:
+      - FRAPPE_HOST_NAME=${FRAPPE_HOST_NAME:-$SERVICE_URL_FRAPPESITE}
+    volumes:
+      - 'sites:/home/frappe/frappe-bench/sites'
+      - 'logs:/home/frappe/frappe-bench/logs'
+    entrypoint:
+      - bash
+      - '-c'
+    command:
+      - |
+        curl -f http://frontend:8080/api/method/ping || exit 0;
+        bench --site all set-config maintenance_mode 1;
+        bench --site all set-config pause_scheduler 1;
+        bench --site all migrate;
+        bench --site all set-config maintenance_mode 0;
+        bench --site all set-config pause_scheduler 0;
+        bench --site frontend set-config host_name $$FRAPPE_HOST_NAME;
