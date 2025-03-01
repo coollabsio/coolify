@@ -219,7 +219,19 @@ class StandalonePostgresql extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}",
+            get: function () {
+                $encodedUser = rawurlencode($this->postgres_user);
+                $encodedPass = rawurlencode($this->postgres_password);
+                $url = "postgres://{$encodedUser}:{$encodedPass}@{$this->uuid}:5432/{$this->postgres_db}";
+                if ($this->enable_ssl) {
+                    $url .= "?sslmode={$this->ssl_mode}";
+                    if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {
+                        $url .= '&sslrootcert=/etc/ssl/certs/coolify-ca.crt';
+                    }
+                }
+
+                return $url;
+            },
         );
     }
 
@@ -228,7 +240,17 @@ class StandalonePostgresql extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+                    $encodedUser = rawurlencode($this->postgres_user);
+                    $encodedPass = rawurlencode($this->postgres_password);
+                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+                    if ($this->enable_ssl) {
+                        $url .= "?sslmode={$this->ssl_mode}";
+                        if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {
+                            $url .= '&sslrootcert=/etc/ssl/certs/coolify-ca.crt';
+                        }
+                    }
+
+                    return $url;
                 }
 
                 return null;
@@ -241,9 +263,19 @@ class StandalonePostgresql extends BaseModel
         return $this->belongsTo(Environment::class);
     }
 
+    public function persistentStorages()
+    {
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
+
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
     }
 
     public function destination()
@@ -256,14 +288,15 @@ class StandalonePostgresql extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
-    public function persistentStorages()
-    {
-        return $this->morphMany(LocalPersistentVolume::class, 'resource');
-    }
-
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderBy('key', 'asc');
     }
 
     public function isBackupSolutionAvailable()
@@ -313,11 +346,5 @@ class StandalonePostgresql extends BaseModel
         });
 
         return $parsedCollection->toArray();
-    }
-
-    public function environment_variables()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderBy('key', 'asc');
     }
 }

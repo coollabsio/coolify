@@ -9,6 +9,7 @@ use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\PullTemplatesFromCDN;
+use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerCheckJob;
 use App\Jobs\ServerStorageCheckJob;
@@ -82,6 +83,8 @@ class Kernel extends ConsoleKernel
 
             $this->checkScheduledBackups();
             $this->checkScheduledTasks();
+
+            $this->scheduleInstance->job(new RegenerateSslCertJob)->twiceDaily();
 
             $this->scheduleInstance->command('cleanup:database --yes')->daily();
             $this->scheduleInstance->command('uploads:clear')->everyTwoMinutes();

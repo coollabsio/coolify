@@ -2,6 +2,8 @@
 
 namespace App\Actions\Database;
 
+use App\Helpers\SslHelper;
+use App\Models\SslCertificate;
 use App\Models\StandaloneMysql;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
@@ -16,6 +18,8 @@ class StartMysql
 
     public string $configuration_dir;
 
+    private ?SslCertificate $ssl_certificate = null;
+
     public function handle(StandaloneMysql $database)
     {
         $this->database = $database;
@@ -25,8 +29,52 @@ class StartMysql
 
         $this->commands = [
             "echo 'Starting database.'",
+            "echo 'Creating directories.'",
             "mkdir -p $this->configuration_dir",
+            "echo 'Directories created successfully.'",
         ];
+
+        if (! $this->database->enable_ssl) {
+            $this->commands[] = "rm -rf $this->configuration_dir/ssl";
+
+            $this->database->sslCertificates()->delete();
+
+            $this->database->fileStorages()
+                ->where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->get()
+                ->filter(function ($storage) {
+                    return in_array($storage->mount_path, [
+                        '/etc/mysql/certs/server.crt',
+                        '/etc/mysql/certs/server.key',
+                    ]);
+                })
+                ->each(function ($storage) {
+                    $storage->delete();
+                });
+        } else {
+            $this->commands[] = "echo 'Setting up SSL for this database.'";
+            $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
+
+            $server = $this->database->destination->server;
+            $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+
+            $this->ssl_certificate = $this->database->sslCertificates()->first();
+
+            if (! $this->ssl_certificate) {
+                $this->commands[] = "echo 'No SSL certificate found, generating new SSL certificate for this database.'";
+                $this->ssl_certificate = SslHelper::generateSslCertificate(
+                    commonName: $this->database->uuid,
+                    resourceType: $this->database->getMorphClass(),
+                    resourceId: $this->database->id,
+                    serverId: $server->id,
+                    caCert: $caCert->ssl_certificate,
+                    caKey: $caCert->ssl_private_key,
+                    configurationDir: $this->configuration_dir,
+                    mountPath: '/etc/mysql/certs',
+                );
+            }
+        }
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
@@ -67,38 +115,82 @@ class StartMysql
                 ],
             ],
         ];
+
         if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
+
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
         }
+
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
         }
+
+        $docker_compose['services'][$container_name]['volumes'] ??= [];
+
         if (count($persistent_storages) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                $persistent_storages
+            );
         }
+
         if (count($persistent_file_volumes) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
-                return "$item->fs_path:$item->mount_path";
-            })->toArray();
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                $persistent_file_volumes->map(function ($item) {
+                    return "$item->fs_path:$item->mount_path";
+                })->toArray()
+            );
         }
+
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
+
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => '/data/coolify/ssl/coolify-ca.crt',
+                        'target' => '/etc/mysql/certs/coolify-ca.crt',
+                        'read_only' => true,
+                    ],
+                ]
+            );
+        }
+
         if (! is_null($this->database->mysql_conf) || ! empty($this->database->mysql_conf)) {
-            $docker_compose['services'][$container_name]['volumes'][] = [
-                'type' => 'bind',
-                'source' => $this->configuration_dir.'/custom-config.cnf',
-                'target' => '/etc/mysql/conf.d/custom-config.cnf',
-                'read_only' => true,
-            ];
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => $this->configuration_dir.'/custom-config.cnf',
+                        'target' => '/etc/mysql/conf.d/custom-config.cnf',
+                        'read_only' => true,
+                    ],
+                ]
+            );
         }
 
         // Add custom docker run options
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['command'] = [
+                'mysqld',
+                '--ssl-cert=/etc/mysql/certs/server.crt',
+                '--ssl-key=/etc/mysql/certs/server.key',
+                '--ssl-ca=/etc/mysql/certs/coolify-ca.crt',
+                '--require-secure-transport=1',
+            ];
+        }
 
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -108,6 +200,11 @@ class StartMysql
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
+
+        if ($this->database->enable_ssl) {
+            $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->mysql_user}:{$this->database->mysql_user} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
+        }
+
         $this->commands[] = "echo 'Database started.'";
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');

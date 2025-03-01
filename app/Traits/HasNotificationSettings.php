@@ -16,6 +16,7 @@ trait HasNotificationSettings
         'server_force_disabled',
         'general',
         'test',
+        'ssl_certificate_renewal',
     ];
 
     /**
