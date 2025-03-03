@@ -1,8 +1,28 @@
 <!DOCTYPE html>
 <html class="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
+@use('App\Models\InstanceSettings')
+@php
+
+    $instanceSettings = instanceSettings();
+    $isHttps = request()->secure();
+
+    $name = null;
+
+    if ($instanceSettings) {
+        $displayName = $instanceSettings->getTitleDisplayName();
+
+        if (strlen($displayName) > 0) {
+            $name = $displayName . ' ';
+        }
+    }
+@endphp
+
 <head>
     <meta charset="utf-8">
+    @if ($isHttps)
+        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    @endif
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#ffffff" />
@@ -18,20 +38,7 @@
     <meta property="og:description" content="An open-source & self-hostable Heroku / Netlify / Vercel alternative." />
     <meta property="og:site_name" content="Coolify" />
     <meta property="og:image" content="https://cdn.coollabs.io/assets/coolify/og-image.png" />
-    @use('App\Models\InstanceSettings')
-    @php
 
-        $instanceSettings = instanceSettings();
-        $name = null;
-
-        if ($instanceSettings) {
-            $displayName = $instanceSettings->getTitleDisplayName();
-
-            if (strlen($displayName) > 0) {
-                $name = $displayName . ' ';
-            }
-        }
-    @endphp
     <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
     <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/x-icon" />
