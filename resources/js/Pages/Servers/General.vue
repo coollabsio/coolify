@@ -61,7 +61,7 @@ const sidebarNavItems: SidebarNavItem[] = [
 </script>
 
 <template>
-    <MainView :breadcrumb="breadcrumb">
+    <MainView :breadcrumb="breadcrumb" :hideSearch="true">
         <template #title>
             {{ server.name }}
         </template>

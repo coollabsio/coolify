@@ -5,7 +5,7 @@
 @php
 
     $instanceSettings = instanceSettings();
-    $isHttps = request()->secure();
+    $isHttps = str(request()->url())->startsWith('https');
 
     $name = null;
 
