@@ -78,7 +78,7 @@ const sidebarNavItems: SidebarNavItem[] = [
         <aside class="-mx-2 lg:w-1/5 w-full max-w-[calc(100vw-30px)] md:max-w-full">
           <ScrollArea>
             <nav class="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1">
-              <Link prefetch v-for="item in sidebarNavItems" :key="item.title" :href="item.href">
+              <Link v-for="item in sidebarNavItems" :key="item.title" :href="item.href">
               <Button variant="ghost" :class="cn(
                 'w-fit xl:w-full text-left justify-start text-muted-foreground hover:bg-primary'
               )">

@@ -44,7 +44,7 @@ class ServerController extends Controller
             $server->settings = $server->settings->only(['wildcard_domain', 'server_timezone']);
             $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
 
-            return Inertia::render('Servers/Server', [
+            return Inertia::render('Servers/General', [
                 'server' => $server,
             ]);
         } catch (NotFoundHttpException $e) {
@@ -72,6 +72,7 @@ class ServerController extends Controller
             $server->privateKey = $server->privateKey->only(['id', 'uuid', 'name']);
             $privateKeys = PrivateKey::ownedByCurrentTeam()->where('id', '!=', data_get($server, 'privateKey.id'))->where('is_git_related', false)->get();
             $server = $server->only(['id', 'uuid', 'ip', 'user', 'port', 'name', 'description', 'privateKey']);
+
             $privateKeys = $privateKeys->map(function ($privateKey) {
                 return [
                     'id' => $privateKey->id,
