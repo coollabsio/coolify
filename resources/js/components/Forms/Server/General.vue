@@ -49,7 +49,7 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
     description: values.description,
     wildcard_domain: values.wildcard_domain,
     server_timezone: values.server_timezone,
-  })).post(`/servers/${props.uuid}`, {
+  })).post(route('next_store_server', props.uuid), {
     showProgress: false,
     onSuccess: () => {
       toast.success('Server updated successfully.')
