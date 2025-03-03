@@ -89,6 +89,13 @@ export interface Server {
     user: string;
     uuid: string;
     validation_logs: null;
+    privateKey: PrivateKey;
+}
+
+export interface PrivateKey {
+    id: number;
+    uuid: string;
+    name: string;
 }
 
 export interface ServerSettings {

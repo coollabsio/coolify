@@ -4,9 +4,10 @@ import { useForm as useVeeForm, useIsFormValid, useIsFormDirty } from 'vee-valid
 import * as z from 'zod'
 import { useForm } from '@inertiajs/vue3'
 import { route } from '@/route';
-import CustomFormField from '../CustomFormField.vue';
-import CustomForm from '../CustomForm.vue';
 import { toast } from 'vue-sonner'
+import CustomFormField from '@/components/CustomFormField.vue';
+import CustomForm from '@/components/CustomForm.vue';
+import { Separator } from '@/components/ui/separator';
 const props = defineProps<{
   uuid: string
   name: string
@@ -62,9 +63,13 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
 </script>
 
 <template>
-  <h2 class="text-2xl pb-2">
+  <h2 class="pb-2">
     General
   </h2>
+  <p class="text-sm text-muted-foreground pb-2">
+    General configuration for the server.
+  </p>
+  <Separator class="my-4" />
   <CustomForm @submit="onSubmit" :is-submitting="inertiaForm.processing" :is-form-valid="isFormValid"
     :is-form-dirty="isFormDirty">
     <div class="flex gap-2 w-full">

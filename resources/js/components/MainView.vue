@@ -45,6 +45,7 @@ import {
     Terminal,
     ListCheck,
     MessageCircleQuestion,
+    CircleX,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
@@ -52,6 +53,7 @@ import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import { Toaster } from '@/components/ui/sonner'
 const props = defineProps<{
     breadcrumb?: CustomBreadcrumbItem[]
+    hideSearch?: boolean
 }>()
 
 const data = {
@@ -105,7 +107,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 </script>
 
 <template>
-    <Toaster position="top-right" richColors closeButton theme="dark" />
+    <Toaster position="top-center" richColors closeButton theme="dark" pauseWhenPageIsHidden />
     <SidebarProvider :defaultOpen="defaultOpen" class="xl:container xl:mx-auto">
         <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
@@ -275,7 +277,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
-                    <Search @search="(value) => $emit('search', value)" />
+                    <Search v-if="!props.hideSearch" @search="(value) => $emit('search', value)" />
                 </div>
                 <h1 class="text-3xl font-bold pt-4">
                     <slot name="title" />

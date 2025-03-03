@@ -7,7 +7,7 @@ import { Bot, ChartSpline, SettingsIcon, Unplug } from 'lucide-vue-next';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import General from '@/components/Server/General.vue';
+import General from '@/components/Forms/Server/General.vue';
 import MainView from '@/components/MainView.vue';
 
 import { CustomBreadcrumbItem } from '@/types/BreadcrumbsType';
@@ -42,9 +42,9 @@ const sidebarNavItems: SidebarNavItem[] = [
         href: route('next_server', props.server.uuid),
     },
     {
-        title: 'Connections',
+        title: 'Connection',
         icon: Unplug,
-        href: route('next_server', props.server.uuid),
+        href: route('next_server_connection', props.server.uuid),
     },
     {
         title: 'Automations',
@@ -73,7 +73,7 @@ const sidebarNavItems: SidebarNavItem[] = [
                 <aside class="-mx-2 lg:w-1/5 w-full max-w-[calc(100vw-30px)] md:max-w-full">
                     <ScrollArea>
                         <nav class="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1">
-                            <Link v-for="item in sidebarNavItems" :key="item.title" :href="item.href">
+                            <Link prefetch v-for="item in sidebarNavItems" :key="item.title" :href="item.href">
                             <Button variant="ghost" :class="cn(
                                 'w-fit xl:w-full text-left justify-start text-muted-foreground hover:bg-primary'
                             )">

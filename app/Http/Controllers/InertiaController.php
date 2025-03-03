@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Application;
 use App\Models\Project;
 use App\Models\Server;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InertiaController extends Controller
@@ -179,48 +178,5 @@ class InertiaController extends Controller
             'mariadbs' => $mariadbs->values()->all(),
             'keydbs' => $keydbs->values()->all(),
         ]);
-    }
-
-    public function servers()
-    {
-        $servers = Server::ownedByCurrentTeam()->orderBy('created_at')->get();
-        $servers = $servers->map(function ($server) {
-            return [
-                'name' => $server->name,
-                'description' => $server->description,
-                'uuid' => $server->uuid,
-            ];
-        });
-
-        return Inertia::render('Servers/Index', [
-            'servers' => $servers,
-        ]);
-    }
-
-    public function server(string $server_uuid)
-    {
-        $server = Server::ownedByCurrentTeam()->where('uuid', $server_uuid)->first();
-        if (! $server) {
-            return redirect()->route('servers');
-        }
-
-        $server->settings = $server->settings->only(['wildcard_domain', 'server_timezone']);
-        $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
-
-        return Inertia::render('Servers/Server', [
-            'server' => $server,
-        ]);
-    }
-
-    public function storeServer(string $server_uuid, Request $request)
-    {
-        $server = Server::ownedByCurrentTeam()->where('uuid', $server_uuid)->first();
-        if (! $server) {
-            return redirect()->route('servers');
-        }
-        $server->update($request->only(['name', 'description']));
-        $server->settings->update($request->only(['wildcard_domain', 'server_timezone']));
-
-        return to_route('next_server', $server_uuid);
     }
 }
