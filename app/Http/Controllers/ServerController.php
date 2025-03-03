@@ -70,7 +70,7 @@ class ServerController extends Controller
         try {
             $server = $this->getServer($server_uuid);
             $server->privateKey = $server->privateKey->only(['id', 'uuid', 'name']);
-            $privateKeys = PrivateKey::ownedByCurrentTeam()->where('id', '!=', data_get($server, 'privateKey.id'))->get();
+            $privateKeys = PrivateKey::ownedByCurrentTeam()->where('id', '!=', data_get($server, 'privateKey.id'))->where('is_git_related', false)->get();
             $server = $server->only(['id', 'uuid', 'ip', 'user', 'port', 'name', 'description', 'privateKey']);
             $privateKeys = $privateKeys->map(function ($privateKey) {
                 return [

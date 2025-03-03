@@ -4,7 +4,6 @@
 @tailwind utilities;
 
 @layer base {
-
     :root {
         --background: 0 0% 100%;
         --foreground: 224 71.4% 4.1%;
@@ -110,5 +109,9 @@ input:where(:not([type])):focus,
 [multiple]:focus,
 textarea:focus,
 select:focus {
-    @apply border-t-primary ring-0 dark:outline-none !important;
+    @apply ring-0 dark:outline-none !important;
+}
+
+.input-type {
+    @apply w-full rounded-xl border border-l-4 border-input bg-input-background dark:border-neutral-800 disabled:cursor-not-allowed placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 dark:outline-coolgray-200 ring-offset-background !important;
 }

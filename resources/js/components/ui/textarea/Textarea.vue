@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { cn } from '@/lib/utils'
+import { cn, inputType } from '@/lib/utils'
 import { useVModel } from '@vueuse/core'
 
 const props = defineProps<{
@@ -20,6 +20,5 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 </script>
 
 <template>
-  <textarea v-model="modelValue"
-    :class="cn('flex min-h-20 w-full rounded-xl border border-l-4 border-input bg-input-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:outline-coolgray-200 shadow', props.class)" />
+  <textarea v-model="modelValue" :class="cn(inputType, 'flex min-h-20', props.class)" />
 </template>
