@@ -31,7 +31,7 @@
                 "@xterm/xterm": "^5.5.0",
                 "class-variance-authority": "^0.7.1",
                 "clsx": "^2.1.1",
-                "ioredis": "5.4.2",
+                "ioredis": "5.5.0",
                 "lucide-vue-next": "^0.475.0",
                 "radix-vue": "^1.9.13",
                 "tailwind-merge": "^3.0.1",
