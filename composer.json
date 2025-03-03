@@ -16,7 +16,6 @@
         "danharrin/livewire-rate-limiting": "2.0.0",
         "doctrine/dbal": "^4.2",
         "guzzlehttp/guzzle": "^7.5.0",
-        "inertiajs/inertia-laravel": "^2.0",
         "laravel/fortify": "^1.16.0",
         "laravel/framework": "^11.0",
         "laravel/horizon": "^5.29.1",
@@ -51,7 +50,6 @@
         "stevebauman/purify": "^6.2",
         "stripe/stripe-php": "^16.2.0",
         "symfony/yaml": "^7.1.6",
-        "tightenco/ziggy": "^2.5",
         "visus/cuid2": "^4.1.0",
         "yosymfony/toml": "^1.0",
         "zircote/swagger-php": "^5.0"
