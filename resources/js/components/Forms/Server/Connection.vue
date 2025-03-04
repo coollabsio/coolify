@@ -77,7 +77,7 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
     private_key_id: values.private_key_id,
   })).post(route('next_server_connection_store', props.uuid), {
     showProgress: false,
-    onSuccess: async (asd) => {
+    onSuccess: async () => {
       toast.success('Server connection updated successfully.')
       inertiaForm.reset()
       veeForm.resetForm({

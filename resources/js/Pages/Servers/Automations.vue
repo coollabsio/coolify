@@ -1,18 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import MainView from '@/components/MainView.vue';
-import Connection from '@/components/Forms/Server/Connection.vue';
-
+import Automations from '@/components/Forms/Server/Automations.vue';
 import { getServerBreadcrumbs, getServerSidebarNavItems } from '@/config/server/shared';
 import { Server } from '@/types/ServerType';
+
 const props = defineProps<{
-  server: Server,
-  private_keys: {
-    id: number
-    uuid: string
-    name: string
-  }[]
-}>()
+  server: Server;
+}>();
 
 const breadcrumb = ref(getServerBreadcrumbs(props.server.name, props.server.uuid))
 const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
@@ -28,8 +23,9 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
       {{ server.description }}
     </template>
     <template #main>
-      <Connection :uuid="server.uuid" :name="server.name" :description="server.description" :ip="server.ip"
-        :port="server.port" :user="server.user" :private_key="server.privateKey" :private_keys="props.private_keys" />
+      <Automations :uuid="server.uuid" :docker_cleanup_frequency="server.settings.docker_cleanup_frequency"
+        :docker_cleanup_threshold="server.settings.docker_cleanup_threshold"
+        :force_docker_cleanup="server.settings.force_docker_cleanup" />
     </template>
   </MainView>
 </template>

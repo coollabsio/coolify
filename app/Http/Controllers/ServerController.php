@@ -137,4 +137,31 @@ class ServerController extends Controller
             return response()->json(['success' => false]);
         }
     }
+
+    public function server_automations(string $server_uuid)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+            $server->settings = $server->settings->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup']);
+            $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
+
+            return Inertia::render('Servers/Automations', [
+                'server' => $server,
+            ]);
+        } catch (NotFoundHttpException $e) {
+            return redirect()->route('next_servers');
+        }
+    }
+
+    public function server_automations_store(string $server_uuid, Request $request)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+            $server->settings->update($request->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup']));
+
+            return goto_route('next_server_automations', $server_uuid);
+        } catch (NotFoundHttpException $e) {
+            return redirect()->route('next_server_automations');
+        }
+    }
 }

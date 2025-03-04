@@ -24,16 +24,12 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
-  <SwitchRoot
-    v-bind="forwarded"
-    :class="cn(
-      'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-neutral-900 data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:focus-visible:ring-offset-neutral-950 dark:data-[state=checked]:bg-neutral-50 dark:data-[state=unchecked]:bg-neutral-800',
-      props.class,
-    )"
-  >
+  <SwitchRoot v-bind="forwarded" :class="cn(
+    'relative peer inline-flex h-6 w-9 shrink-0 cursor-pointer items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 before:absolute before:inset-y-2 before:inset-x-0.5  before:rounded-md before:transition-colors before:data-[state=checked]:bg-neutral-900 before:data-[state=unchecked]:bg-neutral-200 dark:focus-visible:ring-neutral-300 dark:focus-visible:ring-offset-neutral-950 before:dark:data-[state=checked]:bg-primary before:dark:data-[state=unchecked]:bg-neutral-800',
+    props.class,
+  )">
     <SwitchThumb
-      :class="cn('pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 dark:bg-neutral-950')"
-    >
+      :class="cn('pointer-events-none block size-5 rounded-full bg-white ring-0 transition-transform data-[state=checked]:translate-x-5 bg-white relative z-10')">
       <slot name="thumb" />
     </SwitchThumb>
   </SwitchRoot>

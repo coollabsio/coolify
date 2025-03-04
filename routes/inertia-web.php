@@ -19,8 +19,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/servers/{server_uuid}/connection', [ServerController::class, 'server_connection'])->name('next_server_connection');
     Route::post('/servers/{server_uuid}/connection', [ServerController::class, 'server_connection_store'])->name('next_server_connection_store');
-
     Route::get('/servers/{server_uuid}/connection/test', [ServerController::class, 'server_connection_test'])->name('next_server_connection_test');
+
+    Route::get('/servers/{server_uuid}/automations', [ServerController::class, 'server_automations'])->name('next_server_automations');
+    Route::post('/servers/{server_uuid}/automations', [ServerController::class, 'server_automations_store'])->name('next_server_automations_store');
 });
 
 Route::any('/{any}', function () {

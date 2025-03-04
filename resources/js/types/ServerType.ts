@@ -101,4 +101,7 @@ export interface PrivateKey {
 export interface ServerSettings {
     wildcard_domain: string;
     server_timezone: string;
+    force_docker_cleanup: boolean;
+    docker_cleanup_frequency: string;
+    docker_cleanup_threshold: number;
 }
