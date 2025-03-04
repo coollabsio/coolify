@@ -73,19 +73,21 @@ class StripeProcessJob implements ShouldQueue
                     }
                     $subscription = Subscription::where('team_id', $teamId)->first();
                     if ($subscription) {
-                        send_internal_notification('Old subscription activated for team: '.$teamId);
+                        // send_internal_notification('Old subscription activated for team: '.$teamId);
                         $subscription->update([
                             'stripe_subscription_id' => $subscriptionId,
                             'stripe_customer_id' => $customerId,
                             'stripe_invoice_paid' => true,
+                            'stripe_past_due' => false,
                         ]);
                     } else {
-                        send_internal_notification('New subscription for team: '.$teamId);
+                        // send_internal_notification('New subscription for team: '.$teamId);
                         Subscription::create([
                             'team_id' => $teamId,
                             'stripe_subscription_id' => $subscriptionId,
                             'stripe_customer_id' => $customerId,
                             'stripe_invoice_paid' => true,
+                            'stripe_past_due' => false,
                         ]);
                     }
                     break;
@@ -100,6 +102,7 @@ class StripeProcessJob implements ShouldQueue
                     if ($subscription) {
                         $subscription->update([
                             'stripe_invoice_paid' => true,
+                            'stripe_past_due' => false,
                         ]);
                     } else {
                         throw new \RuntimeException("No subscription found for customer: {$customerId}");
@@ -119,9 +122,7 @@ class StripeProcessJob implements ShouldQueue
                     }
                     if (! $subscription->stripe_invoice_paid) {
                         SubscriptionInvoiceFailedJob::dispatch($team);
-                        send_internal_notification('Invoice payment failed: '.$customerId);
-                    } else {
-                        send_internal_notification('Invoice payment failed but already paid: '.$customerId);
+                        // send_internal_notification('Invoice payment failed: '.$customerId);
                     }
                     break;
                 case 'payment_intent.payment_failed':
@@ -136,7 +137,7 @@ class StripeProcessJob implements ShouldQueue
 
                         return;
                     }
-                    send_internal_notification('Subscription payment failed for customer: '.$customerId);
+                    // send_internal_notification('Subscription payment failed for customer: '.$customerId);
                     break;
                 case 'customer.subscription.created':
                     $customerId = data_get($data, 'customer');
@@ -158,7 +159,7 @@ class StripeProcessJob implements ShouldQueue
                     }
                     $subscription = Subscription::where('team_id', $teamId)->first();
                     if ($subscription) {
-                        send_internal_notification("Subscription already exists for team: {$teamId}");
+                        // send_internal_notification("Subscription already exists for team: {$teamId}");
                         throw new \RuntimeException("Subscription already exists for team: {$teamId}");
                     } else {
                         Subscription::create([
@@ -182,7 +183,7 @@ class StripeProcessJob implements ShouldQueue
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
                         if ($status === 'incomplete_expired') {
-                            send_internal_notification('Subscription incomplete expired');
+                            // send_internal_notification('Subscription incomplete expired');
                             throw new \RuntimeException('Subscription incomplete expired');
                         }
                         if ($teamId) {
@@ -224,9 +225,33 @@ class StripeProcessJob implements ShouldQueue
                             ]);
                         }
                     }
+                    if ($status === 'past_due') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_past_due' => true,
+                            ]);
+                            send_internal_notification('Past Due: '.$customerId.'Subscription ID: '.$subscriptionId);
+                        }
+                    }
+                    if ($status === 'unpaid') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_invoice_paid' => false,
+                            ]);
+                            send_internal_notification('Unpaid: '.$customerId.'Subscription ID: '.$subscriptionId);
+                        }
+                        $team = data_get($subscription, 'team');
+                        if ($team) {
+                            $team->subscriptionEnded();
+                        } else {
+                            send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
+                            throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                        }
+                    }
                     if ($status === 'active') {
                         if ($subscription->stripe_subscription_id === $subscriptionId) {
                             $subscription->update([
+                                'stripe_past_due' => false,
                                 'stripe_invoice_paid' => true,
                             ]);
                         }
