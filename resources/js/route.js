@@ -1,16 +1,14 @@
 import { route as ziggyRoute } from 'ziggy-js';
 
-// Wrap the route function to always set absolute URLs to false
 export function route(name, params, absolute = true, config) {
-  const route = ziggyRoute(name, params, absolute, config);
+  let route = ziggyRoute(name, params, absolute, config);
   try {
     if (absolute === false) {
       return route
     }
 
-    const origin = window.location.origin;
-    const routeUrl = new URL(route);
-    const originUrl = new URL(origin);
+    const originUrl = new URL(window.location.origin);
+    let routeUrl = new URL(route);
     console.log(routeUrl.protocol)
     console.log(originUrl.protocol)
     if (routeUrl.protocol !== originUrl.protocol) {
