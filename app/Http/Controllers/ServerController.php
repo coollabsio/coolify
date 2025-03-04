@@ -110,14 +110,14 @@ class ServerController extends Controller
             $server->update(['private_key_id' => $privateKeyId]);
             ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
             if ($uptime) {
-                return to_route('next_server_connection', $server_uuid);
+                return goto_route('next_server_connection', $server_uuid);
             } else {
                 $server->update(['ip' => $originalIp, 'user' => $originalUser, 'port' => $originalPort, 'private_key_id' => $originalPrivateKeyId]);
 
-                return to_route('next_server_connection', $server_uuid)->withErrors(['error' => $error, 'original_private_key_id' => $originalPrivateKeyId, 'original_ip' => $originalIp, 'original_user' => $originalUser, 'original_port' => $originalPort]);
+                return goto_route('next_server_connection', $server_uuid)->withErrors(['error' => $error, 'original_private_key_id' => $originalPrivateKeyId, 'original_ip' => $originalIp, 'original_user' => $originalUser, 'original_port' => $originalPort]);
             }
         } catch (\Exception $e) {
-            return to_route('next_server_connection', $server_uuid)->withErrors(['error' => $e->getMessage(), 'original_private_key_id' => $originalPrivateKeyId, 'original_ip' => $originalIp, 'original_user' => $originalUser, 'original_port' => $originalPort]);
+            return goto_route('next_server_connection', $server_uuid)->withErrors(['error' => $e->getMessage(), 'original_private_key_id' => $originalPrivateKeyId, 'original_ip' => $originalIp, 'original_user' => $originalUser, 'original_port' => $originalPort]);
         }
     }
 
