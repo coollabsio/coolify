@@ -42,8 +42,7 @@ const veeForm = useVeeForm({
 })
 const isFormValid = useIsFormValid()
 const isFormDirty = useIsFormDirty()
-console.log(route('next_server_store', props.uuid, true))
-console.log(route('next_server_store', props.uuid))
+
 const onSubmit = veeForm.handleSubmit(async (values) => {
   inertiaForm.transform(() => ({
     name: values.name,
