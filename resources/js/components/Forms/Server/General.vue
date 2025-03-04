@@ -72,11 +72,11 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
   <Separator class="my-4" />
   <CustomForm @submit="onSubmit" :is-submitting="inertiaForm.processing" :is-form-valid="isFormValid"
     :is-form-dirty="isFormDirty">
-    <div class="flex gap-2 w-full">
+    <div class="flex md:flex-row flex-col gap-2 w-full">
       <CustomFormField field="name" :form-schema="schema" :form="veeForm" :value="name" />
       <CustomFormField field="description" :form-schema="schema" :form="veeForm" :value="description" />
     </div>
-    <div class="flex gap-2 w-full">
+    <div class="flex md:flex-row flex-col gap-2 w-full">
       <CustomFormField field="wildcard_domain" :form-schema="schema" :form="veeForm" :value="wildcard_domain"
         placeholder="https://coolify.io" />
       <CustomFormField field="server_timezone" :form-schema="schema" :form="veeForm" :value="server_timezone"

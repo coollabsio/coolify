@@ -146,12 +146,12 @@ const testConnection = async () => {
     :is-form-dirty="isFormDirty" :is-confirmation="true"
     :confirmation-message="`This will change how Coolify connects to the server.<br><br> Are you sure you want to continue?`"
     :custom-saving-text="`Saving & Checking Connection...`">
-    <div class="flex gap-2 w-full">
+    <div class="flex md:flex-row flex-col gap-2 w-full">
       <CustomFormField label="IP Address / Domain" field="ip" :form-schema="schema" :form="veeForm" :value="ip" />
       <CustomFormField field="port" :form-schema="schema" :form="veeForm" :value="port" />
       <CustomFormField field="user" :form-schema="schema" :form="veeForm" :value="user" />
     </div>
-    <div class="flex gap-2 w-full items-end">
+    <div class="flex md:flex-row flex-col gap-2 w-full items-end">
       <CustomFormField type="select" label="Private Key" readonly field="private_key_id" :form-schema="schema"
         :form="veeForm" :value="private_key.id">
         <template #select-options>
@@ -165,7 +165,7 @@ const testConnection = async () => {
           </SelectGroup>
         </template>
       </CustomFormField>
-      <Button variant="outline" @click.prevent="testConnection"
+      <Button class="md:w-fit w-full" variant="outline" @click.prevent="testConnection"
         :disabled="isTestingConnection || inertiaForm.processing" :loading="isTestingConnection">
         Test Connection
       </Button>

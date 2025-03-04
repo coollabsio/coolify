@@ -1,5 +1,6 @@
 <script setup lang=ts>
 import Search from '@/components/Search.vue'
+import Aside from '@/components/Aside.vue'
 import { Link } from '@inertiajs/vue3'
 import {
     Breadcrumb,
@@ -54,6 +55,7 @@ import { Toaster } from '@/components/ui/sonner'
 const props = defineProps<{
     breadcrumb?: CustomBreadcrumbItem[]
     hideSearch?: boolean
+    sidebarNavItems?: any[]
 }>()
 
 const data = {
@@ -279,15 +281,26 @@ function setActiveTeam(team: typeof data.teams[number]) {
                     </div>
                     <Search v-if="!props.hideSearch" @search="(value) => $emit('search', value)" />
                 </div>
+            </header>
+            <main class="flex flex-1 flex-col gap-4 mb-24">
                 <h1 class="text-3xl font-bold pt-4">
                     <slot name="title" />
                 </h1>
                 <h3 class="text-sm text-muted-foreground">
                     <slot name="subtitle" />
                 </h3>
-            </header>
-            <main class="flex flex-1 flex-col gap-4 mt-10 mb-24">
-                <slot />
+                <div class="pt-6">
+                    <div v-if="props.sidebarNavItems && props.sidebarNavItems.length > 0"
+                        class="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
+                        <Aside :sidebarNavItems="sidebarNavItems" />
+                        <div class="flex-1">
+                            <slot name="main" />
+                        </div>
+                    </div>
+                    <div v-else>
+                        <slot />
+                    </div>
+                </div>
             </main>
         </SidebarInset>
     </SidebarProvider>

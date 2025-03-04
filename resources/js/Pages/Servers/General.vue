@@ -61,36 +61,16 @@ const sidebarNavItems: SidebarNavItem[] = [
 </script>
 
 <template>
-    <MainView :breadcrumb="breadcrumb" :hideSearch="true">
+    <MainView hideSearch :breadcrumb="breadcrumb" :sidebarNavItems="sidebarNavItems">
         <template #title>
             {{ server.name }}
         </template>
         <template #subtitle>
             {{ server.description }}
         </template>
-        <div>
-            <div class="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
-                <aside class="-mx-2 lg:w-1/5 w-full max-w-[calc(100vw-30px)] md:max-w-full">
-                    <ScrollArea>
-                        <nav class="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1">
-                            <Link v-for="item in sidebarNavItems" :key="item.title" :href="item.href">
-                            <Button variant="ghost" :class="cn(
-                                'w-fit xl:w-full text-left justify-start text-muted-foreground hover:bg-primary'
-                            )">
-                                <component v-if="item.icon" :is="item.icon" class="w-4 h-4 mr-2" />
-                                {{ item.title }}
-                            </Button>
-                            </Link>
-                        </nav>
-                        <ScrollBar orientation="horizontal" class="h-1.5" />
-                    </ScrollArea>
-                </aside>
-                <div class="flex-1">
-                    <General :uuid="server.uuid" :name="server.name" :description="server.description"
-                        :wildcard_domain="server.settings.wildcard_domain"
-                        :server_timezone="server.settings.server_timezone" />
-                </div>
-            </div>
-        </div>
+        <template #main>
+            <General :uuid="server.uuid" :name="server.name" :description="server.description"
+                :wildcard_domain="server.settings.wildcard_domain" :server_timezone="server.settings.server_timezone" />
+        </template>
     </MainView>
 </template>
