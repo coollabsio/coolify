@@ -40,6 +40,9 @@ const veeForm = useVeeForm({
   }
 })
 
+const isFormValid = useIsFormValid()
+const isFormDirty = useIsFormDirty()
+
 const onSubmit = veeForm.handleSubmit(async (values) => {
   inertiaForm.transform(() => ({
     docker_cleanup_frequency: values.docker_cleanup_frequency,
@@ -79,8 +82,8 @@ const instantSave = async (value: boolean) => {
     Automations configuration for the server.
   </p>
   <Separator class="my-4" />
-  <CustomForm @submit="onSubmit" :is-submitting="inertiaForm.processing" :is-form-valid="useIsFormValid()"
-    :is-form-dirty="useIsFormDirty()">
+  <CustomForm @submit="onSubmit" :is-submitting="inertiaForm.processing" :is-form-valid="isFormValid"
+    :is-form-dirty="isFormDirty">
     <div class="flex md:flex-row flex-col gap-2 w-full">
       <CustomFormField field="docker_cleanup_frequency" :form-schema="schema" :form="veeForm"
         :value="docker_cleanup_frequency" placeholder="daily" description="The frequency of the docker cleanup." />

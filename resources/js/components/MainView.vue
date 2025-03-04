@@ -110,7 +110,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 
 <template>
     <Toaster position="top-center" richColors closeButton theme="dark" />
-    <SidebarProvider :defaultOpen="defaultOpen" class="xl:container xl:mx-auto">
+    <SidebarProvider :defaultOpen="defaultOpen" class="xl:max-w-screen-2xl xl:mx-auto">
         <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
