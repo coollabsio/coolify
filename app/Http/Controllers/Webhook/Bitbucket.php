@@ -49,7 +49,7 @@ class Bitbucket extends Controller
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = data_get($payload, 'push.changes.0.new.target.hash');
 
-                if (!$branch) {
+                if (! $branch) {
                     return response([
                         'status' => 'failed',
                         'message' => 'Nothing to do. No branch found in the request.',

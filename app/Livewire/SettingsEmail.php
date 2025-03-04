@@ -36,7 +36,7 @@ class SettingsEmail extends Component
     public ?int $smtpPort = null;
 
     #[Validate(['nullable', 'string', 'in:starttls,tls,none'])]
-    public ?string $smtpEncryption = null;
+    public ?string $smtpEncryption = 'starttls';
 
     #[Validate(['nullable', 'string'])]
     public ?string $smtpUsername = null;

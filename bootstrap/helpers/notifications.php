@@ -28,7 +28,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
 {
     $settings = instanceSettings();
     $type = set_transanctional_email_settings($settings);
-    if (! $type) {
+    if (blank($type)) {
         throw new Exception('No email settings found.');
     }
     if ($cc) {
@@ -54,15 +54,19 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
     }
 }
 
-function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string //
+function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string // returns null|resend|smtp and defaults to array based on mail.php config
 {
     if (! $settings) {
         $settings = instanceSettings();
     }
-    config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
-    config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
+    if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
+        return null;
+    }
+
     if (data_get($settings, 'resend_enabled')) {
         config()->set('mail.default', 'resend');
+        config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
+        config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
         config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
 
         return 'resend';
@@ -76,6 +80,8 @@ function set_transanctional_email_settings(?InstanceSettings $settings = null): 
     };
 
     if (data_get($settings, 'smtp_enabled')) {
+        config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
+        config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
         config()->set('mail.default', 'smtp');
         config()->set('mail.mailers.smtp', [
             'transport' => 'smtp',
@@ -91,6 +97,4 @@ function set_transanctional_email_settings(?InstanceSettings $settings = null): 
 
         return 'smtp';
     }
-
-    return null;
 }

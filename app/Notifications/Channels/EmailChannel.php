@@ -50,11 +50,9 @@ class EmailChannel
 
         if ($emailSettings->use_instance_email_settings) {
             $type = set_transanctional_email_settings();
-            if (! $type) {
+            if (blank($type)) {
                 throw new Exception('No email settings found.');
             }
-            config()->set('mail.default', $type);
-
             return;
         }
 
