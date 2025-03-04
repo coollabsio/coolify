@@ -18,10 +18,8 @@ function goto_route($route, $parameters = [], $status = 302, $headers = [])
     if (filled($origin)) {
         $originUrl = Url::fromString($origin);
         $urlUrl = Url::fromString($url);
-        $urlUrl->withScheme($originUrl->getScheme());
-        $url = $urlUrl->__toString();
+        $url = $urlUrl->withScheme($originUrl->getScheme())->__toString();
     }
-    $url = redirect()->route($route, $parameters, $status, $headers);
 
-    return $url;
+    return redirect()->to($url);
 }
