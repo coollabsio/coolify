@@ -91,6 +91,9 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 
 <template>
     <MainView @search="searchProjects" :breadcrumb="breadcrumb">
+        <template #title>
+            {{ capitalize(currentTab) }}
+        </template>
         <div v-if="search">
             <Tabs :default-value="currentTab" orientation="vertical"
                 class="w-full pt-2 max-w-[calc(100vw-30px)] md:max-w-full">
