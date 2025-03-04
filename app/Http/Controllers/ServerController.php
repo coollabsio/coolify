@@ -59,7 +59,7 @@ class ServerController extends Controller
             $server->update($request->only(['name', 'description']));
             $server->settings->update($request->only(['wildcard_domain', 'server_timezone']));
 
-            return to_route('next_server', $server_uuid);
+            return goto_route('next_server', $server_uuid);
         } catch (NotFoundHttpException $e) {
             return redirect()->route('next_servers');
         }
