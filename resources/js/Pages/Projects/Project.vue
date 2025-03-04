@@ -16,11 +16,11 @@ const props = defineProps<{
 const breadcrumb = ref<CustomBreadcrumbItem[]>([
     {
         label: 'Projects',
-        href: route('next_dashboard', { tab: 'projects' })
+        href: route('next_dashboard', { tab: 'projects' }, false)
     },
     {
         label: props.project.name,
-        href: route('next_project', props.project.uuid)
+        href: route('next_project', props.project.uuid, false)
     }
 ])
 </script>
@@ -33,7 +33,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
         <div class="resource-box-container md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
             <div v-for="environment in environments" :key="environment.uuid">
                 <ResourceBox type="environment"
-                    :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: environment.uuid })"
+                    :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: environment.uuid }, false)"
                     :name="environment.name" :description="environment.description" />
             </div>
         </div>

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "883997f0ea1d5a191bd9f814b0f99e83",
+    "content-hash": "11593a959068c21c13c66ccb19a5744f",
     "packages": [
         {
             "name": "3sidedcube/laravel-redoc",
@@ -1076,6 +1076,72 @@
                 "source": "https://github.com/Bacon/BaconQrCode/tree/v3.0.1"
             },
             "time": "2024-10-01T13:55:55+00:00"
+        },
+        {
+            "name": "beyondcode/laravel-server-timing",
+            "version": "1.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/beyondcode/laravel-server-timing.git",
+                "reference": "9cd316fd3862b5e4449882267007213518680186"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/beyondcode/laravel-server-timing/zipball/9cd316fd3862b5e4449882267007213518680186",
+                "reference": "9cd316fd3862b5e4449882267007213518680186",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": "5.8.*|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0",
+                "php": "^7.2|^8.0",
+                "symfony/stopwatch": "^4.0|^5.0|^6.0|^7.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^4.6|^5.0|^6.0|^8.0",
+                "phpunit/phpunit": "^8.0|^9.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Stopwatch": "BeyondCode\\ServerTiming\\Facades\\ServerTiming"
+                    },
+                    "providers": [
+                        "BeyondCode\\ServerTiming\\ServerTimingServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "BeyondCode\\ServerTiming\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Marcel Pociot",
+                    "email": "marcel@beyondco.de",
+                    "homepage": "https://beyondcode.de",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Add Server-Timing header information from within your Laravel apps.",
+            "homepage": "https://github.com/beyondcode/laravel-server-timing",
+            "keywords": [
+                "beyondcode",
+                "laravel-server-timing"
+            ],
+            "support": {
+                "issues": "https://github.com/beyondcode/laravel-server-timing/issues",
+                "source": "https://github.com/beyondcode/laravel-server-timing/tree/1.5.0"
+            },
+            "time": "2024-03-18T13:08:04+00:00"
         },
         {
             "name": "brick/math",

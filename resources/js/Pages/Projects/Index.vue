@@ -19,7 +19,7 @@ function searchProjects(value: string) {
 const breadcrumb = ref<CustomBreadcrumbItem[]>([
     {
         label: 'Projects',
-        href: route('next_projects')
+        href: route('next_projects', false)
     }
 ])
 </script>
@@ -38,7 +38,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                         class="flex flex-col bg-coolgray-100 rounded-lg p-4 border dark:border-black hover:bg-coollabs transition-all cursor-pointer h-24 group">
                     <h3 class="text-lg font-bold">{{ project.name }}</h3>
                     <p class="text-sm text-muted-foreground group-hover:dark:text-white">{{ project.description
-                        }}</p>
+                    }}</p>
                     </Link>
                 </div>
             </div>

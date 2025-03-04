@@ -25,6 +25,7 @@ const props = defineProps<{
     mysqls: Mysql[]
     mariadbs: Mariadb[]
 }>()
+
 const applications = ref(props.applications)
 const services = ref(props.services)
 const postgresqls = ref(props.postgresqls)
@@ -33,15 +34,15 @@ const search = ref('')
 const breadcrumb = ref<CustomBreadcrumbItem[]>([
     {
         label: 'Projects',
-        href: route('next_dashboard', { tab: 'projects' })
+        href: route('next_dashboard', { tab: 'projects' }, false)
     },
     {
         label: props.project.name,
-        href: route('next_project', props.project.uuid)
+        href: route('next_project', props.project.uuid, false)
     },
     {
         label: props.environment.name,
-        href: route('next_environment', { project_uuid: props.project.uuid, environment_uuid: props.environment.uuid })
+        href: route('next_environment', { project_uuid: props.project.uuid, environment_uuid: props.environment.uuid }, false)
     }
 ])
 
@@ -70,23 +71,26 @@ const searchResources = (value: string) => {
                 <h3 class="text-sm font-bold text-foreground">Applications</h3>
             </div>
             <div v-for="application in applications" :key="application.uuid">
-                <ResourceBox type="application" :href="application.href_link" :name="application.name"
-                    :description="application.description" />
+                <ResourceBox type="application"
+                    :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: props.environment.uuid, application_uuid: application.uuid }, false)"
+                    :name="application.name" :description="application.description" />
             </div>
             <div class="col-span-full" v-if="postgresqls.length > 0">
                 <h3 class="text-sm font-bold text-foreground">Databases</h3>
             </div>
             <div v-for="postgresql in postgresqls" :key="postgresql.uuid">
-                <ResourceBox type="standalone-postgresql" :href="postgresql.href_link" :name="postgresql.name"
-                    :description="postgresql.description" />
+                <ResourceBox type="standalone-postgresql"
+                    :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: props.environment.uuid, standalone_postgresql_uuid: postgresql.uuid }, false)"
+                    :name="postgresql.name" :description="postgresql.description" />
             </div>
 
             <div class="col-span-full" v-if="services.length > 0">
                 <h3 class="text-sm font-bold text-foreground">Services</h3>
             </div>
             <div v-for="service in services" :key="service.uuid">
-                <ResourceBox type="service" :href="service.href_link" :name="service.name"
-                    :description="service.description" />
+                <ResourceBox type="service"
+                    :href="route('next_environment', { project_uuid: props.project.uuid, environment_uuid: props.environment.uuid, service_uuid: service.uuid }, false)"
+                    :name="service.name" :description="service.description" />
             </div>
         </div>
     </MainView>

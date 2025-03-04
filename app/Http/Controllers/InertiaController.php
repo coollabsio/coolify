@@ -86,97 +86,102 @@ class InertiaController extends Controller
 
     public function project(string $project_uuid)
     {
-        $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->first();
+        $project = Project::ownedByCurrentTeam()
+            ->where('uuid', $project_uuid)
+            ->select(['id', 'name', 'description', 'uuid'])
+            ->with('environments:id,name,uuid,project_id')
+            ->firstOrFail();
+
         if (! $project) {
             return redirect()->route('projects');
         }
 
-        $environments = $project->environments()->get();
-        if ($environments->count() === 1) {
-            // $environment = $environments->first();
-            // return redirect()->route('project.environment', $environment->uuid);
-        }
-
         return Inertia::render('Projects/Project', [
             'project' => $project,
-            'environments' => $environments,
+            'environments' => $project->environments,
         ]);
     }
 
     public function environment(string $project_uuid, string $environment_uuid)
     {
-        $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->first();
-        if (! $project) {
-            return redirect()->route('projects');
+        try {
+            $project = Project::ownedByCurrentTeam()
+                ->where('uuid', $project_uuid)
+                ->select(['id', 'name', 'uuid'])
+                ->firstOrFail();
+
+            $environment = $project->environments()
+                ->where('uuid', $environment_uuid)
+                ->select(['id', 'name', 'uuid'])
+                ->firstOrFail();
+            $baseFields = ['id', 'name', 'uuid'];
+            $baseRelations = [
+                'tags:id,name',
+            ];
+
+            $applications = $environment->applications()
+                ->select($baseFields)
+                ->with($baseRelations)
+                ->get()
+                ->map(fn ($model) => tap($model, fn ($m) => $m->setAppends([])))
+                ->sortBy('name');
+
+            $databaseTypes = [
+                'postgresqls',
+                'redis',
+                'mongodbs',
+                'mysqls',
+                'mariadbs',
+                'keydbs',
+            ];
+
+            $resources = [];
+            foreach ($databaseTypes as $type) {
+                $resources[$type] = $environment->{$type}()
+                    ->select($baseFields)
+                    ->with($baseRelations)
+                    ->get()
+                    ->map(fn ($model) => tap($model, fn ($m) => $m->setAppends([])))
+                    ->sortBy('name')
+                    ->values()
+                    ->all();
+            }
+
+            $services = $environment->services()
+                ->select($baseFields)
+                ->with($baseRelations)
+                ->get()
+                ->map(fn ($model) => tap($model, fn ($m) => $m->setAppends([])))
+                ->sortBy('name');
+
+            $environment = $environment->loadCount([
+                'applications',
+                'redis',
+                'postgresqls',
+                'mysqls',
+                'keydbs',
+                'dragonflies',
+                'clickhouses',
+                'mariadbs',
+                'mongodbs',
+                'keydbs',
+                'services',
+            ]);
+
+            return Inertia::render('Environment', [
+                'project' => $project,
+                'environment' => $environment,
+                'applications' => $applications->values()->all(),
+                'services' => $services->values()->all(),
+                'postgresqls' => $resources['postgresqls'],
+                'redis' => $resources['redis'],
+                'mongodbs' => $resources['mongodbs'],
+                'mysqls' => $resources['mysqls'],
+                'mariadbs' => $resources['mariadbs'],
+                'keydbs' => $resources['keydbs'],
+            ]);
+        } catch (\Exception $e) {
+            throw $e;
         }
-        $environment = $project->environments()->where('uuid', $environment_uuid)->first();
-        if (! $environment) {
-            return redirect()->route('project', $project_uuid);
-        }
-
-        $applications = $environment->applications()->with([
-            'tags',
-            'additional_servers.settings',
-            'additional_networks',
-            'destination.server.settings',
-        ])->get()->sortBy('name');
-
-        $postgresqls = $environment->postgresqls()->get();
-        $redis = $environment->redis()->get();
-        $mongodbs = $environment->mongodbs()->get();
-        $mysqls = $environment->mysqls()->get();
-        $mariadbs = $environment->mariadbs()->get();
-        $keydbs = $environment->keydbs()->get();
-
-        $environment = $environment->loadCount([
-            'applications',
-            'redis',
-            'postgresqls',
-            'mysqls',
-            'keydbs',
-            'dragonflies',
-            'clickhouses',
-            'mariadbs',
-            'mongodbs',
-            'keydbs',
-            'services',
-        ]);
-        // Load all database resources in a single query per type
-        $databaseTypes = [
-            'postgresqls' => 'postgresqls',
-            'redis' => 'redis',
-            'mongodbs' => 'mongodbs',
-            'mysqls' => 'mysqls',
-            'mariadbs' => 'mariadbs',
-            'keydbs' => 'keydbs',
-            'dragonflies' => 'dragonflies',
-            'clickhouses' => 'clickhouses',
-        ];
-
-        foreach ($databaseTypes as $property => $relation) {
-            ${$property} = $environment->{$relation}()->with([
-                'tags',
-                'destination.server.settings',
-            ])->get()->sortBy('name');
-        }
-
-        // Load services with their tags and server
-        $services = $environment->services()->with([
-            'tags',
-            'destination.server.settings',
-        ])->get()->sortBy('name');
-
-        return Inertia::render('Environment', [
-            'project' => $project,
-            'environment' => $environment,
-            'applications' => $applications->values()->all(),
-            'services' => $services->values()->all(),
-            'postgresqls' => $postgresqls->values()->all(),
-            'redis' => $redis->values()->all(),
-            'mongodbs' => $mongodbs->values()->all(),
-            'mysqls' => $mysqls->values()->all(),
-            'mariadbs' => $mariadbs->values()->all(),
-            'keydbs' => $keydbs->values()->all(),
-        ]);
     }
 }
