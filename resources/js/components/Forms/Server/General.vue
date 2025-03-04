@@ -42,14 +42,15 @@ const veeForm = useVeeForm({
 })
 const isFormValid = useIsFormValid()
 const isFormDirty = useIsFormDirty()
-
+console.log(route('next_server_store', props.uuid, true))
+console.log(route('next_server_store', props.uuid))
 const onSubmit = veeForm.handleSubmit(async (values) => {
   inertiaForm.transform(() => ({
     name: values.name,
     description: values.description,
     wildcard_domain: values.wildcard_domain,
     server_timezone: values.server_timezone,
-  })).post(route('next_store_server', props.uuid), {
+  })).post(route('next_server_store', props.uuid, true), {
     showProgress: false,
     onSuccess: () => {
       toast.success('Server updated successfully.')

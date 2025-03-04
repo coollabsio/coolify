@@ -15,7 +15,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/servers', [ServerController::class, 'servers'])->name('next_servers');
 
     Route::get('/servers/{server_uuid}', [ServerController::class, 'server'])->name('next_server');
-    Route::post('/servers/{server_uuid}', [ServerController::class, 'server_store'])->name('next_store_server');
+    Route::post('/servers/{server_uuid}', [ServerController::class, 'server_store'])->name('next_server_store');
 
     Route::get('/servers/{server_uuid}/connection', [ServerController::class, 'server_connection'])->name('next_server_connection');
     Route::post('/servers/{server_uuid}/connection', [ServerController::class, 'server_connection_store'])->name('next_server_connection_store');
