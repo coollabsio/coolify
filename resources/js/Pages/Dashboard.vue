@@ -137,7 +137,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                             :description="project.description" :environments="project.environments" />
                     </div>
                     <div v-for="server in servers" :key="server.uuid">
-                        <ResourceBox type="server" :href="route('next_project', server.uuid)" :name="server.name"
+                        <ResourceBox type="server" :href="route('next_server', server.uuid)" :name="server.name"
                             :description="server.description" />
                     </div>
                     <div v-for="application in applications" :key="application.uuid">
