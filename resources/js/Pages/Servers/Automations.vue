@@ -12,7 +12,7 @@ import { route } from '@/route';
 import CustomFormField from '@/components/CustomFormField.vue';
 import CustomForm from '@/components/CustomForm.vue';
 import { Separator } from '@/components/ui/separator';
-import { instantSave as sharedInstantSave, getInstantSaveRefs } from '@/lib/utils';
+import { instantSave as sharedInstantSave, getInstantSaveRefs, onSubmit as sharedOnSubmit } from '@/lib/utils';
 
 import { ServerSettings, Server } from '@/types/ServerType';
 const props = defineProps<{
@@ -45,16 +45,12 @@ const isFormValid = useIsFormValid()
 const isFormDirty = useIsFormDirty();
 
 const onSubmit = veeForm.handleSubmit(async (values) => {
-  inertiaForm.transform(() => ({
-    docker_cleanup_frequency: values.docker_cleanup_frequency,
-    docker_cleanup_threshold: values.docker_cleanup_threshold,
-    server_disk_usage_notification_threshold: values.server_disk_usage_notification_threshold,
-    server_disk_usage_check_frequency: values.server_disk_usage_check_frequency,
-  })).post(route('next_server_automations_store', props.server.uuid), {
-    showProgress: false,
-    onSuccess: async () => {
-      toast.success('Automations updated successfully')
-    },
+  return sharedOnSubmit({
+    route: route('next_server_automations_store', props.server.uuid),
+    values,
+    veeForm,
+    inertiaForm,
+    instantSaveRefs
   })
 })
 

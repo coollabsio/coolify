@@ -44,7 +44,7 @@ const onSubmit = (e: Event) => {
         <div class="grid gap-4">
           <div class="text-sm" v-html="confirmationMessage || 'Are you sure you want to continue?'"></div>
           <div class="flex gap-2 justify-between">
-            <Button class="md:w-fit w-full" type="button" variant="outline" @click="isOpen = false">No</Button>
+            <Button class="md:w-fit w-full" type="button" variant="secondary" @click="isOpen = false">No</Button>
             <Button class="md:w-fit w-full" type="submit" variant="destructive" :disabled="!isFormValid || !isFormDirty"
               @click="onSubmit">Yes</Button>
           </div>

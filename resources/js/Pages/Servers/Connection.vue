@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import axios from 'axios';
 import { SelectGroup, SelectItem } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { onSubmit as sharedOnSubmit } from '@/lib/utils';
+
 const props = defineProps<{
   server: Server,
   private_keys: {
@@ -53,23 +55,13 @@ const veeForm = useVeeForm({
 const isFormValid = useIsFormValid()
 const isFormDirty = useIsFormDirty()
 
+
 const onSubmit = veeForm.handleSubmit(async (values) => {
-  inertiaForm.transform(() => ({
-    name: values.name,
-    description: values.description,
-    ip: values.ip,
-    user: values.user,
-    port: values.port,
-    private_key_id: values.private_key_id,
-  })).post(route('next_server_connection_store', props.server.uuid), {
-    showProgress: false,
-    onSuccess: async () => {
-      toast.success('Server connection updated successfully.')
-      inertiaForm.reset()
-      veeForm.resetForm({
-        values
-      })
-    },
+  return sharedOnSubmit({
+    route: route('next_server_connection_store', props.server.uuid),
+    values,
+    veeForm,
+    inertiaForm,
     onError: (errors) => {
       if (errors.error) {
         toast.error('Server connection update failed.', {
@@ -93,6 +85,8 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
     }
   })
 })
+
+
 
 const testConnection = async () => {
   isTestingConnection.value = true
@@ -134,7 +128,7 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
       {{ server.description }}
     </template>
     <template #main>
-      <h2 class="pb-2">
+      <h2 class="pb-2 font-bold text-lg">
         Connection
       </h2>
       <p class="text-sm text-muted-foreground pb-2">

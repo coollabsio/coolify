@@ -8,6 +8,8 @@ import { toast } from 'vue-sonner'
 import CustomFormField from '@/components/CustomFormField.vue';
 import CustomForm from '@/components/CustomForm.vue';
 import { Separator } from '@/components/ui/separator';
+import { onSubmit as sharedOnSubmit } from '@/lib/utils';
+
 const props = defineProps<{
   uuid: string
   name: string
@@ -44,26 +46,17 @@ const isFormValid = useIsFormValid()
 const isFormDirty = useIsFormDirty()
 
 const onSubmit = veeForm.handleSubmit(async (values) => {
-  inertiaForm.transform(() => ({
-    name: values.name,
-    description: values.description,
-    wildcard_domain: values.wildcard_domain,
-    server_timezone: values.server_timezone,
-  })).post(route('next_server_store', props.uuid, true), {
-    showProgress: false,
-    onSuccess: () => {
-      toast.success('Server updated successfully.')
-      inertiaForm.reset()
-      veeForm.resetForm({
-        values
-      })
-    }
+  return sharedOnSubmit({
+    route: route('next_server_store', props.uuid),
+    values,
+    veeForm,
+    inertiaForm,
   })
 })
 </script>
 
 <template>
-  <h2 class="pb-2">
+  <h2 class="pb-2 font-bold text-lg">
     General
   </h2>
   <p class="text-sm text-muted-foreground pb-2">
