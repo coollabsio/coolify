@@ -13,6 +13,7 @@ const { error, formItemId } = useFormField()
 <template>
   <Label :class="cn(
     props.class,
+    'text-sm'
   )" :for="formItemId">
     <slot />
   </Label>

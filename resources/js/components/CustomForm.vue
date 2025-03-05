@@ -8,7 +8,6 @@ const props = defineProps<{
   isSubmitting: boolean;
   isFormValid: boolean;
   isFormDirty: boolean;
-  isConfirmation?: boolean;
   confirmationMessage?: string;
   customSavingText?: string;
 }>();
@@ -29,7 +28,7 @@ const onSubmit = (e: Event) => {
 </script>
 
 <template>
-  <div v-if="isConfirmation" class="space-y-4">
+  <div v-if="confirmationMessage" class="space-y-4">
     <slot />
     <Popover v-model:open="isOpen">
       <PopoverTrigger :disabled="!isFormValid || !isFormDirty" class="w-full md:w-fit">

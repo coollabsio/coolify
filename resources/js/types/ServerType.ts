@@ -104,4 +104,8 @@ export interface ServerSettings {
     force_docker_cleanup: boolean;
     docker_cleanup_frequency: string;
     docker_cleanup_threshold: number;
+    delete_unused_volumes: boolean;
+    delete_unused_networks: boolean;
+    server_disk_usage_notification_threshold: number;
+    server_disk_usage_check_frequency: string;
 }

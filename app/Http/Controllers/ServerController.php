@@ -142,7 +142,7 @@ class ServerController extends Controller
     {
         try {
             $server = $this->getServer($server_uuid);
-            $server->settings = $server->settings->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup']);
+            $server->settings = $server->settings->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup', 'delete_unused_volumes', 'delete_unused_networks', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency']);
             $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
 
             return Inertia::render('Servers/Automations', [
@@ -157,11 +157,13 @@ class ServerController extends Controller
     {
         try {
             $server = $this->getServer($server_uuid);
-            $server->settings->update($request->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup']));
+            $server->settings->update($request->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup', 'delete_unused_volumes', 'delete_unused_networks', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency']));
 
             return goto_route('next_server_automations', $server_uuid);
         } catch (NotFoundHttpException $e) {
-            return redirect()->route('next_server_automations');
+            return redirect()->route('next_server_automations', $server_uuid);
+        } catch (\Exception $e) {
+            return redirect()->route('next_server_automations', $server_uuid)->withErrors(['error' => $e->getMessage()]);
         }
     }
 }

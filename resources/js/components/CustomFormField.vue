@@ -26,6 +26,7 @@ const props = defineProps<{
   type?: string;
   label?: string;
   description?: string;
+  descriptionError?: string;
   readonly?: boolean;
   disabled?: boolean;
   placeholder?: string;
@@ -33,7 +34,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'instant-save', value: boolean): void
+  (e: 'instant-save', event: { target: { name: string; value: any } }): void
 }>();
 
 const type = computed(() => props.type || 'text');
@@ -53,11 +54,16 @@ const computedField = computed(() => {
   return props.field.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 })
 
-const isFieldDirty = computed(() => props.form.isFieldDirty(props.field));
+const isFieldDirty = computed(() => props.form?.isFieldDirty(props.field) ?? false);
 const isRequired = computed(() => details.value.required);
 
 const handleInstantSave = (value: boolean) => {
-  emit('instant-save', value);
+  emit('instant-save', {
+    target: {
+      name: props.field,
+      value: value
+    }
+  });
 };
 </script>
 
@@ -103,7 +109,12 @@ const handleInstantSave = (value: boolean) => {
               {{ label || computedField }}
             </FormLabel>
             <FormDescription>
-              {{ description }}
+              <span v-if="description" class="text-sm text-muted-foreground">
+                {{ description }}
+              </span>
+              <span v-if="descriptionError" class="text-sm text-destructive">
+                {{ descriptionError }}
+              </span>
             </FormDescription>
           </div>
           <FormControl>
