@@ -40,7 +40,7 @@ const onSubmit = (e: Event) => {
           <Button v-else class="md:w-fit w-full" type="submit" :disabled="!isFormValid || !isFormDirty">Save</Button>
         </div>
       </PopoverTrigger>
-      <PopoverContent align="start" class="w-full">
+      <PopoverContent align="start" class="w-full" sideOffset="1">
         <div class="grid gap-4">
           <div class="text-sm" v-html="confirmationMessage || 'Are you sure you want to continue?'"></div>
           <div class="flex gap-2 justify-between">

@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import axios from 'axios';
 import { SelectGroup, SelectItem } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { onSubmit as sharedOnSubmit } from '@/lib/utils';
+import { onSubmit as sharedOnSubmit } from '@/lib/custom';
 
 const props = defineProps<{
   server: Server,
@@ -158,7 +158,7 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
               </SelectGroup>
             </template>
           </CustomFormField>
-          <Button class="md:w-fit w-full" variant="outline" @click.prevent="testConnection"
+          <Button class="md:w-fit w-full" variant="secondary" @click.prevent="testConnection"
             :disabled="isTestingConnection || inertiaForm.processing" :loading="isTestingConnection">
             Test Connection
           </Button>

@@ -41,11 +41,17 @@ class ServerController extends Controller
         try {
             $server = $this->getServer($server_uuid);
 
+            $currentTimezone = $server->settings->server_timezone;
             $server->settings = $server->settings->only(['wildcard_domain', 'server_timezone']);
             $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
 
             return Inertia::render('Servers/General', [
                 'server' => $server,
+                'timezones' => Inertia::defer(fn () => collect(timezone_identifiers_list())
+                    ->filter(fn ($timezone) => $timezone !== $currentTimezone)
+                    ->sort()
+                    ->values()
+                    ->toArray()),
             ]);
         } catch (NotFoundHttpException $e) {
             return redirect()->route('next_servers');
@@ -142,11 +148,13 @@ class ServerController extends Controller
     {
         try {
             $server = $this->getServer($server_uuid);
+            $recentExecutions = $server->dockerCleanupExecutions()->orderBy('created_at', 'desc')->limit(5)->get();
             $server->settings = $server->settings->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup', 'delete_unused_volumes', 'delete_unused_networks', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency']);
             $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
 
             return Inertia::render('Servers/Automations', [
                 'server' => $server,
+                'recent_executions' => $recentExecutions,
             ]);
         } catch (NotFoundHttpException $e) {
             return redirect()->route('next_servers');

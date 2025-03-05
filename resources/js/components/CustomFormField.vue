@@ -18,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { InfoIcon } from 'lucide-vue-next';
+
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger } from '@/components/ui/combobox'
+import { InfoIcon, Check, ChevronsUpDown, Search } from 'lucide-vue-next';
 const props = defineProps<{
   field: string;
   formSchema: z.ZodObject<any>;
@@ -97,11 +99,43 @@ const handleInstantSave = (value: boolean) => {
               <SelectValue :placeholder="placeholder || ''" />
             </SelectTrigger>
           </FormControl>
-          <SelectContent>
+          <SelectContent position="item-aligned">
             <slot name="select-options" />
           </SelectContent>
         </Select>
       </FormControl>
+      <Combobox v-model="value" by="label" v-else-if="type === 'combobox'">
+        <FormControl>
+          <ComboboxAnchor>
+            <ComboboxTrigger>
+              <div class="relative w-full max-w-sm items-center">
+                <ComboboxInput :display-value="(val) => val?.label ?? ''" placeholder="Select framework..." />
+                <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                  <ChevronsUpDown class="size-4 text-muted-foreground" />
+                </ComboboxTrigger>
+              </div>
+            </ComboboxTrigger>
+          </ComboboxAnchor>
+        </FormControl>
+
+        <ComboboxList>
+          <div class="relative w-full max-w-sm items-center">
+            <ComboboxInput class="pl-9 focus-visible:ring-0 border-0 border-b rounded-none h-10"
+              placeholder="Select framework..." />
+            <span class="absolute start-0 inset-y-0 flex items-center justify-center px-3">
+              <Search class="size-4 text-muted-foreground" />
+            </span>
+          </div>
+
+          <ComboboxEmpty>
+            No framework found.
+          </ComboboxEmpty>
+
+          <ComboboxGroup>
+            <slot name="combobox-options" />
+          </ComboboxGroup>
+        </ComboboxList>
+      </Combobox>
       <FormControl v-else-if="type === 'checkbox'">
         <FormItem class="flex flex-row items-center justify-between rounded-xl border border-border p-4">
           <div class="space-y-0.5">

@@ -12,11 +12,24 @@ import { route } from '@/route';
 import CustomFormField from '@/components/CustomFormField.vue';
 import CustomForm from '@/components/CustomForm.vue';
 import { Separator } from '@/components/ui/separator';
-import { instantSave as sharedInstantSave, getInstantSaveRefs, onSubmit as sharedOnSubmit } from '@/lib/utils';
-
+import { instantSave as sharedInstantSave, getInstantSaveRefs, onSubmit as sharedOnSubmit } from '@/lib/custom';
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { ServerSettings, Server } from '@/types/ServerType';
 const props = defineProps<{
   server: Server;
+  recent_executions: any[];
 }>();
 
 const instantSaveFields = ['force_docker_cleanup', 'delete_unused_volumes', 'delete_unused_networks']
@@ -65,6 +78,10 @@ const runDockerCleanup = () => {
 const recentExecutions = () => {
   toast.success('Recent executions fetched successfully.')
 }
+
+const showRecentExecutions = ref(false)
+const selectedExecution = ref(null)
+
 
 const breadcrumb = ref(getServerBreadcrumbs(props.server.name, props.server.uuid))
 const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
@@ -122,6 +139,47 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
           @instant-save="instantSave"
           description-error="Warning: This will delete all unused networks on the server and could cause functional issues." />
       </CustomForm>
+      <Separator class="my-4" />
+      <h2 class="pb-2 font-bold text-lg">
+        Recent Executions
+      </h2>
+      <p class="text-sm text-muted-foreground pb-2">
+        Recent executions of the automations.
+      </p>
+      <div class="flex flex-col gap-2">
+        <div v-for="execution in recent_executions" :key="execution.id">
+          <div class="flex flex-row gap-2">
+            <Badge variant="success" class="min-w-72 justify-center cursor-pointer"
+              @click=" showRecentExecutions = true; selectedExecution = execution">
+              {{ execution.status }} - {{ execution.created_at }}
+            </Badge>
+          </div>
+        </div>
+      </div>
+      <Sheet v-model:open="showRecentExecutions">
+        <SheetContent class="sm:max-w-[800px]">
+          <SheetHeader>
+            <SheetTitle>
+              <div class="flex flex-row gap-2">
+                Docker cleanup
+                <Badge :variant="selectedExecution.status === 'success' ? 'success' : 'destructive'">
+                  {{ selectedExecution.status }}
+                </Badge>
+              </div>
+            </SheetTitle>
+          </SheetHeader>
+          <Separator class="my-4" />
+          <h3 class="text-sm font-medium mb-2">Execution Logs</h3>
+          <div>
+            <p class="text-sm text-muted-foreground">{{ selectedExecution.message }}</p>
+            <Separator class="my-4" />
+            <div v-for="log in JSON.parse(selectedExecution.cleanup_log)" :key="log" class="flex flex-col gap-10">
+              <p class="text-sm text-muted-foreground">{{ log.command }}</p>
+              <p class="text-sm text-muted-foreground">{{ log.output }}</p>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </template>
   </MainView>
 </template>

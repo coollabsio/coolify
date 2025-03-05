@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { SelectContentEmits, SelectContentProps } from 'radix-vue'
 import type { HTMLAttributes } from 'vue'
-import { cn, inputType } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { inputType } from '@/lib/custom'
 import {
   SelectContent,
 
