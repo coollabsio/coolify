@@ -21,13 +21,11 @@ const props = defineProps<{
 const schema = z.object({
   docker_cleanup_frequency: z.string({ message: 'The docker cleanup frequency is required.' }),
   docker_cleanup_threshold: z.number({ message: 'The docker cleanup threshold is required.' }),
-  force_docker_cleanup: z.boolean({ message: 'The docker cleanup force is required.' }),
 
 })
 const formData = {
   docker_cleanup_frequency: props.docker_cleanup_frequency,
   docker_cleanup_threshold: props.docker_cleanup_threshold,
-  force_docker_cleanup: props.force_docker_cleanup,
 }
 const inertiaForm = useForm(formData)
 
@@ -36,7 +34,6 @@ const veeForm = useVeeForm({
   initialValues: {
     docker_cleanup_frequency: props.docker_cleanup_frequency,
     docker_cleanup_threshold: props.docker_cleanup_threshold,
-    force_docker_cleanup: props.force_docker_cleanup,
   }
 })
 
@@ -47,7 +44,6 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
   inertiaForm.transform(() => ({
     docker_cleanup_frequency: values.docker_cleanup_frequency,
     docker_cleanup_threshold: values.docker_cleanup_threshold,
-    force_docker_cleanup: values.force_docker_cleanup,
   })).post(route('next_server_automations_store', props.uuid), {
     showProgress: false,
     onSuccess: async () => {
