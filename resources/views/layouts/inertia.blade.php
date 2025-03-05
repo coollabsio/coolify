@@ -3,10 +3,7 @@
 
 @use('App\Models\InstanceSettings')
 @php
-
     $instanceSettings = instanceSettings();
-    $isHttps = str(request()->url())->startsWith('https');
-
     $name = null;
 
     if ($instanceSettings) {
@@ -20,9 +17,6 @@
 
 <head>
     <meta charset="utf-8">
-    @if ($isHttps)
-        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-    @endif
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#ffffff" />
