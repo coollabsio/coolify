@@ -134,7 +134,14 @@
                     <div class="w-full">
                         @if (!$server->isLocalhost())
                             <div class="w-96">
-                                <x-forms.checkbox instantSave id="isBuildServer" label="Use it as a build server?" />
+                                @if ($isBuildServerLocked)
+                                    <x-forms.checkbox disabled instantSave id="isBuildServer"
+                                        helper="You can't use this server as a build server because it has defined resources."
+                                        label="Use it as a build server?" />
+                                @else
+                                    <x-forms.checkbox instantSave id="isBuildServer"
+                                        label="Use it as a build server?" />
+                                @endif
                             </div>
 
                             @if (!$server->isBuildServer() && !$server->settings->is_cloudflare_tunnel)
