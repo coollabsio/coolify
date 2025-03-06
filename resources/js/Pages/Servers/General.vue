@@ -65,15 +65,6 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
             {{ server.description }}
         </template>
         <template #main>
-            <Deferred data="timezones">
-                <template #fallback>
-                    <div>Loading...</div>
-                </template>
-
-                <div v-for="permission in permissions">
-                    <!-- ... -->
-                </div>
-            </Deferred>
             <h2 class="pb-2 font-bold text-lg">
                 General
             </h2>
@@ -103,7 +94,7 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
                                 </ComboboxItemIndicator>
                             </ComboboxItem>
                         </template>
-                    </CustomFormField> -->
+</CustomFormField> -->
                 </div>
             </CustomForm>
         </template>
