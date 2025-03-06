@@ -10,7 +10,8 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
-
+import Logo from '@/components/Logo.vue'
+import { Separator } from '@/components/ui/separator'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -48,7 +49,7 @@ import {
     MessageCircleQuestion,
     CircleX,
 } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 
 import { Toaster } from '@/components/ui/sonner'
@@ -73,35 +74,42 @@ const data = {
             icon: Home,
             url: '/next/',
         },
-        {
-            title: 'Terminal',
-            icon: Terminal,
-            url: '/next/terminal',
-            isDisabled: true,
-        },
-        {
-            title: 'Settings',
-            icon: Settings,
-            url: '/next/settings',
-            isDisabled: true,
-        },
-        {
-            title: 'Feedback',
-            icon: MessageCircleQuestion,
-            url: '/next/feedback',
-            isBottom: true,
-            isDisabled: true,
-        },
+        // {
+        //     title: 'Terminal',
+        //     icon: Terminal,
+        //     url: '/next/terminal',
+        //     isDisabled: true,
+        // },
+        // {
+        //     title: 'Settings',
+        //     icon: Settings,
+        //     url: '/next/settings',
+        //     isDisabled: true,
+        // },
+        // {
+        //     title: 'Feedback',
+        //     icon: MessageCircleQuestion,
+        //     url: '/next/feedback',
+        //     isBottom: true,
+        //     isDisabled: true,
+        // },
 
     ]
 }
 
 const activeTeam = ref(data.teams[0])
 const defaultOpen = ref(true)
+const open = ref(true)
 const cookie = document.cookie
     .split('; ')
     .find(row => row.startsWith('sidebar:state='))
+
 defaultOpen.value = cookie?.split('=')[1] == 'false' ? false : true
+open.value = defaultOpen.value
+watch(open, (newValue) => {
+    document.cookie = `sidebar:state=${newValue};max-age=${60 * 60 * 24 * 7};path=/`
+})
+
 
 function setActiveTeam(team: typeof data.teams[number]) {
     activeTeam.value = team
@@ -110,15 +118,21 @@ function setActiveTeam(team: typeof data.teams[number]) {
 
 <template>
     <Toaster position="top-right" richColors theme="dark" :expand="true" />
-    <SidebarProvider :defaultOpen="defaultOpen" class="xl:max-w-screen-2xl xl:mx-auto">
-        <Sidebar class="border-coolgray-200 border-r h-screen" collapsible="icon">
+    <SidebarProvider :defaultOpen="defaultOpen" v-model:open="open">
+        <Sidebar class="border-coolgray-200 border-r h-screen " collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
+                        <div class="flex items-center justify-between gap-2 pl-1" :class="open ? 'pt-2' : 'pt-3'">
+                            <Logo :size="open ? 8 : 6" />
+                            <SidebarTrigger class=" dark:text-white -ml-2 mr-0.5 hover:bg-coollabs rounded-xl"
+                                v-if="open" />
+                        </div>
+                        <Separator class="mt-2" v-if="open" />
                         <DropdownMenu>
                             <DropdownMenuTrigger as-child>
                                 <SidebarMenuButton
-                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mt-3 rounded-xl py-6 hover:dark:bg-coolgray-100">
+                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mt-3 py-6 hover:bg-coollabs rounded-xl">
                                     <div class="flex aspect-square items-center justify-center rounded-lg ">
                                         <UsersRound class="size-4" />
                                     </div>
@@ -144,7 +158,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                                     <!-- <DropdownMenuShortcut>⌘{{ index + 1 }}</DropdownMenuShortcut> -->
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem class="gap-2 p-2 rounded-xl">
+                                <DropdownMenuItem class="gap-2 p-2 rounded-xl hover:bg-coollabs">
                                     <div class="flex size-6 items-center justify-center">
                                         <Plus class="size-4" />
                                     </div>
@@ -154,6 +168,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+                        <Separator class="my-2" />
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
@@ -161,11 +176,11 @@ function setActiveTeam(team: typeof data.teams[number]) {
                 <SidebarGroup>
                     <SidebarMenu>
                         <div class="flex flex-col h-full gap-2">
-                            <div v-for="item in data.navMain" :key="item.title">
-                                <SidebarMenuItem v-if="!item.isBottom">
+                            <div v-for="item in data.navMain.filter(item => !item.isBottom)" :key="item.title">
+                                <SidebarMenuItem>
                                     <Link :href="item.isDisabled ? '#' : item.url">
-                                    <SidebarMenuButton :tooltip="item.title" as="div" class="rounded-xl"
-                                        :class="['hover:dark:bg-coollabs', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
+                                    <SidebarMenuButton :tooltip="item.title" as="div"
+                                        class="hover:bg-coollabs rounded-xl">
                                         <component :is="item.icon" />
                                         <span>{{ item.title }}</span>
                                     </SidebarMenuButton>
@@ -178,90 +193,28 @@ function setActiveTeam(team: typeof data.teams[number]) {
             </SidebarContent>
             <SidebarFooter>
                 <SidebarMenu>
-                    <div v-for="item in data.navMain" :key="item.title">
-                        <SidebarMenuItem v-if="item.isBottom">
+                    <div v-for="(item, index) in data.navMain.filter(item => item.isBottom)" :key="item.title">
+                        <SidebarTrigger class=" dark:text-white hover:bg-coollabs ml-0.5 mb-2 rounded-xl"
+                            v-if="!open && index === 0" />
+                        <SidebarMenuItem>
                             <Link :href="item.isDisabled ? '#' : item.url">
-                            <SidebarMenuButton :tooltip="item.title" as="div"
-                                :class="['hover:dark:bg-white/10', item.isDisabled ? 'opacity-50 cursor-not-allowed' : '']">
+                            <SidebarMenuButton :tooltip="item.title" as="div" class="hover:dark:bg-coollabs rounded-xl">
                                 <component :is="item.icon" />
                                 <span>{{ item.title }}</span>
                             </SidebarMenuButton>
                             </Link>
                         </SidebarMenuItem>
                     </div>
-                    <!-- <SidebarMenuItem>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger as-child>
-                                <SidebarMenuButton size="lg"
-                                    class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-                                    <Avatar class="h-8 w-8 rounded-lg">
-                                        <AvatarImage :src="data.user.avatar" :alt="data.user.name" />
-                                        <AvatarFallback class="rounded-lg">
-                                            CN
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div class="grid flex-1 text-left text-sm leading-tight">
-                                        <span class="truncate font-semibold">{{ data.user.name }}</span>
-                                        <span class="truncate text-xs">{{ data.user.email }}</span>
-                                    </div>
-                                    <ChevronsUpDown class="ml-auto size-4" />
-                                </SidebarMenuButton>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent class="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                                side="bottom" align="end" :side-offset="4">
-                                <DropdownMenuLabel class="p-0 font-normal">
-                                    <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                        <Avatar class="h-8 w-8 rounded-lg">
-                                            <AvatarImage :src="data.user.avatar" :alt="data.user.name" />
-                                            <AvatarFallback class="rounded-lg">
-                                                CN
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div class="grid flex-1 text-left text-sm leading-tight">
-                                            <span class="truncate font-semibold">{{ data.user.name }}</span>
-                                            <span class="truncate text-xs">{{ data.user.email }}</span>
-                                        </div>
-                                    </div>
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuGroup>
-                                    <DropdownMenuItem>
-                                        <Sparkles />
-                                        Upgrade to Pro
-                                    </DropdownMenuItem>
-                                </DropdownMenuGroup>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuGroup>
-                                    <DropdownMenuItem>
-                                        <BadgeCheck />
-                                        Account
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <CreditCard />
-                                        Billing
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Bell />
-                                        Notifications
-                                    </DropdownMenuItem>
-                                </DropdownMenuGroup>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                    <LogOut />
-                                    Log out
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </SidebarMenuItem> -->
+                    <SidebarTrigger v-if="!open && data.navMain.filter(item => item.isBottom).length === 0"
+                        class="dark:text-white hover:bg-coollabs ml-0.5 mb-2 rounded-xl" />
                 </SidebarMenu>
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
         <SidebarInset class="dark:bg-background bg-background">
-            <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2">
+            <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2 md:px-10">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center">
-                        <SidebarTrigger class="-ml-2 mr-2 " />
                         <Breadcrumb v-if="props.breadcrumb && props.breadcrumb.length > 0">
                             <BreadcrumbList>
                                 <template v-for="(item, index) in props.breadcrumb" :key="index">
@@ -282,7 +235,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                     <Search v-if="!props.hideSearch" @search="(value) => $emit('search', value)" />
                 </div>
             </header>
-            <main class="flex flex-1 flex-col gap-4 mb-24">
+            <main class="flex flex-1 flex-col gap-4 mb-24 md:px-10">
                 <h1 class="text-3xl font-bold pt-4">
                     <slot name="title" />
                 </h1>
