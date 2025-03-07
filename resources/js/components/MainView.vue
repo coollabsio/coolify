@@ -48,11 +48,29 @@ import {
     ListCheck,
     MessageCircleQuestion,
     CircleX,
+    Menu,
 } from 'lucide-vue-next'
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
+import type { LucideIcon } from 'lucide-vue-next'
 
 import { Toaster } from '@/components/ui/sonner'
+import {
+    Drawer,
+    DrawerContent,
+    DrawerHeader,
+    DrawerTitle,
+    DrawerTrigger,
+} from '@/components/ui/drawer'
+
+interface NavItem {
+    title: string
+    icon: LucideIcon
+    url: string
+    isBottom?: boolean
+    isDisabled?: boolean
+}
+
 const props = defineProps<{
     breadcrumb?: CustomBreadcrumbItem[]
     hideSearch?: boolean
@@ -73,28 +91,30 @@ const data = {
             title: 'Dashboard',
             icon: Home,
             url: '/next/',
+            isBottom: false,
+            isDisabled: false,
         },
-        // {
-        //     title: 'Terminal',
-        //     icon: Terminal,
-        //     url: '/next/terminal',
-        //     isDisabled: true,
-        // },
-        // {
-        //     title: 'Settings',
-        //     icon: Settings,
-        //     url: '/next/settings',
-        //     isDisabled: true,
-        // },
-        // {
-        //     title: 'Feedback',
-        //     icon: MessageCircleQuestion,
-        //     url: '/next/feedback',
-        //     isBottom: true,
-        //     isDisabled: true,
-        // },
+        {
+            title: 'Terminal',
+            icon: Terminal,
+            url: '/next/terminal',
+            isDisabled: true,
+        },
+        {
+            title: 'Settings',
+            icon: Settings,
+            url: '/next/settings',
+            isDisabled: true,
+        },
+        {
+            title: 'Feedback',
+            icon: MessageCircleQuestion,
+            url: '/next/feedback',
+            isBottom: true,
+            isDisabled: true,
+        },
 
-    ]
+    ] as NavItem[]
 }
 
 const activeTeam = ref(data.teams[0])
@@ -110,6 +130,14 @@ watch(open, (newValue) => {
     document.cookie = `sidebar:state=${newValue};max-age=${60 * 60 * 24 * 7};path=/`
 })
 
+const isMobile = ref(window.innerWidth < 768)
+const isDrawerOpen = ref(false)
+
+onMounted(() => {
+    window.addEventListener('resize', () => {
+        isMobile.value = window.innerWidth < 768
+    })
+})
 
 function setActiveTeam(team: typeof data.teams[number]) {
     activeTeam.value = team
@@ -119,7 +147,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
 <template>
     <Toaster position="top-right" richColors theme="dark" :expand="true" />
     <SidebarProvider :defaultOpen="defaultOpen" v-model:open="open">
-        <Sidebar class="border-coolgray-200 border-r h-screen " collapsible="icon">
+        <Sidebar v-if="!isMobile" class="border-coolgray-200 border-r h-screen" collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
@@ -214,7 +242,25 @@ function setActiveTeam(team: typeof data.teams[number]) {
         <SidebarInset class="dark:bg-background bg-background">
             <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2 md:px-10">
                 <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center">
+                    <div class="flex items-center gap-4">
+                        <Drawer v-if="isMobile" v-model:open="isDrawerOpen">
+                            <DrawerTrigger as-child>
+                                <Menu class="size-5 cursor-pointer" />
+                            </DrawerTrigger>
+                            <DrawerContent>
+                                <div class="flex flex-col h-full">
+                                    <div class="flex flex-col gap-4 p-4">
+                                        <div v-for="item in data.navMain"
+                                            :key="item.title">
+                                            <Link :href="item.isDisabled ? '#' : item.url"
+                                                class="flex items-center">
+                                            <span>{{ item.title }}</span>
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            </DrawerContent>
+                        </Drawer>
                         <Breadcrumb v-if="props.breadcrumb && props.breadcrumb.length > 0">
                             <BreadcrumbList>
                                 <template v-for="(item, index) in props.breadcrumb" :key="index">
