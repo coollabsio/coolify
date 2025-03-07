@@ -75,7 +75,7 @@ const handleInstantSave = (value: boolean) => {
       <FormLabel class="flex items-center" v-if="type === 'text' || type === 'textarea' || type === 'select'">
         {{ label || computedField }}
         <span class="text-destructive px-1" v-if="isRequired">*</span>
-        <TooltipProvider v-if="description" delay-duration="0">
+        <TooltipProvider v-if="description" :delay-duration="0">
           <Tooltip>
             <TooltipTrigger>
               <InfoIcon class=" size-4 text-warning" />
