@@ -4,9 +4,10 @@
 # logo: svgs/evolution-api.png
 # port: 8080
 
+version: '3.8'
 services:
   api:
-    image: 'atendai/evolution-api:latest'
+    image: 'atendai/evolution-api:latest' # Change to specific version if needed.
     restart: always
     depends_on:
       - redis
@@ -15,15 +16,14 @@ services:
       - SERVICE_FQDN_EVO_8080
       - SERVER_URL=$SERVICE_FQDN_EVO
       - DB_TYPE=postgresdb
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}
+      - 'DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}'
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_USER=$SERVICE_USER_POSTGRES
-      - DB_POSTGRESDB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - 'DB_POSTGRESDB_USER=${SERVICE_USER_POSTGRES}'
+      - 'DB_POSTGRESDB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-postgres}
-      - DATABASE_CONNECTION_URI=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-postgres}
+      - 'DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-postgres}'
+      - 'DATABASE_CONNECTION_URI=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-postgres}'
       - DEL_INSTANCE=false
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
@@ -34,7 +34,7 @@ services:
       - DATABASE_SAVE_DATA_HISTORIC=true
       - DATABASE_CONNECTION_CLIENT_NAME=evolution_v2
       - RABBITMQ_ENABLED=false
-      - RABBITMQ_URI=amqp://admin:admin@rabbitmq:5672/default
+      - 'RABBITMQ_URI=amqp://admin:admin@rabbitmq:5672/default'
       - RABBITMQ_EXCHANGE_NAME=evolution_v2
       - RABBITMQ_GLOBAL_ENABLED=false
       - RABBITMQ_EVENTS_APPLICATION_STARTUP=false
@@ -63,13 +63,17 @@ services:
       - RABBITMQ_EVENTS_TYPEBOT_START=false
       - RABBITMQ_EVENTS_TYPEBOT_CHANGE_STATUS=false
       - SQS_ENABLED=false
+      - SQS_ACCESS_KEY_ID=
+      - SQS_SECRET_ACCESS_KEY=
+      - SQS_ACCOUNT_ID=
+      - SQS_REGION=
       - WEBSOCKET_ENABLED=false
       - WEBSOCKET_GLOBAL_EVENTS=false
       - WA_BUSINESS_TOKEN_WEBHOOK=evolution
-      - WA_BUSINESS_URL=https://graph.facebook.com
+      - 'WA_BUSINESS_URL=https://graph.facebook.com'
       - WA_BUSINESS_VERSION=v20.0
       - WA_BUSINESS_LANGUAGE=pt_BR
-      - WEBHOOK_GLOBAL_URL=
+      - "WEBHOOK_GLOBAL_URL=''"
       - WEBHOOK_GLOBAL_ENABLED=false
       - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
       - WEBHOOK_EVENTS_APPLICATION_STARTUP=false
@@ -98,7 +102,8 @@ services:
       - WEBHOOK_EVENTS_TYPEBOT_START=false
       - WEBHOOK_EVENTS_TYPEBOT_CHANGE_STATUS=false
       - WEBHOOK_EVENTS_ERRORS=false
-      - CONFIG_SESSION_PHONE_CLIENT=Evolution API V2
+      - WEBHOOK_EVENTS_ERRORS_WEBHOOK=
+      - 'CONFIG_SESSION_PHONE_CLIENT=Evolution API V2'
       - CONFIG_SESSION_PHONE_NAME=Chrome
       - CONFIG_SESSION_PHONE_VERSION=2.3000.1015901307
       - QRCODE_LIMIT=30
@@ -109,52 +114,48 @@ services:
       - CHATWOOT_ENABLED=true
       - CHATWOOT_MESSAGE_READ=true
       - CHATWOOT_MESSAGE_DELETE=true
-      - CHATWOOT_IMPORT_DATABASE_CONNECTION_URI=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-postgres}
+      - 'CHATWOOT_IMPORT_DATABASE_CONNECTION_URI=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-chatwoot}'
       - CHATWOOT_IMPORT_PLACEHOLDER_MEDIA_MESSAGE=true
       - CACHE_REDIS_ENABLED=true
-      - CACHE_REDIS_URI=redis://redis:6379/6
+      - 'CACHE_REDIS_URI=redis://redis:6379/6'
       - CACHE_REDIS_PREFIX_KEY=evolution_v2
       - CACHE_REDIS_SAVE_INSTANCES=false
       - CACHE_LOCAL_ENABLED=false
       - S3_ENABLED=false
-      - AUTHENTICATION_API_KEY=$SERVICE_PASSWORD_EVO
+      - S3_ACCESS_KEY=
+      - S3_SECRET_KEY=
+      - S3_BUCKET=evolution
+      - S3_PORT=443
+      - S3_ENDPOINT=files.site.com
+      - S3_USE_SSL=true
+      - 'AUTHENTICATION_API_KEY=${SERVICE_AUTHENTICATION_API_KEY}'
       - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
       - LANGUAGE=en
     volumes:
-      - evolution_instances:/evolution/instances
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health-check"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
+      - 'evolution_instances:/evolution/instances'
+    expose:
+      - 8080
   redis:
-    image: redis:latest
-    command: redis-server --port 6379 --appendonly yes
+    image: 'redis:latest'
+    command: "redis-server --port 6379 --appendonly yes\n"
     restart: always
     volumes:
-      - evolution_redis:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
+      - 'evolution_redis:/data'
   postgres:
-    image: postgres:16-alpine
+    image: 'postgres:16-alpine'
     command:
       - postgres
-      - -c
+      - '-c'
       - max_connections=1000
     environment:
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
+      - 'AUTHENTICATION_API_KEY=${SERVICE_AUTHENTICATION_API_KEY}'
     restart: always
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $SERVICE_USER_POSTGRES -d ${POSTGRES_DB:-postgres}"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      - 'postgres_data:/var/lib/postgresql/data'
+volumes:
+  evolution_instances: null
+  evolution_redis: null
+  postgres_data: null
