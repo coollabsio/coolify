@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { FormContext } from 'vee-validate';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import * as z from 'zod';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select'
 
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger } from '@/components/ui/combobox'
-import { InfoIcon, Check, ChevronsUpDown, Search } from 'lucide-vue-next';
+import { InfoIcon, Check, ChevronsUpDown, Search, Eye, EyeOff } from 'lucide-vue-next';
 const props = defineProps<{
   field: string;
   formSchema: z.ZodObject<any>;
@@ -33,6 +33,7 @@ const props = defineProps<{
   disabled?: boolean;
   placeholder?: string;
   instantSave?: boolean;
+  hidden?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -40,6 +41,8 @@ const emit = defineEmits<{
 }>();
 
 const type = computed(() => props.type || 'text');
+
+const showPassword = ref(false);
 
 const details = computed(() => {
   const schema = props.formSchema.shape[props.field];
@@ -85,12 +88,18 @@ const handleInstantSave = (value: boolean) => {
         </TooltipProvider>
       </FormLabel>
       <FormControl v-if="type === 'text' || type === 'textarea'">
-        <Input v-if="type === 'text'" :type="details.zodType" :placeholder="placeholder || ''" v-bind="componentField"
-          :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
-          :disabled="disabled || readonly" />
-        <Textarea v-else-if="type === 'textarea'" :placeholder="placeholder || ''" v-bind="componentField"
-          :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
-          :disabled="disabled || readonly" />
+        <div class="relative">
+          <Input v-if="type === 'text'" :type="hidden && !showPassword ? 'password' : details.zodType" :placeholder="placeholder || ''" v-bind="componentField"
+            :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
+            :disabled="disabled || readonly" />
+          <Textarea v-else-if="type === 'textarea'" :placeholder="placeholder || ''" v-bind="componentField"
+            :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
+            :disabled="disabled || readonly" />
+          <button v-if="hidden" type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" @click="showPassword = !showPassword">
+            <Eye v-if="!showPassword" class="size-4" />
+            <EyeOff v-else class="size-4" />
+          </button>
+        </div>
       </FormControl>
       <FormControl v-else-if="type === 'select'">
         <Select v-bind="componentField">

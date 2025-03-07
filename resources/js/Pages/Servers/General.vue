@@ -79,7 +79,7 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
                     <CustomFormField field="description" :form-schema="schema" :form="veeForm" :value="description" />
                 </div>
                 <div class="flex md:flex-row flex-col gap-2 w-full">
-                    <CustomFormField field="wildcard_domain" :form-schema="schema" :form="veeForm"
+                    <CustomFormField :hidden="true" field="wildcard_domain" :form-schema="schema" :form="veeForm"
                         :value="wildcard_domain" placeholder="https://coolify.io" />
                     <CustomFormField field="server_timezone" :form-schema="schema" :form="veeForm"
                         :value="server_timezone" placeholder="America/New_York" />
