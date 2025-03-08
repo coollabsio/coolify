@@ -56,7 +56,7 @@
 </head>
 
 
-<body class="min-h-screen bg-background text-foreground">
+<body class="min-h-screen bg-background text-foreground antialiased">
     @routes
     @inertia
 </body>

@@ -208,7 +208,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                                 <SidebarMenuItem>
                                     <Link :href="item.isDisabled ? '#' : item.url">
                                     <SidebarMenuButton :tooltip="item.title" as="div"
-                                        class="hover:bg-coollabs rounded-xl">
+                                        class="hover:bg-coollabs rounded-xl text-muted-foreground">
                                         <component :is="item.icon" />
                                         <span>{{ item.title }}</span>
                                     </SidebarMenuButton>
@@ -226,7 +226,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
                             v-if="!open && index === 0" />
                         <SidebarMenuItem>
                             <Link :href="item.isDisabled ? '#' : item.url">
-                            <SidebarMenuButton :tooltip="item.title" as="div" class="hover:dark:bg-coollabs rounded-xl">
+                            <SidebarMenuButton :tooltip="item.title" as="div" class="hover:dark:bg-coollabs rounded-xl text-muted-foreground">
                                 <component :is="item.icon" />
                                 <span>{{ item.title }}</span>
                             </SidebarMenuButton>
