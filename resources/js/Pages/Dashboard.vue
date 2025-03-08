@@ -229,7 +229,6 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                         <div v-for="service in services" :key="service.uuid">
                             <ResourceBox type="service" :href="route('next_project', service.uuid)" :name="service.name"
                                 :description="service.description" />
-
                         </div>
                         <!-- <ResourceBox :new="true" type="postgresql" :href="route('next_projects')" name="New Database" /> -->
                     </div>
