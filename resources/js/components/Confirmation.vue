@@ -48,25 +48,25 @@ const handleCancel = () => {
 <template>
     <Popover v-model:open="isOpen">
         <PopoverTrigger :disabled="disabled || isLoading" :class="buttonClass || 'w-full md:w-fit'">
-            <Button :size="size" :variant="isLoading ? 'secondary' : variant || 'default'"
+            <Button :size="size" :variant="isLoading ? 'ghost' : variant || 'default'"
                 :disabled="disabled || isLoading">
                 <template v-if="isLoading">
-                    <Loader2 class="w-4 h-4 mr-2 animate-spin" />
                     {{ loadingText || 'Loading...' }}
+                    <Loader2 class="w-4 h-4 mr-2 animate-spin" />
                 </template>
                 <template v-else>
                     <slot>{{ buttonText || 'Continue' }}</slot>
                 </template>
             </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" class="w-auto min-w-[200px]" :sideOffset="5">
+        <PopoverContent align="start" class="w-auto min-w-[200px]" :sideOffset="5" :collisionPadding="20">
             <div class="grid gap-4">
                 <div class="text-sm" v-html="confirmationMessage || 'Are you sure you want to continue?'" />
                 <div class="flex gap-2 justify-between">
-                    <Button type="button" variant="secondary" @click="handleCancel">
+                    <Button type="button" size="sm" variant="outline" @click="handleCancel">
                         {{ cancelText || 'Cancel' }}
                     </Button>
-                    <Button type="button" variant="destructive" @click="handleContinue">
+                    <Button type="button" size="sm" variant="destructive" @click="handleContinue">
                         {{ continueText || 'Continue' }}
                     </Button>
                 </div>

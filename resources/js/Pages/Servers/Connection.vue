@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import MainView from '@/components/MainView.vue';
 import { getServerBreadcrumbs, getServerSidebarNavItems } from '@/config/server/shared';
 import { Server } from '@/types/ServerType';
@@ -16,8 +16,22 @@ import axios from 'axios';
 import { SelectGroup, SelectItem } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { onSubmit as sharedOnSubmit } from '@/lib/custom';
-import Aside from '@/components/Aside.vue';
+import { usePage } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
+import { useEcho } from '@/lib/useEcho';
+import { PageProps } from '@/types/PagePropsType';
 
+const page = usePage<PageProps>()
+const echo = useEcho()
+
+onMounted(() => {
+    router.flushAll()
+    echo.private(`team.${page.props.currentTeam.id}`)
+        .listen('ProxyStatusChanged', (e: any) => {
+            router.reload({ only: ['server'] })
+            toast.success('Proxy status changed.')
+        })
+})
 const props = defineProps<{
     server: Server,
     private_keys: {
@@ -116,7 +130,7 @@ const testConnection = async () => {
 
 
 const breadcrumb = ref(getServerBreadcrumbs(props.server.name, props.server.uuid))
-const sidebarNavItems = getServerSidebarNavItems(props.server)
+const sidebarNavItems = computed(() => getServerSidebarNavItems(props.server))
 
 </script>
 
@@ -160,7 +174,7 @@ const sidebarNavItems = getServerSidebarNavItems(props.server)
                             </SelectGroup>
                         </template>
                     </CustomFormField>
-                    <Button class="md:w-fit w-full" variant="secondary" @click.prevent="testConnection"
+                    <Button class="md:w-fit w-full" variant="outline" @click.prevent="testConnection"
                         :disabled="isTestingConnection || inertiaForm.processing" :loading="isTestingConnection">
                         Test Connection
                     </Button>

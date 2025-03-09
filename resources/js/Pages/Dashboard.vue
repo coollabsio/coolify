@@ -92,45 +92,11 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
 <template>
     <MainView @search="searchProjects" :breadcrumb="breadcrumb">
         <template #title>
-            {{ capitalize(currentTab) }}
+            Dashboard
         </template>
         <div v-if="search">
-            <Tabs :default-value="currentTab" orientation="vertical"
-                class="w-full pt-2 max-w-[calc(100vw-30px)] md:max-w-full">
-                <ScrollArea>
-                    <TabsList
-                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 md:border-b border-border mb-2">
-                        <TabsTrigger value="projects" disabled>
-                            Projects
-                        </TabsTrigger>
-                        <TabsTrigger value="servers" disabled>
-                            Servers
-                        </TabsTrigger>
-                        <TabsTrigger value="applications" disabled>
-                            Applications
-                        </TabsTrigger>
-                        <TabsTrigger value="databases" disabled>
-                            Databases
-                        </TabsTrigger>
-                        <TabsTrigger value="services" disabled>
-                            Services
-                        </TabsTrigger>
-                        <!-- <TabsTrigger value="git-sources" disabled>
-                            Git Sources
-                        </TabsTrigger>
-                        <TabsTrigger value="destinations" disabled>
-                            Destinations
-                        </TabsTrigger>
-                        <TabsTrigger value="keys" disabled>
-                            Keys & Tokens
-                        </TabsTrigger> -->
-                    </TabsList>
-                    <ScrollBar orientation="horizontal" class="h-1.5" />
-                </ScrollArea>
-            </Tabs>
-
             <div v-if="projects.length > 0 || servers.length > 0 || applications.length > 0 || databases.length > 0 || services.length > 0"
-                class="bg-coolgray-100 p-2 rounded-xl mt-2">
+                class="p-2 rounded-xl mt-2">
                 <div class="resource-box-container">
                     <div v-for="project in projects" :key="project.uuid">
                         <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
@@ -163,25 +129,25 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                 class="w-full pt-2 max-w-[calc(100vw-30px)] md:max-w-full">
                 <ScrollArea>
                     <TabsList
-                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1 md:border-b border-border mb-2">
+                        class="dark:bg-transparent w-full flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted  mb-2">
                         <TabsTrigger value="projects" @click="saveCurrentTab('projects')"
-                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            class="dark:data-[state=active]:bg-coolgray-200">
                             Projects
                         </TabsTrigger>
                         <TabsTrigger value="servers" @click="saveCurrentTab('servers')"
-                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            class="dark:data-[state=active]:bg-coolgray-200">
                             Servers
                         </TabsTrigger>
                         <TabsTrigger value="applications" @click="saveCurrentTab('applications')"
-                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            class="dark:data-[state=active]:bg-coolgray-200">
                             Applications
                         </TabsTrigger>
                         <TabsTrigger value="databases" @click="saveCurrentTab('databases')"
-                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            class="dark:data-[state=active]:bg-coolgray-200">
                             Databases
                         </TabsTrigger>
                         <TabsTrigger value="services" @click="saveCurrentTab('services')"
-                            class="rounded-xl dark:data-[state=active]:bg-coollabs">
+                            class="dark:data-[state=active]:bg-coolgray-200">
                             Services
                         </TabsTrigger>
                     </TabsList>

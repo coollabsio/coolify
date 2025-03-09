@@ -45,7 +45,7 @@
     }
 
     .dark {
-        --background: 0 0% 7%;
+        --background: 0 0% 5.5%;
         /* --background: 264 86% 5%; */
         --foreground: 210 20% 98%;
 
@@ -73,7 +73,7 @@
 
         --border: 0 0% 13%;
         --input: 0 0% 13%;
-        --input-background: 0 0% 9.4%;
+        --input-background: 0 0% 8%;
 
         /* --border: 264 86% 15%;
         --input: 264 86% 15%;

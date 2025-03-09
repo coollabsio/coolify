@@ -53,6 +53,7 @@ import {
 import { ref, watch, onMounted } from 'vue'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import type { LucideIcon } from 'lucide-vue-next'
+import { PageProps } from '@/types/PagePropsType'
 
 import { Toaster } from '@/components/ui/sonner'
 import {
@@ -98,13 +99,17 @@ const data = {
 }
 
 const activeTeam = ref(data.teams[0])
-const defaultOpen = ref(true)
-const open = ref(true)
+const defaultOpen = ref(false)
+const open = ref(false)
 const cookie = document.cookie
     .split('; ')
     .find(row => row.startsWith('sidebar:state='))
 
-defaultOpen.value = cookie?.split('=')[1] == 'false' ? false : true
+if (cookie) {
+    defaultOpen.value = cookie.split('=')[1] == 'false' ? false : true
+} else {
+    defaultOpen.value = false
+}
 open.value = defaultOpen.value
 watch(open, (newValue) => {
     document.cookie = `sidebar:state=${newValue};max-age=${60 * 60 * 24 * 7};path=/`
@@ -123,7 +128,7 @@ function setActiveTeam(team: typeof data.teams[number]) {
     activeTeam.value = team
 }
 
-const page = usePage()
+const page = usePage<PageProps>()
 
 const isActive = (url: string) => {
     const currentUrl = new URL(url, window.location.origin).pathname + (url.endsWith('/') ? '' : '/')
@@ -135,7 +140,7 @@ const isActive = (url: string) => {
 <template>
     <Toaster position="top-right" richColors theme="dark" :expand="true" />
     <SidebarProvider :defaultOpen="defaultOpen" v-model:open="open">
-        <Sidebar v-if="!isMobile" class="border-coolgray-200 border-r h-screen" collapsible="icon">
+        <Sidebar v-if="!isMobile" class="border-border border-r h-screen" collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
@@ -144,7 +149,6 @@ const isActive = (url: string) => {
                             <SidebarTrigger class=" dark:text-white -ml-2 mr-0.5 hover:bg-coollabs rounded-xl"
                                 v-if="open" />
                         </div>
-                        <Separator class="mt-2" v-if="open" />
                         <DropdownMenu>
                             <DropdownMenuTrigger as-child>
                                 <SidebarMenuButton
@@ -184,7 +188,6 @@ const isActive = (url: string) => {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <Separator class="my-2" />
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
@@ -235,7 +238,7 @@ const isActive = (url: string) => {
             <SidebarRail />
         </Sidebar>
         <SidebarInset class="dark:bg-background bg-background">
-            <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2 md:px-10">
+            <header class="flex shrink-0 pb-2 pt-6 bg-background flex flex-col gap-2">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-4">
                         <Drawer v-if="isMobile" v-model:open="isDrawerOpen">
@@ -274,14 +277,14 @@ const isActive = (url: string) => {
                     <Search v-if="!props.hideSearch" @search="(value) => $emit('search', value)" />
                 </div>
             </header>
-            <main class="flex flex-1 flex-col gap-4 mb-24 md:px-10">
-                <h1 class="text-3xl font-bold pt-4">
+            <main class="flex flex-1 flex-col gap-4 mb-24">
+                <h1 v-if="$slots.title" class="text-3xl font-bold pt-4">
                     <slot name="title" />
                 </h1>
-                <h3 class="text-sm text-muted-foreground">
+                <h3 v-if="$slots.subtitle" class="text-sm text-muted-foreground">
                     <slot name="subtitle" />
                 </h3>
-                <div class="pt-6">
+                <div :class="$slots.title || $slots.subtitle ? 'pt-4' : ''">
                     <div v-if="props.sidebarNavItems && props.sidebarNavItems.length > 0"
                         class="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
                         <Aside :sidebarNavItems="sidebarNavItems" />

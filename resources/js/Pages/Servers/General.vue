@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { toTypedSchema } from '@vee-validate/zod';
 import { useForm as useVeeForm, useIsFormValid, useIsFormDirty } from 'vee-validate';
 import * as z from 'zod'
@@ -12,10 +12,23 @@ import { Separator } from '@/components/ui/separator';
 import { onSubmit as sharedOnSubmit } from '@/lib/custom';
 import MainView from '@/components/MainView.vue';
 import { getServerBreadcrumbs, getServerSidebarNavItems } from '@/config/server/shared';
-import { Deferred } from '@inertiajs/vue3'
-
 import { Server } from '@/types/ServerType';
+import { usePage } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
+import { useEcho } from '@/lib/useEcho';
+import { PageProps } from '@/types/PagePropsType';
 
+const page = usePage<PageProps>()
+const echo = useEcho()
+
+onMounted(() => {
+    router.flushAll()
+    echo.private(`team.${page.props.currentTeam.id}`)
+        .listen('ProxyStatusChanged', (e: any) => {
+            router.reload({ only: ['server'] })
+            toast.success('Proxy status changed.')
+        })
+})
 const props = defineProps<{
     server: Server,
 }>()
@@ -52,7 +65,8 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
 })
 
 const breadcrumb = ref(getServerBreadcrumbs(props.server.name, props.server.uuid))
-const sidebarNavItems = getServerSidebarNavItems(props.server)
+const sidebarNavItems = computed(() => getServerSidebarNavItems(props.server))
+
 
 </script>
 

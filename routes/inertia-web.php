@@ -25,7 +25,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/servers/{server_uuid}/proxy', [ServerController::class, 'server_proxy_store'])->name('next_server_proxy_store');
     Route::get('/servers/{server_uuid}/proxy/start', [ServerController::class, 'server_proxy_start'])->name('next_server_proxy_start');
     Route::get('/servers/{server_uuid}/proxy/stop', [ServerController::class, 'server_proxy_stop'])->name('next_server_proxy_stop');
-
+    Route::get('/servers/{server_uuid}/proxy/restart', [ServerController::class, 'server_proxy_restart'])->name('next_server_proxy_restart');
     Route::get('/servers/{server_uuid}/automations', [ServerController::class, 'server_automations'])->name('next_server_automations');
     Route::post('/servers/{server_uuid}/automations', [ServerController::class, 'server_automations_store'])->name('next_server_automations_store');
 });

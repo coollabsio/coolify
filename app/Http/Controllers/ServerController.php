@@ -228,6 +228,21 @@ class ServerController extends Controller
         }
     }
 
+    public function server_proxy_restart(string $server_uuid)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+            StopProxy::run($server);
+            StartProxy::run($server, async: false, force: true);
+
+            return response()->json(['success' => true]);
+        } catch (NotFoundHttpException $e) {
+            return response()->json(['success' => false]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function server_automations(string $server_uuid)
     {
         try {
