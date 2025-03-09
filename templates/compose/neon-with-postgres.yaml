@@ -1,0 +1,44 @@
+# documentation: https://neon.tech
+# slogan: The database you love, on a serverless platform designed to help you build reliable and scalable applications faster.
+# tags: proxy, neon, postgresql
+# logo: svgs/neon.svg
+# port: 80, 2112
+
+services:
+  neon-proxy:
+    image: 'ghcr.io/neondatabase/wsproxy:latest'
+    environment:
+      - SERVICE_FQDN_NEONPROXY
+      - SERVICE_FQDN_NEONPROMETHEUS_2112
+      - 'APPEND_PORT=postgres:5432'
+      - 'ALLOW_ADDR_REGEX=.*'
+      - LOG_TRAFFIC=false
+      - LOG_CONN_INFO=true
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'nc -z 127.0.0.1 80'
+      interval: 5s
+      timeout: 2s
+      retries: 20
+
+  postgres:
+    image: 'postgres:17-alpine'
+    platform: linux/amd64
+    volumes:
+      - 'postgresql-data:/var/lib/postgresql/data'
+    environment:
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRESQL}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}'
+      - 'POSTGRES_DB=${POSTGRESQL_DATABASE:-postgres}'
+      - 'POSTGRES_HOST_AUTH_METHOD=password'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 5s
+      timeout: 20s
+      retries: 10
