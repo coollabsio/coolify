@@ -3,7 +3,7 @@ import { useForm } from '@inertiajs/vue3';
 import { toast } from 'vue-sonner';
 import { ref } from 'vue';
 
-export const inputType = 'w-full rounded-xl border border-l-4 border-input bg-input-background px-3 py-2 text-sm';
+export const inputType = 'w-full rounded-xl border border-l-4 border-input bg-input-background px-3 py-2 text-sm disabled:opacity-50';
 
 export function instantSave(route: string, data: Record<string, any>, successMessage: string = 'Settings updated successfully.') {
   return useForm(data).post(route, {
@@ -24,7 +24,7 @@ export function getInstantSaveRefs(fields: string[], props: any) {
     [field]: ref(props[field])
   }), {} as Record<string, Ref<boolean>>)
 }
-export function onSubmit({ route, values, veeForm, inertiaForm, instantSaveRefs, onError, onSuccess, successMessage = 'Configuration updated successfully.', errorMessage = 'Failed to update configuration.' }: { route: string, values: any, veeForm: any, inertiaForm: any, instantSaveRefs: any, onError?: (error: any) => Promise<void>, onSuccess?: () => Promise<void>, successMessage: string, errorMessage: string }) {
+export function onSubmit({ route, values, veeForm, inertiaForm, instantSaveRefs, onError, onSuccess, successMessage = 'Configuration updated successfully.', errorMessage = 'Failed to update configuration.' }: { route: string, values: any, veeForm: any, inertiaForm: any, instantSaveRefs?: any, onError?: (error: any) => Promise<void>, onSuccess?: () => Promise<void>, successMessage?: string, errorMessage?: string }) {
   const options = {
     showProgress: false,
     onSuccess: async () => {
@@ -32,8 +32,10 @@ export function onSubmit({ route, values, veeForm, inertiaForm, instantSaveRefs,
       veeForm.resetForm({
         values
       })
-      for (const field in instantSaveRefs) {
-        veeForm.setFieldValue(field, instantSaveRefs[field].value)
+      if (instantSaveRefs) {
+        for (const field in instantSaveRefs) {
+          veeForm.setFieldValue(field, instantSaveRefs[field].value)
+        }
       }
       inertiaForm.reset()
     },

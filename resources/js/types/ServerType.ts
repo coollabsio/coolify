@@ -5,7 +5,7 @@ export interface ProxyConfig {
     redirect_enabled: boolean;
     redirect_url: string | null;
     status: string;
-    type: 'TRAEFIK';
+    type: 'TRAEFIK' | 'CADDY';
 }
 
 export interface ServerSettings {

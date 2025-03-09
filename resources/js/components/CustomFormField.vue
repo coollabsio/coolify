@@ -23,8 +23,8 @@ import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, 
 import { InfoIcon, Check, ChevronsUpDown, Search, Eye, EyeOff } from 'lucide-vue-next';
 const props = defineProps<{
   field: string;
-  formSchema: z.ZodObject<any>;
-  form: FormContext<any>;
+  formSchema?: z.ZodObject<any>;
+  form?: FormContext<any>;
   type?: string;
   label?: string;
   description?: string;
@@ -34,6 +34,7 @@ const props = defineProps<{
   placeholder?: string;
   instantSave?: boolean;
   hidden?: boolean;
+  rows?: number;
 }>();
 
 const emit = defineEmits<{
@@ -45,7 +46,7 @@ const type = computed(() => props.type || 'text');
 const showPassword = ref(false);
 
 const details = computed(() => {
-  const schema = props.formSchema.shape[props.field];
+  const schema = props.formSchema?.shape[props.field];
   let type = 'text';
   if (schema._def.typeName === 'ZodNumber') type = 'number';
   if (schema._def.typeName === 'ZodString') type = 'text';
@@ -89,13 +90,16 @@ const handleInstantSave = (value: boolean) => {
       </FormLabel>
       <FormControl v-if="type === 'text' || type === 'textarea'">
         <div class="relative">
-          <Input v-if="type === 'text'" :type="hidden && !showPassword ? 'password' : details.zodType" :placeholder="placeholder || ''" v-bind="componentField"
+          <Input v-if="type === 'text'" :type="hidden && !showPassword ? 'password' : details.zodType"
+            :placeholder="placeholder || ''" v-bind="componentField"
             :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
             :disabled="disabled || readonly" />
           <Textarea v-else-if="type === 'textarea'" :placeholder="placeholder || ''" v-bind="componentField"
-            :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
+            :rows="rows" :class="isFieldDirty ? 'border-l-4 border-warning' : ''" :readonly="readonly"
             :disabled="disabled || readonly" />
-          <button v-if="hidden" type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" @click="showPassword = !showPassword">
+          <button v-if="hidden" type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            @click="showPassword = !showPassword">
             <Eye v-if="!showPassword" class="size-4" />
             <EyeOff v-else class="size-4" />
           </button>
@@ -135,37 +139,34 @@ const handleInstantSave = (value: boolean) => {
               <Search class="size-4 text-muted-foreground" />
             </span>
           </div>
-
           <ComboboxEmpty>
-            No framework found.
+            Nothing found.
           </ComboboxEmpty>
-
           <ComboboxGroup>
             <slot name="combobox-options" />
           </ComboboxGroup>
         </ComboboxList>
       </Combobox>
       <FormControl v-else-if="type === 'checkbox'">
-        <FormItem class="flex flex-row items-center justify-between rounded-xl border border-border p-4">
-          <div class="space-y-0.5">
-            <FormLabel>
-              {{ label || computedField }}
-            </FormLabel>
-            <FormDescription>
-              <span v-if="description" class="text-sm text-muted-foreground">
-                {{ description }}
-              </span>
-              <span v-if="descriptionError" class="text-sm text-destructive">
-                {{ descriptionError }}
-              </span>
-            </FormDescription>
+        <FormItem class="flex flex-col items-center justify-between rounded-xl border border-border p-4">
+          <div class="flex flex-row items-center justify-between w-full">
+            <div class="space-y-0.5">
+              <FormLabel>
+                {{ label || computedField }}
+              </FormLabel>
+              <FormDescription>
+                <div v-if="description" class="text-sm text-muted-foreground" v-html="description" />
+                <div v-if="descriptionError" class="text-sm text-destructive" v-html="descriptionError" />
+              </FormDescription>
+            </div>
+            <FormControl>
+              <Switch :checked="componentField.modelValue" @update:checked="(checked) => {
+                componentField['onUpdate:modelValue'](checked);
+                handleInstantSave(checked);
+              }" :disabled="disabled || readonly" />
+            </FormControl>
           </div>
-          <FormControl>
-            <Switch :checked="componentField.modelValue" @update:checked="(checked) => {
-              componentField['onUpdate:modelValue'](checked);
-              handleInstantSave(checked);
-            }" :disabled="disabled || readonly" />
-          </FormControl>
+          <slot name="switch-additional-content" />
         </FormItem>
       </FormControl>
       <FormMessage />

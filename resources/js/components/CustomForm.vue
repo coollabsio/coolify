@@ -1,63 +1,51 @@
 <script setup lang="ts">
 import { Button } from './ui/button';
 import { Loader2 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
+import Confirmation from './Confirmation.vue';
 
 const props = defineProps<{
-  onSubmit: (e: Event) => void;
-  isSubmitting: boolean;
-  isFormValid: boolean;
-  isFormDirty: boolean;
-  confirmationMessage?: string;
-  customSavingText?: string;
+    onSubmit: (e: Event) => void;
+    isSubmitting: boolean;
+    isFormValid: boolean;
+    isFormDirty: boolean;
+    confirmationMessage?: string;
+    customSavingText?: string;
+    cancelText?: string;
+    continueText?: string;
 }>();
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 
-const isOpen = ref(false);
-const emit = defineEmits(['update:open']);
+const isLoading = ref(props.isSubmitting);
 
-const onSubmit = (e: Event) => {
-  e.preventDefault();
-  isOpen.value = false;
-  props.onSubmit(e);
-}
+// Watch for changes in isSubmitting to update isLoading
+watch(() => props.isSubmitting, (newValue) => {
+    isLoading.value = newValue;
+});
+
+const handleConfirm = () => {
+    const event = new Event('submit');
+    try {
+        props.onSubmit(event);
+    } catch (error) {
+        isLoading.value = false;
+    }
+};
 </script>
 
 <template>
-  <div v-if="confirmationMessage" class="space-y-4">
-    <slot />
-    <Popover v-model:open="isOpen">
-      <PopoverTrigger :disabled="!isFormValid || !isFormDirty" class="w-full md:w-fit">
-        <div class="w-full">
-          <Button v-if="isSubmitting" class="md:w-fit w-full" type="submit" disabled="true">{{ customSavingText ||
-            'Saving...' }}
+    <div v-if="confirmationMessage" class="space-y-4">
+        <slot />
+        <Confirmation v-model:isLoading="isLoading" :disabled="!isFormValid || !isFormDirty || isSubmitting"
+            buttonText="Save" :loadingText="customSavingText || 'Saving...'" :confirmationMessage="confirmationMessage"
+            :cancelText="cancelText" :continueText="continueText" @continue="handleConfirm" />
+    </div>
+    <form v-else class="space-y-4" @submit="props.onSubmit">
+        <slot />
+        <Button v-if="isSubmitting" class="md:w-fit w-full" type="submit" disabled="true">
+            {{ customSavingText || 'Saving...' }}
             <Loader2 class="w-4 h-4 ml-2 animate-spin" />
-          </Button>
-          <Button v-else class="md:w-fit w-full" type="submit" :disabled="!isFormValid || !isFormDirty">Save</Button>
-        </div>
-      </PopoverTrigger>
-      <PopoverContent align="start" class="w-full" sideOffset="1">
-        <div class="grid gap-4">
-          <div class="text-sm" v-html="confirmationMessage || 'Are you sure you want to continue?'"></div>
-          <div class="flex gap-2 justify-between">
-            <Button class="md:w-fit w-full" type="button" variant="secondary" @click="isOpen = false">No</Button>
-            <Button class="md:w-fit w-full" type="submit" variant="destructive" :disabled="!isFormValid || !isFormDirty"
-              @click="onSubmit">Yes</Button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  </div>
-  <form v-else class="space-y-4" @submit="onSubmit">
-    <slot />
-    <Button v-if="isSubmitting" class="md:w-fit w-full" type="submit" disabled="true">{{ customSavingText ||
-      'Saving...' }}
-      <Loader2 class="w-4 h-4 ml-2 animate-spin" />
-    </Button>
-    <Button v-else class="md:w-fit w-full" type="submit" :disabled="!isFormValid || !isFormDirty">Save</Button>
-  </form>
+        </Button>
+        <Button v-else class="md:w-fit w-full" type="submit"
+            :disabled="!isFormValid || !isFormDirty || isSubmitting">Save</Button>
+    </form>
 </template>

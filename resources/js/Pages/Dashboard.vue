@@ -187,7 +187,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                     </TabsList>
                     <ScrollBar orientation="horizontal" class="h-1.5" />
                 </ScrollArea>
-                <TabsContent value="projects" class="bg-coolgray-100 p-2 rounded-xl">
+                <TabsContent value="projects">
                     <div class="resource-box-container">
                         <div v-for="project in projects" :key="project.uuid">
                             <ResourceBox type="project" :href="route('next_project', project.uuid)" :name="project.name"
@@ -196,7 +196,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                         <ResourceBox :new="true" type="project" :href="route('next_projects')" name="New Project" />
                     </div>
                 </TabsContent>
-                <TabsContent value="servers" class="bg-coolgray-100 p-2 rounded-xl">
+                <TabsContent value="servers">
                     <div class="resource-box-container">
                         <div v-for="server in servers" :key="server.uuid">
                             <ResourceBox type="server" :href="route('next_server', server.uuid)" :name="server.name"
@@ -205,7 +205,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                         <ResourceBox :new="true" type="server" :href="route('next_projects')" name="New Server" />
                     </div>
                 </TabsContent>
-                <TabsContent value="applications" class="bg-coolgray-100 p-2 rounded-xl">
+                <TabsContent value="applications">
                     <div class="resource-box-container">
                         <div v-for="application in applications" :key="application.uuid">
                             <ResourceBox type="application" :href="route('next_project', application.uuid)"
@@ -215,7 +215,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                             name="New Application" />
                     </div>
                 </TabsContent>
-                <TabsContent value="databases" class="bg-coolgray-100 p-2 rounded-xl">
+                <TabsContent value="databases">
                     <div class="resource-box-container">
                         <div v-for="database in databases" :key="database.uuid">
                             <ResourceBox :type="database.type" :href="route('next_project', database.uuid)"
@@ -224,7 +224,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                         <!-- <ResourceBox :new="true" type="postgresql" :href="route('next_projects')" name="New Database" /> -->
                     </div>
                 </TabsContent>
-                <TabsContent value="services" class="bg-coolgray-100 p-2 rounded-xl">
+                <TabsContent value="services">
                     <div class="resource-box-container">
                         <div v-for="service in services" :key="service.uuid">
                             <ResourceBox type="service" :href="route('next_project', service.uuid)" :name="service.name"
@@ -242,7 +242,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                         <ResourceBox :new="true" type="source" :href="route('next_projects')" name="New Source" />
                     </div>
                 </TabsContent>
-                <TabsContent value="destinations" class="bg-coolgray-100 p-2 rounded-xl">
+                <TabsContent value="destinations">
                     <div class="resource-box-container">
                         <div v-for="destination in destinations" :key="destination.uuid">
                             <ResourceBox type="destination" :href="route('next_project', destination.uuid)"
@@ -252,7 +252,7 @@ const breadcrumb = ref<CustomBreadcrumbItem[]>([
                             name="New Destination" />
                     </div>
                 </TabsContent> -->
-                <!-- <TabsContent value="keys" class="bg-coolgray-100 p-2 rounded-xl">
+                <!-- <TabsContent value="keys">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-left">
                         <div v-for="server in servers" :key="server.uuid">
                             <ResourceBox :href="route('next_projects')" :name="server.name" :description="server.description" />

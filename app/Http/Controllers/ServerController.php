@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Proxy\CheckConfiguration;
+use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\StartProxy;
+use App\Actions\Proxy\StopProxy;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Http\Request;
@@ -43,7 +47,7 @@ class ServerController extends Controller
 
             $currentTimezone = $server->settings->server_timezone;
             $server->settings = $server->settings->only(['wildcard_domain', 'server_timezone']);
-            $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
+            $server = $server->only(['id', 'uuid', 'name', 'description', 'settings', 'proxy']);
 
             return Inertia::render('Servers/General', [
                 'server' => $server,
@@ -77,7 +81,7 @@ class ServerController extends Controller
             $server = $this->getServer($server_uuid);
             $server->privateKey = $server->privateKey->only(['id', 'uuid', 'name']);
             $privateKeys = PrivateKey::ownedByCurrentTeam()->where('id', '!=', data_get($server, 'privateKey.id'))->where('is_git_related', false)->get();
-            $server = $server->only(['id', 'uuid', 'ip', 'user', 'port', 'name', 'description', 'privateKey']);
+            $server = $server->only(['id', 'uuid', 'ip', 'user', 'port', 'name', 'description', 'privateKey', 'proxy']);
 
             $privateKeys = $privateKeys->map(function ($privateKey) {
                 return [
@@ -144,13 +148,93 @@ class ServerController extends Controller
         }
     }
 
+    public function server_proxy(string $server_uuid)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+            $preserveServer = $server;
+            $server->settings = $server->settings->only(['generate_exact_labels']);
+            $server = $server->only(['id', 'uuid', 'name', 'description', 'proxy', 'settings']);
+
+            return Inertia::render('Servers/Proxy', [
+                'server' => $server,
+                'configuration' => Inertia::defer(fn () => CheckConfiguration::run($preserveServer)),
+            ]);
+        } catch (NotFoundHttpException $e) {
+            return redirect()->route('next_servers');
+        }
+    }
+
+    public function server_proxy_store(string $server_uuid, Request $request)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+        } catch (NotFoundHttpException $e) {
+            return redirect()->route('next_server_proxy', $server_uuid);
+        }
+
+        try {
+            $configuration = $request->input('configuration');
+            $generateExactLabels = $request->input('generate_exact_labels');
+            $redirectEnabled = $request->input('redirect_enabled');
+            $redirect = $request->input('redirect_url');
+
+            if (filled($redirect)) {
+                $server->proxy->set('redirect_url', $redirect);
+                $server->save();
+                SaveConfiguration::run($server, $configuration);
+                $server->setupDefaultRedirect();
+            }
+
+            if (filled($redirectEnabled)) {
+                $server->proxy->set('redirect_enabled', $redirectEnabled);
+                $server->save();
+            }
+            if (filled($generateExactLabels)) {
+                $server->settings->update(['generate_exact_labels' => $generateExactLabels]);
+            }
+
+            return redirect()->route('next_server_proxy', $server_uuid);
+        } catch (\Exception $e) {
+            return redirect()->route('next_server_proxy', $server_uuid)->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function server_proxy_start(string $server_uuid)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+            StartProxy::run($server, async: false, force: true);
+
+            return response()->json(['success' => true]);
+        } catch (NotFoundHttpException $e) {
+            return response()->json(['success' => false]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function server_proxy_stop(string $server_uuid)
+    {
+        try {
+            $server = $this->getServer($server_uuid);
+            StopProxy::run($server);
+
+            return response()->json(['success' => true]);
+        } catch (NotFoundHttpException $e) {
+            return response()->json(['success' => false]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function server_automations(string $server_uuid)
     {
         try {
             $server = $this->getServer($server_uuid);
             $recentExecutions = $server->dockerCleanupExecutions()->orderBy('created_at', 'desc')->limit(5)->get();
             $server->settings = $server->settings->only(['docker_cleanup_frequency', 'docker_cleanup_threshold', 'force_docker_cleanup', 'delete_unused_volumes', 'delete_unused_networks', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency']);
-            $server = $server->only(['id', 'uuid', 'name', 'description', 'settings']);
+            $server = $server->only(['id', 'uuid', 'name', 'description', 'settings', 'proxy']);
 
             return Inertia::render('Servers/Automations', [
                 'server' => $server,

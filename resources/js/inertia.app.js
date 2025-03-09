@@ -3,7 +3,6 @@ import { ZiggyVue } from 'ziggy-js';
 import { createInertiaApp } from '@inertiajs/vue3'
 import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
 import { route } from './route'
-
 createInertiaApp({
     progress: {
         color: '#6B16ED',
@@ -19,6 +18,8 @@ createInertiaApp({
         app.use(plugin)
         app.use(autoAnimatePlugin)
         app.provide('route', route)
+        app.provide('echo', window.Echo)
+        app.provide('pusher', window.Pusher)
         app.mount(el)
     },
 })

@@ -84,7 +84,7 @@ const selectedExecution = ref(null)
 
 
 const breadcrumb = ref(getServerBreadcrumbs(props.server.name, props.server.uuid))
-const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
+const sidebarNavItems = getServerSidebarNavItems(props.server)
 </script>
 
 <template>
@@ -139,8 +139,8 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
           @instant-save="instantSave"
           description-error="Warning: This will delete all unused networks on the server and could cause functional issues." />
       </CustomForm>
-      <Separator class="my-4" />
-      <h2 class="pb-2 font-bold text-lg">
+      <!-- <Separator class="my-4" /> -->
+      <!-- <h2 class="pb-2 font-bold text-lg">
         Recent Executions
       </h2>
       <p class="text-sm text-muted-foreground pb-2">
@@ -179,7 +179,7 @@ const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
             </div>
           </div>
         </SheetContent>
-      </Sheet>
+      </Sheet> -->
     </template>
   </MainView>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang=ts>
 import Search from '@/components/Search.vue'
 import Aside from '@/components/Aside.vue'
-import { Link } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -94,26 +94,6 @@ const data = {
             isBottom: false,
             isDisabled: false,
         },
-        {
-            title: 'Terminal',
-            icon: Terminal,
-            url: '/next/terminal',
-            isDisabled: true,
-        },
-        {
-            title: 'Settings',
-            icon: Settings,
-            url: '/next/settings',
-            isDisabled: true,
-        },
-        {
-            title: 'Feedback',
-            icon: MessageCircleQuestion,
-            url: '/next/feedback',
-            isBottom: true,
-            isDisabled: true,
-        },
-
     ] as NavItem[]
 }
 
@@ -141,6 +121,14 @@ onMounted(() => {
 
 function setActiveTeam(team: typeof data.teams[number]) {
     activeTeam.value = team
+}
+
+const page = usePage()
+
+const isActive = (url: string) => {
+    const currentUrl = new URL(url, window.location.origin).pathname + (url.endsWith('/') ? '' : '/')
+    const pageUrl = new URL(page.url, window.location.origin).pathname + (page.url.endsWith('/') ? '' : '/')
+    return currentUrl === pageUrl
 }
 </script>
 
@@ -207,8 +195,11 @@ function setActiveTeam(team: typeof data.teams[number]) {
                             <div v-for="item in data.navMain.filter(item => !item.isBottom)" :key="item.title">
                                 <SidebarMenuItem>
                                     <Link :href="item.isDisabled ? '#' : item.url">
-                                    <SidebarMenuButton :tooltip="item.title" as="div"
-                                        class="hover:bg-coollabs rounded-xl text-muted-foreground">
+                                    <SidebarMenuButton :tooltip="item.title" as="div" :class="[
+                                        'rounded-xl',
+                                        item.isDisabled ? 'text-muted-foreground' :
+                                            isActive(item.url) ? 'text-warning bg-coolgray-200' : 'text-muted-foreground'
+                                    ]">
                                         <component :is="item.icon" />
                                         <span>{{ item.title }}</span>
                                     </SidebarMenuButton>
@@ -226,7 +217,11 @@ function setActiveTeam(team: typeof data.teams[number]) {
                             v-if="!open && index === 0" />
                         <SidebarMenuItem>
                             <Link :href="item.isDisabled ? '#' : item.url">
-                            <SidebarMenuButton :tooltip="item.title" as="div" class="hover:dark:bg-coollabs rounded-xl text-muted-foreground">
+                            <SidebarMenuButton :tooltip="item.title" as="div" :class="[
+                                'rounded-xl',
+                                item.isDisabled ? 'text-muted-foreground' :
+                                    isActive(item.url) ? 'text-warning bg-coolgray-200' : 'text-muted-foreground'
+                            ]">
                                 <component :is="item.icon" />
                                 <span>{{ item.title }}</span>
                             </SidebarMenuButton>
@@ -250,10 +245,8 @@ function setActiveTeam(team: typeof data.teams[number]) {
                             <DrawerContent>
                                 <div class="flex flex-col h-full">
                                     <div class="flex flex-col gap-4 p-4">
-                                        <div v-for="item in data.navMain"
-                                            :key="item.title">
-                                            <Link :href="item.isDisabled ? '#' : item.url"
-                                                class="flex items-center">
+                                        <div v-for="item in data.navMain" :key="item.title">
+                                            <Link :href="item.isDisabled ? '#' : item.url" class="flex items-center">
                                             <span>{{ item.title }}</span>
                                             </Link>
                                         </div>

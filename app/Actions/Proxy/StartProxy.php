@@ -4,6 +4,7 @@ namespace App\Actions\Proxy;
 
 use App\Enums\ProxyTypes;
 use App\Events\ProxyStarted;
+use App\Events\ProxyStatusChanged;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
@@ -62,7 +63,6 @@ class StartProxy
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));
         }
-
         if ($async) {
             return remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
         } else {
@@ -71,6 +71,7 @@ class StartProxy
             $server->proxy->set('type', $proxyType);
             $server->save();
             ProxyStarted::dispatch($server);
+            ProxyStatusChanged::dispatch($server->team_id);
 
             return 'OK';
         }

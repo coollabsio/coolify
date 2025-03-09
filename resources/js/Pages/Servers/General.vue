@@ -52,7 +52,7 @@ const onSubmit = veeForm.handleSubmit(async (values) => {
 })
 
 const breadcrumb = ref(getServerBreadcrumbs(props.server.name, props.server.uuid))
-const sidebarNavItems = getServerSidebarNavItems(props.server.uuid)
+const sidebarNavItems = getServerSidebarNavItems(props.server)
 
 </script>
 
