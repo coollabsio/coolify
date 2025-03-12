@@ -27,21 +27,19 @@ class StartDatabaseProxy
         $server = data_get($database, 'destination.server');
         $containerName = data_get($database, 'uuid');
         $proxyContainerName = "{$database->uuid}-proxy";
-
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
-            // $connectPredefined = data_get($database, 'service.connect_to_docker_network');
             $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
             $proxyContainerName = "{$database->service->uuid}-proxy";
-            $containerName = "{$database->name}-{$database->service->uuid}";
+            $containerName = str($database->name)->slug().'-'.$database->s˝ervice->uuid;
         }
-
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,
             'standalone-postgresql', 'standalone-supabase/postgres' => 5432,
             'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
             'standalone-clickhouse' => 9000,
+            'standalone-mongodb' => 27017,
         };
 
         $configuration_dir = database_proxy_dir($database->uuid);
