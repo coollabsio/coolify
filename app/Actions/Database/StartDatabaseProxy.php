@@ -40,6 +40,7 @@ class StartDatabaseProxy
             'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
             'standalone-clickhouse' => 9000,
             'standalone-mongodb' => 27017,
+            default => throw new \Exception("Unsupported database type: $databaseType"),
         };
 
         $configuration_dir = database_proxy_dir($database->uuid);
