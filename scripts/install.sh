@@ -336,13 +336,13 @@ if ! [ -x "$(command -v docker)" ]; then
                 exit 1
             fi
             ;;
-        "fedora")
+        "centos" | "fedora" | "rhel")
             if [ -x "$(command -v dnf5)" ]; then
                 # dnf5 is available
-                dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo --overwrite >/dev/null 2>&1
+                dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1
             else
                 # dnf5 is not available, use dnf
-                dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo >/dev/null 2>&1
+                dnf config-manager --add-repo=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo >/dev/null 2>&1
             fi
             dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
             if ! [ -x "$(command -v docker)" ]; then
