@@ -2,7 +2,7 @@
 # https://github.com/soketi/soketi/releases
 ARG SOKETI_VERSION=1.6-16-alpine
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2025.1.0
+ARG CLOUDFLARED_VERSION=2025.2.0
 
 FROM quay.io/soketi/soketi:${SOKETI_VERSION}
 

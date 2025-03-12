@@ -133,9 +133,9 @@ class Show extends Component
             $this->task->delete();
 
             if ($this->type === 'application') {
-                return redirect()->route('project.application.configuration', $this->parameters, $this->task->name);
+                return redirect()->route('project.application.scheduled-tasks.show', $this->parameters);
             } else {
-                return redirect()->route('project.service.configuration', $this->parameters, $this->task->name);
+                return redirect()->route('project.service.scheduled-tasks.show', $this->parameters);
             }
         } catch (\Exception $e) {
             return handleError($e);
