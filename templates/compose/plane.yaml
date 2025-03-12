@@ -5,7 +5,7 @@
 
 x-app-env: &app-env
   environment:
-    - APP_RELEASE=${APP_RELEASE:-v0.25.1}
+    - APP_RELEASE=${APP_RELEASE:-v0.25.2}
     - WEB_URL=${SERVICE_FQDN_PLANE}
     - DEBUG=${DEBUG:-0}
     - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
