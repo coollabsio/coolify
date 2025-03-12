@@ -32,7 +32,7 @@ class StartDatabaseProxy
             $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
             $proxyContainerName = "{$database->service->uuid}-proxy";
-            $containerName = str($database->name)->slug().'-'.$database->s˝ervice->uuid;
+            $containerName = substr(str($database->name)->slug().'-'.$database->service->uuid, 0, 32);
         }
         $internalPort = match ($databaseType) {
             'standalone-mariadb', 'standalone-mysql' => 3306,
