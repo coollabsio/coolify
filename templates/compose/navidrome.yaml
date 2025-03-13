@@ -4,7 +4,7 @@
 # logo: svgs/navidrome.svg
 # port: 4533
 
-ervices:
+services:
   navidrome:
     image: 'deluan/navidrome:latest'
     ports:
