@@ -1,6 +1,14 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to install and auto-update!
 
+## Environment variables that can be set:
+## ROOT_USERNAME - Predefined root username
+## ROOT_USER_EMAIL - Predefined root user email
+## ROOT_USER_PASSWORD - Predefined root user password
+## DOCKER_ADDRESS_POOL_BASE - Custom Docker address pool base (default: 10.0.0.0/8)
+## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
+## AUTOUPDATE - Set to "false" to disable auto-updates
+
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
@@ -8,7 +16,7 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.7"
+VERSION="1.8"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -26,6 +34,80 @@ echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/in
 ROOT_USERNAME=${ROOT_USERNAME:-}
 ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
 ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
+
+# Docker address pool configuration defaults
+DOCKER_ADDRESS_POOL_BASE_DEFAULT="10.0.0.0/8"
+DOCKER_ADDRESS_POOL_SIZE_DEFAULT=24
+
+# Check if environment variables were explicitly provided
+DOCKER_POOL_BASE_PROVIDED=false
+DOCKER_POOL_SIZE_PROVIDED=false
+
+if [ -n "${DOCKER_ADDRESS_POOL_BASE+x}" ]; then
+    DOCKER_POOL_BASE_PROVIDED=true
+fi
+
+if [ -n "${DOCKER_ADDRESS_POOL_SIZE+x}" ]; then
+    DOCKER_POOL_SIZE_PROVIDED=true
+fi
+
+# Function to compare address pools
+compare_address_pools() {
+    local base1="$1"
+    local size1="$2"
+    local base2="$3"
+    local size2="$4"
+    
+    # Normalize CIDR notation for comparison
+    local ip1=$(echo "$base1" | cut -d'/' -f1)
+    local prefix1=$(echo "$base1" | cut -d'/' -f2)
+    local ip2=$(echo "$base2" | cut -d'/' -f1)
+    local prefix2=$(echo "$base2" | cut -d'/' -f2)
+    
+    # Compare IPs and prefixes
+    if [ "$ip1" = "$ip2" ] && [ "$prefix1" = "$prefix2" ] && [ "$size1" = "$size2" ]; then
+        return 0  # Pools are the same
+    else
+        return 1  # Pools are different
+    fi
+}
+
+# Docker address pool configuration
+DOCKER_ADDRESS_POOL_BASE=${DOCKER_ADDRESS_POOL_BASE:-"$DOCKER_ADDRESS_POOL_BASE_DEFAULT"}
+DOCKER_ADDRESS_POOL_SIZE=${DOCKER_ADDRESS_POOL_SIZE:-$DOCKER_ADDRESS_POOL_SIZE_DEFAULT}
+
+# Load Docker address pool configuration from .env file if it exists and environment variables were not provided
+if [ -f "/data/coolify/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
+    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2)
+    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2)
+    
+    if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ] || [ -n "$ENV_DOCKER_ADDRESS_POOL_SIZE" ]; then
+        echo "Found custom docker address pool configuration in .env file."
+    fi
+
+    if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ]; then
+        echo "Using Docker address pool base: $ENV_DOCKER_ADDRESS_POOL_BASE"
+        DOCKER_ADDRESS_POOL_BASE="$ENV_DOCKER_ADDRESS_POOL_BASE"
+    fi
+    
+    if [ -n "$ENV_DOCKER_ADDRESS_POOL_SIZE" ]; then
+        echo "Using Docker address pool size: $ENV_DOCKER_ADDRESS_POOL_SIZE"
+        DOCKER_ADDRESS_POOL_SIZE="$ENV_DOCKER_ADDRESS_POOL_SIZE"
+    fi
+fi
+
+# Validate Docker address pool configuration
+if ! [[ $DOCKER_ADDRESS_POOL_BASE =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+    echo "Warning: Invalid DOCKER_ADDRESS_POOL_BASE format: $DOCKER_ADDRESS_POOL_BASE"
+    echo "Using default value: $DOCKER_ADDRESS_POOL_BASE_DEFAULT"
+    DOCKER_ADDRESS_POOL_BASE="$DOCKER_ADDRESS_POOL_BASE_DEFAULT"
+fi
+
+if ! [[ $DOCKER_ADDRESS_POOL_SIZE =~ ^[0-9]+$ ]] || [ "$DOCKER_ADDRESS_POOL_SIZE" -lt 16 ] || [ "$DOCKER_ADDRESS_POOL_SIZE" -gt 28 ]; then
+    echo "Warning: Invalid DOCKER_ADDRESS_POOL_SIZE: $DOCKER_ADDRESS_POOL_SIZE (must be a number between 16 and 28)"
+    echo "Using default value: $DOCKER_ADDRESS_POOL_SIZE_DEFAULT"
+    DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE_DEFAULT
+fi
 
 TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
 AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
@@ -160,6 +242,7 @@ echo "| Docker            | $DOCKER_VERSION"
 echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
+echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
 echo -e "---------------------------------------------\n"
 echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
@@ -375,38 +458,109 @@ else
 fi
 
 echo -e "4. Check Docker Configuration. "
-mkdir -p /etc/docker
-# shellcheck disable=SC2015
-test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE" || cat >/etc/docker/daemon.json <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-address-pools": [
-    {"base":"10.0.0.0/8","size":24}
-  ]
-}
-EOL
-cat >/etc/docker/daemon.json.coolify <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-address-pools": [
-    {"base":"10.0.0.0/8","size":24}
-  ]
-}
-EOL
-TEMP_FILE=$(mktemp)
-if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify >"$TEMP_FILE"; then
-    echo "Error merging JSON files"
-    exit 1
+
+# Check if daemon.json exists and extract existing address pool configuration
+if [ -f /etc/docker/daemon.json ]; then
+    echo " - Existing Docker configuration found."
+    if jq -e '.["default-address-pools"]' /etc/docker/daemon.json >/dev/null 2>&1; then
+        EXISTING_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null)
+        EXISTING_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null)
+        
+        if [ -n "$EXISTING_POOL_BASE" ] && [ -n "$EXISTING_POOL_SIZE" ] && [ "$EXISTING_POOL_BASE" != "null" ] && [ "$EXISTING_POOL_SIZE" != "null" ]; then
+            echo " - Found existing Docker address pool: $EXISTING_POOL_BASE (size $EXISTING_POOL_SIZE)"
+            
+            # Check if environment variables were explicitly provided
+            if [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
+                echo " - No custom Docker address pool provided. Using existing configuration."
+                DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
+                DOCKER_ADDRESS_POOL_SIZE="$EXISTING_POOL_SIZE"
+            else
+                # Check if the provided values are different from existing ones
+                if compare_address_pools "$DOCKER_ADDRESS_POOL_BASE" "$DOCKER_ADDRESS_POOL_SIZE" "$EXISTING_POOL_BASE" "$EXISTING_POOL_SIZE"; then
+                    echo " - Provided Docker address pool is identical to existing configuration."
+                else
+                    echo " - Custom Docker address pool provided: $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
+                    echo " - This will override the existing configuration in daemon.json: $EXISTING_POOL_BASE (size $EXISTING_POOL_SIZE)"
+                fi
+            fi
+        fi
+    fi
 fi
-mv "$TEMP_FILE" /etc/docker/daemon.json
+
+echo " - Using Docker address pool: ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE})"
+echo "   To override, set DOCKER_ADDRESS_POOL_BASE and DOCKER_ADDRESS_POOL_SIZE environment variables."
+
+mkdir -p /etc/docker
+
+# Backup original daemon.json if it exists
+if [ -f /etc/docker/daemon.json ]; then
+    cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE"
+fi
+
+# Create coolify configuration with or without address pools based on whether they were explicitly provided
+if [ "$DOCKER_POOL_BASE_PROVIDED" = true ] || [ "$DOCKER_POOL_SIZE_PROVIDED" = true ] || ! [ -f /etc/docker/daemon.json ]; then
+    # If environment variables were explicitly provided or daemon.json doesn't exist,
+    # create a new configuration with the specified address pools
+    cat >/etc/docker/daemon.json.coolify <<EOL
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "default-address-pools": [
+    {"base":"${DOCKER_ADDRESS_POOL_BASE}","size":${DOCKER_ADDRESS_POOL_SIZE}}
+  ]
+}
+EOL
+    NEED_MERGE=true
+else
+    # Check if we need to update log settings
+    if [ -f /etc/docker/daemon.json ] && jq -e '.["log-driver"] == "json-file" and .["log-opts"]["max-size"] == "10m" and .["log-opts"]["max-file"] == "3"' /etc/docker/daemon.json >/dev/null 2>&1; then
+        echo " - Docker log configuration is already set correctly."
+        NEED_MERGE=false
+    else
+        # If no environment variables were provided and daemon.json exists,
+        # create a configuration without address pools to preserve existing ones
+        cat >/etc/docker/daemon.json.coolify <<EOL
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOL
+        NEED_MERGE=true
+    fi
+fi
+
+# If daemon.json doesn't exist, create it
+if ! [ -f /etc/docker/daemon.json ]; then
+    cat >/etc/docker/daemon.json <<EOL
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "default-address-pools": [
+    {"base":"${DOCKER_ADDRESS_POOL_BASE}","size":${DOCKER_ADDRESS_POOL_SIZE}}
+  ]
+}
+EOL
+    NEED_MERGE=false
+fi
+
+# Merge the configurations if needed
+if [ "$NEED_MERGE" = true ]; then
+    TEMP_FILE=$(mktemp)
+    if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify >"$TEMP_FILE"; then
+        echo "Error merging JSON files"
+        exit 1
+    fi
+    mv "$TEMP_FILE" /etc/docker/daemon.json
+fi
 
 restart_docker_service() {
     # Check if systemctl is available
@@ -443,14 +597,30 @@ restart_docker_service() {
 if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
     DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-"$DATE"))
     if [ "$DIFF" != "" ]; then
+        echo " - Docker configuration updated, checking changes..."
+        
+        # Check if address pools were changed
+        if echo "$DIFF" | grep -q "default-address-pools"; then
+            if [ "$DOCKER_POOL_BASE_PROVIDED" = true ] || [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
+                echo " - Docker address pools were explicitly changed by user request."
+            else
+                echo " - Warning: Docker address pools were changed but not by user request."
+                echo "   This might be due to a configuration issue. Please check your Docker configuration."
+            fi
+        fi
+        
+        echo " - Restarting Docker daemon..."
+        restart_docker_service
+    else
+        echo " - Docker configuration is up to date, no restart needed."
+    fi
+else
+    if [ "$NEED_MERGE" = true ]; then
         echo " - Docker configuration updated, restart docker daemon..."
         restart_docker_service
     else
-        echo " - Docker configuration is up to date."
+        echo " - Docker configuration is up to date, no restart needed."
     fi
-else
-    echo " - Docker configuration updated, restart docker daemon..."
-    restart_docker_service
 fi
 
 echo -e "5. Download required files from CDN. "
@@ -510,6 +680,26 @@ if [ "$AUTOUPDATE" = "false" ]; then
         sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
     fi
 fi
+
+# Save Docker address pool configuration to .env file
+if ! grep -q "DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env; then
+    echo "DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE" >>/data/coolify/source/.env
+else
+    # Only update if explicitly provided
+    if [ "$DOCKER_POOL_BASE_PROVIDED" = true ]; then
+        sed -i "s|DOCKER_ADDRESS_POOL_BASE=.*|DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE|g" /data/coolify/source/.env
+    fi
+fi
+
+if ! grep -q "DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env; then
+    echo "DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE" >>/data/coolify/source/.env
+else
+    # Only update if explicitly provided
+    if [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
+        sed -i "s|DOCKER_ADDRESS_POOL_SIZE=.*|DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE|g" /data/coolify/source/.env
+    fi
+fi
+
 echo -e "8. Checking for SSH key for localhost access."
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
