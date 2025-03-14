@@ -3,7 +3,7 @@
     <h1>Deployments</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div class="flex flex-col gap-2 pb-10" @if (!$skip) wire:poll.5000ms='reload_deployments' @endif>
+    <div class="flex flex-col gap-2 pb-10" @if (!$skip) wire:poll.1000ms='reload_deployments' @endif>
         <div class="flex items-end gap-2 pt-4">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
             @if ($deployments_count > 0)
