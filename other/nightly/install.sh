@@ -7,6 +7,7 @@
 ## ROOT_USER_PASSWORD - Predefined root user password
 ## DOCKER_ADDRESS_POOL_BASE - Custom Docker address pool base (default: 10.0.0.0/8)
 ## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
+## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 
 set -e # Exit immediately if a command exits with a non-zero status
@@ -84,18 +85,18 @@ compare_address_pools() {
     local size1="$2"
     local base2="$3"
     local size2="$4"
-    
+
     # Normalize CIDR notation for comparison
     local ip1=$(echo "$base1" | cut -d'/' -f1)
     local prefix1=$(echo "$base1" | cut -d'/' -f2)
     local ip2=$(echo "$base2" | cut -d'/' -f1)
     local prefix2=$(echo "$base2" | cut -d'/' -f2)
-    
+
     # Compare IPs and prefixes
     if [ "$ip1" = "$ip2" ] && [ "$prefix1" = "$prefix2" ] && [ "$size1" = "$size2" ]; then
-        return 0  # Pools are the same
+        return 0 # Pools are the same
     else
-        return 1  # Pools are different
+        return 1 # Pools are different
     fi
 }
 
@@ -107,11 +108,11 @@ DOCKER_ADDRESS_POOL_SIZE=${DOCKER_ADDRESS_POOL_SIZE:-$DOCKER_ADDRESS_POOL_SIZE_D
 if [ -f "/data/coolify/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
     ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2)
     ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2)
-    
+
     if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ]; then
         DOCKER_ADDRESS_POOL_BASE="$ENV_DOCKER_ADDRESS_POOL_BASE"
     fi
-    
+
     if [ -n "$ENV_DOCKER_ADDRESS_POOL_SIZE" ]; then
         DOCKER_ADDRESS_POOL_SIZE="$ENV_DOCKER_ADDRESS_POOL_SIZE"
     fi
@@ -123,11 +124,11 @@ if [ -f /etc/docker/daemon.json ]; then
     if jq -e '.["default-address-pools"]' /etc/docker/daemon.json >/dev/null 2>&1; then
         EXISTING_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null)
         EXISTING_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null)
-        
+
         if [ -n "$EXISTING_POOL_BASE" ] && [ -n "$EXISTING_POOL_SIZE" ] && [ "$EXISTING_POOL_BASE" != "null" ] && [ "$EXISTING_POOL_SIZE" != "null" ]; then
             echo "Found existing Docker network pool: $EXISTING_POOL_BASE/$EXISTING_POOL_SIZE"
             EXISTING_POOL_CONFIGURED=true
-            
+
             # Check if environment variables were explicitly provided
             if [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
                 DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
@@ -181,7 +182,7 @@ WARNING_SPACE=false
 
 if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
     WARNING_SPACE=true
-    cat << EOF
+    cat <<EOF
 WARNING: Insufficient total disk space!
 
 Total disk space:     ${TOTAL_SPACE}GB
@@ -192,7 +193,7 @@ EOF
 fi
 
 if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
-    cat << EOF
+    cat <<EOF
 WARNING: Insufficient available disk space!
 
 Available disk space:   ${AVAILABLE_SPACE}GB
@@ -200,7 +201,7 @@ Required available space: ${REQUIRED_AVAILABLE_SPACE}GB
 
 ==================
 EOF
-WARNING_SPACE=true
+    WARNING_SPACE=true
 fi
 
 if [ "$WARNING_SPACE" = true ]; then
@@ -282,7 +283,6 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
     LATEST_REALTIME_VERSION=latest
 fi
 
-
 case "$OS_TYPE" in
 arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
 *)
@@ -297,8 +297,6 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION,,}"
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
-
-
 
 echo -e "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
@@ -346,7 +344,6 @@ sles | opensuse-leap | opensuse-tumbleweed)
     ;;
 esac
 
-
 echo -e "2. Check OpenSSH server configuration. "
 
 # Detect OpenSSH server
@@ -368,7 +365,6 @@ elif [ -x "$(command -v service)" ]; then
         SSH_DETECTED=true
     fi
 fi
-
 
 if [ "$SSH_DETECTED" = "false" ]; then
     echo " - OpenSSH server not detected. Installing OpenSSH server."
@@ -435,86 +431,112 @@ if [ -x "$(command -v snap)" ]; then
     fi
 fi
 
+install_docker() {
+    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
+    if ! [ -x "$(command -v docker)" ]; then
+        curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker installation failed."
+            echo "   Maybe your OS is not supported?"
+            echo " - Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+    fi
+}
 echo -e "3. Check Docker Installation. "
 if ! [ -x "$(command -v docker)" ]; then
     echo " - Docker is not installed. Installing Docker. It may take a while."
     getAJoke
     case "$OS_TYPE" in
-        "almalinux")
-            dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo >/dev/null 2>&1
-            dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+    "almalinux")
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo >/dev/null 2>&1
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+        systemctl start docker >/dev/null 2>&1
+        systemctl enable docker >/dev/null 2>&1
+        ;;
+    "alpine")
+        apk add docker docker-cli-compose >/dev/null 2>&1
+        rc-update add docker default >/dev/null 2>&1
+        service docker start >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Failed to install Docker with apk. Try to install it manually."
+            echo "   Please visit https://wiki.alpinelinux.org/wiki/Docker for more information."
+            exit 1
+        fi
+        ;;
+    "arch")
+        pacman -Sy docker docker-compose --noconfirm >/dev/null 2>&1
+        systemctl enable docker.service >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Failed to install Docker with pacman. Try to install it manually."
+            echo "   Please visit https://wiki.archlinux.org/title/docker for more information."
+            exit 1
+        fi
+        ;;
+    "amzn")
+        dnf install docker -y >/dev/null 2>&1
+        DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
+        mkdir -p $DOCKER_CONFIG/cli-plugins >/dev/null 2>&1
+        curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
+        chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
+        systemctl start docker >/dev/null 2>&1
+        systemctl enable docker >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Failed to install Docker with dnf. Try to install it manually."
+            echo "   Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
+            exit 1
+        fi
+        ;;
+    "centos" | "fedora" | "rhel")
+        if [ -x "$(command -v dnf5)" ]; then
+            # dnf5 is available
+            dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1
+        else
+            # dnf5 is not available, use dnf
+            dnf config-manager --add-repo=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo >/dev/null 2>&1
+        fi
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+        systemctl start docker >/dev/null 2>&1
+        systemctl enable docker >/dev/null 2>&1
+        ;;
+    "ubuntu" | "debian" | "raspbian")
+        if [ "$OS_TYPE" = "ubuntu" ] && [ "$OS_VERSION" = "24.10" ]; then
+            echo " - Installing Docker for Ubuntu 24.10..."
+            apt-get update >/dev/null
+            apt-get install -y ca-certificates curl >/dev/null
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+
+            # Add the repository to Apt sources
+            echo \
+                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
+                tee /etc/apt/sources.list.d/docker.list >/dev/null
+            apt-get update >/dev/null
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null
+
             if ! [ -x "$(command -v docker)" ]; then
-                echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                echo " - Docker installation failed."
+                echo "   Please visit https://docs.docker.com/engine/install/ubuntu/ and install Docker manually to continue."
                 exit 1
             fi
-            systemctl start docker >/dev/null 2>&1
-            systemctl enable docker >/dev/null 2>&1
-            ;;
-        "alpine")
-            apk add docker docker-cli-compose >/dev/null 2>&1
-            rc-update add docker default >/dev/null 2>&1
-            service docker start >/dev/null 2>&1
-            if ! [ -x "$(command -v docker)" ]; then
-                echo " - Failed to install Docker with apk. Try to install it manually."
-                echo "   Please visit https://wiki.alpinelinux.org/wiki/Docker for more information."
-                exit 1
-            fi
-            ;;
-        "arch")
-            pacman -Sy docker docker-compose --noconfirm >/dev/null 2>&1
-            systemctl enable docker.service >/dev/null 2>&1
-            if ! [ -x "$(command -v docker)" ]; then
-                echo " - Failed to install Docker with pacman. Try to install it manually."
-                echo "   Please visit https://wiki.archlinux.org/title/docker for more information."
-                exit 1
-            fi
-            ;;
-        "amzn")
-            dnf install docker -y >/dev/null 2>&1
-            DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
-            mkdir -p $DOCKER_CONFIG/cli-plugins >/dev/null 2>&1
-            curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
-            chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
-            systemctl start docker >/dev/null 2>&1
-            systemctl enable docker >/dev/null 2>&1
-            if ! [ -x "$(command -v docker)" ]; then
-                echo " - Failed to install Docker with dnf. Try to install it manually."
-                echo "   Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
-                exit 1
-            fi
-            ;;
-        "centos" | "fedora" | "rhel")
-            if [ -x "$(command -v dnf5)" ]; then
-                # dnf5 is available
-                dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo --overwrite >/dev/null 2>&1
-            else
-                # dnf5 is not available, use dnf
-                dnf config-manager --add-repo=https://download.docker.com/linux/$OS_TYPE/docker-ce.repo >/dev/null 2>&1
-            fi
-            dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
-            if ! [ -x "$(command -v docker)" ]; then
-                echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-                exit 1
-            fi
-            systemctl start docker >/dev/null 2>&1
-            systemctl enable docker >/dev/null 2>&1
-            ;;
-        *)
-            if [ "$OS_TYPE" = "ubuntu" ] && [ "$OS_VERSION" = "24.10" ]; then
-                echo "Docker automated installation is not supported on Ubuntu 24.10 (non-LTS release)."
-                    echo "Please install Docker manually."
-                exit 1
-            fi
-            curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
-            if ! [ -x "$(command -v docker)" ]; then
-                curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
-                if ! [ -x "$(command -v docker)" ]; then
-                    echo " - Docker installation failed."
-                    echo "   Maybe your OS is not supported?"
-                    echo " - Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-                    exit 1
-                fi
-            fi
+            echo " - Docker installed successfully for Ubuntu 24.10."
+        else
+            install_docker
+        fi
+        ;;
+    *)
+        install_docker
+        ;;
     esac
     echo " - Docker installed successfully."
 else
@@ -539,7 +561,7 @@ if [ "$DOCKER_POOL_FORCE_OVERRIDE" = true ] || [ "$EXISTING_POOL_CONFIGURED" = f
     if [ -f /etc/docker/daemon.json ]; then
         CURRENT_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null)
         CURRENT_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null)
-        
+
         if [ "$CURRENT_POOL_BASE" = "$DOCKER_ADDRESS_POOL_BASE" ] && [ "$CURRENT_POOL_SIZE" = "$DOCKER_ADDRESS_POOL_SIZE" ]; then
             echo " - Network pool configuration unchanged, skipping update"
             NEED_MERGE=false
@@ -620,7 +642,7 @@ if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
     DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-"$DATE") || true)
     if [ "$DIFF" != "" ]; then
         echo " - Checking configuration changes..."
-        
+
         # Check if address pools were changed
         if echo "$DIFF" | grep -q "default-address-pools"; then
             if [ "$DOCKER_POOL_BASE_PROVIDED" = true ] || [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
@@ -629,7 +651,7 @@ if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
                 echo " - Warning: Network pool modified without explicit request"
             fi
         fi
-        
+
         # Remove this redundant restart since we already restarted when writing the config
         echo " - Configuration changes confirmed"
         if [ "$NEED_MERGE" = true ]; then
@@ -698,7 +720,7 @@ fi
 
 # Merge .env and .env.production. New values will be added to .env
 echo -e "7. Propagating .env with new values - if necessary."
-awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production > $ENV_FILE
+awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production >$ENV_FILE
 
 if [ "$AUTOUPDATE" = "false" ]; then
     if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
@@ -744,7 +766,7 @@ if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
     sed -i "/coolify/d" ~/.ssh/authorized_keys
-    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >> ~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
     rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
 
