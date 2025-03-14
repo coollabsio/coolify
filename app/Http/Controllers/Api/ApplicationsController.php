@@ -1310,7 +1310,6 @@ class ApplicationsController extends Controller
             $service->destination_type = $destination->getMorphClass();
             $service->save();
 
-            $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
             if ($instantDeploy) {
                 StartService::dispatch($service);
