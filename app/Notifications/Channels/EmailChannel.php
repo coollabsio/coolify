@@ -53,6 +53,7 @@ class EmailChannel
             if (blank($type)) {
                 throw new Exception('No email settings found.');
             }
+
             return;
         }
 
