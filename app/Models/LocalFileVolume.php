@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Events\FileStorageChanged;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LocalFileVolume extends BaseModel
@@ -11,12 +12,23 @@ class LocalFileVolume extends BaseModel
 
     protected $guarded = [];
 
+    public $appends = ['is_binary'];
+
     protected static function booted()
     {
         static::created(function (LocalFileVolume $fileVolume) {
             $fileVolume->load(['service']);
             dispatch(new \App\Jobs\ServerStorageSaveJob($fileVolume));
         });
+    }
+
+    protected function isBinary(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->content === '[binary file]';
+            }
+        );
     }
 
     public function service()
@@ -44,6 +56,10 @@ class LocalFileVolume extends BaseModel
         $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
         if ($isFile === 'OK') {
             $content = instant_remote_process(["cat $path"], $server, false);
+            // Check if content contains binary data by looking for null bytes or non-printable characters
+            if (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
+                $content = '[binary file]';
+            }
             $this->content = $content;
             $this->is_directory = false;
             $this->save();
