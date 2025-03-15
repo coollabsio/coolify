@@ -16,11 +16,11 @@ services:
     environment:
       - SERVICE_FQDN_FREESCOUT_80
       - DB_HOST=mariadb
-      - DB_NAME=${DATABASE_NAME:-freescout}
+      - DB_NAME=${MARIADB_DATABASE:-freescout}
       - DB_USER=${SERVICE_USER_MARIADB:-freescout}
-      - DB_PASS=${SERVICE_PASSWORD_DATABASE}
+      - DB_PASS=${SERVICE_PASSWORD_MARIADB}
       - SITE_URL=${SERVICE_FQDN_FREESCOUT}
-      - ADMIN_EMAIL=${SERVICE_EMAIL_ADMIN:-admin@freescout.local}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASS=${SERVICE_PASSWORD_ADMIN}
       - DISPLAY_ERRORS=${DISPLAY_ERRORS:-FALSE}
       - TIMEZONE=${TIMEZONE:-UTC}
@@ -35,10 +35,10 @@ services:
     volumes:
       - mariadb-data:/var/lib/mysql
     environment:
-      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_DBROOT}
-      - MARIADB_DATABASE=${DATABASE_NAME}
+      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MARIADB_DATABASE=${MARIADB_DATABASE}
       - MARIADB_USER=${SERVICE_USER_MARIADB}
-      - MARIADB_PASSWORD=${SERVICE_PASSWORD_DATABASE}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       start_period: 10s
