@@ -5,6 +5,7 @@
     "auth.login.github": "Đăng Nhập Bằng GitHub",
     "auth.login.gitlab": "Đăng Nhập Bằng Gitlab",
     "auth.login.google": "Đăng Nhập Bằng Google",
+    "auth.login.infomaniak": "Đăng Nhập Bằng Infomaniak",
     "auth.already_registered": "Đã đăng ký?",
     "auth.confirm_password": "Nhập lại mật khẩu",
     "auth.forgot_password": "Quên mật khẩu",

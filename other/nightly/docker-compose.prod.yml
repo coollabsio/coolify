@@ -13,46 +13,14 @@ services:
       - /data/coolify/backups:/var/www/html/storage/app/backups
       - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
-      - APP_ENV=production
-      - APP_NAME
-      - APP_ID
-      - APP_KEY
-      - APP_URL
-      - APP_DEBUG
-      - DB_DATABASE
-      - DB_USERNAME
-      - DB_PASSWORD
-      - DB_HOST
-      - DB_PORT
-      - DB_CONNECTION
-      - QUEUE_CONNECTION
-      - REDIS_HOST
-      - REDIS_PASSWORD
-      - HORIZON_BALANCE
-      - HORIZON_MIN_PROCESSES
-      - HORIZON_MAX_PROCESSES
-      - HORIZON_BALANCE_MAX_SHIFT
-      - HORIZON_BALANCE_COOLDOWN
-      - SSL_MODE=off
-      - PHP_MEMORY_LIMIT
-      - PHP_PM_CONTROL=dynamic
-      - PHP_PM_START_SERVERS=1
-      - PHP_PM_MIN_SPARE_SERVERS=1
-      - PHP_PM_MAX_SPARE_SERVERS=10
-      - PUSHER_HOST
-      - PUSHER_BACKEND_HOST
-      - PUSHER_PORT
-      - PUSHER_BACKEND_PORT
-      - PUSHER_SCHEME
-      - PUSHER_APP_ID
-      - PUSHER_APP_KEY
-      - PUSHER_APP_SECRET
-      - TERMINAL_PROTOCOL
-      - TERMINAL_HOST
-      - TERMINAL_PORT
-      - AUTOUPDATE
-      - SSH_MUX_ENABLED
-      - SSH_MUX_PERSIST_TIME
+      - APP_ENV=${APP_ENV:-production}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
+      - PHP_FPM_PM_CONTROL=${PHP_FPM_PM_CONTROL:-dynamic}
+      - PHP_FPM_PM_START_SERVERS=${PHP_FPM_PM_START_SERVERS:-1}
+      - PHP_FPM_PM_MIN_SPARE_SERVERS=${PHP_FPM_PM_MIN_SPARE_SERVERS:-1}
+      - PHP_FPM_PM_MAX_SPARE_SERVERS=${PHP_FPM_PM_MAX_SPARE_SERVERS:-10}
+    env_file:
+      - /data/coolify/source/.env
     ports:
       - "${APP_PORT:-8000}:8080"
     expose:
@@ -93,7 +61,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.5'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.6'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"

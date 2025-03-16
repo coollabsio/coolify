@@ -15,6 +15,8 @@ class StatusChanged extends CustomEmailNotification
 
     public string $project_uuid;
 
+    public string $environment_uuid;
+
     public string $environment_name;
 
     public ?string $resource_url = null;
@@ -26,12 +28,13 @@ class StatusChanged extends CustomEmailNotification
         $this->onQueue('high');
         $this->resource_name = data_get($resource, 'name');
         $this->project_uuid = data_get($resource, 'environment.project.uuid');
+        $this->environment_uuid = data_get($resource, 'environment.uuid');
         $this->environment_name = data_get($resource, 'environment.name');
         $this->fqdn = data_get($resource, 'fqdn', null);
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->resource->uuid}";
+        $this->resource_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
@@ -80,7 +83,7 @@ class StatusChanged extends CustomEmailNotification
 
     public function toPushover(): PushoverMessage
     {
-        $message = $this->resource_name . ' has been stopped.';
+        $message = $this->resource_name.' has been stopped.';
 
         return new PushoverMessage(
             title: 'Application stopped',
@@ -100,9 +103,9 @@ class StatusChanged extends CustomEmailNotification
         $title = 'Application stopped';
         $description = "{$this->resource_name} has been stopped";
 
-        $description .= "\n\n**Project:** ".data_get($this->resource, 'environment.project.name');
-        $description .= "\n**Environment:** {$this->environment_name}";
-        $description .= "\n**Application URL:** {$this->resource_url}";
+        $description .= "\n\n*Project:* ".data_get($this->resource, 'environment.project.name');
+        $description .= "\n*Environment:* {$this->environment_name}";
+        $description .= "\n*Application URL:* {$this->resource_url}";
 
         return new SlackMessage(
             title: $title,

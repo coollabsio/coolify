@@ -7,7 +7,6 @@
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
         <div class="pt-4">
-            <h2>Logs</h2>
             <div class="subtitle">Here you can see the logs of the application.</div>
             <div class="pt-2" wire:loading wire:target="loadContainers">
                 Loading containers...
@@ -31,10 +30,8 @@
         <h1>Logs</h1>
         <livewire:project.database.heading :database="$resource" />
         <div class="pt-4">
+            <div class="subtitle">Here you can see the logs of the database.</div>
             @forelse ($containers as $container)
-                @if ($loop->first)
-                    <h2 class="pb-4">Logs</h2>
-                @endif
                 @if (data_get($servers, '0'))
                     <livewire:project.shared.get-logs :server="data_get($servers, '0')" :resource="$resource" :container="$container" />
                 @else
@@ -45,11 +42,10 @@
             @endforelse
         </div>
     @elseif ($type === 'service')
-        <div>
+        <livewire:project.service.navbar :service="$resource" :parameters="$parameters" :query="$query" title="Logs" />
+        <div class="pt-4">
+            <div class="subtitle">Here you can see the logs of the service.</div>
             @forelse ($containers as $container)
-                @if ($loop->first)
-                    <h2 class="pb-4">Logs</h2>
-                @endif
                 @if (data_get($servers, '0'))
                     <livewire:project.shared.get-logs :server="data_get($servers, '0')" :resource="$resource" :container="$container" />
                 @else

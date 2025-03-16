@@ -11,6 +11,7 @@ use App\Models\Service;
 use App\Models\Team;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -131,6 +132,11 @@ class ScheduledTaskJob implements ShouldQueue
             throw $e;
         } finally {
             ScheduledTaskDone::dispatch($this->team->id);
+            if ($this->task_log) {
+                $this->task_log->update([
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+            }
         }
     }
 }

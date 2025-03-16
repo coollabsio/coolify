@@ -37,6 +37,8 @@ class Change extends Component
 
     public $applications;
 
+    public $privateKeys;
+
     protected $rules = [
         'github_app.name' => 'required|string',
         'github_app.organization' => 'nullable|string',
@@ -54,6 +56,7 @@ class Change extends Component
         'github_app.metadata' => 'nullable|string',
         'github_app.pull_requests' => 'nullable|string',
         'github_app.administration' => 'nullable|string',
+        'github_app.private_key_id' => 'required|int',
     ];
 
     public function boot()
@@ -65,9 +68,13 @@ class Change extends Component
 
     public function checkPermissions()
     {
-        GithubAppPermissionJob::dispatchSync($this->github_app);
-        $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
-        $this->dispatch('success', 'Github App permissions updated.');
+        try {
+            GithubAppPermissionJob::dispatchSync($this->github_app);
+            $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->dispatch('success', 'Github App permissions updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     // public function check()
@@ -76,7 +83,7 @@ class Change extends Component
     // Need administration:read:write permission
     // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
 
-    //     $github_access_token = generate_github_installation_token($this->github_app);
+    //     $github_access_token = generateGithubInstallationToken($this->github_app);
     //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
     //     $runners_by_repository = collect([]);
     //     $repositories = $repositories->json()['repositories'];
@@ -101,7 +108,6 @@ class Change extends Component
     //         ]);
     //     }
 
-    //     ray($runners_by_repository);
     // }
 
     public function mount()
@@ -110,6 +116,7 @@ class Change extends Component
             $github_app_uuid = request()->github_app_uuid;
             $this->github_app = GithubApp::ownedByCurrentTeam()->whereUuid($github_app_uuid)->firstOrFail();
             $this->github_app->makeVisible(['client_secret', 'webhook_secret']);
+            $this->privateKeys = PrivateKey::ownedByCurrentTeam()->get();
 
             $this->applications = $this->github_app->applications;
             $settings = instanceSettings();
@@ -130,14 +137,14 @@ class Change extends Component
                 } else {
                     $parameters = data_get(session('from'), 'parameters');
                     $back = data_get(session('from'), 'back');
-                    $environment_name = data_get($parameters, 'environment_name');
+                    $environment_uuid = data_get($parameters, 'environment_uuid');
                     $project_uuid = data_get($parameters, 'project_uuid');
                     $type = data_get($parameters, 'type');
                     $destination = data_get($parameters, 'destination');
                     session()->forget('from');
 
                     return redirect()->route($back, [
-                        'environment_name' => $environment_name,
+                        'environment_uuid' => $environment_uuid,
                         'project_uuid' => $project_uuid,
                         'type' => $type,
                         'destination' => $destination,
@@ -244,12 +251,22 @@ class Change extends Component
                 'github_app.client_secret' => 'required|string',
                 'github_app.webhook_secret' => 'required|string',
                 'github_app.is_system_wide' => 'required|bool',
+                'github_app.private_key_id' => 'required|int',
             ]);
             $this->github_app->save();
             $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function createGithubAppManually()
+    {
+        $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+        $this->github_app->app_id = '1234567890';
+        $this->github_app->installation_id = '1234567890';
+        $this->github_app->save();
+        $this->dispatch('success', 'Github App updated.');
     }
 
     public function instantSave()

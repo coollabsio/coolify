@@ -130,47 +130,30 @@
         </div>
 
         <h4 class="py-4">Confirmation Settings</h4>
-        <div x-data="{ open: false }" class="mb-32 md:w-[40rem]">
-            <button type="button" @click.prevent="open = !open"
-                class="flex items-center justify-between w-full p-4 rounded-md
-                       dark:bg-coolgray-100 dark:hover:bg-coolgray-200
-                       bg-gray-100 hover:bg-gray-200">
-                <span class="font-medium">Two-Step Confirmation Settings</span>
-                <svg class="w-5 h-5 transition-transform" :class="{ 'rotate-180': open }" fill="none"
-                    stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
 
-            <div x-show="open" x-transition class="mt-4">
-                @if ($disable_two_step_confirmation)
-                    <div class="md:w-96 pb-4">
-                        <x-forms.checkbox instantSave id="disable_two_step_confirmation"
-                            label="Disable Two Step Confirmation"
-                            helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
-                    </div>
-                @else
-                    <div class="md:w-96 pb-4">
-                        <x-modal-confirmation title="Disable Two Step Confirmation?"
-                            buttonTitle="Disable Two Step Confirmation" isErrorButton
-                            submitAction="toggleTwoStepConfirmation" :actions="[
-                                'Two Step confimation will be disabled globally.',
-                                'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
-                                'The risk of accidental actions will increase.',
-                            ]"
-                            confirmationText="DISABLE TWO STEP CONFIRMATION"
-                            confirmationLabel="Please type the confirmation text to disable two step confirmation."
-                            shortConfirmationLabel="Confirmation text"
-                            step3ButtonText="Disable Two Step Confirmation" />
-                    </div>
-                    <div class="w-full px-4 py-2 mb-4 text-white rounded-sm border-l-4 border-red-500 bg-error">
-                        <p class="font-bold">Warning!</p>
-                        <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and
-                            increases
-                            the risk of accidental actions. This is not recommended for production servers.</p>
-                    </div>
-                @endif
+        @if ($disable_two_step_confirmation)
+            <div class="md:w-96 pb-4" wire:key="two-step-confirmation-enabled">
+                <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation"
+                    helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
             </div>
-        </div>
+        @else
+            <div class="md:w-96 pb-4" wire:key="two-step-confirmation-disabled">
+                <x-modal-confirmation title="Disable Two Step Confirmation?"
+                    buttonTitle="Disable Two Step Confirmation" isErrorButton submitAction="toggleTwoStepConfirmation"
+                    :actions="[
+                        'Two Step confimation will be disabled globally.',
+                        'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
+                        'The risk of accidental actions will increase.',
+                    ]" confirmationText="DISABLE TWO STEP CONFIRMATION"
+                    confirmationLabel="Please type the confirmation text to disable two step confirmation."
+                    shortConfirmationLabel="Confirmation text" step3ButtonText="Disable Two Step Confirmation" />
+            </div>
+            <div class="w-full px-4 py-2 mb-4 text-white rounded-sm border-l-4 border-red-500 bg-error">
+                <p class="font-bold">Warning!</p>
+                <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and
+                    increases
+                    the risk of accidental actions. This is not recommended for production servers.</p>
+            </div>
+        @endif
     </form>
 </div>

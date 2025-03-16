@@ -22,6 +22,8 @@ class DeploymentSuccess extends CustomEmailNotification
 
     public string $project_uuid;
 
+    public string $environment_uuid;
+
     public string $environment_name;
 
     public ?string $deployment_url = null;
@@ -36,12 +38,13 @@ class DeploymentSuccess extends CustomEmailNotification
         $this->preview = $preview;
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
+        $this->environment_uuid = data_get($application, 'environment.uuid');
         $this->environment_name = data_get($application, 'environment.name');
         $this->fqdn = data_get($application, 'fqdn');
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->deployment_url = base_url()."/project/{$this->project_uuid}/".urlencode($this->environment_name)."/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+        $this->deployment_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
     }
 
     public function via(object $notifiable): array
@@ -144,7 +147,7 @@ class DeploymentSuccess extends CustomEmailNotification
     {
         if ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
-            $message = 'New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '';
+            $message = 'New PR'.$this->preview->pull_request_id.' version successfully deployed of '.$this->application_name.'';
             if ($this->preview->fqdn) {
                 $buttons[] = [
                     'text' => 'Open Application',
@@ -153,7 +156,7 @@ class DeploymentSuccess extends CustomEmailNotification
             }
         } else {
             $title = 'New version successfully deployed';
-            $message = 'New version successfully deployed of ' . $this->application_name . '';
+            $message = 'New version successfully deployed of '.$this->application_name.'';
             if ($this->fqdn) {
                 $buttons[] = [
                     'text' => 'Open Application',
@@ -192,9 +195,9 @@ class DeploymentSuccess extends CustomEmailNotification
             }
         }
 
-        $description .= "\n\n**Project:** ".data_get($this->application, 'environment.project.name');
-        $description .= "\n**Environment:** {$this->environment_name}";
-        $description .= "\n**Deployment Logs:** {$this->deployment_url}";
+        $description .= "\n\n*Project:* ".data_get($this->application, 'environment.project.name');
+        $description .= "\n*Environment:* {$this->environment_name}";
+        $description .= "\n*<{$this->deployment_url}|Deployment Logs>*";
 
         return new SlackMessage(
             title: $title,

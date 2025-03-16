@@ -40,6 +40,8 @@ class PrivateKey extends BaseModel
         'private_key' => 'encrypted',
     ];
 
+    protected $appends = ['public_key'];
+
     protected static function booted()
     {
         static::saving(function ($key) {
@@ -62,6 +64,11 @@ class PrivateKey extends BaseModel
         static::deleted(function ($key) {
             self::deleteFromStorage($key);
         });
+    }
+
+    public function getPublicKeyAttribute()
+    {
+        return self::extractPublicKeyFromPrivate($this->private_key) ?? 'Error loading private key';
     }
 
     public function getPublicKey()
@@ -208,15 +215,14 @@ class PrivateKey extends BaseModel
     {
         try {
             $key = PublicKeyLoader::load($privateKey);
-            $publicKey = $key->getPublicKey();
 
-            return $publicKey->getFingerprint('sha256');
+            return $key->getPublicKey()->getFingerprint('sha256');
         } catch (\Throwable $e) {
             return null;
         }
     }
 
-    private static function fingerprintExists($fingerprint, $excludeId = null)
+    public static function fingerprintExists($fingerprint, $excludeId = null)
     {
         $query = self::query()
             ->where('fingerprint', $fingerprint)

@@ -2,7 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.380',
+        'version' => '4.0.0-beta.399',
+        'helper_version' => '1.0.7',
+        'realtime_version' => '1.0.6',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -62,26 +64,6 @@ return [
         'link' => [
             'base_url' => '/invitations/',
             'expiration_days' => 3,
-        ],
-    ],
-
-    'limits' => [
-        'trial_period' => 0,
-        'server' => [
-            'zero' => 0,
-            'self-hosted' => 999999999999,
-            'basic' => env('LIMIT_SERVER_BASIC', 2),
-            'pro' => env('LIMIT_SERVER_PRO', 10),
-            'ultimate' => env('LIMIT_SERVER_ULTIMATE', 25),
-            'dynamic' => env('LIMIT_SERVER_DYNAMIC', 2),
-        ],
-        'email' => [
-            'zero' => true,
-            'self-hosted' => true,
-            'basic' => true,
-            'pro' => true,
-            'ultimate' => true,
-            'dynamic' => true,
         ],
     ],
 

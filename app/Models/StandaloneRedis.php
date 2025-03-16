@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneRedis extends BaseModel
@@ -37,6 +36,12 @@ class StandaloneRedis extends BaseModel
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
                 $database->forceFill(['last_online_at' => now()]);
+            }
+        });
+
+        static::retrieved(function ($database) {
+            if (! $database->redis_username) {
+                $database->redis_username = 'default';
             }
         });
     }
@@ -170,7 +175,7 @@ class StandaloneRedis extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'database_uuid' => data_get($this, 'uuid'),
             ]);
         }
@@ -194,8 +199,8 @@ class StandaloneRedis extends BaseModel
     {
         return Attribute::make(
             get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            ? []
+            : explode(',', $this->ports_mappings),
 
         );
     }
@@ -262,14 +267,9 @@ class StandaloneRedis extends BaseModel
         return $this->morphTo();
     }
 
-    public function environment_variables(): HasMany
+    public function runtime_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class);
-    }
-
-    public function runtime_environment_variables(): HasMany
-    {
-        return $this->hasMany(EnvironmentVariable::class);
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function persistentStorages()
@@ -352,11 +352,22 @@ class StandaloneRedis extends BaseModel
             get: function () {
                 $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
-                    return null;
+                    $this->runtime_environment_variables()->create([
+                        'key' => 'REDIS_USERNAME',
+                        'value' => 'default',
+                    ]);
+
+                    return 'default';
                 }
 
                 return $username->value;
             }
         );
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
+            ->orderBy('key', 'asc');
     }
 }

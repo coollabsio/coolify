@@ -41,6 +41,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
+use Laravel\Horizon\Contracts\JobRepository;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
@@ -439,11 +440,7 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
-    if (isDev()) {
-        $services = File::get(base_path('templates/service-templates.json'));
 
-        return collect(json_decode($services))->sortKeys();
-    }
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -751,6 +748,7 @@ function parseCommandFromMagicEnvVariable(Str|string $key): Stringable
 {
     $value = str($key);
     $count = substr_count($value->value(), '_');
+    $command = null;
     if ($count === 2) {
         if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
             // SERVICE_FQDN_UMAMI
@@ -803,7 +801,6 @@ function parseEnvVariable(Str|string $value)
             } else {
                 // SERVICE_BASE64_64_UMAMI
                 $command = $value->after('SERVICE_')->beforeLast('_');
-                ray($command);
             }
         }
     }
@@ -955,7 +952,6 @@ function validate_dns_entry(string $fqdn, Server $server)
     $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            ray("Checking $host on $dns_server");
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
@@ -964,13 +960,10 @@ function validate_dns_entry(string $fqdn, Server $server)
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
                         if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
-                            ray("Found match in Cloudflare IPs: $match");
                             $found_matching_ip = true;
                             break;
                         }
                         if ($result->getData() === $ip) {
-                            ray($host.' has IP address '.$result->getData());
-                            ray($result->getString());
                             $found_matching_ip = true;
                             break;
                         }
@@ -980,7 +973,6 @@ function validate_dns_entry(string $fqdn, Server $server)
         } catch (\Exception) {
         }
     }
-    ray("Found match: $found_matching_ip");
 
     return $found_matching_ip;
 }
@@ -1257,14 +1249,22 @@ function get_public_ips()
 
 function isAnyDeploymentInprogress()
 {
-    // Only use it in the deployment script
-    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
-    if ($count > 0) {
-        echo "There are $count deployments in progress. Exiting...\n";
-        exit(1);
+    $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
+    $horizonJobIds = [];
+    foreach ($runningJobs as $runningJob) {
+        $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
+        if ($horizonJobStatus === 'unknown') {
+            return true;
+        }
+        $horizonJobIds[] = $runningJob->horizon_job_id;
     }
-    echo "No deployments in progress.\n";
-    exit(0);
+    if (count($horizonJobIds) === 0) {
+        echo "No deployments in progress.\n";
+        exit(0);
+    }
+    $horizonJobIds = collect($horizonJobIds)->unique()->toArray();
+    echo 'There are '.count($horizonJobIds)." deployments in progress.\n";
+    exit(1);
 }
 
 function isBase64Encoded($strValue)
@@ -1326,7 +1326,6 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
                 $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                 if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
                     // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                    ray('setting isDirectory to true');
                     $isDirectory = true;
                 }
             }
@@ -1494,7 +1493,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $serviceLabels->push("$removedLabelName=$removedLabel");
                     }
                 }
-
                 $containerName = "$serviceName-{$resource->uuid}";
 
                 // Decide if the service is a database
@@ -1657,7 +1655,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             if (is_null($isDirectory) && is_null($content)) {
                                 // if isDirectory is not set & content is also not set, we assume it is a directory
-                                ray('setting isDirectory to true');
                                 $isDirectory = true;
                             }
                         }
@@ -1819,7 +1816,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'key' => $key,
                                 'value' => $fqdn,
                                 'is_build_time' => false,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -1831,7 +1829,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $env = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
@@ -1854,14 +1853,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($value?->startsWith('$')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'service_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
                         $value = replaceVariables($value);
                         $key = $value;
                         if ($value->startsWith('SERVICE_')) {
                             $foundEnv = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                             if (! is_null($command)) {
@@ -1895,7 +1896,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'key' => $key,
                                             'value' => $fqdn,
                                             'is_build_time' => false,
-                                            'service_id' => $resource->id,
+                                            'resourceable_type' => get_class($resource),
+                                            'resourceable_id' => $resource->id,
                                             'is_preview' => false,
                                         ]);
                                     }
@@ -1912,7 +1914,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             }
                                             $env = EnvironmentVariable::where([
                                                 'key' => $key,
-                                                'service_id' => $resource->id,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
                                             ])->first();
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
@@ -1932,7 +1935,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             'key' => $key,
                                             'value' => $generatedValue,
                                             'is_build_time' => false,
-                                            'service_id' => $resource->id,
+                                            'resourceable_type' => get_class($resource),
+                                            'resourceable_id' => $resource->id,
                                             'is_preview' => false,
                                         ]);
                                     }
@@ -1957,18 +1961,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $foundEnv = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             if ($foundEnv) {
                                 $defaultValue = data_get($foundEnv, 'value');
                             }
                             EnvironmentVariable::updateOrCreate([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ], [
                                 'value' => $defaultValue,
                                 'is_build_time' => false,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -1980,7 +1987,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
-                $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+                $defaultLabels = defaultLabels(
+                    id: $resource->id,
+                    name: $containerName,
+                    projectName: $resource->project()->name,
+                    resourceName: $resource->name,
+                    type: 'service',
+                    subType: $isDatabase ? 'database' : 'application',
+                    subId: $savedService->id,
+                    subName: $savedService->name,
+                    environment: $resource->environment->name,
+                );
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
@@ -2086,6 +2103,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $parsedServiceVariables->put($key, $value);
                     }
                 }
+                $parsedServiceVariables->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
 
                 // TODO: move this in a shared function
@@ -2503,9 +2521,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
             }
-            if ($collectedPorts->count() > 0) {
-                ray($collectedPorts->implode(','));
-            }
             $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                 return $value == $definedNetwork;
             });
@@ -2616,7 +2631,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($value?->startsWith('$')) {
                     $foundEnv = EnvironmentVariable::where([
                         'key' => $key,
-                        'application_id' => $resource->id,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
                         'is_preview' => false,
                     ])->first();
                     $value = replaceVariables($value);
@@ -2624,7 +2640,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                         if (! is_null($command)) {
@@ -2647,7 +2664,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'key' => $key,
                                         'value' => $fqdn,
                                         'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -2658,7 +2676,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'key' => $key,
                                         'value' => $generatedValue,
                                         'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -2683,7 +2702,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                             'is_preview' => false,
                         ])->first();
                         if ($foundEnv) {
@@ -2693,7 +2713,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($foundEnv) {
                             $foundEnv->update([
                                 'key' => $key,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_build_time' => $isBuildTime,
                                 'value' => $defaultValue,
                             ]);
@@ -2702,7 +2723,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'key' => $key,
                                 'value' => $defaultValue,
                                 'is_build_time' => $isBuildTime,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -2808,7 +2830,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
             }
-            $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
+
+            $defaultLabels = defaultLabels(
+                id: $resource->id,
+                name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
+                environment: $resource->environment->name,
+                pull_request_id: $pull_request_id,
+                type: 'application'
+            );
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
             if ($server->isLogDrainEnabled()) {
@@ -2831,6 +2862,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_set($service, 'container_name', $containerName);
             data_forget($service, 'volumes.*.content');
             data_forget($service, 'volumes.*.isDirectory');
+            data_forget($service, 'volumes.*.is_directory');
+            data_forget($service, 'exclude_from_hc');
+            data_set($service, 'environment', $serviceVariables->toArray());
 
             return $service;
         });
@@ -2869,13 +2903,11 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     if ($isApplication) {
-        $nameOfId = 'application_id';
         $pullRequestId = $pull_request_id;
         $isPullRequest = $pullRequestId == 0 ? false : true;
         $server = data_get($resource, 'destination.server');
         $fileStorages = $resource->fileStorages();
     } elseif ($isService) {
-        $nameOfId = 'service_id';
         $server = data_get($resource, 'server');
         $allServices = get_service_templates();
     } else {
@@ -2913,7 +2945,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
-    // ray()->clearAll();
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -2973,7 +3004,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $environment = $environment->merge($buildArgs);
 
             // convert environment variables to one format
-            $environment = convertComposeEnvironmentToArray($environment);
+            $environment = convertToKeyValueCollection($environment);
 
             // Add Coolify defined environments
             $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
@@ -3042,9 +3073,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
 
                     if (substr_count(str($key)->value(), '_') === 2) {
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3053,9 +3085,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                     if (substr_count(str($key)->value(), '_') === 3) {
                         $newKey = str($key)->beforeLast('_');
-                        $resource->environment_variables()->where('key', $newKey->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $newKey->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3071,7 +3104,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     $key = str($key);
                     $value = replaceVariables($value);
                     $command = parseCommandFromMagicEnvVariable($key);
-                    $found = $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->first();
+                    $found = $resource->environment_variables()->where('key', $key->value())->where('resourceable_type', get_class($resource))->where('resourceable_id', $resource->id)->first();
                     if ($found) {
                         continue;
                     }
@@ -3085,9 +3118,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         } elseif ($isService) {
                             $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3104,9 +3138,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
                         }
                         $fqdn = str($fqdn)->replace('http://', '')->replace('https://', '');
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $fqdn,
                             'is_build_time' => false,
@@ -3114,9 +3149,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         ]);
                     } else {
                         $value = generateEnvValue($command, $resource);
-                        $resource->environment_variables()->where('key', $key->value())->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $key->value(),
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'value' => $value,
                             'is_build_time' => false,
@@ -3149,7 +3185,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
 
-        $environment = convertComposeEnvironmentToArray($environment);
+        $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
         $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
@@ -3464,9 +3500,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
             if ($value->startsWith('$SERVICE_')) {
-                $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
-                    $nameOfId => $resource->id,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_build_time' => false,
@@ -3480,9 +3517,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
             if ($key->value() === $parsedValue->value()) {
                 $value = null;
-                $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
-                    $nameOfId => $resource->id,
+                    'resourceable_type' => get_class($resource),
+                    'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_build_time' => false,
@@ -3516,22 +3554,24 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     if ($originalValue->value() === $value->value()) {
                         // This means the variable does not have a default value, so it needs to be created in Coolify
                         $parsedKeyValue = replaceVariables($value);
-                        $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->firstOrCreate([
+                        $resource->environment_variables()->firstOrCreate([
                             'key' => $parsedKeyValue,
-                            $nameOfId => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ], [
                             'is_build_time' => false,
                             'is_preview' => false,
                             'is_required' => $isRequired,
                         ]);
                         // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where($nameOfId, $resource->id)->first()->value;
+                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where('resourceable_type', get_class($resource))->where('resourceable_id', $resource->id)->first()->value;
 
                         continue;
                     }
-                    $resource->environment_variables()->where('key', $key)->where($nameOfId, $resource->id)->firstOrCreate([
+                    $resource->environment_variables()->firstOrCreate([
                         'key' => $key,
-                        $nameOfId => $resource->id,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
                     ], [
                         'value' => $value,
                         'is_build_time' => false,
@@ -3551,9 +3591,14 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             }
         }
 
+        // Add COOLIFY_RESOURCE_UUID to environment
+        if ($resource->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $coolifyEnvironments->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
+        }
+
         // Add COOLIFY_CONTAINER_NAME to environment
         if ($resource->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "\"{$containerName}\"");
+            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "{$containerName}");
         }
 
         if ($isApplication) {
@@ -3591,11 +3636,15 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                 }
             }
+
             $defaultLabels = defaultLabels(
                 id: $resource->id,
                 name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
                 pull_request_id: $pullRequestId,
-                type: 'application'
+                type: 'application',
+                environment: $resource->environment->name,
             );
         } elseif ($isService) {
             if ($savedService->serviceType()) {
@@ -3603,7 +3652,18 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             } else {
                 $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
             }
-            $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+
+            $defaultLabels = defaultLabels(
+                id: $resource->id,
+                name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
+                type: 'service',
+                subType: $isDatabase ? 'database' : 'application',
+                subId: $savedService->id,
+                subName: $savedService->human_name ?? $savedService->name,
+                environment: $resource->environment->name,
+            );
         }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
@@ -3862,7 +3922,7 @@ function add_coolify_default_environment_variables(StandaloneRedis|StandalonePos
     }
 }
 
-function convertComposeEnvironmentToArray($environment)
+function convertToKeyValueCollection($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {
@@ -3994,28 +4054,23 @@ function defaultNginxConfiguration(): string
 {
     return 'server {
     location / {
-        root   /usr/share/nginx/html;
-        index  index.html index.htm;
-        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ /index.html /index.htm =404;
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ =404;
     }
 
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
     error_page 500 502 503 504 /50x.html;
     location = /50x.html {
         root /usr/share/nginx/html;
-        try_files $uri @redirect_to_index;
         internal;
-    }
-
-    error_page 404 = @handle_404;
-
-    location @handle_404 {
-        root /usr/share/nginx/html;
-        try_files /404.html @redirect_to_index;
-        internal;
-    }
-
-    location @redirect_to_index {
-        return 302 /;
     }
 }';
 }
@@ -4068,4 +4123,17 @@ function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp
         'repository' => $repository,
         'port' => $providerInfo['port'],
     ];
+}
+
+function getJobStatus(?string $jobId = null)
+{
+    if (blank($jobId)) {
+        return 'unknown';
+    }
+    $jobFound = app(JobRepository::class)->getJobs([$jobId]);
+    if ($jobFound->isEmpty()) {
+        return 'unknown';
+    }
+
+    return $jobFound->first()->status;
 }

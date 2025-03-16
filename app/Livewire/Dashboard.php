@@ -49,6 +49,11 @@ class Dashboard extends Component
         ])->sortBy('id')->groupBy('server_name')->toArray();
     }
 
+    public function navigateToProject($projectUuid)
+    {
+        return $this->redirect(collect($this->projects)->firstWhere('uuid', $projectUuid)->navigateTo(), true);
+    }
+
     public function render()
     {
         return view('livewire.dashboard');

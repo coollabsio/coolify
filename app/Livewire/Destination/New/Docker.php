@@ -35,10 +35,18 @@ class Docker extends Component
         $this->network = new Cuid2;
         $this->servers = Server::isUsable()->get();
         if ($server_id) {
-            $this->selectedServer = $this->servers->find($server_id) ?: $this->servers->first();
+            $foundServer = $this->servers->find($server_id) ?: $this->servers->first();
+            if (! $foundServer) {
+                throw new \Exception('Server not found.');
+            }
+            $this->selectedServer = $foundServer;
             $this->serverId = $this->selectedServer->id;
         } else {
-            $this->selectedServer = $this->servers->first();
+            $foundServer = $this->servers->first();
+            if (! $foundServer) {
+                throw new \Exception('Server not found.');
+            }
+            $this->selectedServer = $foundServer;
             $this->serverId = $this->selectedServer->id;
         }
         $this->generateName();
@@ -83,9 +91,7 @@ class Docker extends Component
                     ]);
                 }
             }
-            $connectProxyToDockerNetworks = connectProxyToNetworks($this->selectedServer);
-            instant_remote_process($connectProxyToDockerNetworks, $this->selectedServer, false);
-            $this->dispatch('reloadWindow');
+            $this->redirect(route('destination.show', $docker->uuid));
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

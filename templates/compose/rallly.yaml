@@ -1,0 +1,47 @@
+# documentation: https://support.rallly.co/self-hosting/introduction
+# slogan: Rallly is an open-source scheduling and collaboration tool designed to make organizing events and meetings easier.
+# tags: scheduling,rallly,events,meeting,doodle
+# logo: svgs/rallly.svg
+# port: 3000
+
+services:
+  rallly_db:
+    image: postgres:14.2
+    volumes:
+      - rallly_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-rallly}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  rallly:
+    image: lukevella/rallly:latest
+    platform: linux/amd64
+    depends_on:
+      rallly_db:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_RALLLY_3000
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@rallly_db:5432/${POSTGRES_DB:-rallly}
+      - SECRET_PASSWORD=${SERVICE_PASSWORD_64_RALLLY}
+      - NEXT_PUBLIC_BASE_URL=https://${SERVICE_URL_RALLLY}
+      - ALLOWED_EMAILS=${ALLOWED_EMAILS}
+      - SUPPORT_EMAIL=${SUPPORT_EMAIL:-support@example.com}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PWD=${SMTP_PWD}
+      - SMTP_TLS_ENABLED=${SMTP_TLS_ENABLED}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/3000' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

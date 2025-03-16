@@ -1,10 +1,12 @@
 {
     "auth.login": "Connexion",
+    "auth.login.authentik": "Connexion avec Authentik",
     "auth.login.azure": "Connexion avec Microsoft",
     "auth.login.bitbucket": "Connexion avec Bitbucket",
     "auth.login.github": "Connexion avec GitHub",
     "auth.login.gitlab": "Connexion avec Gitlab",
     "auth.login.google": "Connexion avec Google",
+    "auth.login.infomaniak": "Connexion avec Infomaniak",
     "auth.already_registered": "Déjà enregistré ?",
     "auth.confirm_password": "Confirmer le mot de passe",
     "auth.forgot_password": "Mot de passe oublié",
@@ -33,5 +35,6 @@
     "resource.delete_volumes": "Supprimer définitivement tous les volumes associés à cette ressource.",
     "resource.delete_connected_networks": "Supprimer définitivement tous les réseaux non-prédéfinis associés à cette ressource.",
     "resource.delete_configurations": "Supprimer définitivement tous les fichiers de configuration du serveur.",
-    "database.delete_backups_locally": "Toutes les sauvegardes seront définitivement supprimées du stockage local."
+    "database.delete_backups_locally": "Toutes les sauvegardes seront définitivement supprimées du stockage local.",
+    "warning.sslipdomain": "Votre configuration est enregistrée, mais l'utilisation du domaine sslip avec https <span class='dark:text-red-500 text-red-500 font-bold'>N'EST PAS</span> recommandée, car les serveurs Let's Encrypt avec ce domaine public sont limités en taux (la validation du certificat SSL échouera). <br><br>Utilisez plutôt votre propre domaine."
 }

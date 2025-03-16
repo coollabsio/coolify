@@ -46,7 +46,7 @@ class Show extends Component
     #[Locked]
     public string $task_uuid;
 
-    public function mount(string $task_uuid, string $project_uuid, string $environment_name, ?string $application_uuid = null, ?string $service_uuid = null)
+    public function mount(string $task_uuid, string $project_uuid, string $environment_uuid, ?string $application_uuid = null, ?string $service_uuid = null)
     {
         try {
             $this->task_uuid = $task_uuid;
@@ -60,7 +60,7 @@ class Show extends Component
                 $this->resource = Service::ownedByCurrentTeam()->where('uuid', $service_uuid)->firstOrFail();
             }
             $this->parameters = [
-                'environment_name' => $environment_name,
+                'environment_uuid' => $environment_uuid,
                 'project_uuid' => $project_uuid,
                 'application_uuid' => $application_uuid,
                 'service_uuid' => $service_uuid,
@@ -77,6 +77,11 @@ class Show extends Component
     {
         if ($toModel) {
             $this->validate();
+            $isValid = validate_cron_expression($this->frequency);
+            if (! $isValid) {
+                $this->frequency = $this->task->frequency;
+                throw new \Exception('Invalid Cron / Human expression.');
+            }
             $this->task->enabled = $this->isEnabled;
             $this->task->name = str($this->name)->trim()->value();
             $this->task->command = str($this->command)->trim()->value();
@@ -109,7 +114,7 @@ class Show extends Component
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
         } catch (\Exception $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -128,9 +133,9 @@ class Show extends Component
             $this->task->delete();
 
             if ($this->type === 'application') {
-                return redirect()->route('project.application.configuration', $this->parameters, $this->task->name);
+                return redirect()->route('project.application.scheduled-tasks.show', $this->parameters);
             } else {
-                return redirect()->route('project.service.configuration', $this->parameters, $this->task->name);
+                return redirect()->route('project.service.scheduled-tasks.show', $this->parameters);
             }
         } catch (\Exception $e) {
             return handleError($e);

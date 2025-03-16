@@ -188,7 +188,22 @@ function get_port_from_dockerfile($dockerfile): ?int
     return null;
 }
 
-function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null)
+function defaultDatabaseLabels($database)
+{
+    $labels = collect([]);
+    $labels->push('coolify.managed=true');
+    $labels->push('coolify.type=database');
+    $labels->push('coolify.databaseId='.$database->id);
+    $labels->push('coolify.resourceName='.Str::slug($database->name));
+    $labels->push('coolify.serviceName='.Str::slug($database->name));
+    $labels->push('coolify.projectName='.Str::slug($database->project()->name));
+    $labels->push('coolify.environmentName='.Str::slug($database->environment->name));
+    $labels->push('coolify.database.subType='.$database->type());
+
+    return $labels;
+}
+
+function defaultLabels($id, $name, string $projectName, string $resourceName, string $environment, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null)
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
@@ -196,14 +211,21 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name='.$name);
+    $labels->push('coolify.resourceName='.Str::slug($resourceName));
+    $labels->push('coolify.projectName='.Str::slug($projectName));
+    $labels->push('coolify.serviceName='.Str::slug($subName ?? $resourceName));
+    $labels->push('coolify.environmentName='.Str::slug($environment));
+
     $labels->push('coolify.pullRequestId='.$pull_request_id);
     if ($type === 'service') {
         $subId && $labels->push('coolify.service.subId='.$subId);
         $subType && $labels->push('coolify.service.subType='.$subType);
+        $subName && $labels->push('coolify.service.subName='.Str::slug($subName));
     }
 
     return $labels;
 }
+
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
     if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
@@ -756,7 +778,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                     }
                 }
             }
-            ray($payload);
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
@@ -807,27 +828,47 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
-    return 'OK';
+    $uuid = Str::random(18);
+    $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
-        $uuid = Str::random(10);
-        $server = Server::findOrFail($server_id);
+        if (! $server) {
+            throw new \Exception('Server not found');
+        }
         $base64_compose = base64_encode($compose);
-        $output = instant_remote_process([
+        instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "docker compose -f /tmp/{$uuid}.yml config",
+            "chmod 600 /tmp/{$uuid}.yml",
+            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
+            "rm /tmp/{$uuid}.yml",
         ], $server);
-        ray($output);
 
         return 'OK';
     } catch (\Throwable $e) {
-        ray($e);
-
         return $e->getMessage();
     } finally {
-        instant_remote_process([
-            "rm /tmp/{$uuid}.yml",
+        if (filled($server)) {
+            instant_remote_process([
+                "rm /tmp/{$uuid}.yml",
+            ], $server, throwError: false);
+        }
+    }
+}
+
+function getContainerLogs(Server $server, string $container_id, int $lines = 100): string
+{
+    if ($server->isSwarm()) {
+        $output = instant_remote_process([
+            "docker service logs -n {$lines} {$container_id}",
+        ], $server);
+    } else {
+        $output = instant_remote_process([
+            "docker logs -n {$lines} {$container_id}",
         ], $server);
     }
+
+    $output .= removeAnsiColors($output);
+
+    return $output;
 }
 
 function escapeEnvVariables($value)

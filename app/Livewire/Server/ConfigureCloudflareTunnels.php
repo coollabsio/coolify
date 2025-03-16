@@ -41,7 +41,7 @@ class ConfigureCloudflareTunnels extends Component
             $server->ip = $this->ssh_domain;
             $server->save();
             $server->settings->save();
-            $this->dispatch('warning', 'Cloudflare Tunnels configuration started.');
+            $this->dispatch('info', 'Cloudflare Tunnels configuration started.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

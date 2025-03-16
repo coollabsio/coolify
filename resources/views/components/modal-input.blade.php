@@ -32,9 +32,9 @@
             <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                @if ($closeOutside) @click="modalOpen=false" @endif
                 class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
-                @if ($closeOutside) @click.outside="modalOpen=false" @endif
                 x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"

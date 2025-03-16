@@ -91,16 +91,9 @@ class RunRemoteProcess
         } else {
             if ($processResult->exitCode() == 0) {
                 $status = ProcessStatus::FINISHED;
-            }
-            if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
+            } else {
                 $status = ProcessStatus::ERROR;
             }
-            // if (($processResult->exitCode() == 0 && $this->is_finished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
-            //     $status = ProcessStatus::FINISHED;
-            // }
-            // if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
-            //     $status = ProcessStatus::ERROR;
-            // }
         }
 
         $this->activity->properties = $this->activity->properties->merge([
@@ -110,9 +103,6 @@ class RunRemoteProcess
             'status' => $status->value,
         ]);
         $this->activity->save();
-        if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
-            throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
-        }
         if ($this->call_event_on_finish) {
             try {
                 if ($this->call_event_data) {
@@ -127,6 +117,9 @@ class RunRemoteProcess
             } catch (\Throwable $e) {
                 Log::error('Error calling event: '.$e->getMessage());
             }
+        }
+        if ($processResult->exitCode() != 0 && ! $this->ignore_errors) {
+            throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
         }
 
         return $processResult;

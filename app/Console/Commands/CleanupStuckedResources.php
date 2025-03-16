@@ -39,6 +39,11 @@ class CleanupStuckedResources extends Command
             $servers = Server::all()->filter(function ($server) {
                 return $server->isFunctional();
             });
+            if (isCloud()) {
+                $servers = $servers->filter(function ($server) {
+                    return data_get($server->team->subscription, 'stripe_invoice_paid', false) === true;
+                });
+            }
             foreach ($servers as $server) {
                 CleanupHelperContainersJob::dispatch($server);
             }

@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\DockerImageParser;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -28,12 +29,10 @@ class DockerImage extends Component
         $this->validate([
             'dockerImage' => 'required',
         ]);
-        $image = str($this->dockerImage)->before(':');
-        if (str($this->dockerImage)->contains(':')) {
-            $tag = str($this->dockerImage)->after(':');
-        } else {
-            $tag = 'latest';
-        }
+
+        $parser = new DockerImageParser;
+        $parser->parse($this->dockerImage);
+
         $destination_uuid = $this->query['destination'];
         $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
         if (! $destination) {
@@ -45,7 +44,7 @@ class DockerImage extends Component
         $destination_class = $destination->getMorphClass();
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+        $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
         $application = Application::create([
             'name' => 'docker-image-'.new Cuid2,
             'repository_project_id' => 0,
@@ -53,8 +52,8 @@ class DockerImage extends Component
             'git_branch' => 'main',
             'build_pack' => 'dockerimage',
             'ports_exposes' => 80,
-            'docker_registry_image_name' => $image,
-            'docker_registry_image_tag' => $tag,
+            'docker_registry_image_name' => $parser->getFullImageNameWithoutTag(),
+            'docker_registry_image_tag' => $parser->getTag(),
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
@@ -69,7 +68,7 @@ class DockerImage extends Component
 
         return redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
-            'environment_name' => $environment->name,
+            'environment_uuid' => $environment->uuid,
             'project_uuid' => $project->uuid,
         ]);
     }

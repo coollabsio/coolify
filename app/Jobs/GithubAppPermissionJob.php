@@ -27,19 +27,28 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            $github_access_token = generate_github_jwt_token($this->github_app);
+            $github_access_token = generateGithubJwt($this->github_app);
+
             $response = Http::withHeaders([
                 'Authorization' => "Bearer $github_access_token",
                 'Accept' => 'application/vnd.github+json',
             ])->get("{$this->github_app->api_url}/app");
+
+            if (! $response->successful()) {
+                throw new \RuntimeException('Failed to fetch GitHub app permissions: '.$response->body());
+            }
+
             $response = $response->json();
             $permissions = data_get($response, 'permissions');
+
             $this->github_app->contents = data_get($permissions, 'contents');
             $this->github_app->metadata = data_get($permissions, 'metadata');
             $this->github_app->pull_requests = data_get($permissions, 'pull_requests');
             $this->github_app->administration = data_get($permissions, 'administration');
+
             $this->github_app->save();
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+
         } catch (\Throwable $e) {
             send_internal_notification('GithubAppPermissionJob failed with: '.$e->getMessage());
             throw $e;

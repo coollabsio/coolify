@@ -30,4 +30,11 @@ class Index extends Component
     {
         return view('livewire.project.index');
     }
+
+    public function navigateToProject($projectUuid)
+    {
+        $project = collect($this->projects)->firstWhere('uuid', $projectUuid);
+
+        return $this->redirect($project->navigateTo(), true);
+    }
 }

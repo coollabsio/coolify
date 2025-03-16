@@ -141,17 +141,4 @@ class Executions extends Component
 
         return $lines->count() > ($this->currentPage * $this->logsPerPage);
     }
-
-    public function formatDateInServerTimezone($date)
-    {
-        $serverTimezone = $this->serverTimezone;
-        $dateObj = new \DateTime($date);
-        try {
-            $dateObj->setTimezone(new \DateTimeZone($serverTimezone));
-        } catch (\Exception) {
-            $dateObj->setTimezone(new \DateTimeZone('UTC'));
-        }
-
-        return $dateObj->format('Y-m-d H:i:s T');
-    }
 }

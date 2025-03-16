@@ -2,9 +2,9 @@
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2024-11-17T19-35-25Z
+ARG MINIO_VERSION=RELEASE.2025-02-15T10-36-16Z
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2024.11.1
+ARG CLOUDFLARED_VERSION=2025.2.0
 # https://www.postgresql.org/support/versioning/
 ARG POSTGRES_VERSION=15
 
@@ -99,6 +99,9 @@ RUN mkdir -p /usr/local/bin && \
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
 ENV PHP_OPCACHE_ENABLE=1
 
+# Configure entrypoint
+COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d
+
 # Copy application files from previous stages
 COPY --from=base --chown=www-data:www-data /var/www/html/vendor ./vendor
 COPY --from=static-assets --chown=www-data:www-data /app/public/build ./public/build
@@ -116,6 +119,7 @@ COPY --chown=www-data:www-data storage ./storage
 COPY --chown=www-data:www-data templates ./templates
 COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
+COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 
 RUN composer dump-autoload
 

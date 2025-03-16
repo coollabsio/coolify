@@ -3,23 +3,26 @@
         @forelse($database->scheduledBackups as $backup)
             @if ($type == 'database')
                 <a class="box"
+                    wire:navigate
                     href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
                     <div class="flex flex-col">
-                        <div>Frequency: {{ $backup->frequency }}</div>
+                        <div>Frequency: {{ $backup->frequency }}
+                            ({{ data_get($backup->server(), 'settings.server_timezone', 'Instance timezone') }})
+                        </div>
                         <div>Last backup: {{ data_get($backup->latest_log, 'status', 'No backup yet') }}</div>
-                        <div>Number of backups to keep (locally): {{ $backup->number_of_backups_locally }}</div>
                     </div>
                 </a>
             @else
-                <div class="box" wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
+                <div class="box" wire:navigate wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
                     <div @class([
                         'border-coollabs' =>
                             data_get($backup, 'id') === data_get($selectedBackup, 'id'),
                         'flex flex-col border-l-2 border-transparent',
                     ])>
-                        <div>Frequency: {{ $backup->frequency }}</div>
+                        <div>Frequency: {{ $backup->frequency }}
+                            ({{ data_get($backup->server(), 'settings.server_timezone', 'Instance timezone') }})
+                        </div>
                         <div>Last backup: {{ data_get($backup->latest_log, 'status', 'No backup yet') }}</div>
-                        <div>Number of backups to keep (locally): {{ $backup->number_of_backups_locally }}</div>
                     </div>
                 </div>
             @endif
