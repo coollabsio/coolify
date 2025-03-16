@@ -23,7 +23,7 @@ trait ExecuteRemoteCommand
         } else {
             $commandsText = collect($commands);
         }
-        if ($this->server instanceof Server === false) {
+        if (! $this->server instanceof Server) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
         $commandsText->each(function ($single_command) {
@@ -36,6 +36,10 @@ trait ExecuteRemoteCommand
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $append = data_get($single_command, 'append', true);
             $this->save = data_get($single_command, 'save');
+            $secrets = data_get($single_command, 'secrets', []);
+            if (!empty($secrets)) {
+                $command = $this->replaceSecrets($command, $secrets);
+            }
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
                     $command = str($command)->replace('docker exec', 'sudo docker exec');
@@ -44,10 +48,14 @@ trait ExecuteRemoteCommand
                 }
             }
             $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $secrets, $hidden, $customType, $append) {
                 $output = str($output)->trim();
-                if ($output->startsWith('╔')) {
-                    $output = "\n".$output;
+                if (!empty($secrets)) {
+                    $output = $this->maskSecrets($output, $secrets);
+                    $command = $this->maskSecrets($command, $secrets);
+                }
+                if (str($output)->startsWith('╔')) {
+                    $output = "\n" . $output;
                 }
                 $new_log_entry = [
                     'command' => remove_iip($command),
@@ -60,7 +68,11 @@ trait ExecuteRemoteCommand
                 if (! $this->application_deployment_queue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    $previous_logs = json_decode(
+                        $this->application_deployment_queue->logs,
+                        associative: true,
+                        flags: JSON_THROW_ON_ERROR
+                    );
                     $new_log_entry['order'] = count($previous_logs) + 1;
                 }
                 $previous_logs[] = $new_log_entry;
@@ -92,5 +104,26 @@ trait ExecuteRemoteCommand
                 }
             }
         });
+    }
+
+    private function replaceSecrets(string $text, array $secrets): string
+    {
+        return preg_replace_callback(
+            '/\{\{secrets\.(\w+)\}\}/',
+            fn($match) => $secrets[$match[1]] ?? $match[0],
+            $text
+        );
+    }
+
+    private function maskSecrets(string $text, array $secrets): string
+    {
+        // Sort by length to prevent partial matches
+        $sortedSecrets = collect($secrets)->sortByDesc(fn($value) => strlen($value));
+        foreach ($sortedSecrets as $value) {
+            if (!empty($value)) {
+                $text = str_replace($value, '******', $text);
+            }
+        }
+        return $text;
     }
 }
