@@ -41,7 +41,7 @@ const handleBlur = () => {
 onMounted(() => {
     window.addEventListener('keydown', (e) => {
         // Check for Command+F (Mac) or Control+F (Windows/Linux)
-        if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
             e.preventDefault(); // Prevent the default browser find behavior
             isSearchVisible.value = true;
             nextTick(() => {
@@ -63,7 +63,7 @@ onMounted(() => {
                 <SearchIcon @click="toggleSearch"
                     class="size-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
                     :class="{ 'text-primary': isSearchVisible }" />
-                <span class="text-xs text-muted-foreground">{{ isMac ? '⌘' : 'Ctrl' }}F</span>
+                <span class="text-xs text-muted-foreground">{{ isMac ? '⌘' : 'Ctrl' }}K</span>
             </div>
             <div v-show="isSearchVisible" class="absolute right-0 top-1/2 -translate-y-1/2 transform"
                 ref="searchInputRef">
