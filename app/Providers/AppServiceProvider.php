@@ -48,14 +48,12 @@ final class AppServiceProvider extends ServiceProvider
     private function configurePasswordValidation(): void
     {
         if (App::isProduction()) {
-            Password::defaults(function () {
-                return Password::min(12)
-                    ->mixedCase()
-                    ->letters()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised();
-            });
+            Password::defaults(fn () => Password::min(12)
+                ->mixedCase()
+                ->letters()
+                ->numbers()
+                ->symbols()
+                ->uncompromised());
         }
     }
 
@@ -77,6 +75,7 @@ final class AppServiceProvider extends ServiceProvider
         if (! App::isProduction()) {
             Model::preventLazyLoading();
         }
+
         Model::preventAccessingMissingAttributes();
         Model::unguard();
 
