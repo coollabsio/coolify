@@ -12,15 +12,15 @@ return new class extends Migration
     public function up()
     {
         Schema::table('standalone_postgresqls', function (Blueprint $table) {
-            $table->boolean('enable_ssl')->default(true);
+            $table->boolean('enable_ssl')->default(false);
             $table->enum('ssl_mode', ['allow', 'prefer', 'require', 'verify-ca', 'verify-full'])->default('require');
         });
         Schema::table('standalone_mysqls', function (Blueprint $table) {
-            $table->boolean('enable_ssl')->default(true);
+            $table->boolean('enable_ssl')->default(false);
             $table->enum('ssl_mode', ['PREFERRED', 'REQUIRED', 'VERIFY_CA', 'VERIFY_IDENTITY'])->default('REQUIRED');
         });
         Schema::table('standalone_mariadbs', function (Blueprint $table) {
-            $table->boolean('enable_ssl')->default(true);
+            $table->boolean('enable_ssl')->default(false);
         });
         Schema::table('standalone_redis', function (Blueprint $table) {
             $table->boolean('enable_ssl')->default(false);
