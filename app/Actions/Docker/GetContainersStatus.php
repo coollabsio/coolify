@@ -208,7 +208,6 @@ class GetContainersStatus
                     $foundServices[] = "$service->id-$service->name";
                     $statusFromDb = $service->status;
                     if ($statusFromDb !== $containerStatus) {
-                        // ray('Updating status: ' . $containerStatus);
                         $service->update(['status' => $containerStatus]);
                     } else {
                         $service->update(['last_online_at' => now()]);

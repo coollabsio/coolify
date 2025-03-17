@@ -236,15 +236,29 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
 function removeOldBackups($backup): void
 {
     try {
-        $processedBackups = deleteOldBackupsLocally($backup);
-
-        if ($backup->save_s3) {
-            $processedBackups = $processedBackups->merge(deleteOldBackupsFromS3($backup));
+        if ($backup->executions) {
+            $localBackupsToDelete = deleteOldBackupsLocally($backup);
+            if ($localBackupsToDelete->isNotEmpty()) {
+                $backup->executions()
+                    ->whereIn('id', $localBackupsToDelete->pluck('id'))
+                    ->update(['local_storage_deleted' => true]);
+            }
         }
 
-        if ($processedBackups->isNotEmpty()) {
-            $backup->executions()->whereIn('id', $processedBackups->pluck('id'))->delete();
+        if ($backup->save_s3 && $backup->executions) {
+            $s3BackupsToDelete = deleteOldBackupsFromS3($backup);
+            if ($s3BackupsToDelete->isNotEmpty()) {
+                $backup->executions()
+                    ->whereIn('id', $s3BackupsToDelete->pluck('id'))
+                    ->update(['s3_storage_deleted' => true]);
+            }
         }
+
+        $backup->executions()
+            ->where('local_storage_deleted', true)
+            ->where('s3_storage_deleted', true)
+            ->delete();
+
     } catch (\Exception $e) {
         throw $e;
     }
@@ -258,6 +272,7 @@ function deleteOldBackupsLocally($backup): Collection
 
     $successfulBackups = $backup->executions()
         ->where('status', 'success')
+        ->where('local_storage_deleted', false)
         ->orderBy('created_at', 'desc')
         ->get();
 
@@ -341,6 +356,7 @@ function deleteOldBackupsFromS3($backup): Collection
 
     $successfulBackups = $backup->executions()
         ->where('status', 'success')
+        ->where('s3_storage_deleted', false)
         ->orderBy('created_at', 'desc')
         ->get();
 

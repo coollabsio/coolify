@@ -38,6 +38,12 @@ class StandaloneRedis extends BaseModel
                 $database->forceFill(['last_online_at' => now()]);
             }
         });
+
+        static::retrieved(function ($database) {
+            if (! $database->redis_username) {
+                $database->redis_username = 'default';
+            }
+        });
     }
 
     protected function serverStatus(): Attribute
@@ -198,8 +204,8 @@ class StandaloneRedis extends BaseModel
     {
         return Attribute::make(
             get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            ? []
+            : explode(',', $this->ports_mappings),
 
         );
     }
@@ -366,7 +372,12 @@ class StandaloneRedis extends BaseModel
             get: function () {
                 $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
-                    return null;
+                    $this->runtime_environment_variables()->create([
+                        'key' => 'REDIS_USERNAME',
+                        'value' => 'default',
+                    ]);
+
+                    return 'default';
                 }
 
                 return $username->value;
