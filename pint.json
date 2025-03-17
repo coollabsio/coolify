@@ -1,0 +1,205 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "align_multiline_comment": {
+            "comment_type": "phpdocs_like"
+        },
+        "array_push": true,
+        "assign_null_coalescing_to_coalesce_equal": true,
+        "attribute_empty_parentheses": {
+            "use_parentheses": false
+        },
+        "backtick_to_shell_exec": true,
+        "blank_line_before_statement": {
+            "statements": [
+                "break",
+                "case",
+                "continue",
+                "declare",
+                "default",
+                "do",
+                "exit",
+                "for",
+                "foreach",
+                "goto",
+                "if",
+                "include",
+                "include_once",
+                "phpdoc",
+                "require",
+                "require_once",
+                "return",
+                "switch",
+                "throw",
+                "try",
+                "while",
+                "yield",
+                "yield_from"
+            ]
+        },
+        "class_reference_name_casing": true,
+        "date_time_immutable": true,
+        "declare_strict_types": true,
+        "doctrine_annotation_array_assignment": true,
+        "doctrine_annotation_braces": true,
+        "doctrine_annotation_indentation": true,
+        "doctrine_annotation_spaces": true,
+        "echo_tag_syntax": true,
+        "empty_loop_body": true,
+        "empty_loop_condition": true,
+        "final_class": true,
+        "final_internal_class": true,
+        "final_public_method_for_abstract_class": true,
+        "fully_qualified_strict_types": true,
+        "global_namespace_import": {
+            "import_classes": true,
+            "import_constants": true,
+            "import_functions": true
+        },
+        "heredoc_closing_marker": true,
+        "heredoc_indentation": {
+            "indentation": "same_as_start"
+        },
+        "logical_operators": true,
+        "long_to_shorthand_operator": true,
+        "mb_str_functions": true,
+        "modernize_strpos": {
+            "modernize_stripos": true
+        },
+        "modernize_types_casting": true,
+        "multiline_comment_opening_closing": true,
+        "multiline_string_to_heredoc": true,
+        "no_empty_comment": true,
+        "no_extra_blank_lines": {
+            "tokens": [
+                "attribute",
+                "break",
+                "case",
+                "continue",
+                "curly_brace_block",
+                "default",
+                "extra",
+                "parenthesis_brace_block",
+                "return",
+                "square_brace_block",
+                "switch",
+                "throw",
+                "use",
+                "use_trait"
+            ]
+        },
+        "no_homoglyph_names": true,
+        "no_php4_constructor": true,
+        "no_superfluous_elseif": true,
+        "no_unneeded_braces": {
+            "namespaces": true
+        },
+        "no_unneeded_control_parentheses": {
+            "statements": [
+                "break",
+                "clone",
+                "continue",
+                "echo_print",
+                "negative_instanceof",
+                "others",
+                "return",
+                "switch_case",
+                "yield",
+                "yield_from"
+            ]
+        },
+        "no_useless_concat_operator": {
+            "juggle_simple_strings": true
+        },
+        "no_useless_else": true,
+        "no_useless_nullsafe_operator": true,
+        "no_useless_sprintf": true,
+        "no_whitespace_before_comma_in_array": {
+            "after_heredoc": true
+        },
+        "operator_linebreak": true,
+        "ordered_class_elements": {
+            "order": [
+                "use_trait",
+                "case",
+                "constant",
+                "constant_public",
+                "constant_protected",
+                "constant_private",
+                "property_public",
+                "property_protected",
+                "property_private",
+                "construct",
+                "destruct",
+                "magic",
+                "phpunit",
+                "method_abstract",
+                "method_public_static",
+                "method_public",
+                "method_protected_static",
+                "method_protected",
+                "method_private_static",
+                "method_private"
+            ],
+            "sort_algorithm": "none"
+        },
+        "php_unit_assert_new_names": true,
+        "php_unit_construct": true,
+        "php_unit_data_provider_method_order": {
+            "placement": "before"
+        },
+        "php_unit_dedicate_assert": true,
+        "php_unit_dedicate_assert_internal_type": true,
+        "php_unit_expectation": true,
+        "php_unit_mock": true,
+        "php_unit_mock_short_will_return": true,
+        "php_unit_namespaced": true,
+        "php_unit_no_expectation_annotation": true,
+        "php_unit_strict": true,
+        "php_unit_test_annotation": true,
+        "php_unit_test_case_static_method_calls": true,
+        "phpdoc_annotation_without_dot": true,
+        "phpdoc_no_alias_tag": true,
+        "phpdoc_no_empty_return": true,
+        "phpdoc_return_self_reference": true,
+        "phpdoc_tag_casing": true,
+        "phpdoc_trim_consecutive_blank_line_separation": true,
+        "phpdoc_types_order": {
+            "null_adjustment": "always_last"
+        },
+        "phpdoc_var_annotation_correct_order": true,
+        "protected_to_private": true,
+        "random_api_migration": true,
+        "regular_callable_call": true,
+        "return_assignment": true,
+        "self_accessor": true,
+        "set_type_to_cast": true,
+        "single_line_throw": true,
+        "single_trait_insert_per_statement": false,
+        "strict_comparison": true,
+        "strict_param": true,
+        "string_length_to_empty": true,
+        "string_line_ending": true,
+        "ternary_to_null_coalescing": true,
+        "trailing_comma_in_multiline": {
+            "elements": [
+                "arguments",
+                "array_destructuring",
+                "arrays",
+                "match",
+                "parameters"
+            ]
+        },
+        "type_declaration_spaces": {
+            "elements": [
+                "constant",
+                "function",
+                "property"
+            ]
+        },
+        "visibility_required": true,
+        "whitespace_after_comma_in_array": {
+            "ensure_single_space": true
+        }
+    }
+}
