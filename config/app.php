@@ -1,7 +1,8 @@
 <?php
 
-return [
+declare(strict_types=1);
 
+return [
     /*
     |--------------------------------------------------------------------------
     | Application Name
@@ -13,7 +14,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Coolify'),
 
     /*
     |--------------------------------------------------------------------------
@@ -53,6 +54,30 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Port
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the port your application is running on. It can be
+    | used to change what port the application is running on.
+    |
+    */
+
+    'port' => env('APP_PORT', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Force HTTPS
+    |--------------------------------------------------------------------------
+    |
+    | This option can be used to force your application to use HTTPS instead
+    | of HTTP, providing an additional layer of security for your application.
+    |
+    */
+
+    'force_https' => env('APP_FORCE_HTTPS', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -101,7 +126,7 @@ return [
 
     'previous_keys' => [
         ...array_filter(
-            explode(',', env('APP_PREVIOUS_KEYS', ''))
+            explode(',', env('APP_PREVIOUS_KEYS', '')),
         ),
     ],
 
@@ -122,5 +147,4 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
-
 ];
