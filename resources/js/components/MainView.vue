@@ -50,7 +50,7 @@ import {
     CircleX,
     Menu,
 } from 'lucide-vue-next'
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import type { CustomBreadcrumbItem } from '@/types/BreadcrumbsType'
 import type { LucideIcon } from 'lucide-vue-next'
 import { PageProps } from '@/types/PagePropsType'
@@ -75,8 +75,10 @@ interface NavItem {
 const props = defineProps<{
     breadcrumb?: CustomBreadcrumbItem[]
     hideSearch?: boolean
-    sidebarNavItems?: any[]
+    sidebarNavItems?: NavItem[]
 }>()
+
+const sidebarNavItems = computed(() => props.sidebarNavItems ?? [])
 
 const data = {
     teams: [
@@ -118,10 +120,16 @@ watch(open, (newValue) => {
 const isMobile = ref(window.innerWidth < 768)
 const isDrawerOpen = ref(false)
 
+const handleResize = () => {
+    isMobile.value = window.innerWidth < 768
+}
+
 onMounted(() => {
-    window.addEventListener('resize', () => {
-        isMobile.value = window.innerWidth < 768
-    })
+    window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
 })
 
 function setActiveTeam(team: typeof data.teams[number]) {
