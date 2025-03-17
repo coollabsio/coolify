@@ -182,7 +182,7 @@
                             </div>
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
-                                <a class="underline" href="https://coolify.io/docs/applications">Framework
+                                <a class="underline" href="https://coolify.io/docs/applications/">Framework
                                     Specific Docs</a>
                             </div>
                         @endif

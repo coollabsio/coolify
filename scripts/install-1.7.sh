@@ -14,10 +14,10 @@ set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
-CDN="https://cdn.coollabs.io/coolify-nightly"
+CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.8"
+VERSION="1.7"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -106,8 +106,8 @@ DOCKER_ADDRESS_POOL_SIZE=${DOCKER_ADDRESS_POOL_SIZE:-$DOCKER_ADDRESS_POOL_SIZE_D
 
 # Load Docker address pool configuration from .env file if it exists and environment variables were not provided
 if [ -f "/data/coolify/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
-    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
-    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
+    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2)
+    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2)
 
     if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ]; then
         DOCKER_ADDRESS_POOL_BASE="$ENV_DOCKER_ADDRESS_POOL_BASE"
@@ -122,8 +122,8 @@ fi
 EXISTING_POOL_CONFIGURED=false
 if [ -f /etc/docker/daemon.json ]; then
     if jq -e '.["default-address-pools"]' /etc/docker/daemon.json >/dev/null 2>&1; then
-        EXISTING_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null || true)
-        EXISTING_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null || true)
+        EXISTING_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null)
+        EXISTING_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null)
 
         if [ -n "$EXISTING_POOL_BASE" ] && [ -n "$EXISTING_POOL_SIZE" ] && [ "$EXISTING_POOL_BASE" != "null" ] && [ "$EXISTING_POOL_SIZE" != "null" ]; then
             echo "Found existing Docker network pool: $EXISTING_POOL_BASE/$EXISTING_POOL_SIZE"
@@ -431,18 +431,6 @@ if [ -x "$(command -v snap)" ]; then
     fi
 fi
 
-install_docker() {
-    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
-    if ! [ -x "$(command -v docker)" ]; then
-        curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
-        if ! [ -x "$(command -v docker)" ]; then
-            echo " - Docker installation failed."
-            echo "   Maybe your OS is not supported?"
-            echo " - Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-            exit 1
-        fi
-    fi
-}
 echo -e "3. Check Docker Installation. "
 if ! [ -x "$(command -v docker)" ]; then
     echo " - Docker is not installed. Installing Docker. It may take a while."
@@ -507,35 +495,22 @@ if ! [ -x "$(command -v docker)" ]; then
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
         ;;
-    "ubuntu" | "debian" | "raspbian")
+    *)
         if [ "$OS_TYPE" = "ubuntu" ] && [ "$OS_VERSION" = "24.10" ]; then
-            echo " - Installing Docker for Ubuntu 24.10..."
-            apt-get update >/dev/null
-            apt-get install -y ca-certificates curl >/dev/null
-            install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-            chmod a+r /etc/apt/keyrings/docker.asc
-
-            # Add the repository to Apt sources
-            echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
-                tee /etc/apt/sources.list.d/docker.list >/dev/null
-            apt-get update >/dev/null
-            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null
-
+            echo "Docker automated installation is not supported on Ubuntu 24.10 (non-LTS release)."
+            echo "Please install Docker manually."
+            exit 1
+        fi
+        curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
             if ! [ -x "$(command -v docker)" ]; then
                 echo " - Docker installation failed."
-                echo "   Please visit https://docs.docker.com/engine/install/ubuntu/ and install Docker manually to continue."
+                echo "   Maybe your OS is not supported?"
+                echo " - Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
                 exit 1
             fi
-            echo " - Docker installed successfully for Ubuntu 24.10."
-        else
-            install_docker
         fi
-        ;;
-    *)
-        install_docker
         ;;
     esac
     echo " - Docker installed successfully."

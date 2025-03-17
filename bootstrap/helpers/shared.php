@@ -4054,28 +4054,23 @@ function defaultNginxConfiguration(): string
 {
     return 'server {
     location / {
-        root   /usr/share/nginx/html;
-        index  index.html index.htm;
-        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ /index.html /index.htm =404;
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ =404;
     }
 
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
     error_page 500 502 503 504 /50x.html;
     location = /50x.html {
         root /usr/share/nginx/html;
-        try_files $uri @redirect_to_index;
         internal;
-    }
-
-    error_page 404 = @handle_404;
-
-    location @handle_404 {
-        root /usr/share/nginx/html;
-        try_files /404.html @redirect_to_index;
-        internal;
-    }
-
-    location @redirect_to_index {
-        return 302 /;
     }
 }';
 }

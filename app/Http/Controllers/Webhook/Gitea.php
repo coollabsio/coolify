@@ -152,7 +152,7 @@ class Gitea extends Controller
                     }
                 }
                 if ($x_gitea_event === 'pull_request') {
-                    if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
+                    if ($action === 'opened' || $action === 'synchronized' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2;
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();

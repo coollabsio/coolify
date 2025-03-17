@@ -18,6 +18,32 @@ class StandaloneRedis extends BaseDatabaseModel
                 'is_readonly' => true,
             ]);
         });
+        static::forceDeleting(function ($database) {
+            $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
+            $database->environment_variables()->delete();
+            $database->tags()->detach();
+        });
+        static::saving(function ($database) {
+            if ($database->isDirty('status')) {
+                $database->forceFill(['last_online_at' => now()]);
+            }
+        });
+
+        static::retrieved(function ($database) {
+            if (! $database->redis_username) {
+                $database->redis_username = 'default';
+            }
+        });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
     }
 
     public function isConfigurationChanged(bool $save = false)
@@ -44,6 +70,130 @@ class StandaloneRedis extends BaseDatabaseModel
 
             return true;
         }
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return (bool) str($this->status)->startsWith('exited');
+    }
+
+    public function workdir()
+    {
+        return database_configuration_dir()."/{$this->uuid}";
+    }
+
+    public function delete_configurations()
+    {
+        $server = data_get($this, 'destination.server');
+        $workdir = $this->workdir();
+        if (str($workdir)->endsWith($this->uuid)) {
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function delete_volumes(Collection $persistentStorages)
+    {
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+        }
+    }
+
+    public function realStatus()
+    {
+        return $this->getRawOriginal('status');
+    }
+
+    public function status(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } elseif (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+
+                return "$status:$health";
+            },
+            get: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } elseif (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+
+                return "$status:$health";
+            },
+        );
+    }
+
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
+
+    public function project()
+    {
+        return data_get($this, 'environment.project');
+    }
+
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
+
+    public function link()
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.database.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
+                'database_uuid' => data_get($this, 'uuid'),
+            ]);
+        }
+
+        return null;
+    }
+
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
+
+    public function portsMappings(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === '' ? null : $value,
+        );
+    }
+
+    public function portsMappingsArray(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->ports_mappings)
+            ? []
+            : explode(',', $this->ports_mappings),
+
+        );
     }
 
     public function type(): string
@@ -112,7 +262,12 @@ class StandaloneRedis extends BaseDatabaseModel
             get: function () {
                 $username = $this->runtimeEnvironmentVariables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
-                    return null;
+                    $this->runtime_environment_variables()->create([
+                        'key' => 'REDIS_USERNAME',
+                        'value' => 'default',
+                    ]);
+
+                    return 'default';
                 }
 
                 return $username->value;
