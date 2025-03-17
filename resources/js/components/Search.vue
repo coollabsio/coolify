@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Input } from '@/components/ui/input'
-import { ref, nextTick, onMounted, watch, computed } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
 import { Search as SearchIcon } from 'lucide-vue-next'
 
@@ -38,20 +38,25 @@ const handleBlur = () => {
     }
 }
 
+const handleKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        isSearchVisible.value = true;
+        nextTick(() => {
+            const input = searchInputRef.value?.querySelector('input');
+            if (input) {
+                input.focus();
+            }
+        });
+    }
+}
+
 onMounted(() => {
-    window.addEventListener('keydown', (e) => {
-        // Check for Command+F (Mac) or Control+F (Windows/Linux)
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-            e.preventDefault(); // Prevent the default browser find behavior
-            isSearchVisible.value = true;
-            nextTick(() => {
-                const input = searchInputRef.value?.querySelector('input');
-                if (input) {
-                    input.focus();
-                }
-            });
-        }
-    });
+    window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleKeyDown);
 });
 
 </script>
