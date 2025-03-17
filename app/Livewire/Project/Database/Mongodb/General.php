@@ -143,11 +143,14 @@ class General extends Component
         }
     }
 
+    public function updatedDatabaseSslMode()
+    {
+        $this->instantSaveSSL();
+    }
+
     public function instantSaveSSL()
     {
         try {
-            $this->database->enable_ssl = $this->database->enable_ssl;
-            $this->database->ssl_mode = $this->database->ssl_mode;
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {

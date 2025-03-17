@@ -151,7 +151,6 @@ class General extends Component
     public function instantSaveSSL()
     {
         try {
-            $this->database->enable_ssl = $this->database->enable_ssl;
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {

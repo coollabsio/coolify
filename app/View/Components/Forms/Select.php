@@ -18,7 +18,7 @@ class Select extends Component
         public ?string $label = null,
         public ?string $helper = null,
         public bool $required = false,
-        public string $defaultClass = 'select'
+        public string $defaultClass = 'select w-full'
     ) {
         //
     }
