@@ -67,7 +67,7 @@ class StartMysql
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -87,7 +87,7 @@ class StartMysql
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->mysql_conf) || ! empty($this->database->mysql_conf)) {
+        if (filled($this->database->mysql_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/custom-config.cnf',
@@ -174,7 +174,7 @@ class StartMysql
 
     private function add_custom_mysql()
     {
-        if (is_null($this->database->mysql_conf) || empty($this->database->mysql_conf)) {
+        if (blank($this->database->mysql_conf)) {
             return;
         }
         $filename = 'custom-config.cnf';

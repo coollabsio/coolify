@@ -53,7 +53,7 @@ class RunRemoteProcess
 
     public static function decodeOutput(?Activity $activity = null): string
     {
-        if (is_null($activity)) {
+        if (blank($activity)) {
             return '';
         }
 

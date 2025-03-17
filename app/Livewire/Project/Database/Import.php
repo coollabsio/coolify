@@ -125,7 +125,7 @@ EOD;
             abort(404);
         }
         $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
-        if (is_null($resource)) {
+        if (blank($resource)) {
             abort(404);
         }
         $this->resource = $resource;

@@ -95,7 +95,7 @@ class InstanceSettings extends Model implements SendsEmail
     public function getRecipients($notification)
     {
         $recipients = data_get($notification, 'emails', null);
-        if (is_null($recipients) || $recipients === '') {
+        if (blank($recipients)) {
             return [];
         }
 

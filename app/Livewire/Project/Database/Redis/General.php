@@ -86,12 +86,12 @@ class General extends Component
             $this->validate();
 
             if (version_compare($this->redis_version, '6.0', '>=')) {
-                $this->database->runtime_environment_variables()->updateOrCreate(
+                $this->database->runtimeEnvironmentVariables()->updateOrCreate(
                     ['key' => 'REDIS_USERNAME'],
                     ['value' => $this->redis_username, 'resourceable_id' => $this->database->id]
                 );
             }
-            $this->database->runtime_environment_variables()->updateOrCreate(
+            $this->database->runtimeEnvironmentVariables()->updateOrCreate(
                 ['key' => 'REDIS_PASSWORD'],
                 ['value' => $this->redis_password, 'resourceable_id' => $this->database->id]
             );
@@ -158,6 +158,6 @@ class General extends Component
 
     public function isSharedVariable($name)
     {
-        return $this->database->runtime_environment_variables()->where('key', $name)->where('is_shared', true)->exists();
+        return $this->database->runtimeEnvironmentVariables()->where('key', $name)->where('is_shared', true)->exists();
     }
 }

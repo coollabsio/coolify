@@ -70,7 +70,7 @@ class DatabasesController extends Controller
     public function databases(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $projects = Project::where('team_id', $teamId)->get();
@@ -132,7 +132,7 @@ class DatabasesController extends Controller
     public function database_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -241,7 +241,7 @@ class DatabasesController extends Controller
     {
         $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -1024,7 +1024,7 @@ class DatabasesController extends Controller
         $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
 
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -1595,7 +1595,7 @@ class DatabasesController extends Controller
     {
         $teamId = getTeamIdFromToken();
         $cleanup = filter_var($request->query->get('cleanup', true), FILTER_VALIDATE_BOOLEAN);
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -1673,7 +1673,7 @@ class DatabasesController extends Controller
     public function action_deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -1751,7 +1751,7 @@ class DatabasesController extends Controller
     public function action_stop(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -1829,7 +1829,7 @@ class DatabasesController extends Controller
     public function action_restart(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');

@@ -90,7 +90,7 @@ class ByIp extends Component
                 return $this->dispatch('error', 'This IP/Domain is already in use by another server in your team.');
             }
 
-            if (is_null($this->private_key_id)) {
+            if (blank($this->private_key_id)) {
                 return $this->dispatch('error', 'You must select a private key');
             }
             if (Team::serverLimitReached()) {

@@ -55,7 +55,7 @@ class SecurityController extends Controller
     public function keys(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $keys = PrivateKey::where('team_id', $teamId)->get();
@@ -98,13 +98,13 @@ class SecurityController extends Controller
     public function key_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
         $key = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
 
-        if (is_null($key)) {
+        if (blank($key)) {
             return response()->json([
                 'message' => 'Private Key not found.',
             ], 404);
@@ -168,7 +168,7 @@ class SecurityController extends Controller
     public function create_key(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $return = validateIncomingRequest($request);
@@ -288,7 +288,7 @@ class SecurityController extends Controller
     {
         $allowedFields = ['name', 'description', 'private_key'];
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $return = validateIncomingRequest($request);
@@ -317,7 +317,7 @@ class SecurityController extends Controller
             ], 422);
         }
         $foundKey = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
-        if (is_null($foundKey)) {
+        if (blank($foundKey)) {
             return response()->json([
                 'message' => 'Private Key not found.',
             ], 404);
@@ -373,7 +373,7 @@ class SecurityController extends Controller
     public function delete_key(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -381,7 +381,7 @@ class SecurityController extends Controller
         }
 
         $key = PrivateKey::where('team_id', $teamId)->where('uuid', $request->uuid)->first();
-        if (is_null($key)) {
+        if (blank($key)) {
             return response()->json(['message' => 'Private Key not found.'], 404);
         }
         $key->forceDelete();

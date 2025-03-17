@@ -18,7 +18,7 @@ class DeleteService
             if ($deleteVolumes && $server->isFunctional()) {
                 $storagesToDelete = collect([]);
 
-                $service->environment_variables()->delete();
+                $service->environmentVariables()->delete();
                 $commands = [];
                 foreach ($service->applications()->get() as $application) {
                     $storages = $application->persistentStorages()->get();
@@ -56,7 +56,7 @@ class DeleteService
             throw new \Exception($e->getMessage());
         } finally {
             if ($deleteConfigurations) {
-                $service->delete_configurations();
+                $service->deleteConfigurations();
             }
             foreach ($service->applications()->get() as $application) {
                 $application->forceDelete();

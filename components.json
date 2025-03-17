@@ -1,0 +1,16 @@
+{
+    "$schema": "https://shadcn-vue.com/schema.json",
+    "style": "default",
+    "typescript": true,
+    "tailwind": {
+        "config": "tailwind-inertia.config.js",
+        "css": "resources/css/inertia.css",
+        "baseColor": "neutral",
+        "cssVariables": false,
+        "prefix": ""
+    },
+    "aliases": {
+        "components": "@/components",
+        "utils": "@/lib/utils"
+    }
+}

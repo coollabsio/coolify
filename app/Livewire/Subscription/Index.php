@@ -30,7 +30,7 @@ class Index extends Component
     public function stripeCustomerPortal()
     {
         $session = getStripeCustomerPortalSession(currentTeam());
-        if (is_null($session)) {
+        if (blank($session)) {
             return;
         }
 

@@ -110,7 +110,7 @@ class SshMultiplexingHelper
 
     public static function generateSshCommand(Server $server, string $command)
     {
-        if ($server->settings->force_disabled) {
+        if (data_get($server->settings, 'force_disabled')) {
             throw new \RuntimeException('Server is disabled.');
         }
 

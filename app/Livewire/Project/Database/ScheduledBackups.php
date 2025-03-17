@@ -44,7 +44,7 @@ class ScheduledBackups extends Component
         }
         $this->selectedBackupId = $backupId;
         $this->selectedBackup = $this->database->scheduledBackups->find($backupId);
-        if (is_null($this->selectedBackup)) {
+        if (blank($this->selectedBackup)) {
             $this->selectedBackupId = null;
         }
     }

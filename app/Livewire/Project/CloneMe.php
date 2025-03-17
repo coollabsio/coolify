@@ -11,6 +11,7 @@ use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -231,7 +232,7 @@ class CloneMe extends Component
                                 no_questions_asked: true
                             );
                         } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                         }
                     }
                 }
@@ -248,9 +249,9 @@ class CloneMe extends Component
                     $newStorage->save();
                 }
 
-                $environmentVaribles = $application->environment_variables()->get();
-                foreach ($environmentVaribles as $environmentVarible) {
-                    $newEnvironmentVariable = $environmentVarible->replicate([
+                $environmentVariables = $application->environmentVariables()->get();
+                foreach ($environmentVariables as $environmentVariable) {
+                    $newEnvironmentVariable = $environmentVariable->replicate([
                         'id',
                         'created_at',
                         'updated_at',
@@ -333,7 +334,7 @@ class CloneMe extends Component
 
                             StartDatabase::dispatch($database);
                         } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                            Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                         }
                     }
                 }
@@ -366,12 +367,12 @@ class CloneMe extends Component
                     $newBackup->save();
                 }
 
-                $environmentVaribles = $database->environment_variables()->get();
-                foreach ($environmentVaribles as $environmentVarible) {
+                $environmentVariables = $database->environmentVariables()->get();
+                foreach ($environmentVariables as $environmentVariable) {
                     $payload = [];
                     $payload['resourceable_id'] = $newDatabase->id;
                     $payload['resourceable_type'] = $newDatabase->getMorphClass();
-                    $newEnvironmentVariable = $environmentVarible->replicate([
+                    $newEnvironmentVariable = $environmentVariable->replicate([
                         'id',
                         'created_at',
                         'updated_at',
@@ -412,7 +413,7 @@ class CloneMe extends Component
                     $newTask->save();
                 }
 
-                $environmentVariables = $service->environment_variables()->get();
+                $environmentVariables = $service->environmentVariables()->get();
                 foreach ($environmentVariables as $environmentVariable) {
                     $newEnvironmentVariable = $environmentVariable->replicate([
                         'id',
@@ -461,7 +462,7 @@ class CloneMe extends Component
 
                                 StartService::dispatch($application);
                             } catch (\Exception $e) {
-                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                                Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                             }
                         }
                     }
@@ -515,7 +516,7 @@ class CloneMe extends Component
 
                                 StartService::dispatch($database->service);
                             } catch (\Exception $e) {
-                                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                                Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                             }
                         }
                     }

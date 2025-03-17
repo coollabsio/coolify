@@ -11,7 +11,7 @@ class SaveConfiguration
 
     public function handle(Server $server, ?string $proxy_settings = null)
     {
-        if (is_null($proxy_settings)) {
+        if (blank($proxy_settings)) {
             $proxy_settings = CheckConfiguration::run($server, true);
         }
         $proxy_path = $server->proxyPath();

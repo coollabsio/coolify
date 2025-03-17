@@ -45,14 +45,14 @@ class Project extends BaseModel
         static::deleting(function ($project) {
             $project->environments()->delete();
             $project->settings()->delete();
-            $shared_variables = $project->environment_variables();
+            $shared_variables = $project->environmentVariables();
             foreach ($shared_variables as $shared_variable) {
                 $shared_variable->delete();
             }
         });
     }
 
-    public function environment_variables()
+    public function environmentVariables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class);
     }

@@ -43,7 +43,7 @@ function serializeApiResponse($data)
                 $d = $d->prepend($d['uuid'], 'uuid');
             }
 
-            if (! is_null(data_get($d, 'id'))) {
+            if (filled(data_get($d, 'id'))) {
                 $d = $d->prepend($d['id'], 'id');
             }
 
@@ -71,7 +71,7 @@ function serializeApiResponse($data)
             $d = $d->prepend($d['uuid'], 'uuid');
         }
 
-        if (! is_null(data_get($d, 'id'))) {
+        if (filled(data_get($d, 'id'))) {
             $d = $d->prepend($d['id'], 'id');
         }
 

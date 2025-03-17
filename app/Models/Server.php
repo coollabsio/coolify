@@ -1139,7 +1139,7 @@ $schema://$host {
     public function validateDockerEngine($throwError = false)
     {
         $dockerBinary = instant_remote_process(['command -v docker'], $this, false, no_sudo: true);
-        if (is_null($dockerBinary)) {
+        if (blank($dockerBinary)) {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
@@ -1169,7 +1169,7 @@ $schema://$host {
     public function validateDockerCompose($throwError = false)
     {
         $dockerCompose = instant_remote_process(['docker compose version'], $this, false);
-        if (is_null($dockerCompose)) {
+        if (blank($dockerCompose)) {
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
@@ -1206,7 +1206,7 @@ $schema://$host {
         $dockerVersionJson = json_decode($dockerVersionRaw, true);
         $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-        if (is_null($dockerVersion)) {
+        if (blank($dockerVersion)) {
             $this->settings->is_usable = false;
             $this->settings->save();
 

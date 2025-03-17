@@ -14,11 +14,11 @@ class Show extends Component
     public function saveKey($data)
     {
         try {
-            $found = $this->project->environment_variables()->where('key', $data['key'])->first();
+            $found = $this->project->environmentVariables()->where('key', $data['key'])->first();
             if ($found) {
                 throw new \Exception('Variable already exists.');
             }
-            $this->project->environment_variables()->create([
+            $this->project->environmentVariables()->create([
                 'key' => $data['key'],
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],

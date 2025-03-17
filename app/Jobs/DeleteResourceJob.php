@@ -66,10 +66,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($this->deleteVolumes && $this->resource->type() !== 'service') {
-                $this->resource?->delete_volumes($persistentStorages);
+                $this->resource?->deleteVolumes($persistentStorages);
             }
             if ($this->deleteConfigurations) {
-                $this->resource?->delete_configurations();
+                $this->resource?->deleteConfigurations();
             }
 
             $isDatabase = $this->resource instanceof StandalonePostgresql

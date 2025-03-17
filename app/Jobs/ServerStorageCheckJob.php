@@ -36,7 +36,7 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue
             $team = data_get($this->server, 'team');
             $serverDiskUsageNotificationThreshold = data_get($this->server, 'settings.server_disk_usage_notification_threshold');
 
-            if (is_null($this->percentage)) {
+            if (blank($this->percentage)) {
                 $this->percentage = $this->server->storageCheck();
             }
             if (! $this->percentage) {

@@ -3,18 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
-class StandaloneRedis extends BaseModel
+class StandaloneRedis extends BaseDatabaseModel
 {
-    use HasFactory, SoftDeletes;
-
-    protected $guarded = [];
-
-    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
-
     protected static function booted()
     {
         static::created(function ($database) {
@@ -58,7 +49,7 @@ class StandaloneRedis extends BaseModel
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->redis_conf;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= json_encode($this->environmentVariables()->get('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -210,13 +201,6 @@ class StandaloneRedis extends BaseModel
         return 'standalone-redis';
     }
 
-    public function databaseType(): Attribute
-    {
-        return new Attribute(
-            get: fn () => $this->type(),
-        );
-    }
-
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
@@ -252,80 +236,6 @@ class StandaloneRedis extends BaseModel
         return $image_parts[1] ?? '0.0';
     }
 
-    public function environment()
-    {
-        return $this->belongsTo(Environment::class);
-    }
-
-    public function fileStorages()
-    {
-        return $this->morphMany(LocalFileVolume::class, 'resource');
-    }
-
-    public function destination()
-    {
-        return $this->morphTo();
-    }
-
-    public function runtime_environment_variables()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
-    }
-
-    public function persistentStorages()
-    {
-        return $this->morphMany(LocalPersistentVolume::class, 'resource');
-    }
-
-    public function scheduledBackups()
-    {
-        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
-    }
-
-    public function getCpuMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/cpu/history?from=$from'"], $server, false);
-        if (str($metrics)->contains('error')) {
-            $error = json_decode($metrics, true);
-            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error === 'Unauthorized') {
-                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-            }
-            throw new \Exception($error);
-        }
-        $metrics = json_decode($metrics, true);
-        $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['percent']];
-        });
-
-        return $parsedCollection->toArray();
-    }
-
-    public function getMemoryMetrics(int $mins = 5)
-    {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        $from = now()->subMinutes($mins)->toIso8601ZuluString();
-        $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->sentinel_token}\" http://localhost:8888/api/container/{$container_name}/memory/history?from=$from'"], $server, false);
-        if (str($metrics)->contains('error')) {
-            $error = json_decode($metrics, true);
-            $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-            if ($error === 'Unauthorized') {
-                $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
-            }
-            throw new \Exception($error);
-        }
-        $metrics = json_decode($metrics, true);
-        $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['used']];
-        });
-
-        return $parsedCollection->toArray();
-    }
-
     public function isBackupSolutionAvailable()
     {
         return false;
@@ -335,7 +245,7 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $password = $this->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->first();
+                $password = $this->runtimeEnvironmentVariables()->where('key', 'REDIS_PASSWORD')->first();
                 if (! $password) {
                     return null;
                 }
@@ -350,7 +260,7 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $username = $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
+                $username = $this->runtimeEnvironmentVariables()->where('key', 'REDIS_USERNAME')->first();
                 if (! $username) {
                     $this->runtime_environment_variables()->create([
                         'key' => 'REDIS_USERNAME',
@@ -363,11 +273,5 @@ class StandaloneRedis extends BaseModel
                 return $username->value;
             }
         );
-    }
-
-    public function environment_variables()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderBy('key', 'asc');
     }
 }

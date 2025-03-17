@@ -172,7 +172,7 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {
-            if (is_null($this->database->config_hash)) {
+            if (blank($this->database->config_hash)) {
                 $this->database->isConfigurationChanged(true);
             } else {
                 $this->dispatch('configurationChanged');

@@ -44,7 +44,7 @@ class ProjectController extends Controller
     public function projects(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $projects = Project::whereTeamId($teamId)->select('id', 'name', 'description', 'uuid')->get();
@@ -87,7 +87,7 @@ class ProjectController extends Controller
     public function project_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $project = Project::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
@@ -137,7 +137,7 @@ class ProjectController extends Controller
     public function environment_details(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -219,7 +219,7 @@ class ProjectController extends Controller
         $allowedFields = ['name', 'description'];
 
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -317,7 +317,7 @@ class ProjectController extends Controller
         $allowedFields = ['name', 'description'];
 
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -416,7 +416,7 @@ class ProjectController extends Controller
     public function delete_project(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 

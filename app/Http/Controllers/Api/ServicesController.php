@@ -72,7 +72,7 @@ class ServicesController extends Controller
     public function services(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $projects = Project::where('team_id', $teamId)->get();
@@ -240,7 +240,7 @@ class ServicesController extends Controller
         $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy'];
 
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -422,7 +422,7 @@ class ServicesController extends Controller
     public function service_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -487,7 +487,7 @@ class ServicesController extends Controller
     public function delete_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         if (! $request->uuid) {
@@ -563,7 +563,7 @@ class ServicesController extends Controller
     public function envs(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
@@ -571,7 +571,7 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $envs = $service->environment_variables->map(function ($env) {
+        $envs = $service->environmentVariables->map(function ($env) {
             $env->makeHidden([
                 'application_id',
                 'standalone_clickhouse_id',
@@ -666,7 +666,7 @@ class ServicesController extends Controller
     public function update_env_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -692,7 +692,7 @@ class ServicesController extends Controller
         }
 
         $key = str($request->key)->trim()->replace(' ', '_')->value;
-        $env = $service->environment_variables()->where('key', $key)->first();
+        $env = $service->environmentVariables()->where('key', $key)->first();
         if (! $env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
@@ -787,7 +787,7 @@ class ServicesController extends Controller
     public function create_bulk_envs(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -819,7 +819,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $key = str($item['key'])->trim()->replace(' ', '_')->value;
-            $env = $service->environment_variables()->updateOrCreate(
+            $env = $service->environmentVariables()->updateOrCreate(
                 ['key' => $key],
                 $item
             );
@@ -903,7 +903,7 @@ class ServicesController extends Controller
     public function create_env(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -929,14 +929,14 @@ class ServicesController extends Controller
         }
 
         $key = str($request->key)->trim()->replace(' ', '_')->value;
-        $existingEnv = $service->environment_variables()->where('key', $key)->first();
+        $existingEnv = $service->environmentVariables()->where('key', $key)->first();
         if ($existingEnv) {
             return response()->json([
                 'message' => 'Environment variable already exists. Use PATCH request to update it.',
             ], 409);
         }
 
-        $env = $service->environment_variables()->create($request->all());
+        $env = $service->environmentVariables()->create($request->all());
 
         return response()->json($this->removeSensitiveData($env))->setStatusCode(201);
     }
@@ -1005,7 +1005,7 @@ class ServicesController extends Controller
     public function delete_env_by_uuid(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -1082,7 +1082,7 @@ class ServicesController extends Controller
     public function action_deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -1160,7 +1160,7 @@ class ServicesController extends Controller
     public function action_stop(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
@@ -1238,7 +1238,7 @@ class ServicesController extends Controller
     public function action_restart(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');

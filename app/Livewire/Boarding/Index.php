@@ -179,7 +179,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function selectExistingPrivateKey()
     {
-        if (is_null($this->selectedExistingPrivateKey)) {
+        if (blank($this->selectedExistingPrivateKey)) {
             $this->restartBoarding();
 
             return;
@@ -287,7 +287,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         try {
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-            if (is_null($dockerVersion)) {
+            if (blank($dockerVersion)) {
                 $this->currentState = 'validate-server';
                 throw new \Exception('Docker not found or old version is installed.');
             }

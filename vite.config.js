@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
 
     return {
         server: {
+            cors: true,
             watch: {
                 ignored: [
                     "**/dev_*_data/**",
@@ -20,7 +21,7 @@ export default defineConfig(({ mode }) => {
         },
         plugins: [
             laravel({
-                input: ["resources/css/app.css", "resources/js/app.js"],
+                input: ["resources/css/app.css", "resources/js/app.js", "resources/js/inertia.app.js", "resources/css/inertia.css"],
                 refresh: true,
             }),
             vue({
@@ -32,10 +33,10 @@ export default defineConfig(({ mode }) => {
                 },
             }),
         ],
-        resolve: {
-            alias: {
-                vue: "vue/dist/vue.esm-bundler.js",
-            },
-        },
+        // resolve: {
+        //     alias: {
+        //         vue: "vue/dist/vue.esm-bundler.js",
+        //     },
+        // },
     }
 });

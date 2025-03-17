@@ -17,10 +17,10 @@ class DatabaseProxyStopped implements ShouldBroadcast
 
     public function __construct($teamId = null)
     {
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             $teamId = Auth::user()?->currentTeam()?->id ?? null;
         }
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             throw new \Exception('Team id is null');
         }
         $this->teamId = $teamId;

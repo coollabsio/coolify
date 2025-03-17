@@ -78,7 +78,7 @@ use Symfony\Component\Yaml\Yaml;
 //         'source_id' => 1,
 //         'source_type' => GithubApp::class,
 //     ]);
-//     $this->application->environment_variables_preview()->where('key', 'APP_DEBUG')->update(['value' => 'true']);
+//     $this->application->environmentVariablesPreview()->where('key', 'APP_DEBUG')->update(['value' => 'true']);
 //     $this->applicationPreview = ApplicationPreview::create([
 //         'git_type' => 'github',
 //         'application_id' => $this->application->id,
@@ -342,7 +342,7 @@ use Symfony\Component\Yaml\Yaml;
 //     $output = parseDockerComposeFile($this->service);
 //     ray('Old parser');
 //     // ray($output->toArray());
-//     // ray($this->service->environment_variables->pluck('value', 'key')->toArray());
+//     // ray($this->service->environmentVariables->pluck('value', 'key')->toArray());
 //     // foreach ($this->service->applications as $application) {
 //     //     ray($application->persistentStorages->pluck('mount_path', 'name')->toArray());
 //     // }

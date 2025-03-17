@@ -13,7 +13,7 @@
             helper="More info <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
     </div>
     <div class="flex flex-col gap-2">
-        @forelse ($environment->environment_variables->sort()->sortBy('key') as $env)
+        @forelse ($environment->environmentVariables->sort()->sortBy('key') as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" type="environment" />
         @empty

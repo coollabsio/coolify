@@ -75,7 +75,7 @@ class ServersController extends Controller
     public function servers(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
@@ -137,11 +137,11 @@ class ServersController extends Controller
     {
         $with_resources = $request->query('resources');
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $server = ModelsServer::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
-        if (is_null($server)) {
+        if (blank($server)) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
         if ($with_resources) {
@@ -217,11 +217,11 @@ class ServersController extends Controller
     public function resources_by_server(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $server = ModelsServer::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
-        if (is_null($server)) {
+        if (blank($server)) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $server['resources'] = $server->definedResources()->map(function ($resource) {
@@ -285,7 +285,7 @@ class ServersController extends Controller
     public function domains_by_server(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $uuid = $request->get('uuid');
@@ -454,7 +454,7 @@ class ServersController extends Controller
         $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -494,13 +494,13 @@ class ServersController extends Controller
         if (! $request->user) {
             $request->offsetSet('user', 'root');
         }
-        if (is_null($request->port)) {
+        if (blank($request->port)) {
             $request->offsetSet('port', 22);
         }
-        if (is_null($request->is_build_server)) {
+        if (blank($request->is_build_server)) {
             $request->offsetSet('is_build_server', false);
         }
-        if (is_null($request->instant_validate)) {
+        if (blank($request->instant_validate)) {
             $request->offsetSet('instant_validate', false);
         }
         if ($request->proxy_type) {
@@ -611,7 +611,7 @@ class ServersController extends Controller
         $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type'];
 
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -727,7 +727,7 @@ class ServersController extends Controller
     public function delete_server(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 
@@ -795,7 +795,7 @@ class ServersController extends Controller
     public function validate_server(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
 

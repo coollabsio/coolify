@@ -27,7 +27,7 @@ class CheckProxy
             return false;
         }
         $proxyType = $server->proxyType();
-        if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
+        if (blank($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
             return false;
         }
         ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();

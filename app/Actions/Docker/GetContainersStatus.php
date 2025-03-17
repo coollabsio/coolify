@@ -51,7 +51,7 @@ class GetContainersStatus
             ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
         }
 
-        if (is_null($this->containers)) {
+        if (blank($this->containers)) {
             return;
         }
 

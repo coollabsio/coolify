@@ -112,7 +112,7 @@ class ServiceApplication extends BaseModel
     public function fqdns(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->fqdn)
+            get: fn () => blank($this->fqdn)
                 ? []
                 : explode(',', $this->fqdn),
         );

@@ -38,11 +38,11 @@
             <div>Environment (secrets) variables for Production.</div>
         </div>
         @php
-            $requiredEmptyVars = $resource->environment_variables->filter(function ($env) {
+            $requiredEmptyVars = $resource->environmentVariables->filter(function ($env) {
                 return $env->is_required && empty($env->value);
             });
 
-            $otherVars = $resource->environment_variables->diff($requiredEmptyVars);
+            $otherVars = $resource->environmentVariables->diff($requiredEmptyVars);
         @endphp
         @forelse ($requiredEmptyVars->merge($otherVars) as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
@@ -50,12 +50,12 @@
         @empty
             <div>No environment variables found.</div>
         @endforelse
-        @if ($resource->type() === 'application' && $resource->environment_variables_preview->count() > 0 && $showPreview)
+        @if ($resource->type() === 'application' && $resource->environmentVariablesPreview->count() > 0 && $showPreview)
             <div>
                 <h3>Preview Deployments Environment Variables</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview as $env)
+            @foreach ($resource->environmentVariablesPreview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
             @endforeach

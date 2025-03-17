@@ -1,0 +1,117 @@
+@import 'fonts';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 224 71.4% 4.1%;
+
+        --card: 0 0% 100%;
+        --card-foreground: 224 71.4% 4.1%;
+
+        --popover: 0 0% 100%;
+        --popover-foreground: 224 71.4% 4.1%;
+
+        --primary: 262.1 83.3% 57.8%;
+        --primary-foreground: 210 20% 98%;
+
+        --secondary: 220 14.3% 95.9%;
+        --secondary-foreground: 220.9 39.3% 11%;
+
+        --muted: 220 14.3% 95.9%;
+        --muted-foreground: 220 8.9% 46.1%;
+
+        --accent: 220 14.3% 95.9%;
+        --accent-foreground: 220.9 39.3% 11%;
+
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 20% 98%;
+
+        --border: 220 13% 91%;
+        --input: 220 13% 91%;
+        --input-background: 220 13% 91%;
+        --ring: 262.1 83.3% 57.8%;
+        --radius: 0.1rem;
+
+        --sidebar-background: 0 0% 98%;
+        --sidebar-foreground: 240 5.3% 26.1%;
+        --sidebar-primary: 240 5.9% 10%;
+        --sidebar-primary-foreground: 0 0% 98%;
+        --sidebar-accent: 262.1 83.3% 57.8%;
+        --sidebar-accent-foreground: 240 5.9% 10%;
+        --sidebar-border: 220 13% 91%;
+    }
+
+    .dark {
+        --background: 0 0% 5.5%;
+        /* --background: 264 86% 5%; */
+        --foreground: 210 20% 98%;
+
+        --card: 0 0% 13%;
+        --card-foreground: 210 20% 98%;
+
+        --popover: 224 71.4% 4.1%;
+        --popover-foreground: 210 20% 98%;
+
+        --primary: 263.7 85.7% 50.8%;
+        --primary-foreground: 210 20% 98%;
+
+        --secondary: 0 0% 13%;
+        /* --secondary: 263.7 85.7% 20%; */
+        --secondary-foreground: 210 20% 98%;
+
+        --muted: 215 27.9% 16.9%;
+        --muted-foreground: 0 0% 64%;
+
+        --accent: 0 0% 13%;
+        --accent-foreground: 210 20% 98%;
+
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 20% 98%;
+
+        --border: 0 0% 13%;
+        --input: 0 0% 13%;
+        --input-background: 0 0% 8%;
+
+        /* --border: 264 86% 15%;
+        --input: 264 86% 15%;
+        --input-background: 264 86% 7%; */
+        --ring: 271 83% 51%;
+
+        --sidebar-background: 0 0% 7%;
+        /* --sidebar-background: 264 86% 51% / 0.03; */
+        --sidebar-foreground: 210 20% 98%;
+        --sidebar-primary: 0 0% 7%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 0 0% 13%;
+        --sidebar-accent-foreground: 210 20% 98%;
+        --sidebar-border: 0 0% 13%;
+        --sidebar-border-foreground: 210 20% 98%;
+    }
+}
+
+.resource-box-container {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-2 text-left;
+}
+
+
+[type='text']:focus,
+input:where(:not([type])):focus,
+[type='email']:focus,
+[type='url']:focus,
+[type='password']:focus,
+[type='number']:focus,
+[type='date']:focus,
+[type='datetime-local']:focus,
+[type='month']:focus,
+[type='search']:focus,
+[type='tel']:focus,
+[type='time']:focus,
+[type='week']:focus,
+[multiple]:focus,
+textarea:focus,
+select:focus {
+    @apply ring-0 dark:outline-none border-primary !important;
+}

@@ -33,7 +33,7 @@ class Heading extends Component
         ]);
         $this->dispatch('refresh');
         $this->check_status();
-        if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
+        if (blank($this->database->config_hash) || $this->database->isConfigurationChanged()) {
             $this->database->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
         } else {

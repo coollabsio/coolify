@@ -63,7 +63,7 @@ class Heading extends Component
 
     public function deploy(bool $force_rebuild = false)
     {
-        if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
+        if ($this->application->build_pack === 'dockercompose' && blank($this->application->docker_compose_raw)) {
             $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
 
             return;

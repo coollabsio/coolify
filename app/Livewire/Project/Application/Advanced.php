@@ -197,7 +197,7 @@ class Advanced extends Component
         } else {
             $this->customInternalName = null;
         }
-        if (is_null($this->customInternalName)) {
+        if (blank($this->customInternalName)) {
             $this->syncData(true);
             $this->dispatch('success', 'Custom name saved.');
 

@@ -52,7 +52,7 @@ class InviteLink extends Component
             $link = url('/').config('constants.invitation.link.base_url').$uuid;
             $user = User::whereEmail($this->email)->first();
 
-            if (is_null($user)) {
+            if (blank($user)) {
                 $password = Str::password();
                 $user = User::create([
                     'name' => str($this->email)->before('@'),
@@ -64,7 +64,7 @@ class InviteLink extends Component
                 $link = route('auth.link', ['token' => $token]);
             }
             $invitation = TeamInvitation::whereEmail($this->email)->first();
-            if (! is_null($invitation)) {
+            if (filled($invitation)) {
                 $invitationValid = $invitation->isValid();
                 if ($invitationValid) {
                     return handleError(livewire: $this, customErrorMessage: "Pending invitation already exists for $this->email.");

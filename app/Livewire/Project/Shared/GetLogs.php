@@ -43,7 +43,7 @@ class GetLogs extends Component
 
     public function mount()
     {
-        if (! is_null($this->resource)) {
+        if (filled($this->resource)) {
             if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
             } else {
@@ -68,7 +68,7 @@ class GetLogs extends Component
 
     public function instantSave()
     {
-        if (! is_null($this->resource)) {
+        if (filled($this->resource)) {
             if ($this->resource->getMorphClass() === \App\Models\Application::class) {
                 $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
                 $this->resource->settings->save();
@@ -98,7 +98,7 @@ class GetLogs extends Component
         if (! $refresh && ($this->resource?->getMorphClass() === \App\Models\Service::class || str($this->container)->contains('-pr-'))) {
             return;
         }
-        if ($this->numberOfLines <= 0 || is_null($this->numberOfLines)) {
+        if ($this->numberOfLines <= 0 || blank($this->numberOfLines)) {
             $this->numberOfLines = 1000;
         }
         if ($this->container) {

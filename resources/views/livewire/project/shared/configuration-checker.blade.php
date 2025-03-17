@@ -1,5 +1,5 @@
 <div>
-    @if ($isConfigurationChanged && !is_null($resource->config_hash) && !$resource->isExited())
+    @if ($isConfigurationChanged && filled($resource->config_hash) && !$resource->isExited())
         <x-popup-small>
             <x-slot:title>
                 The latest configuration has not been applied

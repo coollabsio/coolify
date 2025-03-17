@@ -17,10 +17,10 @@ class DatabaseStatusChanged implements ShouldBroadcast
 
     public function __construct($userId = null)
     {
-        if (is_null($userId)) {
+        if (blank($userId)) {
             $userId = Auth::id() ?? null;
         }
-        if (is_null($userId)) {
+        if (blank($userId)) {
             return false;
         }
 
@@ -29,7 +29,7 @@ class DatabaseStatusChanged implements ShouldBroadcast
 
     public function broadcastOn(): ?array
     {
-        if (! is_null($this->userId)) {
+        if (filled($this->userId)) {
             return [
                 new PrivateChannel("user.{$this->userId}"),
             ];

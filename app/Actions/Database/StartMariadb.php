@@ -67,7 +67,7 @@ class StartMariadb
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -87,7 +87,7 @@ class StartMariadb
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->mariadb_conf) || ! empty($this->database->mariadb_conf)) {
+        if (filled($this->database->mariadb_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/custom-config.cnf',
@@ -174,7 +174,7 @@ class StartMariadb
 
     private function add_custom_mysql()
     {
-        if (is_null($this->database->mariadb_conf) || empty($this->database->mariadb_conf)) {
+        if (blank($this->database->mariadb_conf)) {
             return;
         }
         $filename = 'custom-config.cnf';

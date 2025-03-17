@@ -58,7 +58,7 @@ class ExecuteContainerCommand extends Component
         } elseif (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
             $resource = getResourceByUuid($this->parameters['database_uuid'], data_get(auth()->user()->currentTeam(), 'id'));
-            if (is_null($resource)) {
+            if (blank($resource)) {
                 abort(404);
             }
             $this->resource = $resource;
@@ -193,7 +193,7 @@ class ExecuteContainerCommand extends Component
 
             // Verify container exists in our allowed list
             $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
-            if (is_null($container)) {
+            if (blank($container)) {
                 throw new \RuntimeException('Container not found.');
             }
 

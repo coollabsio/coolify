@@ -146,7 +146,7 @@ class EnvironmentVariable extends BaseModel
 
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        if ((is_null($environment_variable) && $environment_variable === '') || is_null($resource)) {
+        if ((blank($environment_variable)) || blank($resource)) {
             return null;
         }
         $environment_variable = trim($environment_variable);
@@ -167,7 +167,7 @@ class EnvironmentVariable extends BaseModel
             } elseif ($type->value() === 'team') {
                 $id = $resource->team()->id;
             }
-            if (is_null($id)) {
+            if (blank($id)) {
                 continue;
             }
             $environment_variable_found = SharedEnvironmentVariable::where('type', $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
@@ -190,7 +190,7 @@ class EnvironmentVariable extends BaseModel
 
     private function set_environment_variables(?string $environment_variable = null): ?string
     {
-        if (is_null($environment_variable) && $environment_variable === '') {
+        if (blank($environment_variable)) {
             return null;
         }
         $environment_variable = trim($environment_variable);

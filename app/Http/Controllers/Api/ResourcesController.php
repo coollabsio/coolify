@@ -40,7 +40,7 @@ class ResourcesController extends Controller
     public function resources(Request $request)
     {
         $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
+        if (blank($teamId)) {
             return invalidTokenResponse();
         }
         $projects = Project::where('team_id', $teamId)->get();

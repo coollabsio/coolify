@@ -76,7 +76,7 @@ class StartRedis
                 ],
             ],
         ];
-        if (! is_null($this->database->limits_cpuset)) {
+        if (filled($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
@@ -96,7 +96,7 @@ class StartRedis
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->redis_conf) || ! empty($this->database->redis_conf)) {
+        if (filled($this->database->redis_conf)) {
             $docker_compose['services'][$container_name]['volumes'][] = [
                 'type' => 'bind',
                 'source' => $this->configuration_dir.'/redis.conf',
@@ -186,7 +186,7 @@ class StartRedis
 
     private function buildStartCommand(): string
     {
-        $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
+        $hasRedisConf = filled($this->database->redis_conf);
         $redisConfPath = '/usr/local/etc/redis/redis.conf';
 
         if ($hasRedisConf) {
@@ -207,7 +207,7 @@ class StartRedis
 
     private function add_custom_redis()
     {
-        if (is_null($this->database->redis_conf) || empty($this->database->redis_conf)) {
+        if (blank($this->database->redis_conf)) {
             return;
         }
         $filename = 'redis.conf';

@@ -27,14 +27,14 @@ class InstanceSettingsSeeder extends Seeder
             $ipv4 = trim($ipv4);
             $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
             $settings = instanceSettings();
-            if (is_null($settings->public_ipv4) && $ipv4) {
+            if (blank($settings->public_ipv4) && $ipv4) {
                 $settings->update(['public_ipv4' => $ipv4]);
             }
             $ipv6 = Process::run('curl -6s https://ifconfig.io')->output();
             $ipv6 = trim($ipv6);
             $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
             $settings = instanceSettings();
-            if (is_null($settings->public_ipv6) && $ipv6) {
+            if (blank($settings->public_ipv6) && $ipv6) {
                 $settings->update(['public_ipv6' => $ipv6]);
             }
         } catch (\Throwable $e) {

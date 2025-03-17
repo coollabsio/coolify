@@ -61,7 +61,7 @@ class Create extends Component
                     'database_uuid' => $database->uuid,
                 ]);
             }
-            if ($type->startsWith('one-click-service-') && ! is_null((int) $server_id)) {
+            if ($type->startsWith('one-click-service-') && filled((int) $server_id)) {
                 $oneClickServiceName = $type->after('one-click-service-')->value();
                 $oneClickService = data_get($services, "$oneClickServiceName.compose");
                 $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
