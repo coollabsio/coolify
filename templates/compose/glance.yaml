@@ -11,8 +11,8 @@ services:
       - SERVICE_FQDN_GLANCE_8080
     volumes:
       - type: bind
-        source: ./glance-settings
-        target: /app/glance.yml
+        source: ./config
+        target: /app/config/glance.yml
         content: |
           pages:
             - name: Home
