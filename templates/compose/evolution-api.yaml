@@ -1,7 +1,7 @@
 # documentation: https://doc.evolution-api.com/v1/pt/get-started/introduction
 # slogan: Evolution API Installation with Postgres and Redis
 # tags: evolution-api,evo-api,evolution,whatsapp,api,postgres,redis
-# logo: svgs/evolution-api.png
+# logo: svgs/evolution-api.svg
 # port: 8080
 
 version: '3.8'

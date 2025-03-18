@@ -573,7 +573,7 @@
             "key-value",
             "database"
         ],
-        "logo": "svgs/deno.svg",
+        "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
         "port": "4512"
     },
@@ -812,7 +812,7 @@
             "postgres",
             "redis"
         ],
-        "logo": "svgs/evolution-api.png",
+        "logo": "svgs/evolution-api.svg",
         "minversion": "0.0.0",
         "port": "8080"
     },
@@ -2094,7 +2094,7 @@
             "transformation",
             "service"
         ],
-        "logo": "svgs/coolify-transparent.png",
+        "logo": "coolify-logo.svg",
         "minversion": "0.0.0",
         "port": "3000"
     },
