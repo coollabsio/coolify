@@ -65,6 +65,41 @@
                     type="password" readonly wire:model="db_url_public" />
             @endif
         </div>
+
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between py-2">
+                <div class="flex items-center justify-between w-full">
+                    <h3>SSL Configuration</h3>
+                    @if($database->enable_ssl && $certificateValidUntil)
+                        <x-modal-confirmation
+                            title="Regenerate SSL Certificates"
+                            buttonTitle="Regenerate SSL Certificates"
+                            :actions="['The SSL certificate of this database will be regenerated.','You must restart the database after regenerating the certificate to start using the new certificate.']"
+                            submitAction="regenerateSslCertificate"
+                            :confirmWithText="false"
+                            :confirmWithPassword="false"
+                        />
+                    @endif
+                </div>
+            </div>
+            @if($database->enable_ssl && $certificateValidUntil)
+                <span class="text-sm">Valid until: 
+                @if(now()->gt($certificateValidUntil))
+                    <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
+                @elseif(now()->addDays(30)->gt($certificateValidUntil))
+                    <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expiring soon</span>
+                @else
+                    <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }}</span>
+                @endif
+                </span>
+            @endif
+        </div>
+        <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2">
+                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+            </div>
+        </div>
+        
         <div>
             <div class="flex flex-col py-2 w-64">
                 <div class="flex items-center gap-2 pb-2">
