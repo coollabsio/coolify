@@ -748,6 +748,7 @@ function parseCommandFromMagicEnvVariable(Str|string $key): Stringable
 {
     $value = str($key);
     $count = substr_count($value->value(), '_');
+    $command = null;
     if ($count === 2) {
         if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
             // SERVICE_FQDN_UMAMI
@@ -800,7 +801,6 @@ function parseEnvVariable(Str|string $value)
             } else {
                 // SERVICE_BASE64_64_UMAMI
                 $command = $value->after('SERVICE_')->beforeLast('_');
-                ray($command);
             }
         }
     }
@@ -952,7 +952,6 @@ function validate_dns_entry(string $fqdn, Server $server)
     $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            ray("Checking $host on $dns_server");
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
@@ -961,13 +960,10 @@ function validate_dns_entry(string $fqdn, Server $server)
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
                         if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
-                            ray("Found match in Cloudflare IPs: $match");
                             $found_matching_ip = true;
                             break;
                         }
                         if ($result->getData() === $ip) {
-                            ray($host.' has IP address '.$result->getData());
-                            ray($result->getString());
                             $found_matching_ip = true;
                             break;
                         }
@@ -977,7 +973,6 @@ function validate_dns_entry(string $fqdn, Server $server)
         } catch (\Exception) {
         }
     }
-    ray("Found match: $found_matching_ip");
 
     return $found_matching_ip;
 }
@@ -1331,7 +1326,6 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
                 $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                 if ((is_null($isDirectory) || ! $isDirectory) && is_null($content)) {
                     // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
-                    ray('setting isDirectory to true');
                     $isDirectory = true;
                 }
             }
@@ -1499,7 +1493,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $serviceLabels->push("$removedLabelName=$removedLabel");
                     }
                 }
-
                 $containerName = "$serviceName-{$resource->uuid}";
 
                 // Decide if the service is a database
@@ -1662,7 +1655,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             if (is_null($isDirectory) && is_null($content)) {
                                 // if isDirectory is not set & content is also not set, we assume it is a directory
-                                ray('setting isDirectory to true');
                                 $isDirectory = true;
                             }
                         }
@@ -2529,9 +2521,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     }
                 }
             }
-            if ($collectedPorts->count() > 0) {
-                ray($collectedPorts->implode(','));
-            }
             $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                 return $value == $definedNetwork;
             });
@@ -2956,7 +2945,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     }
 
     $parsedServices = collect([]);
-    // ray()->clearAll();
 
     $allMagicEnvironments = collect([]);
     foreach ($services as $serviceName => $service) {
@@ -3016,7 +3004,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             $environment = $environment->merge($buildArgs);
 
             // convert environment variables to one format
-            $environment = convertComposeEnvironmentToArray($environment);
+            $environment = convertToKeyValueCollection($environment);
 
             // Add Coolify defined environments
             $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
@@ -3197,7 +3185,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
 
-        $environment = convertComposeEnvironmentToArray($environment);
+        $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
         $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
@@ -3934,7 +3922,7 @@ function add_coolify_default_environment_variables(StandaloneRedis|StandalonePos
     }
 }
 
-function convertComposeEnvironmentToArray($environment)
+function convertToKeyValueCollection($environment)
 {
     $convertedServiceVariables = collect([]);
     if (isAssociativeArray($environment)) {

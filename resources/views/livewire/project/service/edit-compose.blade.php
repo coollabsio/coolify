@@ -20,27 +20,29 @@
         </x-forms.textarea>
     </div>
     <div class="pt-2 flex gap-2">
-        <x-forms.checkbox label="Escape special characters in labels?"
-            helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
-            id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
-        <div class="flex-1"></div>
-        <div x-cloak x-show="raw">
-            <x-forms.button class="w-32" @click.prevent="showNormalTextarea = !showNormalTextarea">Switch
-                Textarea</x-forms.button>
+        <div class="flex flex-col gap-2">
+            <x-forms.checkbox label="Escape special characters in labels?"
+                helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
+                id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+            <x-forms.checkbox label="Show Normal Textarea" x-model="showNormalTextarea"></x-forms.checkbox>
         </div>
+
     </div>
-    <div class="flex justify-end w-full gap-2 pt-4">
-        <div class="flex items-end gap-2">
-            <div x-cloak x-show="raw">
-                <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Deployable Compose</x-forms.button>
-            </div>
-            <div x-cloak x-show="raw === false">
-                <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Source
-                    Compose</x-forms.button>
-            </div>
+    <div class="flex  w-full gap-2 pt-4">
+        <div x-cloak x-show="raw">
+            <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Deployable Compose</x-forms.button>
+        </div>
+        <div x-cloak x-show="raw === false">
+            <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Source
+                Compose</x-forms.button>
         </div>
         <div class="flex-1"></div>
-        <x-forms.button class="w-64" wire:click.prevent='saveEditedCompose'>
+        @if (blank($service->service_type))
+            <x-forms.button class="w-28" wire:click.prevent='validateCompose'>
+                Validate
+            </x-forms.button>
+        @endif
+        <x-forms.button class="w-28" wire:click.prevent='saveEditedCompose'>
             Save
         </x-forms.button>
     </div>

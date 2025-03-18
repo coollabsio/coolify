@@ -101,7 +101,6 @@ class Change extends Component
     //         ]);
     //     }
 
-    //     ray($runners_by_repository);
     // }
 
     public function mount()
