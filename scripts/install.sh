@@ -21,6 +21,7 @@ VERSION="1.8"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
+PORT=8000
 
 if [ $EUID != 0 ]; then
     echo "Please run this script as root or with sudo"
@@ -30,6 +31,31 @@ fi
 echo -e "Welcome to Coolify Installer!"
 echo -e "This script will install everything for you. Sit back and relax."
 echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+
+while getopts "p:-:" opt; do
+    case "$opt" in
+        p) PORT="$OPTARG" ;;
+        -)
+            case "$OPTARG" in
+                port) PORT="${!OPTIND}"; OPTIND=$((OPTIND + 1)) ;;
+                *) echo "Invalid option: --$OPTARG" >&2; exit 1 ;;
+            esac
+            ;;
+        ?) echo "Usage: $0 [-p port] [--port port]" >&2; exit 1 ;;
+    esac
+done
+
+# check if port option is number
+if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
+    echo "Error: Port must be a numeric value." >&2
+    exit 1
+fi
+
+if [ "$PORT" -eq 8000 ]; then
+    echo "Coolify will run on default port: $PORT"
+else
+    echo "Coolify will run on customized port: $PORT"
+fi
 
 # Predefined root user
 ROOT_USERNAME=${ROOT_USERNAME:-}
@@ -687,9 +713,11 @@ else
     echo " - File does not exist: $ENV_FILE"
     echo " - Copying .env.production to .env-$DATE"
     cp /data/coolify/source/.env.production $ENV_FILE-$DATE
-    # Generate a secure APP_ID and APP_KEY
+
+    # Generate a secure APP_ID and APP_KEY and APP_PORT
     sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
     sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
+    sed -i "s|^APP_PORT=.*|APP_PORT=$PORT|" "$ENV_FILE-$DATE"
 
     # Generate a secure Postgres DB username and password
     # Causes issues: database "random-user" does not exist
@@ -795,7 +823,7 @@ echo -e "\033[0;35m
                    |___/
 \033[0m"
 echo -e "\nYour instance is ready to use!\n"
-echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
+echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):$PORT"
 
 set +e
 DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
@@ -806,7 +834,7 @@ if [ -n "$PRIVATE_IPS" ]; then
     echo -e "\nIf your Public IP is not accessible, you can use the following Private IPs:\n"
     for IP in $PRIVATE_IPS; do
         if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
-            echo -e "http://$IP:8000"
+            echo -e "http://$IP:$PORT"
         fi
     done
 fi
