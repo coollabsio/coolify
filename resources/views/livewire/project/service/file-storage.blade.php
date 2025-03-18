@@ -28,12 +28,15 @@
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                     shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
             @else
-                <x-modal-confirmation title="Confirm File Conversion to Directory?" buttonTitle="Convert to directory"
-                    submitAction="convertToDirectory" :actions="[
-                        'The selected file will be permanently deleted and an empty directory will be created in its place.',
-                    ]" confirmationText="{{ $fs_path }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                    shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to directory" />
+                @if (!$fileStorage->is_binary)
+                    <x-modal-confirmation title="Confirm File Conversion to Directory?"
+                        buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
+                            'The selected file will be permanently deleted and an empty directory will be created in its place.',
+                        ]"
+                        confirmationText="{{ $fs_path }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                        shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to directory" />
+                @endif
                 <x-modal-confirmation title="Confirm File Deletion?" buttonTitle="Delete File" isErrorButton
                     submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']" confirmationText="{{ $fs_path }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
@@ -66,8 +69,8 @@
             <x-forms.textarea
                 label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                 rows="20" id="fileStorage.content"
-                readonly="{{ $fileStorage->is_based_on_git }}"></x-forms.textarea>
-            @if (!$fileStorage->is_based_on_git)
+                readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
+            @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
                 <x-forms.button class="w-full" type="submit">Save</x-forms.button>
             @endif
         @endif

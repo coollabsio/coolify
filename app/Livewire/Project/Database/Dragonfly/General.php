@@ -4,8 +4,11 @@ namespace App\Livewire\Project\Database\Dragonfly;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Helpers\SslHelper;
 use App\Models\Server;
+use App\Models\SslCertificate;
 use App\Models\StandaloneDragonfly;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Validate;
@@ -50,6 +53,11 @@ class General extends Component
     #[Validate(['nullable', 'boolean'])]
     public bool $isLogDrainEnabled = false;
 
+    public ?Carbon $certificateValidUntil = null;
+
+    #[Validate(['nullable', 'boolean'])]
+    public bool $enable_ssl = false;
+
     public function getListeners()
     {
         $teamId = Auth::user()->currentTeam()->id;
@@ -64,6 +72,12 @@ class General extends Component
         try {
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+
+            $existingCert = $this->database->sslCertificates()->first();
+
+            if ($existingCert) {
+                $this->certificateValidUntil = $existingCert->valid_until;
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -82,6 +96,7 @@ class General extends Component
             $this->database->public_port = $this->publicPort;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->enable_ssl = $this->enable_ssl;
             $this->database->save();
 
             $this->dbUrl = $this->database->internal_db_url;
@@ -96,6 +111,7 @@ class General extends Component
             $this->publicPort = $this->database->public_port;
             $this->customDockerRunOptions = $this->database->custom_docker_run_options;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->enable_ssl = $this->database->enable_ssl;
             $this->dbUrl = $this->database->internal_db_url;
             $this->dbUrlPublic = $this->database->external_db_url;
         }
@@ -172,6 +188,49 @@ class General extends Component
             } else {
                 $this->dispatch('configurationChanged');
             }
+        }
+    }
+
+    public function instantSaveSSL()
+    {
+        try {
+            $this->syncData(true);
+            $this->dispatch('success', 'SSL configuration updated.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function regenerateSslCertificate()
+    {
+        try {
+            $existingCert = $this->database->sslCertificates()->first();
+
+            if (! $existingCert) {
+                $this->dispatch('error', 'No existing SSL certificate found for this database.');
+
+                return;
+            }
+
+            $caCert = SslCertificate::where('server_id', $existingCert->server_id)
+                ->where('is_ca_certificate', true)
+                ->first();
+
+            SslHelper::generateSslCertificate(
+                commonName: $existingCert->commonName,
+                subjectAlternativeNames: $existingCert->subjectAlternativeNames ?? [],
+                resourceType: $existingCert->resource_type,
+                resourceId: $existingCert->resource_id,
+                serverId: $existingCert->server_id,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
+                configurationDir: $existingCert->configuration_dir,
+                mountPath: $existingCert->mount_path,
+            );
+
+            $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
+        } catch (Exception $e) {
+            handleError($e, $this);
         }
     }
 }

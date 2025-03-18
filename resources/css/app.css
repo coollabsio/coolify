@@ -25,11 +25,6 @@ body {
     @apply hidden !important;
 }
 
-.input,
-.select {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300;
-}
-
 .input-sticky {
     @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
 }
@@ -51,7 +46,11 @@ body {
 
 .input,
 .select {
-    @apply block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
+}
+
+.select {
+    @apply w-full;
 }
 
 .input[type="password"] {
