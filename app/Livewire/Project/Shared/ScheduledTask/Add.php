@@ -75,7 +75,7 @@ class Add extends Component
     public function saveScheduledTask()
     {
         try {
-            $task = new ScheduledTask();
+            $task = new ScheduledTask;
             $task->name = $this->name;
             $task->command = $this->command;
             $task->frequency = $this->frequency;
