@@ -81,9 +81,6 @@
                 "dockerfile": {
                     "type": "object",
                     "properties": {
-                        "content": {
-                            "type": "string"
-                        },
                         "location": {
                             "type": "string"
                         },
@@ -95,13 +92,16 @@
                 "docker_compose": {
                     "type": "object",
                     "properties": {
-                        "content": {
-                            "type": "string"
-                        },
                         "location": {
                             "type": "string"
                         },
-                        "parsing_version": {
+                        "domains": {
+                            "type": "string"
+                        },
+                        "custom_start_command": {
+                            "type": "string"
+                        },
+                        "custom_build_command": {
                             "type": "string"
                         }
                     }
@@ -113,6 +113,42 @@
                             "type": "string"
                         },
                         "custom_labels": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "docker_custom_options": {
+            "type": "string"
+        },
+        "labels": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "deployment": {
+            "type": "object",
+            "properties": {
+                "pre_deployment": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string"
+                        },
+                        "container": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "post_deployment": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string"
+                        },
+                        "container": {
                             "type": "string"
                         }
                     }
@@ -181,7 +217,11 @@
                     "type": "integer"
                 },
                 "scheme": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "http",
+                        "https"
+                    ]
                 },
                 "response_text": {
                     "type": "string"
@@ -224,6 +264,9 @@
                     "type": "object",
                     "properties": {
                         "limit": {
+                            "type": "string"
+                        },
+                        "set": {
                             "type": "string"
                         },
                         "shares": {
@@ -482,6 +525,28 @@
             "type": "array",
             "items": {
                 "type": "string"
+            }
+        },
+        "webhooks": {
+            "type": "object",
+            "properties": {
+                "secrets": {
+                    "type": "object",
+                    "properties": {
+                        "github": {
+                            "type": "string"
+                        },
+                        "gitlab": {
+                            "type": "string"
+                        },
+                        "bitbucket": {
+                            "type": "string"
+                        },
+                        "gitea": {
+                            "type": "string"
+                        }
+                    }
+                }
             }
         }
     }

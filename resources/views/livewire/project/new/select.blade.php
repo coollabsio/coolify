@@ -20,9 +20,11 @@
             <div x-show="loading">Loading...</div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
                 <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
-                {{-- <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
-                    <livewire:project.shared.upload-config />
-                </x-modal-input> --}}
+                {{-- @if (isDev())
+                    <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
+                        <livewire:project.shared.upload-config />
+                    </x-modal-input>
+                @endif --}}
                 <h4 x-show="filteredGitBasedApplications.length > 0">Git Based</h4>
                 <div x-show="filteredGitBasedApplications.length > 0"
                     class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">

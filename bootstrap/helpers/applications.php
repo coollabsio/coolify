@@ -186,6 +186,14 @@ function configValidator(string $config)
         'config.resources.cpu.limit.string' => 'CPU limit must be a string (resources.cpu.limit).',
         'config.resources.cpu.shares.integer' => 'CPU shares must be an integer (resources.cpu.shares).',
         'config.network.domains.fqdn.string' => 'FQDN must be a string (network.domains.fqdn).',
+        'config.deployment.pre_deployment.command.string' => 'Pre-deployment command must be a string',
+        'config.deployment.pre_deployment.container.string' => 'Pre-deployment container must be a string',
+        'config.deployment.post_deployment.command.string' => 'Post-deployment command must be a string',
+        'config.deployment.post_deployment.container.string' => 'Post-deployment container must be a string',
+        'config.webhooks.secrets.github.string' => 'Github webhook secret must be a string',
+        'config.webhooks.secrets.gitlab.string' => 'Gitlab webhook secret must be a string',
+        'config.webhooks.secrets.bitbucket.string' => 'Bitbucket webhook secret must be a string',
+        'config.webhooks.secrets.gitea.string' => 'Gitea webhook secret must be a string',
     ];
 
     $deepValidator = Validator::make(['config' => $config], [
@@ -213,14 +221,17 @@ function configValidator(string $config)
         'config.build.watch_paths' => 'nullable|string',
 
         'config.build.dockerfile' => 'array',
-        'config.build.dockerfile.content' => 'nullable|string',
+        // 'config.build.dockerfile.content' => 'nullable|string',
         'config.build.dockerfile.location' => 'nullable|string',
         'config.build.dockerfile.target_build' => 'nullable|string',
 
         'config.build.docker_compose' => 'array',
-        'config.build.docker_compose.content' => 'required_if:config.build.build_pack,dockercompose|string',
+        // 'config.build.docker_compose.content' => 'required_if:config.build.build_pack,dockercompose|string',
         'config.build.docker_compose.location' => 'nullable|string',
-        'config.build.docker_compose.parsing_version' => 'nullable|string',
+        // 'config.build.docker_compose.parsing_version' => 'nullable|string',
+        'config.build.docker_compose.domains' => 'nullable|string',
+        'config.build.docker_compose.custom_start_command' => 'nullable|string',
+        'config.build.docker_compose.custom_build_command' => 'nullable|string',
 
         'config.build.docker' => 'array',
         'config.build.docker.custom_options' => 'nullable|string',
@@ -242,7 +253,7 @@ function configValidator(string $config)
         'config.health_check.host' => 'nullable|string',
         'config.health_check.method' => 'nullable|string',
         'config.health_check.return_code' => 'nullable|integer',
-        'config.health_check.scheme' => 'nullable|string',
+        'config.health_check.scheme' => 'nullable|string|in:http,https',
         'config.health_check.response_text' => 'nullable|string',
         'config.health_check.interval' => 'nullable|integer',
         'config.health_check.timeout' => 'nullable|integer',
@@ -258,6 +269,7 @@ function configValidator(string $config)
         'config.resources.cpu' => 'array',
         'config.resources.cpu.limit' => 'nullable|string',
         'config.resources.cpu.shares' => 'nullable|integer',
+        'config.resources.cpu.set' => 'nullable|string',
 
         'config.preview' => 'array',
         'config.preview.url_template' => 'nullable|string',
@@ -335,6 +347,25 @@ function configValidator(string $config)
 
         'config.tags' => 'array',
         'config.tags.*' => 'string',
+
+        'config.deployment' => 'array',
+        'config.deployment.pre_deployment' => 'array',
+        'config.deployment.pre_deployment.command' => 'nullable|string',
+        'config.deployment.pre_deployment.container' => 'nullable|string',
+        'config.deployment.post_deployment' => 'array',
+        'config.deployment.post_deployment.command' => 'nullable|string',
+        'config.deployment.post_deployment.container' => 'nullable|string',
+
+        'config.webhooks' => 'array',
+        'config.webhooks.secrets' => 'array',
+        'config.webhooks.secrets.github' => 'nullable|string',
+        'config.webhooks.secrets.gitlab' => 'nullable|string',
+        'config.webhooks.secrets.bitbucket' => 'nullable|string',
+        'config.webhooks.secrets.gitea' => 'nullable|string',
+
+        'config.docker_custom_options' => 'nullable|string',
+        'config.labels' => 'nullable|array',
+        'config.labels.*' => 'string',
     ], $messages);
 
     if ($deepValidator->fails()) {
@@ -343,25 +374,25 @@ function configValidator(string $config)
     }
 
     // Custom validation for dockerfile content
-    $buildPack = data_get($config, 'build.build_pack');
-    $gitRepository = data_get($config, 'source.git_repository');
-    $gitBranch = data_get($config, 'source.git_branch');
-    $dockerfileContent = data_get($config, 'build.dockerfile.content');
+    // $buildPack = data_get($config, 'build.build_pack');
+    // $gitRepository = data_get($config, 'source.git_repository');
+    // $gitBranch = data_get($config, 'source.git_branch');
+    // $dockerfileContent = data_get($config, 'build.dockerfile.content');
 
-    if ($buildPack === 'dockerfile' && ! $gitRepository && ! $gitBranch && ! $dockerfileContent) {
-        throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- When using dockerfile build pack without git repository and branch, the Dockerfile content is required (build.dockerfile.content)');
-    }
+    // if ($buildPack === 'dockerfile' && ! $gitRepository && ! $gitBranch) {
+    //     throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- When using dockerfile build pack without git repository and branch, the Dockerfile content is required (build.dockerfile.content)');
+    // }
 
-    //validate domains
+    // validate domains
     $domains = data_get($config, 'network.domains.fqdn');
     if ($domains) {
         $domains = explode(',', $domains);
         foreach ($domains as $domain) {
-            if (!str_starts_with($domain, 'http://') && !str_starts_with($domain, 'https://')) {
+            if (! str_starts_with($domain, 'http://') && ! str_starts_with($domain, 'https://')) {
                 throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- Domain must start with http:// or https://<br><br>Your domain: '.$domain);
             }
             $parsedDomain = parse_url($domain, PHP_URL_HOST);
-            if (!$parsedDomain || !filter_var($parsedDomain, FILTER_VALIDATE_DOMAIN)) {
+            if (! $parsedDomain || ! filter_var($parsedDomain, FILTER_VALIDATE_DOMAIN)) {
                 throw new \Exception('Validation failed:'.PHP_EOL.PHP_EOL.'- Invalid domain: '.$domain);
             }
         }

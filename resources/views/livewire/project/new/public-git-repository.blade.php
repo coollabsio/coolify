@@ -79,7 +79,6 @@
                     </div>
                     @if (filled($coolify_config))
                         <div class="flex flex-col gap-2">
-                            <div>coolify.json</div>
                             <x-forms.textarea id="coolify_config" wire:model="coolify_config"
                                 monacoEditorLanguage="json" useMonacoEditor />
                         </div>

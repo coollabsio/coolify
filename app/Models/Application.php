@@ -1686,22 +1686,22 @@ class Application extends BaseModel
                 'watch_paths' => data_get($config, 'build.watch_paths'),
 
                 // Dockerfile settings
-                'dockerfile' => data_get($config, 'build.dockerfile.content'),
+                // 'dockerfile' => data_get($config, 'build.dockerfile.content'),
                 'dockerfile_location' => data_get($config, 'build.dockerfile.location'),
                 'dockerfile_target_build' => data_get($config, 'build.dockerfile.target_build'),
 
                 // Docker compose settings
-                'docker_compose' => data_get($config, 'build.docker_compose.content'),
+                // 'docker_compose' => data_get($config, 'build.docker_compose.content'),
                 'docker_compose_location' => data_get($config, 'build.docker_compose.location'),
-                'docker_compose_raw' => data_get($config, 'build.docker_compose.raw'),
+                // 'docker_compose_raw' => data_get($config, 'build.docker_compose.raw'),
                 'docker_compose_domains' => data_get($config, 'build.docker_compose.domains'),
                 'docker_compose_custom_start_command' => data_get($config, 'build.docker_compose.custom_start_command'),
                 'docker_compose_custom_build_command' => data_get($config, 'build.docker_compose.custom_build_command'),
-                'compose_parsing_version' => data_get($config, 'build.docker_compose.parsing_version'),
+                // 'compose_parsing_version' => data_get($config, 'build.docker_compose.parsing_version'),
 
                 // Docker settings
-                'custom_docker_run_options' => data_get($config, 'build.docker.custom_options'),
-                'custom_labels' => data_get($config, 'build.docker.custom_labels'),
+                'custom_docker_run_options' => data_get($config, 'docker_custom_options'),
+                'custom_labels' => data_get($config, 'labels'),
 
                 // Deployment commands
                 'pre_deployment_command' => data_get($config, 'deployment.pre_deployment.command'),
@@ -1753,6 +1753,7 @@ class Application extends BaseModel
                 'manual_webhook_secret_gitlab' => data_get($config, 'webhooks.secrets.gitlab'),
                 'manual_webhook_secret_bitbucket' => data_get($config, 'webhooks.secrets.bitbucket'),
                 'manual_webhook_secret_gitea' => data_get($config, 'webhooks.secrets.gitea'),
+
             ];
 
             // remove null values

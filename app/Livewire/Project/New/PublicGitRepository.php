@@ -10,7 +10,6 @@ use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -280,7 +279,7 @@ class PublicGitRepository extends Component
                     DB::beginTransaction();
 
                     // Create and save the base application first
-                    $cuid = new Cuid2();
+                    $cuid = new Cuid2;
                     $application = new Application([
                         'name' => generate_application_name($this->git_repository, $this->git_branch),
                         'description' => data_get($config, 'description'),
@@ -322,90 +321,90 @@ class PublicGitRepository extends Component
                     throw $e;
                 }
             } else {
-            if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
-                $server = $destination->server;
-                $new_service = [
-                    'name' => 'service'.str()->random(10),
-                    'docker_compose_raw' => 'coolify',
-                    'environment_id' => $environment->id,
-                    'server_id' => $server->id,
-                ];
-                if ($this->git_source === 'other') {
-                    $new_service['git_repository'] = $this->git_repository;
-                    $new_service['git_branch'] = $this->git_branch;
-                } else {
-                    $new_service['git_repository'] = $this->git_repository;
-                    $new_service['git_branch'] = $this->git_branch;
-                    $new_service['source_id'] = $this->git_source->id;
-                    $new_service['source_type'] = $this->git_source->getMorphClass();
-                }
-                $service = Service::create($new_service);
+                if ($this->build_pack === 'dockercompose' && isDev() && $this->new_compose_services) {
+                    $server = $destination->server;
+                    $new_service = [
+                        'name' => 'service'.str()->random(10),
+                        'docker_compose_raw' => 'coolify',
+                        'environment_id' => $environment->id,
+                        'server_id' => $server->id,
+                    ];
+                    if ($this->git_source === 'other') {
+                        $new_service['git_repository'] = $this->git_repository;
+                        $new_service['git_branch'] = $this->git_branch;
+                    } else {
+                        $new_service['git_repository'] = $this->git_repository;
+                        $new_service['git_branch'] = $this->git_branch;
+                        $new_service['source_id'] = $this->git_source->id;
+                        $new_service['source_type'] = $this->git_source->getMorphClass();
+                    }
+                    $service = Service::create($new_service);
 
-                return redirect()->route('project.service.configuration', [
-                    'service_uuid' => $service->uuid,
+                    return redirect()->route('project.service.configuration', [
+                        'service_uuid' => $service->uuid,
+                        'environment_uuid' => $environment->uuid,
+                        'project_uuid' => $project->uuid,
+                    ]);
+
+                    return;
+                }
+                if ($this->git_source === 'other') {
+                    $application_init = [
+                        'name' => generate_random_name(),
+                        'git_repository' => $this->git_repository,
+                        'git_branch' => $this->git_branch,
+                        'ports_exposes' => $this->port,
+                        'publish_directory' => $this->publish_directory,
+                        'environment_id' => $environment->id,
+                        'destination_id' => $destination->id,
+                        'destination_type' => $destination_class,
+                        'build_pack' => $this->build_pack,
+                        'base_directory' => $this->base_directory,
+                    ];
+                } else {
+                    $application_init = [
+                        'name' => generate_application_name($this->git_repository, $this->git_branch),
+                        'git_repository' => $this->git_repository,
+                        'git_branch' => $this->git_branch,
+                        'ports_exposes' => $this->port,
+                        'publish_directory' => $this->publish_directory,
+                        'environment_id' => $environment->id,
+                        'destination_id' => $destination->id,
+                        'destination_type' => $destination_class,
+                        'source_id' => $this->git_source->id,
+                        'source_type' => $this->git_source->getMorphClass(),
+                        'build_pack' => $this->build_pack,
+                        'base_directory' => $this->base_directory,
+                    ];
+                }
+
+                if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                    $application_init['health_check_enabled'] = false;
+                }
+                if ($this->build_pack === 'dockercompose') {
+                    $application_init['docker_compose_location'] = $this->docker_compose_location;
+                    $application_init['base_directory'] = $this->base_directory;
+                }
+                $application = Application::create($application_init);
+
+                $application->settings->is_static = $this->isStatic;
+                $application->settings->save();
+                $fqdn = generateFqdn($destination->server, $application->uuid);
+                $application->fqdn = $fqdn;
+                $application->save();
+                if ($this->checkCoolifyConfig) {
+                    // $config = loadConfigFromGit($this->repository_url, $this->git_branch, $this->base_directory, $this->query['server_id'], auth()->user()->currentTeam()->id);
+                    // if ($config) {
+                    //     $application->setConfig($config);
+                    // }
+                }
+
+                return redirect()->route('project.application.configuration', [
+                    'application_uuid' => $application->uuid,
                     'environment_uuid' => $environment->uuid,
                     'project_uuid' => $project->uuid,
                 ]);
-
-                return;
             }
-            if ($this->git_source === 'other') {
-                $application_init = [
-                    'name' => generate_random_name(),
-                    'git_repository' => $this->git_repository,
-                    'git_branch' => $this->git_branch,
-                    'ports_exposes' => $this->port,
-                    'publish_directory' => $this->publish_directory,
-                    'environment_id' => $environment->id,
-                    'destination_id' => $destination->id,
-                    'destination_type' => $destination_class,
-                    'build_pack' => $this->build_pack,
-                    'base_directory' => $this->base_directory,
-                ];
-            } else {
-                $application_init = [
-                    'name' => generate_application_name($this->git_repository, $this->git_branch),
-                    'git_repository' => $this->git_repository,
-                    'git_branch' => $this->git_branch,
-                    'ports_exposes' => $this->port,
-                    'publish_directory' => $this->publish_directory,
-                    'environment_id' => $environment->id,
-                    'destination_id' => $destination->id,
-                    'destination_type' => $destination_class,
-                    'source_id' => $this->git_source->id,
-                    'source_type' => $this->git_source->getMorphClass(),
-                    'build_pack' => $this->build_pack,
-                    'base_directory' => $this->base_directory,
-                ];
-            }
-
-            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
-                $application_init['health_check_enabled'] = false;
-            }
-            if ($this->build_pack === 'dockercompose') {
-                $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
-            }
-            $application = Application::create($application_init);
-
-            $application->settings->is_static = $this->isStatic;
-            $application->settings->save();
-            $fqdn = generateFqdn($destination->server, $application->uuid);
-            $application->fqdn = $fqdn;
-            $application->save();
-            if ($this->checkCoolifyConfig) {
-                // $config = loadConfigFromGit($this->repository_url, $this->git_branch, $this->base_directory, $this->query['server_id'], auth()->user()->currentTeam()->id);
-                // if ($config) {
-                //     $application->setConfig($config);
-                // }
-            }
-
-            return redirect()->route('project.application.configuration', [
-                'application_uuid' => $application->uuid,
-                'environment_uuid' => $environment->uuid,
-                'project_uuid' => $project->uuid,
-            ]);
-        }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

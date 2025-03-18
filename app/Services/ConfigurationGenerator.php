@@ -16,25 +16,28 @@ class ConfigurationGenerator
 
     protected function generateConfig(): void
     {
+        // Commented out some stuffs to simplify the initial release feature scope.
+        // Commented out stuffs are required for passing coolify.json without a source code, like you can define git_repository, git_branch, etc.
+        // Current scope is only for having coolify.json next to your source code in a git repo.
         if ($this->resource instanceof Application) {
             $this->config = [
                 'name' => $this->resource->name,
                 'description' => $this->resource->description,
-                'coolify' => [
-                    'project_uuid' => $this->resource->project()->uuid,
-                    'environment_uuid' => $this->resource->environment->uuid,
-                    'destination_type' => $this->resource->destination_type,
-                    'destination_id' => $this->resource->destination_id,
-                    'source_type' => $this->resource->source_type,
-                    'source_id' => $this->resource->source_id,
-                    'private_key_id' => $this->resource->private_key_id,
-                ],
-                'source' => [
-                    'git_repository' => $this->resource->git_repository,
-                    'git_branch' => $this->resource->git_branch,
-                    'git_commit_sha' => $this->resource->git_commit_sha,
-                    'repository_project_id' => $this->resource->repository_project_id,
-                ],
+                // 'coolify' => [
+                //     'project_uuid' => $this->resource->project()->uuid,
+                //     'environment_uuid' => $this->resource->environment->uuid,
+                //     'destination_type' => $this->resource->destination_type,
+                //     'destination_id' => $this->resource->destination_id,
+                //     'source_type' => $this->resource->source_type,
+                //     'source_id' => $this->resource->source_id,
+                //     'private_key_id' => $this->resource->private_key_id,
+                // ],
+                // 'source' => [
+                //     'git_repository' => $this->resource->git_repository,
+                //     'git_branch' => $this->resource->git_branch,
+                //     'git_commit_sha' => $this->resource->git_commit_sha,
+                //     'repository_project_id' => $this->resource->repository_project_id,
+                // ],
                 'build' => [
                     'build_pack' => $this->resource->build_pack,
                     'static_image' => $this->resource->static_image,
@@ -45,24 +48,23 @@ class ConfigurationGenerator
                     'start_command' => $this->resource->start_command,
                     'watch_paths' => $this->resource->watch_paths,
                     'dockerfile' => [
-                        'content' => $this->resource->dockerfile,
+                        // 'content' => $this->resource->dockerfile,
                         'location' => $this->resource->dockerfile_location,
                         'target_build' => $this->resource->dockerfile_target_build,
                     ],
                     'docker_compose' => [
-                        'content' => $this->resource->docker_compose,
+                        // 'content' => $this->resource->docker_compose,
                         'location' => $this->resource->docker_compose_location,
-                        'raw' => $this->resource->docker_compose_raw,
+                        // 'raw' => $this->resource->docker_compose_raw,
                         'domains' => $this->resource->docker_compose_domains,
                         'custom_start_command' => $this->resource->docker_compose_custom_start_command,
                         'custom_build_command' => $this->resource->docker_compose_custom_build_command,
-                        'parsing_version' => $this->resource->compose_parsing_version,
+                        // 'parsing_version' => $this->resource->compose_parsing_version,
                     ],
-                    'docker' => [
-                        'custom_options' => $this->resource->custom_docker_options,
-                        'custom_labels' => $this->resource->custom_labels,
-                    ],
+
                 ],
+                'docker_custom_options' => $this->resource->custom_docker_options,
+                'labels' => $this->resource->custom_labels,
                 'deployment' => [
                     'pre_deployment' => [
                         'command' => $this->resource->pre_deployment_command,
