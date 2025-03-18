@@ -83,7 +83,7 @@
                         respective
                         companies, and use of them does not imply any affiliation or endorsement.<br>Find more services
                         <a class="dark:text-white underline" target="_blank"
-                            href="https://coolify.io/docs/services">here</a>.
+                            href="https://coolify.io/docs/services/overview">here</a>.
                     </div>
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
@@ -106,7 +106,7 @@
                                                 :src='service.logo'
                                                 x-on:error.window="$event.target.src = service.logo_github_url"
                                                 onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                x-on:error="$event.target.src = '/svgs/coolify-transparent.png'"
+                                                x-on:error="$event.target.src = 'coolify-logo.svg'"
                                                 :data-fallback='service.logo_github_url' />
                                         </template>
                                     </x-slot:logo>

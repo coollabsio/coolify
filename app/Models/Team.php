@@ -93,6 +93,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $servers >= $serverLimit;
     }
 
+    public function subscriptionPastOverDue()
+    {
+        if (isCloud()) {
+            return $this->subscription?->stripe_past_due;
+        }
+
+        return false;
+    }
+
     public function serverOverflow()
     {
         if ($this->serverLimit() < $this->servers->count()) {
@@ -185,6 +194,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,
             'stripe_trial_already_ended' => false,
+            'stripe_past_due' => false,
         ]);
         foreach ($this->servers as $server) {
             $server->settings()->update([
@@ -248,15 +258,17 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     {
         $sources = collect([]);
         $github_apps = GithubApp::where(function ($query) {
-            $query->where('team_id', $this->id)
-                ->Where('is_public', false)
-                ->orWhere('is_system_wide', true);
+            $query->where(function ($q) {
+                $q->where('team_id', $this->id)
+                    ->orWhere('is_system_wide', true);
+            })->where('is_public', false);
         })->get();
 
         $gitlab_apps = GitlabApp::where(function ($query) {
-            $query->where('team_id', $this->id)
-                ->Where('is_public', false)
-                ->orWhere('is_system_wide', true);
+            $query->where(function ($q) {
+                $q->where('team_id', $this->id)
+                    ->orWhere('is_system_wide', true);
+            })->where('is_public', false);
         })->get();
 
         return $sources->merge($github_apps)->merge($gitlab_apps);

@@ -1064,7 +1064,6 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $base_command = "{$base_command} {$customRepository}";
-            $base_command = $this->setGitImportSettings($deployment_uuid, $base_command, public: true);
 
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $base_command));

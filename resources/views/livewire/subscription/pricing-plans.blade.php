@@ -1,4 +1,4 @@
-<div x-data="{ selected: 'monthly' }" class="w-full pb-20">
+<div x-data="{ selected: 'monthly' }" class="w-full pb-20 pt-10">
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset

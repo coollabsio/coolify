@@ -24,6 +24,7 @@ class SendMessageToSlackJob implements ShouldQueue
     public function handle(): void
     {
         Http::post($this->webhookUrl, [
+            'text' => $this->message->title,
             'blocks' => [
                 [
                     'type' => 'section',

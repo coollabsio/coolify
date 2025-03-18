@@ -4,8 +4,11 @@ namespace App\Livewire\Project\Database\Redis;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Helpers\SslHelper;
 use App\Models\Server;
+use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
+use Carbon\Carbon;
 use Exception;
 use Livewire\Component;
 
@@ -30,6 +33,8 @@ class General extends Component
 
     public ?string $db_url_public = null;
 
+    public ?Carbon $certificateValidUntil = null;
+
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
@@ -42,6 +47,7 @@ class General extends Component
         'database.custom_docker_run_options' => 'nullable',
         'redis_username' => 'required',
         'redis_password' => 'required',
+        'database.enable_ssl' => 'boolean',
     ];
 
     protected $validationAttributes = [
@@ -55,12 +61,18 @@ class General extends Component
         'database.custom_docker_run_options' => 'Custom Docker Options',
         'redis_username' => 'Redis Username',
         'redis_password' => 'Redis Password',
+        'database.enable_ssl' => 'Enable SSL',
     ];
 
     public function mount()
     {
         $this->server = data_get($this->database, 'destination.server');
         $this->refreshView();
+        $existingCert = $this->database->sslCertificates()->first();
+
+        if ($existingCert) {
+            $this->certificateValidUntil = $existingCert->valid_until;
+        }
     }
 
     public function instantSaveAdvanced()
@@ -133,6 +145,47 @@ class General extends Component
             $this->database->is_public = ! $this->database->is_public;
 
             return handleError($e, $this);
+        }
+    }
+
+    public function instantSaveSSL()
+    {
+        try {
+            $this->database->save();
+            $this->dispatch('success', 'SSL configuration updated.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function regenerateSslCertificate()
+    {
+        try {
+            $existingCert = $this->database->sslCertificates()->first();
+
+            if (! $existingCert) {
+                $this->dispatch('error', 'No existing SSL certificate found for this database.');
+
+                return;
+            }
+
+            $caCert = SslCertificate::where('server_id', $existingCert->server_id)->where('is_ca_certificate', true)->first();
+
+            SslHelper::generateSslCertificate(
+                commonName: $existingCert->commonName,
+                subjectAlternativeNames: $existingCert->subjectAlternativeNames ?? [],
+                resourceType: $existingCert->resource_type,
+                resourceId: $existingCert->resource_id,
+                serverId: $existingCert->server_id,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
+                configurationDir: $existingCert->configuration_dir,
+                mountPath: $existingCert->mount_path,
+            );
+
+            $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
+        } catch (Exception $e) {
+            handleError($e, $this);
         }
     }
 

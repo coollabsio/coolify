@@ -80,7 +80,7 @@ class HighDiskUsage extends CustomEmailNotification
         $description .= "Tips for cleanup: https://coolify.io/docs/knowledge-base/server/automated-cleanup\n";
         $description .= "Change settings:\n";
         $description .= '- Threshold: '.base_url().'/server/'.$this->server->uuid."#advanced\n";
-        $description .= '- Notifications: '.base_url().'/notifications/discord';
+        $description .= '- Notifications: '.base_url().'/notifications/slack';
 
         return new SlackMessage(
             title: 'High disk usage detected',

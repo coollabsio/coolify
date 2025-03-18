@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -24,6 +25,7 @@ use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Server model',
@@ -101,11 +103,13 @@ class Server extends BaseModel
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    StandaloneDocker::create([
+                    $standaloneDocker = new StandaloneDocker([
                         'name' => 'coolify',
+                        'uuid' => (string) new Cuid2,
                         'network' => 'coolify',
                         'server_id' => $server->id,
                     ]);
+                    $standaloneDocker->saveQuietly();
                 }
             }
             if (! isset($server->proxy->redirect_enabled)) {
@@ -428,10 +432,6 @@ class Server extends BaseModel
                     "mkdir -p $dynamic_config_path",
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
-
-                if (config('app.env') === 'local') {
-                    // ray($yaml);
-                }
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
@@ -700,22 +700,6 @@ $schema://$host {
         ];
     }
 
-    public function getContainersWithSentinel(): Collection
-    {
-        $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
-        $sentinel_found = json_decode($sentinel_found, true);
-        $status = data_get($sentinel_found, '0.State.Status', 'exited');
-        if ($status === 'running') {
-            $containers = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/containers"'], $this, false);
-            if (is_null($containers)) {
-                return collect([]);
-            }
-            $containers = data_get(json_decode($containers, true), 'containers', []);
-
-            return collect($containers);
-        }
-    }
-
     public function loadAllContainers(): Collection
     {
         if ($this->isFunctional()) {
@@ -961,10 +945,8 @@ $schema://$host {
             }
         });
         if ($supported->count() === 1) {
-            // ray('supported');
             return str($supported->first());
         } else {
-            // ray('not supported');
             return false;
         }
     }
@@ -1033,7 +1015,7 @@ $schema://$host {
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
 
-        \Log::debug('Server reachability check', [
+        Log::debug('Server reachability check', [
             'server_id' => $this->id,
             'is_reachable' => $isReachable,
             'notification_sent' => $unreachableNotificationSent,
@@ -1045,7 +1027,7 @@ $schema://$host {
             $this->save();
 
             if ($unreachableNotificationSent === true) {
-                \Log::debug('Server is now reachable, sending notification', [
+                Log::debug('Server is now reachable, sending notification', [
                     'server_id' => $this->id,
                 ]);
                 $this->sendReachableNotification();
@@ -1055,7 +1037,7 @@ $schema://$host {
         }
 
         $this->increment('unreachable_count');
-        \Log::debug('Incremented unreachable count', [
+        Log::debug('Incremented unreachable count', [
             'server_id' => $this->id,
             'new_count' => $this->unreachable_count,
         ]);
@@ -1063,7 +1045,7 @@ $schema://$host {
         if ($this->unreachable_count === 1) {
             $this->settings->is_reachable = true;
             $this->settings->save();
-            \Log::debug('First unreachable attempt, marking as reachable', [
+            Log::debug('First unreachable attempt, marking as reachable', [
                 'server_id' => $this->id,
             ]);
 
@@ -1074,7 +1056,7 @@ $schema://$host {
             $failedChecks = 0;
             for ($i = 0; $i < 3; $i++) {
                 $status = $this->serverStatus();
-                \Log::debug('Additional reachability check', [
+                Log::debug('Additional reachability check', [
                     'server_id' => $this->id,
                     'attempt' => $i + 1,
                     'status' => $status,
@@ -1086,7 +1068,7 @@ $schema://$host {
             }
 
             if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                \Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
+                Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
                     'server_id' => $this->id,
                 ]);
                 $this->sendUnreachableNotification();
@@ -1331,5 +1313,12 @@ $schema://$host {
         } else {
             throw new \Exception('Invalid proxy type.');
         }
+    }
+
+    public function isEmpty()
+    {
+        return $this->applications()->count() == 0 &&
+            $this->databases()->count() == 0 &&
+            $this->services()->count() == 0;
     }
 }

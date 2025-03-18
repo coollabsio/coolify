@@ -21,15 +21,6 @@
                     ]" confirmationText="{{ $fs_path }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                     shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
-            @else
-                <x-modal-confirmation title="Confirm File Conversion to Directory?" buttonTitle="Convert to directory"
-                    submitAction="convertToDirectory" :actions="[
-                        'The selected file will be permanently deleted and an empty directory will be created in its place.',
-                    ]" confirmationText="{{ $fs_path }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                    shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to directory" />
-            @endif
-            @if ($fileStorage->is_directory)
                 <x-modal-confirmation title="Confirm Directory Deletion?" buttonTitle="Delete Directory" isErrorButton
                     submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
                         'The selected directory and all its contents will be permanently deleted from the container.',
@@ -37,13 +28,21 @@
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                     shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
             @else
+                @if (!$fileStorage->is_binary)
+                    <x-modal-confirmation title="Confirm File Conversion to Directory?"
+                        buttonTitle="Convert to directory" submitAction="convertToDirectory" :actions="[
+                            'The selected file will be permanently deleted and an empty directory will be created in its place.',
+                        ]"
+                        confirmationText="{{ $fs_path }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                        shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to directory" />
+                @endif
                 <x-modal-confirmation title="Confirm File Deletion?" buttonTitle="Delete File" isErrorButton
                     submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']" confirmationText="{{ $fs_path }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                     shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
             @endif
-
-            @if (!$fileStorage->is_based_on_git)
+            {{-- @if (!$fileStorage->is_based_on_git)
                 <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     <div class="px-2">This storage will be deleted. It is not reversible. <strong
                             class="text-error">Please
@@ -58,7 +57,7 @@
                             label="Permanently delete file from the server?"></x-forms.checkbox>
                     @endif
                 </x-modal-confirmation>
-            @endif
+            @endif --}}
         </div>
         @if (!$fileStorage->is_directory)
             @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
@@ -70,11 +69,10 @@
             <x-forms.textarea
                 label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
                 rows="20" id="fileStorage.content"
-                readonly="{{ $fileStorage->is_based_on_git }}"></x-forms.textarea>
-            @if (!$fileStorage->is_based_on_git)
+                readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
+            @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
                 <x-forms.button class="w-full" type="submit">Save</x-forms.button>
             @endif
         @endif
-
     </form>
 </div>
