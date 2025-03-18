@@ -9,6 +9,7 @@ use RectorLaravel\Rector\ArrayDimFetch\RequestVariablesToRequestFacadeRector;
 use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
 use RectorLaravel\Rector\ArrayDimFetch\SessionVariableToSessionFacadeRector;
 use RectorLaravel\Rector\BooleanNot\AvoidNegatedCollectionContainsOrDoesntContainRector;
+use RectorLaravel\Rector\Cast\DatabaseExpressionCastsToMethodCallRector;
 use RectorLaravel\Rector\Class_\AddExtendsAnnotationToModelFactoriesRector;
 use RectorLaravel\Rector\Class_\AddMockConsoleOutputFalseToConsoleTestsRector;
 use RectorLaravel\Rector\Class_\AnonymousMigrationsRector;
@@ -31,13 +32,17 @@ use RectorLaravel\Rector\FuncCall\RemoveRedundantValueCallsRector;
 use RectorLaravel\Rector\FuncCall\RemoveRedundantWithCallsRector;
 use RectorLaravel\Rector\FuncCall\SleepFuncToSleepStaticCallRector;
 use RectorLaravel\Rector\FuncCall\TypeHintTappableCallRector;
+use RectorLaravel\Rector\If_\AbortIfRector;
 use RectorLaravel\Rector\If_\ReportIfRector;
 use RectorLaravel\Rector\If_\ThrowIfRector;
 use RectorLaravel\Rector\MethodCall\AssertSeeToAssertSeeHtmlRector;
 use RectorLaravel\Rector\MethodCall\AssertStatusToAssertMethodRector;
 use RectorLaravel\Rector\MethodCall\AvoidNegatedCollectionFilterOrRejectRector;
+use RectorLaravel\Rector\MethodCall\DatabaseExpressionToStringToMethodCallRector;
 use RectorLaravel\Rector\MethodCall\FactoryApplyingStatesRector;
 use RectorLaravel\Rector\MethodCall\JsonCallToExplicitJsonCallRector;
+use RectorLaravel\Rector\MethodCall\LumenRoutesStringActionToUsesArrayRector;
+use RectorLaravel\Rector\MethodCall\LumenRoutesStringMiddlewareToArrayRector;
 use RectorLaravel\Rector\MethodCall\RedirectBackToBackHelperRector;
 use RectorLaravel\Rector\MethodCall\RedirectRouteToToRouteHelperRector;
 use RectorLaravel\Rector\MethodCall\RefactorBlueprintGeometryColumnsRector;
@@ -46,6 +51,8 @@ use RectorLaravel\Rector\MethodCall\ResponseHelperCallToJsonResponseRector;
 use RectorLaravel\Rector\MethodCall\ReverseConditionableMethodCallRector;
 use RectorLaravel\Rector\MethodCall\UnaliasCollectionMethodsRector;
 use RectorLaravel\Rector\MethodCall\UseComponentPropertyWithinCommandsRector;
+use RectorLaravel\Rector\MethodCall\ValidationRuleArrayStringValueToArrayRector;
+use RectorLaravel\Rector\MethodCall\WhereToWhereLikeRector;
 use RectorLaravel\Rector\Namespace_\FactoryDefinitionRector;
 use RectorLaravel\Rector\PropertyFetch\OptionalToNullsafeOperatorRector;
 use RectorLaravel\Rector\PropertyFetch\ReplaceFakerInstanceWithHelperRector;
@@ -87,8 +94,8 @@ return RectorConfig::configure()
         typeDeclarations: true,
     )
     ->withAttributesSets()
-    ->withImportNames(removeUnusedImports: true)
     ->withRules([
+        AbortIfRector::class,
         AddExtendsAnnotationToModelFactoriesRector::class,
         AddGenericReturnTypeToRelationsRector::class,
         AddMockConsoleOutputFalseToConsoleTestsRector::class,
@@ -99,6 +106,8 @@ return RectorConfig::configure()
         AvoidNegatedCollectionContainsOrDoesntContainRector::class,
         AvoidNegatedCollectionFilterOrRejectRector::class,
         CarbonSetTestNowToTravelToRector::class,
+        DatabaseExpressionCastsToMethodCallRector::class,
+        DatabaseExpressionToStringToMethodCallRector::class,
         DispatchNonShouldQueueToDispatchSyncRector::class,
         DispatchToHelperFunctionsRector::class,
         EmptyToBlankAndFilledFuncRector::class,
@@ -108,6 +117,8 @@ return RectorConfig::configure()
         FactoryFuncCallToStaticCallRector::class,
         HelperFuncCallToFacadeClassRector::class,
         JsonCallToExplicitJsonCallRector::class,
+        LumenRoutesStringActionToUsesArrayRector::class,
+        LumenRoutesStringMiddlewareToArrayRector::class,
         MigrateToSimplifiedAttributeRector::class,
         NotFilledBlankFuncCallToBlankFilledFuncCallRector::class,
         NowFuncWithStartOfDayMethodCallToTodayFuncRector::class,
@@ -139,11 +150,14 @@ return RectorConfig::configure()
         UnaliasCollectionMethodsRector::class,
         UnifyModelDatesWithCastsRector::class,
         UseComponentPropertyWithinCommandsRector::class,
+        ValidationRuleArrayStringValueToArrayRector::class,
     ])
     ->withConfiguredRule(RemoveDumpDataDeadCodeRector::class, [
-        'd',
         'dd',
         'ddd',
         'dump',
         'ray',
+    ])
+    ->withConfiguredRule(WhereToWhereLikeRector::class, [
+        WhereToWhereLikeRector::USING_POSTGRES_DRIVER => true,
     ]);
