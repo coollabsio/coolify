@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use Symfony\Component\Yaml\Yaml;
 
 class ServicesController extends Controller
 {
@@ -88,10 +89,10 @@ class ServicesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create',
+        summary: 'Create one-click',
         description: 'Create a one-click service',
-        path: '/services',
-        operationId: 'create-service',
+        path: '/services/one-click',
+        operationId: 'create-one-click-service',
         security: [
             ['bearerAuth' => []],
         ],
@@ -211,7 +212,7 @@ class ServicesController extends Controller
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Create a service.',
+                description: 'Service created successfully.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -235,7 +236,7 @@ class ServicesController extends Controller
             ),
         ]
     )]
-    public function create_service(Request $request)
+    public function create_one_click_service(Request $request)
     {
         $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy'];
 
@@ -381,10 +382,10 @@ class ServicesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create (compose)',
+        summary: 'Create',
         description: 'Create a service',
         path: '/services',
-        operationId: 'compose-service',
+        operationId: 'create-service',
         security: [
             ['bearerAuth' => []],
         ],
@@ -405,7 +406,7 @@ class ServicesController extends Controller
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
-                        'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                        'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'The flag to connect the service to the predefined Docker network.'],
                         'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
 
                     ],
@@ -415,7 +416,7 @@ class ServicesController extends Controller
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Create a service.',
+                description: 'Service created successfully.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -439,7 +440,7 @@ class ServicesController extends Controller
             ),
         ]
     )]
-    public function compose_service(Request $request)
+    public function create_service(Request $request)
     {
         $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', "docker_compose_raw", "connect_to_docker_network"];
 
@@ -487,9 +488,6 @@ class ServicesController extends Controller
         }
         $serverUuid = $request->server_uuid;
         $instantDeploy = $request->instant_deploy ?? false;
-        if ($request->is_public && ! $request->public_port) {
-            $request->offsetSet('is_public', false);
-        }
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
@@ -534,13 +532,14 @@ class ServicesController extends Controller
         $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
         $service = new Service;
-        $service->fill($request->all());
-
+        $service->name = $request->name;
+        $service->description = $request->description;
         $service->docker_compose_raw = $dockerComposeRaw;
         $service->environment_id = $environment->id;
         $service->server_id = $server->id;
         $service->destination_id = $destination->id;
         $service->destination_type = $destination->getMorphClass();
+        $service->connect_to_docker_network = $request->connect_to_docker_network;
         $service->save();
 
 
@@ -557,11 +556,10 @@ class ServicesController extends Controller
 
             return $domain;
         });
-
-        return response()->json([
+        return response()->json(serializeApiResponse([
             'uuid' => $service->uuid,
             'domains' => $domains,
-        ]);
+        ]))->setStatusCode(201);
     }
 
     #[OA\Get(
