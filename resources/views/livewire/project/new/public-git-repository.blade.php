@@ -54,8 +54,10 @@
                                     wire:model.live.debounce.500ms="docker_compose_location"
                                     label="Docker Compose Location"
                                     helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
-                                Compose file location in your repository:<span
-                                    class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                                <div class="flex gap-1">
+                                    Compose file location in your repository:<span
+                                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                                </div>
                             @else
                                 <x-forms.input wire:model.live.debounce.500ms="base_directory" label="Base Directory"
                                     helper="Directory to use as root. Useful for monorepos." />

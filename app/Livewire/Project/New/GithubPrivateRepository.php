@@ -89,6 +89,7 @@ class GithubPrivateRepository extends Component
         }
         $this->getCoolifyConfig();
     }
+
     public function updatedSelectedBranchName()
     {
         $this->getCoolifyConfig();
@@ -103,6 +104,9 @@ class GithubPrivateRepository extends Component
             $this->show_is_static = false;
             $this->is_static = false;
             $this->port = 80;
+        } elseif ($this->build_pack === 'dockercompose') {
+            $this->show_is_static = false;
+            $this->is_static = false;
         } else {
             $this->show_is_static = true;
             $this->is_static = false;
@@ -214,7 +218,7 @@ class GithubPrivateRepository extends Component
                     DB::beginTransaction();
 
                     // Create and save the base application first
-                    $cuid = new Cuid2();
+                    $cuid = new Cuid2;
                     $application = new Application([
                         'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                         'repository_project_id' => $this->selected_repository_id,

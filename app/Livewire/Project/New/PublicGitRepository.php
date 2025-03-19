@@ -127,6 +127,9 @@ class PublicGitRepository extends Component
             $this->show_is_static = false;
             $this->isStatic = false;
             $this->port = 80;
+        } elseif ($this->build_pack === 'dockercompose') {
+            $this->show_is_static = false;
+            $this->isStatic = false;
         } else {
             $this->show_is_static = true;
             $this->isStatic = false;
