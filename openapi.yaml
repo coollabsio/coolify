@@ -4053,7 +4053,7 @@ paths:
               schema:
                 properties:
                   uuid: { type: string, description: 'Service UUID.' }
-                  domains: { type: array, items: { type: string }, description: 'Service domains.' }
+                  domains: { type: array, items: { type: string, nullable: true }, description: 'Service domains.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -4215,6 +4215,76 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Service deletion request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Services
+      summary: Update
+      description: 'Update service by UUID.'
+      operationId: update-service-by-uuid
+      requestBody:
+        description: 'Service updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+                - docker_compose_raw
+              properties:
+                name:
+                  type: string
+                  description: 'The service name.'
+                description:
+                  type: string
+                  description: 'The service description.'
+                project_uuid:
+                  type: string
+                  description: 'The project UUID.'
+                environment_name:
+                  type: string
+                  description: 'The environment name.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID.'
+                server_uuid:
+                  type: string
+                  description: 'The server UUID.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                instant_deploy:
+                  type: boolean
+                  description: 'The flag to indicate if the service should be deployed instantly.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'The flag to connect the service to the predefined Docker network.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
+              type: object
+      responses:
+        '200':
+          description: 'Service updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, description: 'Service UUID.' }
+                  domains: { type: array, items: { type: string }, description: 'Service domains.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
