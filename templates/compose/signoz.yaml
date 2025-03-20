@@ -1,7 +1,7 @@
 # documentation: https://github.com/SigNoz/signoz
 # slogan: An observability platform native to OpenTelemetry with logs, traces and metrics.
 # tags: telemetry, server, applications, interface, logs, monitoring, traces, metrics
-# logo: svgs/signoz.png
+# logo: svgs/signoz.svg
 # port: 8080
 
 services:
@@ -22,8 +22,6 @@ services:
         mkdir -p /var/lib/clickhouse/user_scripts/histogramQuantile
         mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
     restart: on-failure
-    networks:
-      - signoz-net
     logging:
       options:
         max-size: 50m
@@ -40,8 +38,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    networks:
-      - signoz-net
     restart: unless-stopped
     logging:
       options:
@@ -86,8 +82,6 @@ services:
       nofile:
         soft: 262144
         hard: 262144
-    networks:
-      - signoz-net
     restart: unless-stopped
     logging:
       options:
@@ -1487,8 +1481,6 @@ services:
         condition: service_healthy
       schema-migrator-sync:
         condition: service_completed_successfully
-    networks:
-      - signoz-net
     restart: unless-stopped
     logging:
       options:
@@ -1562,8 +1554,6 @@ services:
         condition: service_completed_successfully
       signoz:
         condition: service_healthy
-    networks:
-      - signoz-net
     restart: unless-stopped
     logging:
       options:
@@ -1703,8 +1693,6 @@ services:
       clickhouse:
         condition: service_healthy
     restart: on-failure
-    networks:
-      - signoz-net
     logging:
       options:
         max-size: 50m
@@ -1718,8 +1706,6 @@ services:
         condition: service_healthy
       schema-migrator-sync:
         condition: service_completed_successfully
-    networks:
-      - signoz-net
     logging:
       options:
         max-size: 50m
@@ -1729,10 +1715,6 @@ services:
       - --dsn=tcp://clickhouse:9000
       - --up=
     restart: on-failure
-
-networks:
-  signoz-net:
-    name: signoz-net
 
 volumes:
   clickhouse:
