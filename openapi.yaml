@@ -1494,6 +1494,49 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/logs':
+    get:
+      tags:
+        - Applications
+      summary: 'Get application logs.'
+      description: 'Get application logs by UUID.'
+      operationId: get-application-logs-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        '200':
+          description: 'Get application logs by UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/envs':
     get:
       tags:
@@ -3953,8 +3996,79 @@ paths:
       tags:
         - Services
       summary: Create
-      description: 'Create a one-click service'
+      description: 'Create a service'
       operationId: create-service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+                - docker_compose_raw
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: 'Name of the service.'
+                description:
+                  type: string
+                  nullable: true
+                  description: 'Description of the service.'
+                project_uuid:
+                  type: string
+                  description: 'Project UUID.'
+                environment_name:
+                  type: string
+                  description: 'Environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'
+                server_uuid:
+                  type: string
+                  description: 'Server UUID.'
+                destination_uuid:
+                  type: string
+                  description: 'Destination UUID. Required if server has multiple destinations.'
+                instant_deploy:
+                  type: boolean
+                  default: false
+                  description: 'Start the service immediately after creation.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'The flag to connect the service to the predefined Docker network.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
+              type: object
+      responses:
+        '201':
+          description: 'Service created successfully.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, description: 'Service UUID.' }
+                  domains: { type: array, items: { type: string, nullable: true }, description: 'Service domains.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /services/one-click:
+    post:
+      tags:
+        - Services
+      summary: 'Create one-click'
+      description: 'Create a one-click service'
+      operationId: create-one-click-service
       requestBody:
         required: true
         content:
@@ -4001,7 +4115,7 @@ paths:
               type: object
       responses:
         '201':
-          description: 'Create a service.'
+          description: 'Service created successfully.'
           content:
             application/json:
               schema:
@@ -4101,6 +4215,76 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Service deletion request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Services
+      summary: Update
+      description: 'Update service by UUID.'
+      operationId: update-service-by-uuid
+      requestBody:
+        description: 'Service updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+                - docker_compose_raw
+              properties:
+                name:
+                  type: string
+                  description: 'The service name.'
+                description:
+                  type: string
+                  description: 'The service description.'
+                project_uuid:
+                  type: string
+                  description: 'The project UUID.'
+                environment_name:
+                  type: string
+                  description: 'The environment name.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID.'
+                server_uuid:
+                  type: string
+                  description: 'The server UUID.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                instant_deploy:
+                  type: boolean
+                  description: 'The flag to indicate if the service should be deployed instantly.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'The flag to connect the service to the predefined Docker network.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
+              type: object
+      responses:
+        '200':
+          description: 'Service updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, description: 'Service UUID.' }
+                  domains: { type: array, items: { type: string }, description: 'Service domains.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'

@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
+use Symfony\Component\Yaml\Yaml;
 
 class ServicesController extends Controller
 {
@@ -88,10 +89,10 @@ class ServicesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create',
+        summary: 'Create one-click',
         description: 'Create a one-click service',
-        path: '/services',
-        operationId: 'create-service',
+        path: '/services/one-click',
+        operationId: 'create-one-click-service',
         security: [
             ['bearerAuth' => []],
         ],
@@ -211,7 +212,7 @@ class ServicesController extends Controller
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Create a service.',
+                description: 'Service created successfully.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -235,7 +236,7 @@ class ServicesController extends Controller
             ),
         ]
     )]
-    public function create_service(Request $request)
+    public function create_one_click_service(Request $request)
     {
         $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy'];
 
@@ -380,6 +381,83 @@ class ServicesController extends Controller
         return response()->json(['message' => 'Invalid service type.'], 400);
     }
 
+    #[OA\Post(
+        summary: 'Create',
+        description: 'Create a service',
+        path: '/services',
+        operationId: 'create-service',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
+                    properties: [
+                        'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
+                        'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
+                        'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
+                        'environment_name' => ['type' => 'string', 'description' => 'Environment name. You need to provide at least one of environment_name or environment_uuid.'],
+                        'environment_uuid' => ['type' => 'string', 'description' => 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
+                        'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
+                        'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
+                        'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
+                        'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
+                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+
+                    ],
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Service created successfully.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'description' => 'Service UUID.'],
+                                'domains' => ['type' => 'array', 'items' => ['type' => 'string', 'nullable' => true], 'description' => 'Service domains.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function create_service(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $service = new Service;
+        $result = $this->upsert_service($request, $service, $teamId);
+
+        return response()->json(serializeApiResponse($result))->setStatusCode(201);
+    }
+
     #[OA\Get(
         summary: 'Get',
         description: 'Get service by UUID.',
@@ -509,6 +587,205 @@ class ServicesController extends Controller
         return response()->json([
             'message' => 'Service deletion request queued.',
         ]);
+    }
+
+    #[OA\Patch(
+        summary: 'Update',
+        description: 'Update service by UUID.',
+        path: '/services/{uuid}',
+        operationId: 'update-service-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        requestBody: new OA\RequestBody(
+            description: 'Service updated.',
+            required: true,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
+                        properties: [
+                            'name' => ['type' => 'string', 'description' => 'The service name.'],
+                            'description' => ['type' => 'string', 'description' => 'The service description.'],
+                            'project_uuid' => ['type' => 'string', 'description' => 'The project UUID.'],
+                            'environment_name' => ['type' => 'string', 'description' => 'The environment name.'],
+                            'environment_uuid' => ['type' => 'string', 'description' => 'The environment UUID.'],
+                            'server_uuid' => ['type' => 'string', 'description' => 'The server UUID.'],
+                            'destination_uuid' => ['type' => 'string', 'description' => 'The destination UUID.'],
+                            'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
+                            'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
+                            'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                        ],
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Service updated.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'description' => 'Service UUID.'],
+                                'domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Service domains.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function update_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $result = $this->upsert_service($request, $service, $teamId);
+
+        return response()->json(serializeApiResponse($result))->setStatusCode(200);
+    }
+
+    private function upsert_service(Request $request, Service $service, string $teamId)
+    {
+        $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+        $validator = customApiValidator($request->all(), [
+            'project_uuid' => 'string|required',
+            'environment_name' => 'string|nullable',
+            'environment_uuid' => 'string|nullable',
+            'server_uuid' => 'string|required',
+            'destination_uuid' => 'string',
+            'name' => 'string|max:255',
+            'description' => 'string|nullable',
+            'instant_deploy' => 'boolean',
+            'connect_to_docker_network' => 'boolean',
+            'docker_compose_raw' => 'string|required',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            if (! empty($extraFields)) {
+                foreach ($extraFields as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $environmentUuid = $request->environment_uuid;
+        $environmentName = $request->environment_name;
+        if (blank($environmentUuid) && blank($environmentName)) {
+            return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
+        }
+        $serverUuid = $request->server_uuid;
+        $instantDeploy = $request->instant_deploy ?? false;
+        $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+        $environment = $project->environments()->where('name', $environmentName)->first();
+        if (! $environment) {
+            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
+        }
+        if (! $environment) {
+            return response()->json(['message' => 'Environment not found.'], 404);
+        }
+        $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $destinations = $server->destinations();
+        if ($destinations->count() == 0) {
+            return response()->json(['message' => 'Server has no destinations.'], 400);
+        }
+        if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
+            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
+        }
+        $destination = $destinations->first();
+        if (! isBase64Encoded($request->docker_compose_raw)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                ],
+            ], 422);
+        }
+        $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+        if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                ],
+            ], 422);
+        }
+        $dockerCompose = base64_decode($request->docker_compose_raw);
+        $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+        $service->name = $request->name;
+        $service->description = $request->description;
+        $service->docker_compose_raw = $dockerComposeRaw;
+        $service->environment_id = $environment->id;
+        $service->server_id = $server->id;
+        $service->destination_id = $destination->id;
+        $service->destination_type = $destination->getMorphClass();
+        $service->connect_to_docker_network = $request->connect_to_docker_network;
+        $service->save();
+
+        $service->parse();
+        if ($instantDeploy) {
+            StartService::dispatch($service);
+        }
+
+        $domains = $service->applications()->get()->pluck('fqdn')->sort();
+        $domains = $domains->map(function ($domain) {
+            if (count(explode(':', $domain)) > 2) {
+                return str($domain)->beforeLast(':')->value();
+            }
+
+            return $domain;
+        })->values();
+
+        return [
+            'uuid' => $service->uuid,
+            'domains' => $domains,
+        ];
     }
 
     #[OA\Get(

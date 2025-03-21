@@ -114,9 +114,10 @@ Route::group([
 
     Route::get('/services', [ServicesController::class, 'services'])->middleware(['api.ability:read']);
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
+    Route::post('/services/one-click', [ServicesController::class, 'create_one_click_service'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid'])->middleware(['api.ability:read']);
-    // Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['ability:write']);
+    Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['ability:write']);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs'])->middleware(['api.ability:read']);
