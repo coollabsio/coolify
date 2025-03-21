@@ -12,7 +12,7 @@
                     @if ($server->id === 0)
                         <x-modal-confirmation title="Confirm Server Settings Change?" buttonTitle="Save"
                             submitAction="submit" :actions="[
-                                'If you missconfigure the server, you could lose a lot of functionalities of Coolify.',
+                                'If you misconfigure the server, you could lose a lot of functionalities of Coolify.',
                             ]" :confirmWithText="false" :confirmWithPassword="false"
                             step2ButtonText="Save" />
                     @else
