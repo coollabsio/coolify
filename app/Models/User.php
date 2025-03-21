@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -37,7 +38,7 @@ use OpenApi\Attributes as OA;
 )]
 class User extends Authenticatable implements SendsEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected $guarded = [];
 
@@ -57,6 +58,7 @@ class User extends Authenticatable implements SendsEmail
     protected static function boot()
     {
         parent::boot();
+
         static::created(function (User $user) {
             $team = [
                 'name' => $user->name."'s Team",
