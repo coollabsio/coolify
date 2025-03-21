@@ -43,11 +43,6 @@ services:
       options:
         max-size: 50m
         max-file: "3"
-    
-    # ports:
-    #   - "2181:2181"
-    #   - "2888:2888"
-    #   - "3888:3888"
     volumes:
       - zookeeper-1:/bitnami/zookeeper
     environment:
@@ -87,10 +82,6 @@ services:
       options:
         max-size: 50m
         max-file: "3"
-    # ports:
-    #   - "9000:9000"
-    #   - "8123:8123"
-    #   - "9181:9181"
     volumes:
       - type: bind
         source: ./clickhouse/config.xml
