@@ -1684,6 +1684,11 @@ services:
       - SERVICE_FQDN_OTELCOLLECTORHTTP_4318
       - OTEL_RESOURCE_ATTRIBUTES=host.name=signoz-host,os.type=linux
       - LOW_CARDINAL_EXCEPTION_GROUPING=false
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/localhost/13133"
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   schema-migrator-sync:
     image: signoz/signoz-schema-migrator:${OTELCOL_TAG:-v0.111.34}
