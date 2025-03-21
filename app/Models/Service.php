@@ -50,6 +50,11 @@ class Service extends BaseModel
 
     protected static function booted()
     {
+        static::creating(function ($service) {
+            if (blank($service->name)) {
+                $service->name = 'service-'.(new Cuid2);
+            }
+        });
         static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
             $service->save();

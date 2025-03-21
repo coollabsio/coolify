@@ -89,10 +89,10 @@ class ServicesController extends Controller
     }
 
     #[OA\Post(
-        summary: 'Create one-click',
-        description: 'Create a one-click service',
-        path: '/services/one-click',
-        operationId: 'create-one-click-service',
+        summary: 'Create service',
+        description: 'Create a one-click / custom service',
+        path: '/services',
+        operationId: 'create-service',
         security: [
             ['bearerAuth' => []],
         ],
@@ -236,9 +236,9 @@ class ServicesController extends Controller
             ),
         ]
     )]
-    public function create_one_click_service(Request $request)
+    public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -250,7 +250,8 @@ class ServicesController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'type' => 'string|required',
+            'type' => 'string|required_without:docker_compose_raw',
+            'docker_compose_raw' => 'string|required_without:type',
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
             'environment_uuid' => 'string|nullable',
@@ -373,89 +374,16 @@ class ServicesController extends Controller
                 ]);
             }
 
-            return response()->json(['message' => 'Service not found.'], 404);
+            return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
+        } elseif (filled($request->docker_compose_raw)) {
+
+            $service = new Service;
+            $result = $this->upsert_service($request, $service, $teamId);
+
+            return response()->json(serializeApiResponse($result))->setStatusCode(201);
         } else {
-            return response()->json(['message' => 'Invalid service type.', 'valid_service_types' => $serviceKeys], 400);
+            return response()->json(['message' => 'No service type or docker_compose_raw provided.'], 400);
         }
-
-        return response()->json(['message' => 'Invalid service type.'], 400);
-    }
-
-    #[OA\Post(
-        summary: 'Create',
-        description: 'Create a service',
-        path: '/services',
-        operationId: 'create-service',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Services'],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\MediaType(
-                mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
-                    properties: [
-                        'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
-                        'description' => ['type' => 'string', 'nullable' => true, 'description' => 'Description of the service.'],
-                        'project_uuid' => ['type' => 'string', 'description' => 'Project UUID.'],
-                        'environment_name' => ['type' => 'string', 'description' => 'Environment name. You need to provide at least one of environment_name or environment_uuid.'],
-                        'environment_uuid' => ['type' => 'string', 'description' => 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'],
-                        'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
-                        'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
-                        'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
-                        'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
-                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
-
-                    ],
-                ),
-            ),
-        ),
-        responses: [
-            new OA\Response(
-                response: 201,
-                description: 'Service created successfully.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'uuid' => ['type' => 'string', 'description' => 'Service UUID.'],
-                                'domains' => ['type' => 'array', 'items' => ['type' => 'string', 'nullable' => true], 'description' => 'Service domains.'],
-                            ]
-                        )
-                    ),
-                ]
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-        ]
-    )]
-    public function create_service(Request $request)
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-
-        $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
-            return $return;
-        }
-
-        $service = new Service;
-        $result = $this->upsert_service($request, $service, $teamId);
-
-        return response()->json(serializeApiResponse($result))->setStatusCode(201);
     }
 
     #[OA\Get(
@@ -757,15 +685,16 @@ class ServicesController extends Controller
         }
         $dockerCompose = base64_decode($request->docker_compose_raw);
         $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+        $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
 
-        $service->name = $request->name;
-        $service->description = $request->description;
+        $service->name = $request->name ?? null;
+        $service->description = $request->description ?? null;
         $service->docker_compose_raw = $dockerComposeRaw;
         $service->environment_id = $environment->id;
         $service->server_id = $server->id;
         $service->destination_id = $destination->id;
         $service->destination_type = $destination->getMorphClass();
-        $service->connect_to_docker_network = $request->connect_to_docker_network;
+        $service->connect_to_docker_network = $connectToDockerNetwork;
         $service->save();
 
         $service->parse();
