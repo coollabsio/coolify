@@ -26,7 +26,7 @@ services:
       options:
         max-size: 50m
         max-file: "3"
-  
+
   zookeeper-1:
     image: bitnami/zookeeper:3.7.1
     container_name: signoz-zookeeper-1
@@ -51,7 +51,7 @@ services:
       - ZOO_AUTOPURGE_INTERVAL=1
       - ZOO_ENABLE_PROMETHEUS_METRICS=yes
       - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=9141
-  
+
   clickhouse:
     # addding non LTS version due to this fix https://github.com/ClickHouse/ClickHouse/commit/32caf8716352f45c1b617274c7508c86b7d1afab
     image: clickhouse/clickhouse-server:24.1.2-alpine
@@ -1229,7 +1229,7 @@ services:
                   <continue_if_corrupted>true</continue_if_corrupted>
               </merge_tree_metadata_cache>
           </clickhouse>
-      - type: bind 
+      - type: bind
         source: ./clickhouse/users.xml
         target: /etc/clickhouse-server/users.xml
         content: |
@@ -1522,8 +1522,18 @@ services:
       - DASHBOARDS_PATH=/root/config/dashboards
       - STORAGE=clickhouse
       - GODEBUG=netdns=go
-      - TELEMETRY_ENABLED=true
       - DEPLOYMENT_TYPE=docker-standalone-amd
+      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-true}
+      - SMTP_ENABLED=${SMTP_ENABLED:-false}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__PASSWORD=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__PASSWORD}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__USERNAME=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__USERNAME}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__FROM=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__FROM}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__SMARTHOST=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__SMARTHOST}
     healthcheck:
       test:
         - CMD
