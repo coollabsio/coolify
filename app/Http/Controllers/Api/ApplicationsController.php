@@ -932,10 +932,31 @@ class ApplicationsController extends Controller
             if (! $githubApp) {
                 return response()->json(['message' => 'Github App not found.'], 404);
             }
+            $token = generateGithubInstallationToken($githubApp);
+            if (! $token) {
+                return response()->json(['message' => 'Failed to generate Github App token.'], 400);
+            }
+
+            $repositories = collect();
+            $page = 1;
+            $repositories = loadRepositoryByPage($githubApp, $token, $page);
+            if ($repositories['total_count'] > 0) {
+                while (count($repositories['repositories']) < $repositories['total_count']) {
+                    $page++;
+                    $repositories = loadRepositoryByPage($githubApp, $token, $page);
+                }
+            }
+
             $gitRepository = $request->git_repository;
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
+            $gitRepositoryFound = collect($repositories['repositories'])->firstWhere('full_name', $gitRepository);
+            if (! $gitRepositoryFound) {
+                return response()->json(['message' => 'Repository not found.'], 404);
+            }
+            $repository_project_id = data_get($gitRepositoryFound, 'id');
+
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
@@ -966,6 +987,8 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->source_type = $githubApp->getMorphClass();
             $application->source_id = $githubApp->id;
+            $application->repository_project_id = $repository_project_id;
+
             $application->save();
             $application->refresh();
             if (isset($useBuildServer)) {
