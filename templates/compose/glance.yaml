@@ -12,7 +12,7 @@ services:
     volumes:
       - type: bind
         source: ./glance-settings
-        target: /app/glance.yml
+        target: /app/config/glance.yml
         content: |
           pages:
             - name: Home
