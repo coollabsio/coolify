@@ -10,6 +10,7 @@ use App\Events\ServerReachabilityChanged;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
+use App\Services\ConfigurationRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -543,7 +544,7 @@ $schema://$host {
         $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
-        Storage::disk('ssh-mux')->delete($this->muxFilename());
+        $this->disableSshMux();
     }
 
     public function sentinelHeartbeat(bool $isReset = false)
@@ -1103,7 +1104,7 @@ $schema://$host {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        config()->set('constants.ssh.mux_enabled', false);
+        $this->disableSshMux();
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
@@ -1329,5 +1330,11 @@ $schema://$host {
         return $this->applications()->count() == 0 &&
             $this->databases()->count() == 0 &&
             $this->services()->count() == 0;
+    }
+
+    private function disableSshMux(): void
+    {
+        $configRepository = app(ConfigurationRepository::class);
+        $configRepository->disableSshMux();
     }
 }
