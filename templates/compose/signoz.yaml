@@ -1274,11 +1274,11 @@ services:
                           Password could be empty.
 
                           If you want to specify SHA256, place it in 'password_sha256_hex' element.
-                          Example: <password_sha256_hex>65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5</password_sha256_hex>
+                          Example: <password_sha256_hex>**PASSWORD HASHED WITH SHA256**</password_sha256_hex>
                           Restrictions of SHA256: impossibility to connect to ClickHouse using MySQL JS client (as of July 2019).
 
                           If you want to specify double SHA1, place it in 'password_double_sha1_hex' element.
-                          Example: <password_double_sha1_hex>e395796d6546b1b65db9d665cd43f0e858dd4303</password_double_sha1_hex>
+                          Example: <password_double_sha1_hex>**PASSWORD HASHED WITH SHA1**</password_double_sha1_hex>
 
                           If you want to specify a previously defined LDAP server (see 'ldap_servers' in the main config) for authentication,
                             place its name in 'server' element inside 'ldap' element.
