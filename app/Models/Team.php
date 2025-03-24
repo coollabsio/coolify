@@ -7,6 +7,7 @@ use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
+use App\Notifications\Channels\SendsTeams;
 use App\Traits\HasNotificationSettings;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -34,7 +35,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack, SendsTeams
 {
     use HasNotificationSettings, Notifiable;
 
@@ -52,6 +53,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->slackNotificationSettings()->create();
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
+            $team->teamsNotificationSettings()->create();
         });
 
         static::saving(function ($team) {
@@ -163,6 +165,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         ];
     }
 
+    public function routeNotificationForTeams()
+    {
+        return data_get($this, 'teams_webhook_url', null);
+    }
+
     public function getRecipients($notification)
     {
         $recipients = data_get($notification, 'emails', null);
@@ -183,7 +190,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('discord')?->isEnabled() ||
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
-            $this->getNotificationSettings('pushover')?->isEnabled();
+            $this->getNotificationSettings('pushover')?->isEnabled() ||
+            $this->getNotificationSettings('teams')?->isEnabled();
     }
 
     public function subscriptionEnded()
@@ -302,5 +310,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function pushoverNotificationSettings()
     {
         return $this->hasOne(PushoverNotificationSettings::class);
+    }
+
+    public function teamsNotificationSettings()
+    {
+        return $this->hasOne(TeamsNotificationSettings::class);
     }
 }
