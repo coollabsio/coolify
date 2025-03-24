@@ -25,7 +25,7 @@
         </div>
     @endif
     @if (count($filteredTags) > 0)
-        <h3 class="pt-4">Exisiting Tags</h3>
+        <h3 class="pt-4">Existing Tags</h3>
         <div>Click to add quickly</div>
         <div class="flex flex-wrap gap-2 pt-4">
             @foreach ($filteredTags as $tag)

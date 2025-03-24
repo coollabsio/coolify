@@ -484,7 +484,7 @@ $schema://$host {
         $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
-        // TODO: should use /traefik for already exisiting configurations?
+        // TODO: should use /traefik for already existing configurations?
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
         if ($proxyType === ProxyTypes::TRAEFIK->value) {

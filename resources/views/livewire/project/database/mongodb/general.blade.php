@@ -55,6 +55,53 @@
                     type="password" readonly wire:model="db_url_public" />
             @endif
         </div>
+
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between py-2">
+                <div class="flex items-center justify-between w-full">
+                    <h3>SSL Configuration</h3>
+                    @if ($database->enable_ssl)
+                        <x-modal-confirmation title="Regenerate SSL Certificates"
+                            buttonTitle="Regenerate SSL Certificates" :actions="[
+                                'The SSL certificate of this database will be regenerated.',
+                                'You must restart the database after regenerating the certificate to start using the new certificate.',
+                            ]"
+                            submitAction="regenerateSslCertificate" :confirmWithText="false" :confirmWithPassword="false" />
+                    @endif
+                </div>
+            </div>
+            @if ($database->enable_ssl && $certificateValidUntil)
+                <span class="text-sm">Valid until:
+                    @if (now()->gt($certificateValidUntil))
+                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
+                    @elseif(now()->addDays(30)->gt($certificateValidUntil))
+                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expiring
+                            soon</span>
+                    @else
+                        <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }}</span>
+                    @endif
+                </span>
+            @endif
+        </div>
+        <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2">
+                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl"
+                    instantSave="instantSaveSSL" />
+                @if ($database->enable_ssl)
+                    <div class="mx-2">
+                        <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
+                            instantSave="instantSaveSSL"
+                            helper="Choose the SSL verification mode for MongoDB connections">
+                            <option value="allow" title="Allow insecure connections">allow (insecure)</option>
+                            <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
+                            <option value="require" title="Require secure connections">require (secure)</option>
+                            <option value="verify-full" title="Verify full certificate">verify-full (secure)</option>
+                        </x-forms.select>
+                    </div>
+                @endif
+            </div>
+        </div>
+
         <div>
             <div class="flex flex-col py-2 w-64">
                 <div class="flex items-center gap-2 pb-2">

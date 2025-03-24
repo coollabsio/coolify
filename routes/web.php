@@ -99,15 +99,6 @@ Route::middleware(['throttle:login'])->group(function () {
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
-// Route::prefix('magic')->middleware(['auth'])->group(function () {
-//     Route::get('/servers', [MagicController::class, 'servers']);
-//     Route::get('/destinations', [MagicController::class, 'destinations']);
-//     Route::get('/projects', [MagicController::class, 'projects']);
-//     Route::get('/environments', [MagicController::class, 'environments']);
-//     Route::get('/project/new', [MagicController::class, 'newProject']);
-//     Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
-// });
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');

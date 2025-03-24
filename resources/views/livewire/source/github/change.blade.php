@@ -27,6 +27,7 @@
                             confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
                             step2ButtonText="Permanently Delete" />
                     @endif
+
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
@@ -46,7 +47,7 @@
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
                         <div class="flex items-end gap-2 w-full">
-                            <x-forms.input id="github_app.name" label="App Name" disabled />
+                            <x-forms.input id="github_app.name" label="App Name" />
                             <x-forms.button wire:click.prevent="updateGithubAppName" class="bg-coollabs">
                                 Sync Name
                             </x-forms.button>
@@ -57,7 +58,7 @@
                                 </x-forms.button>
                             </a>
                         </div>
-                        <x-forms.input id="github_app.organization" label="Organization" disabled
+                        <x-forms.input id="github_app.organization" label="Organization"
                             placeholder="If empty, personal user will be used" />
                     </div>
                     @if (!isCloud())
@@ -68,27 +69,32 @@
                         </div>
                     @endif
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-                        <x-forms.input id="github_app.api_url" label="API Url" disabled />
+                        <x-forms.input id="github_app.html_url" label="HTML Url" />
+                        <x-forms.input id="github_app.api_url" label="API Url" />
                     </div>
                     <div class="flex gap-2">
-                        @if ($github_app->html_url === 'https://github.com')
-                            <x-forms.input id="github_app.custom_user" label="User" disabled />
-                            <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
-                        @else
-                            <x-forms.input id="github_app.custom_user" label="User" required />
-                            <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
-                        @endif
+                        <x-forms.input id="github_app.custom_user" label="User" required />
+                        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
+                        <x-forms.input type="number" id="github_app.app_id" label="App Id" required />
                         <x-forms.input type="number" id="github_app.installation_id" label="Installation Id"
-                            disabled />
+                            required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
-                        <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
-                        <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
+                        <x-forms.input id="github_app.client_id" label="Client Id" type="password" required />
+                        <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" required />
+                        <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" required />
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.select id="github_app.private_key_id" label="Private Key" required>
+                            @if (blank($github_app->private_key_id))
+                                <option value="0" selected>Select a private key</option>
+                            @endif
+                            @foreach ($privateKeys as $privateKey)
+                                <option value="{{ $privateKey->id }}">{{ $privateKey->name }}</option>
+                            @endforeach
+                        </x-forms.select>
                     </div>
                     <div class="flex items-end gap-2 ">
                         <h2 class="pt-4">Permissions</h2>
@@ -182,120 +188,129 @@
                     shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
             </div>
         </div>
-        <div class=" pb-5 rounded alert-error">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
-                viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>You must complete this step before you can use this source!</span>
-        </div>
-        <div class="flex flex-col">
-            <div class="pb-10">
-                @if (!isCloud() || isDev())
-                    <div class="flex items-end gap-2">
-                        <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
-                            helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
-                            @if ($ipv4)
-                                <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
-                            @endif
-                            @if ($ipv6)
-                                <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                            @endif
-                            @if ($fqdn)
-                                <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
-                            @endif
-                            @if (config('app.url'))
-                                <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
-                            @endif
-                        </x-forms.select>
-                        <x-forms.button isHighlighted
-                            x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
-                            Register Now
-                        </x-forms.button>
-                    </div>
-                @else
-                    <div class="flex gap-2">
-                        <h2>Register a GitHub App</h2>
-                        <x-forms.button isHighlighted
-                            x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
-                            Register Now
-                        </x-forms.button>
-                    </div>
-                    <div>You need to register a GitHub App before using this source.</div>
-                @endif
+        <div class="flex flex-col gap-2">
+            <h3>Manual Installation</h3>
+            <div class="flex gap-2 items-center">
+                If you want to fill the form manually, you can continue below. Only for advanced users.
+                <x-forms.button wire:click.prevent="createGithubAppManually">
+                    Continue
+                </x-forms.button>
+            </div>
+            <h3>Automated Installation</h3>
+            <div class=" pb-5 rounded alert-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>You must complete this step before you can use this source!</span>
+            </div>
+            <div class="flex flex-col">
+                <div class="pb-10">
+                    @if (!isCloud() || isDev())
+                        <div class="flex items-end gap-2">
+                            <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
+                                helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
+                                @if ($ipv4)
+                                    <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
+                                @endif
+                                @if ($ipv6)
+                                    <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
+                                @endif
+                                @if ($fqdn)
+                                    <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                                @endif
+                                @if (config('app.url'))
+                                    <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
+                                @endif
+                            </x-forms.select>
+                            <x-forms.button isHighlighted
+                                x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                                Register Now
+                            </x-forms.button>
+                        </div>
+                    @else
+                        <div class="flex gap-2">
+                            <h2>Register a GitHub App</h2>
+                            <x-forms.button isHighlighted
+                                x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                                Register Now
+                            </x-forms.button>
+                        </div>
+                        <div>You need to register a GitHub App before using this source.</div>
+                    @endif
 
-                <div class="flex flex-col gap-2 pt-4 w-96">
-                    <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
-                        helper="Contents: read<br>Metadata: read<br>Email: read" />
-                    <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
-                        helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
-                    {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
+                    <div class="flex flex-col gap-2 pt-4 w-96">
+                        <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
+                            helper="Contents: read<br>Metadata: read<br>Email: read" />
+                        <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
+                            helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
+                        {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
                         helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
+                    </div>
                 </div>
             </div>
-        </div>
-        <script>
-            function createGithubApp(webhook_endpoint, preview_deployment_permissions, administration) {
-                const {
-                    organization,
-                    uuid,
-                    html_url
-                } = @json($github_app);
-                if (!webhook_endpoint) {
-                    alert('Please select a webhook endpoint.');
-                    return;
+            <script>
+                function createGithubApp(webhook_endpoint, preview_deployment_permissions, administration) {
+                    const {
+                        organization,
+                        uuid,
+                        html_url
+                    } = @json($github_app);
+                    if (!webhook_endpoint) {
+                        alert('Please select a webhook endpoint.');
+                        return;
+                    }
+                    let baseUrl = webhook_endpoint;
+                    const name = @js($name);
+                    const isDev = @js(config('app.env')) ===
+                        'local';
+                    const devWebhook = @js(config('constants.webhooks.dev_webhook'));
+                    if (isDev && devWebhook) {
+                        baseUrl = devWebhook;
+                    }
+                    const webhookBaseUrl = `${baseUrl}/webhooks`;
+                    const path = organization ? `organizations/${organization}/settings/apps/new` : 'settings/apps/new';
+                    const default_permissions = {
+                        contents: 'read',
+                        metadata: 'read',
+                        emails: 'read',
+                        administration: 'read'
+                    };
+                    if (preview_deployment_permissions) {
+                        default_permissions.pull_requests = 'write';
+                    }
+                    if (administration) {
+                        default_permissions.administration = 'write';
+                    }
+                    const data = {
+                        name,
+                        url: baseUrl,
+                        hook_attributes: {
+                            url: `${webhookBaseUrl}/source/github/events`,
+                            active: true,
+                        },
+                        redirect_url: `${webhookBaseUrl}/source/github/redirect`,
+                        callback_urls: [`${baseUrl}/login/github/app`],
+                        public: false,
+                        request_oauth_on_install: false,
+                        setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,
+                        setup_on_update: true,
+                        default_permissions,
+                        default_events: ['pull_request', 'push']
+                    };
+                    const form = document.createElement('form');
+                    form.setAttribute('method', 'post');
+                    form.setAttribute('action', `${html_url}/${path}?state=${uuid}`);
+                    const input = document.createElement('input');
+                    input.setAttribute('id', 'manifest');
+                    input.setAttribute('name', 'manifest');
+                    input.setAttribute('type', 'hidden');
+                    input.setAttribute('value', JSON.stringify(data));
+                    form.appendChild(input);
+                    document.getElementsByTagName('body')[0].appendChild(form);
+                    form.submit();
                 }
-                let baseUrl = webhook_endpoint;
-                const name = @js($name);
-                const isDev = @js(config('app.env')) ===
-                    'local';
-                const devWebhook = @js(config('constants.webhooks.dev_webhook'));
-                if (isDev && devWebhook) {
-                    baseUrl = devWebhook;
-                }
-                const webhookBaseUrl = `${baseUrl}/webhooks`;
-                const path = organization ? `organizations/${organization}/settings/apps/new` : 'settings/apps/new';
-                const default_permissions = {
-                    contents: 'read',
-                    metadata: 'read',
-                    emails: 'read',
-                    administration: 'read'
-                };
-                if (preview_deployment_permissions) {
-                    default_permissions.pull_requests = 'write';
-                }
-                if (administration) {
-                    default_permissions.administration = 'write';
-                }
-                const data = {
-                    name,
-                    url: baseUrl,
-                    hook_attributes: {
-                        url: `${webhookBaseUrl}/source/github/events`,
-                        active: true,
-                    },
-                    redirect_url: `${webhookBaseUrl}/source/github/redirect`,
-                    callback_urls: [`${baseUrl}/login/github/app`],
-                    public: false,
-                    request_oauth_on_install: false,
-                    setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,
-                    setup_on_update: true,
-                    default_permissions,
-                    default_events: ['pull_request', 'push']
-                };
-                const form = document.createElement('form');
-                form.setAttribute('method', 'post');
-                form.setAttribute('action', `${html_url}/${path}?state=${uuid}`);
-                const input = document.createElement('input');
-                input.setAttribute('id', 'manifest');
-                input.setAttribute('name', 'manifest');
-                input.setAttribute('type', 'hidden');
-                input.setAttribute('value', JSON.stringify(data));
-                form.appendChild(input);
-                document.getElementsByTagName('body')[0].appendChild(form);
-                form.submit();
-            }
-        </script>
+            </script>
     @endif
 </div>
