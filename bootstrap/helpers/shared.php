@@ -4137,3 +4137,35 @@ function getJobStatus(?string $jobId = null)
 
     return $jobFound->first()->status;
 }
+
+function parseDockerfileInterval(string $something)
+{
+    $value = preg_replace('/[^0-9]/', '', $something);
+    $unit = preg_replace('/[0-9]/', '', $something);
+
+    // Default to seconds if no unit specified
+    $unit = $unit ?: 's';
+
+    // Convert to seconds based on unit
+    $seconds = (int) $value;
+    switch ($unit) {
+        case 'ns':
+            $seconds = (int) ($value / 1000000000);
+            break;
+        case 'us':
+        case 'µs':
+            $seconds = (int) ($value / 1000000);
+            break;
+        case 'ms':
+            $seconds = (int) ($value / 1000);
+            break;
+        case 'm':
+            $seconds = (int) ($value * 60);
+            break;
+        case 'h':
+            $seconds = (int) ($value * 3600);
+            break;
+    }
+
+    return $seconds;
+}
