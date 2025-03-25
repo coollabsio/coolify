@@ -1988,8 +1988,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             "($curl_cmd) || ($wget_cmd) || exit 1",
         ];
 
-        ray($generated_healthchecks_commands);
-
         return implode(' ', $generated_healthchecks_commands);
     }
 
