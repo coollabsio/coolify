@@ -446,7 +446,7 @@ if [ -x "$(command -v snap)" ]; then
 fi
 
 install_docker() {
-    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
+    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1 || true
     if ! [ -x "$(command -v docker)" ]; then
         curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
         if ! [ -x "$(command -v docker)" ]; then
@@ -822,8 +822,17 @@ echo -e "\033[0;35m
   \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
                    |___/
 \033[0m"
+
+IPV4_PUBLIC_IP=$(curl -4s https://ifconfig.io || true)
+IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
+
 echo -e "\nYour instance is ready to use!\n"
-echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
+if [ -n "$IPV4_PUBLIC_IP" ]; then
+    echo -e "You can access Coolify through your Public IPV4: http://$(curl -4s https://ifconfig.io):8000"
+fi
+if [ -n "$IPV6_PUBLIC_IP" ]; then
+    echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"
+fi
 
 set +e
 DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
