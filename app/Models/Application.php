@@ -1065,7 +1065,6 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $base_command = "{$base_command} {$customRepository}";
-            $base_command = $this->setGitImportSettings($deployment_uuid, $base_command, public: true);
 
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $base_command));
@@ -1508,6 +1507,7 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
+        $dockerfile = str($dockerfile)->trim()->explode("\n");
         if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
             $lines = $dockerfile->toArray();
@@ -1527,23 +1527,24 @@ class Application extends BaseModel
                 }
             }
             if (str($healthcheckCommand)->isNotEmpty()) {
-                $interval = str($healthcheckCommand)->match('/--interval=(\d+)/');
-                $timeout = str($healthcheckCommand)->match('/--timeout=(\d+)/');
-                $start_period = str($healthcheckCommand)->match('/--start-period=(\d+)/');
-                $start_interval = str($healthcheckCommand)->match('/--start-interval=(\d+)/');
+                $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
+                $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
+                $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
+                $start_interval = str($healthcheckCommand)->match('/--start-interval=([0-9]+[a-zµ]*)/');
                 $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
+
                 if ($interval->isNotEmpty()) {
-                    $this->health_check_interval = $interval->toInteger();
+                    $this->health_check_interval = parseDockerfileInterval($interval);
                 }
                 if ($timeout->isNotEmpty()) {
-                    $this->health_check_timeout = $timeout->toInteger();
+                    $this->health_check_timeout = parseDockerfileInterval($timeout);
                 }
                 if ($start_period->isNotEmpty()) {
-                    $this->health_check_start_period = $start_period->toInteger();
+                    $this->health_check_start_period = parseDockerfileInterval($start_period);
                 }
-                // if ($start_interval) {
-                //     $this->health_check_start_interval = $start_interval->value();
-                // }
+                if ($start_interval->isNotEmpty()) {
+                    $this->health_check_start_interval = parseDockerfileInterval($start_interval);
+                }
                 if ($retries->isNotEmpty()) {
                     $this->health_check_retries = $retries->toInteger();
                 }

@@ -4054,28 +4054,23 @@ function defaultNginxConfiguration(): string
 {
     return 'server {
     location / {
-        root   /usr/share/nginx/html;
-        index  index.html index.htm;
-        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ /index.html /index.htm =404;
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ =404;
     }
 
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
     error_page 500 502 503 504 /50x.html;
     location = /50x.html {
         root /usr/share/nginx/html;
-        try_files $uri @redirect_to_index;
         internal;
-    }
-
-    error_page 404 = @handle_404;
-
-    location @handle_404 {
-        root /usr/share/nginx/html;
-        try_files /404.html @redirect_to_index;
-        internal;
-    }
-
-    location @redirect_to_index {
-        return 302 /;
     }
 }';
 }
@@ -4141,4 +4136,36 @@ function getJobStatus(?string $jobId = null)
     }
 
     return $jobFound->first()->status;
+}
+
+function parseDockerfileInterval(string $something)
+{
+    $value = preg_replace('/[^0-9]/', '', $something);
+    $unit = preg_replace('/[0-9]/', '', $something);
+
+    // Default to seconds if no unit specified
+    $unit = $unit ?: 's';
+
+    // Convert to seconds based on unit
+    $seconds = (int) $value;
+    switch ($unit) {
+        case 'ns':
+            $seconds = (int) ($value / 1000000000);
+            break;
+        case 'us':
+        case 'µs':
+            $seconds = (int) ($value / 1000000);
+            break;
+        case 'ms':
+            $seconds = (int) ($value / 1000);
+            break;
+        case 'm':
+            $seconds = (int) ($value * 60);
+            break;
+        case 'h':
+            $seconds = (int) ($value * 3600);
+            break;
+    }
+
+    return $seconds;
 }

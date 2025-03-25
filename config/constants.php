@@ -2,13 +2,14 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.398',
+        'version' => '4.0.0-beta.399',
         'helper_version' => '1.0.7',
         'realtime_version' => '1.0.6',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
-        'helper_image' => env('HELPER_IMAGE', 'ghcr.io/coollabsio/coolify-helper'),
+        'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
+        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
     ],
 
