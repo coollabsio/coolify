@@ -1212,7 +1212,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $counter = 1;
                 $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                 if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
-                    $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
+                    $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url} -> it should return {$this->application->health_check_return_code} return code.");
                 }
                 $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
                 $sleeptime = 0;
@@ -1961,17 +1961,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
             $health_check_port = 80;
         }
+
+        // Build the health check URL
+        $url = "{$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}";
         if ($this->application->health_check_path) {
-            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1",
-            ];
-        } else {
-            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1",
-            ];
+            $url .= $this->application->health_check_path;
         }
+        $this->full_healthcheck_url = "{$this->application->health_check_method}: {$url}";
+
+        // Expected return code from the application
+        $expected_return_code = $this->application->health_check_return_code ?? 200;
+
+        // Generate curl command with proper return code handling
+        $curl_cmd = "curl -s -X {$this->application->health_check_method} -f -w '%{http_code}' {$url} | grep -q '^$expected_return_code$'";
+
+        // Generate wget command with proper return code handling
+        $wget_cmd = "wget -q -O- --method={$this->application->health_check_method} --server-response {$url} 2>&1 | grep -q 'HTTP/.* $expected_return_code'";
+
+        // Combine commands with proper error handling
+        $generated_healthchecks_commands = [
+            "($curl_cmd) || ($wget_cmd) || exit 1",
+        ];
+
+        ray($generated_healthchecks_commands);
 
         return implode(' ', $generated_healthchecks_commands);
     }
