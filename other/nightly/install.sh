@@ -20,7 +20,7 @@ DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
-VERSION="1.8"
+VERSION="19"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER

@@ -9,6 +9,7 @@
 ## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
 ## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
+## REGISTRY_URL - Custom registry URL for Docker images (default: ghcr.io)
 
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
@@ -17,7 +18,9 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.8"
+OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+ENV_FILE="/data/coolify/source/.env"
+VERSION="19"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -35,6 +38,18 @@ echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/in
 ROOT_USERNAME=${ROOT_USERNAME:-}
 ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
 ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
+
+if [ -n "${REGISTRY_URL+x}" ]; then
+    echo "Using registry URL from environment variable: $REGISTRY_URL"
+else
+    if [ -f "$ENV_FILE" ] && grep -q "^REGISTRY_URL=" "$ENV_FILE"; then
+        REGISTRY_URL=$(grep "^REGISTRY_URL=" "$ENV_FILE" | cut -d '=' -f2)
+        echo "Using registry URL from .env: $REGISTRY_URL"
+    else
+        REGISTRY_URL="ghcr.io"
+        echo "Using default registry URL: $REGISTRY_URL"
+    fi
+fi
 
 # Docker address pool configuration defaults
 DOCKER_ADDRESS_POOL_BASE_DEFAULT="10.0.0.0/8"
@@ -209,7 +224,7 @@ if [ "$WARNING_SPACE" = true ]; then
     sleep 5
 fi
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,ssl,webhooks-during-maintenance,sentinel}
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
@@ -227,8 +242,6 @@ getAJoke() {
         echo -e "$JOKES\n"
     fi
 }
-OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
-ENV_FILE="/data/coolify/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
@@ -305,6 +318,7 @@ echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
+echo "| Registry URL      | $REGISTRY_URL"
 echo -e "---------------------------------------------\n"
 echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
@@ -718,6 +732,16 @@ if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASS
     fi
 fi
 
+# Add registry URL to .env file
+if [ -n "${REGISTRY_URL+x}" ]; then
+    # Only update if REGISTRY_URL was explicitly provided
+    if grep -q "^REGISTRY_URL=" "$ENV_FILE-$DATE"; then
+        sed -i "s|^REGISTRY_URL=.*|REGISTRY_URL=$REGISTRY_URL|" "$ENV_FILE-$DATE"
+    else
+        echo "REGISTRY_URL=$REGISTRY_URL" >>"$ENV_FILE-$DATE"
+    fi
+fi
+
 # Merge .env and .env.production. New values will be added to .env
 echo -e "7. Propagating .env with new values - if necessary."
 awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production >$ENV_FILE
@@ -778,7 +802,11 @@ echo -e " - It could take a while based on your server's performance, network sp
 echo -e " - Please wait."
 getAJoke
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
+if [[ $- == *x* ]]; then
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
+else
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
+fi
 echo " - Coolify installed successfully."
 rm -f $ENV_FILE-$DATE
 
