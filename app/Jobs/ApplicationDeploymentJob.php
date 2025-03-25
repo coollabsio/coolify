@@ -1975,8 +1975,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Generate curl command with proper return code handling
         $curl_cmd = "curl -s -X {$this->application->health_check_method} -f -w '%{http_code}' {$url} | grep -q '^$expected_return_code$'";
 
-        // Generate wget command with proper return code handling
-        $wget_cmd = "wget -q -O- --method={$this->application->health_check_method} --server-response {$url} 2>&1 | grep -q 'HTTP/.* $expected_return_code'";
+        // Generate BusyBox-compatible wget command
+        $wget_method = '';
+        if ($this->application->health_check_method === 'POST') {
+            $wget_method = '--post-data=""';
+        } elseif ($this->application->health_check_method === 'PUT') {
+            $wget_method = '--post-data=""';
+        } elseif ($this->application->health_check_method === 'DELETE') {
+            $wget_method = '--post-data=""';
+        }
+
+        // Use --spider to only check existence and get status code
+        $wget_cmd = "wget -q -S --spider {$wget_method} {$url} 2>&1 | grep -q 'HTTP/.* $expected_return_code'";
 
         // Combine commands with proper error handling
         $generated_healthchecks_commands = [
