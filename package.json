@@ -9,7 +9,7 @@
     "devDependencies": {
         "@vitejs/plugin-vue": "5.2.1",
         "autoprefixer": "10.4.20",
-        "axios": "1.7.9",
+        "axios": "1.8.2",
         "laravel-echo": "2.0.2",
         "laravel-vite-plugin": "^1.2.0",
         "postcss": "8.5.3",
