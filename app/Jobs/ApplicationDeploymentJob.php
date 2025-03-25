@@ -1212,7 +1212,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $counter = 1;
                 $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
                 if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
-                    $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url} -> it should return {$this->application->health_check_return_code} return code.");
+                    $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url} with {$this->application->health_check_return_code} return code.");
                 }
                 $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
                 $sleeptime = 0;
@@ -1968,13 +1968,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $url .= $this->application->health_check_path;
         }
         $this->full_healthcheck_url = "{$this->application->health_check_method}: {$url}";
-
         // Expected return code from the application
         $expected_return_code = $this->application->health_check_return_code ?? 200;
-
         // Generate curl command with proper return code handling
         $curl_cmd = "curl -s -X {$this->application->health_check_method} -f -w '%{http_code}' {$url} | grep -q '^$expected_return_code$'";
-
         // Generate BusyBox-compatible wget command
         $wget_method = '';
         if ($this->application->health_check_method === 'POST') {
@@ -1984,10 +1981,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } elseif ($this->application->health_check_method === 'DELETE') {
             $wget_method = '--post-data=""';
         }
-
         // Use --spider to only check existence and get status code
         $wget_cmd = "wget -q -S --spider {$wget_method} {$url} 2>&1 | grep -q 'HTTP/.* $expected_return_code'";
-
         // Combine commands with proper error handling
         $generated_healthchecks_commands = [
             "($curl_cmd) || ($wget_cmd) || exit 1",
