@@ -15,11 +15,6 @@ use Livewire\Component;
 
 class General extends Component
 {
-    protected $listeners = [
-        'envsUpdated' => 'refresh',
-        'refresh',
-    ];
-
     public Server $server;
 
     public StandaloneRedis $database;
@@ -42,7 +37,8 @@ class General extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            'refresh' => '$refresh',
+            'envsUpdated' => 'refresh',
+            'refresh',
         ];
     }
 
