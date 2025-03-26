@@ -8,9 +8,9 @@ use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMongodb;
-use Auth;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
