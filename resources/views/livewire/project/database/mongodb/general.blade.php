@@ -85,8 +85,6 @@
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
-                {{ $database->status }}
-
                 <div class="w-64">
                     @if (str($database->status)->contains('exited'))
                         <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
