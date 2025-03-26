@@ -46,7 +46,7 @@ body {
 
 .input,
 .select {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset disabled:dark:bg-coolgray-100/40 disabled:dark:ring-transparent disabled:bg-neutral-200 disabled:text-neutral-500;
 }
 
 .select {
@@ -96,6 +96,7 @@ a {
 label {
     @apply dark:text-neutral-400;
 }
+
 
 table {
     @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300;

@@ -8,6 +8,7 @@ use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
+use Auth;
 use Carbon\Carbon;
 use Exception;
 use Livewire\Component;
@@ -34,6 +35,16 @@ class General extends Component
     public ?string $db_url_public = null;
 
     public ?Carbon $certificateValidUntil = null;
+
+    public function getListeners()
+    {
+        $userId = Auth::id();
+
+        return [
+            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            'refresh' => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'database.name' => 'required',

@@ -85,52 +85,73 @@
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
-                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl"
-                    instantSave="instantSaveSSL" />
+                {{ $database->status }}
+
+                <div class="w-64">
+                    @if (str($database->status)->contains('exited'))
+                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                    @else
+                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" disabled
+                            helper="Database should be stopped to change this settings." />
+                    @endif
+                </div>
                 @if ($database->enable_ssl)
                     <div class="mx-2">
-                        <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
-                            instantSave="instantSaveSSL"
-                            helper="Choose the SSL verification mode for MongoDB connections">
-                            <option value="allow" title="Allow insecure connections">allow (insecure)</option>
-                            <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
-                            <option value="require" title="Require secure connections">require (secure)</option>
-                            <option value="verify-full" title="Verify full certificate">verify-full (secure)</option>
-                        </x-forms.select>
+                        @if (str($database->status)->contains('exited'))
+                            <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
+                                instantSave="instantSaveSSL"
+                                helper="Choose the SSL verification mode for MongoDB connections">
+                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
+                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
+                                <option value="require" title="Require secure connections">require (secure)</option>
+                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
+                                </option>
+                            </x-forms.select>
+                        @else
+                            <x-forms.select id="database.ssl_mode" label="SSL Mode" instantSave="instantSaveSSL"
+                                disabled helper="Database should be stopped to change this settings.">
+                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
+                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
+                                <option value="require" title="Require secure connections">require (secure)</option>
+                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
+                                </option>
+                            </x-forms.select>
+                        @endif
                     </div>
                 @endif
             </div>
-        </div>
 
-        <div>
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
+            <div>
+                <div class="flex flex-col py-2 w-64">
+                    <div class="flex items-center gap-2 pb-2">
+                        <div class="flex items-center">
+                            <h3>Proxy</h3>
+                            <x-loading wire:loading wire:target="instantSave" />
+                        </div>
+                        @if (data_get($database, 'is_public'))
+                            <x-slide-over fullScreen>
+                                <x-slot:title>Proxy Logs</x-slot:title>
+                                <x-slot:content>
+                                    <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                        container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                                </x-slot:content>
+                                <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
+                                    @click="slideOverOpen=true">Logs</x-forms.button>
+                            </x-slide-over>
+                        @endif
                     </div>
-                    @if (data_get($database, 'is_public'))
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
+                    <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
                 </div>
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                    id="database.public_port" label="Public Port" />
             </div>
-            <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                id="database.public_port" label="Public Port" />
-        </div>
-        <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="database.mongo_conf" />
-        <h3 class="pt-4">Advanced</h3>
-        <div class="flex flex-col">
-            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
-        </div>
+            <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="database.mongo_conf" />
+            <h3 class="pt-4">Advanced</h3>
+            <div class="flex flex-col">
+                <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                    instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+            </div>
     </form>
 </div>
