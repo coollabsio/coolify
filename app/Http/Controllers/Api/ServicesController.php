@@ -103,7 +103,7 @@ class ServicesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'type'],
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
                     properties: [
                         'type' => [
                             'description' => 'The one-click service type',
@@ -205,6 +205,7 @@ class ServicesController extends Controller
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
+                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                     ],
                 ),
             ),

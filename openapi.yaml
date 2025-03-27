@@ -4037,7 +4037,6 @@ paths:
                 - project_uuid
                 - environment_name
                 - environment_uuid
-                - type
               properties:
                 type:
                   description: 'The one-click service type'
@@ -4070,6 +4069,9 @@ paths:
                   type: boolean
                   default: false
                   description: 'Start the service immediately after creation.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
               type: object
       responses:
         '201':
