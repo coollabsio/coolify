@@ -142,6 +142,7 @@ class DeployController extends Controller
             new OA\Parameter(name: 'tag', in: 'query', description: 'Tag name(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id', schema: new OA\Schema(type: 'integer')),
         ],
 
         responses: [
@@ -187,6 +188,8 @@ class DeployController extends Controller
         $uuids = $request->query->get('uuid');
         $tags = $request->query->get('tag');
         $force = $request->query->get('force') ?? false;
+        $pr = $request->query->get('pr');
+
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
@@ -194,16 +197,19 @@ class DeployController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        if ($tags && $pr) {
+            return response()->json(['message' => 'You can only use tag or pr, not both.'], 400);
+        }
         if ($tags) {
             return $this->by_tags($tags, $teamId, $force);
         } elseif ($uuids) {
-            return $this->by_uuids($uuids, $teamId, $force);
+            return $this->by_uuids($uuids, $teamId, $force, $pr);
         }
 
         return response()->json(['message' => 'You must provide uuid or tag.'], 400);
     }
 
-    private function by_uuids(string $uuid, int $teamId, bool $force = false)
+    private function by_uuids(string $uuid, int $teamId, bool $force = false, int $pr = 0)
     {
         $uuids = explode(',', $uuid);
         $uuids = collect(array_filter($uuids));
@@ -216,7 +222,7 @@ class DeployController extends Controller
         foreach ($uuids as $uuid) {
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
-                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force);
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force, $pr);
                 if ($deployment_uuid) {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
                 } else {
@@ -281,7 +287,7 @@ class DeployController extends Controller
         return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
-    public function deploy_resource($resource, bool $force = false): array
+    public function deploy_resource($resource, bool $force = false, int $pr = 0): array
     {
         $message = null;
         $deployment_uuid = null;
@@ -295,6 +301,7 @@ class DeployController extends Controller
                     application: $resource,
                     deployment_uuid: $deployment_uuid,
                     force_rebuild: $force,
+                    pull_request_id: $pr,
                 );
                 $message = "Application {$resource->name} deployment queued.";
                 break;
