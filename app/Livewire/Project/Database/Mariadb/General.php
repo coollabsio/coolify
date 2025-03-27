@@ -10,6 +10,7 @@ use App\Models\SslCertificate;
 use App\Models\StandaloneMariadb;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
@@ -25,6 +26,16 @@ class General extends Component
     public ?string $db_url_public = null;
 
     public ?Carbon $certificateValidUntil = null;
+
+    public function getListeners()
+    {
+        $userId = Auth::id();
+
+        return [
+            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            'refresh' => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'database.name' => 'required',
@@ -173,6 +184,7 @@ class General extends Component
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
+                isPemKeyFileRequired: true,
             );
 
             $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
