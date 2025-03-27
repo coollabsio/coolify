@@ -4477,6 +4477,14 @@
                         "schema": {
                             "type": "boolean"
                         }
+                    },
+                    {
+                        "name": "pr",
+                        "in": "query",
+                        "description": "Pull request ID",
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "responses": {
