@@ -188,6 +188,7 @@ class General extends Component
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
+                isPemKeyFileRequired: true,
             );
 
             $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
