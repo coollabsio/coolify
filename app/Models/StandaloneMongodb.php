@@ -248,9 +248,9 @@ class StandaloneMongodb extends BaseModel
                 $encodedPass = rawurlencode($this->mongo_initdb_root_password);
                 $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->uuid}:27017/?directConnection=true";
                 if ($this->enable_ssl) {
-                    $url .= '&tls=true';
+                    $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                     if (in_array($this->ssl_mode, ['verify-full'])) {
-                        $url .= '&tlsCAFile=/etc/ssl/certs/coolify-ca.crt';
+                        $url .= '&tlsCertificateKeyFile=/etc/mongo/certs/server.pem';
                     }
                 }
 
@@ -268,9 +268,9 @@ class StandaloneMongodb extends BaseModel
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
                     $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
-                        $url .= '&tls=true';
+                        $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
-                            $url .= '&tlsCAFile=/etc/ssl/certs/coolify-ca.crt';
+                            $url .= '&tlsCertificateKeyFile=/etc/mongo/certs/server.pem';
                         }
                     }
 

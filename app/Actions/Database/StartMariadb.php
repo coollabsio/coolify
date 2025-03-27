@@ -183,7 +183,7 @@ class StartMariadb
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
         if ($this->database->enable_ssl) {
             $docker_compose['services'][$container_name]['command'] = [
-                'mysqld',
+                'mariadbd',
                 '--ssl-cert=/etc/mysql/certs/server.crt',
                 '--ssl-key=/etc/mysql/certs/server.key',
                 '--ssl-ca=/etc/mysql/certs/coolify-ca.crt',

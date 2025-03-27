@@ -70,10 +70,6 @@ class EmailNotificationSettings extends Model
 
     public function isEnabled()
     {
-        if (isCloud()) {
-            return true;
-        }
-
         return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
     }
 }

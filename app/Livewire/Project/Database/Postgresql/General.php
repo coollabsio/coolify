@@ -10,6 +10,7 @@ use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
@@ -30,8 +31,11 @@ class General extends Component
 
     public function getListeners()
     {
+        $userId = Auth::id();
+
         return [
-            'refresh',
+            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            'refresh' => '$refresh',
             'save_init_script',
             'delete_init_script',
         ];
@@ -144,6 +148,7 @@ class General extends Component
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
+                isPemKeyFileRequired: true,
             );
 
             $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
@@ -204,7 +209,7 @@ class General extends Component
             $delete_command = "rm -f $old_file_path";
             try {
                 instant_remote_process([$delete_command], $this->server);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
 
                 return;
@@ -245,7 +250,7 @@ class General extends Component
             $command = "rm -f $file_path";
             try {
                 instant_remote_process([$command], $this->server);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
 
                 return;
@@ -262,14 +267,9 @@ class General extends Component
 
             $this->database->init_scripts = $updatedScripts;
             $this->database->save();
-            $this->refresh();
+            $this->dispatch('refresh')->self();
             $this->dispatch('success', 'Init script deleted from the database and the server.');
         }
-    }
-
-    public function refresh(): void
-    {
-        $this->database->refresh();
     }
 
     public function save_new_init_script()

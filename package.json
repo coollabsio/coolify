@@ -9,14 +9,14 @@
     "devDependencies": {
         "@vitejs/plugin-vue": "5.2.1",
         "autoprefixer": "10.4.20",
-        "axios": "1.7.9",
+        "axios": "1.8.2",
         "laravel-echo": "2.0.2",
         "laravel-vite-plugin": "^1.2.0",
         "postcss": "8.5.3",
         "pusher-js": "8.4.0",
         "tailwind-scrollbar": "^3.1.0",
         "tailwindcss": "3.4.17",
-        "vite": "^6.1.1",
+        "vite": "^6.2.3",
         "vue": "3.5.13"
     },
     "dependencies": {
