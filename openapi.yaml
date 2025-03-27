@@ -3995,8 +3995,8 @@ paths:
     post:
       tags:
         - Services
-      summary: Create
-      description: 'Create a service'
+      summary: 'Create service'
+      description: 'Create a one-click / custom service'
       operationId: create-service
       requestBody:
         required: true
@@ -4008,78 +4008,6 @@ paths:
                 - project_uuid
                 - environment_name
                 - environment_uuid
-                - docker_compose_raw
-              properties:
-                name:
-                  type: string
-                  maxLength: 255
-                  description: 'Name of the service.'
-                description:
-                  type: string
-                  nullable: true
-                  description: 'Description of the service.'
-                project_uuid:
-                  type: string
-                  description: 'Project UUID.'
-                environment_name:
-                  type: string
-                  description: 'Environment name. You need to provide at least one of environment_name or environment_uuid.'
-                environment_uuid:
-                  type: string
-                  description: 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'
-                server_uuid:
-                  type: string
-                  description: 'Server UUID.'
-                destination_uuid:
-                  type: string
-                  description: 'Destination UUID. Required if server has multiple destinations.'
-                instant_deploy:
-                  type: boolean
-                  default: false
-                  description: 'Start the service immediately after creation.'
-                connect_to_docker_network:
-                  type: boolean
-                  default: false
-                  description: 'The flag to connect the service to the predefined Docker network.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
-              type: object
-      responses:
-        '201':
-          description: 'Service created successfully.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  uuid: { type: string, description: 'Service UUID.' }
-                  domains: { type: array, items: { type: string, nullable: true }, description: 'Service domains.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-      security:
-        -
-          bearerAuth: []
-  /services/one-click:
-    post:
-      tags:
-        - Services
-      summary: 'Create one-click'
-      description: 'Create a one-click service'
-      operationId: create-one-click-service
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              required:
-                - server_uuid
-                - project_uuid
-                - environment_name
-                - environment_uuid
-                - type
               properties:
                 type:
                   description: 'The one-click service type'
@@ -4112,6 +4040,9 @@ paths:
                   type: boolean
                   default: false
                   description: 'Start the service immediately after creation.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
               type: object
       responses:
         '201':
@@ -4271,7 +4202,7 @@ paths:
                 connect_to_docker_network:
                   type: boolean
                   default: false
-                  description: 'The flag to connect the service to the predefined Docker network.'
+                  description: 'Connect the service to the predefined docker network.'
                 docker_compose_raw:
                   type: string
                   description: 'The Docker Compose raw content.'
