@@ -1264,7 +1264,7 @@ function isAnyDeploymentInprogress()
     $horizonJobIds = [];
     foreach ($runningJobs as $runningJob) {
         $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
-        if ($horizonJobStatus === 'unknown') {
+        if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
             $horizonJobIds[] = $runningJob->horizon_job_id;
         }
     }
