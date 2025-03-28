@@ -67,8 +67,13 @@
                     <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
                         label="Docker Compose Location"
                         helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
-                    Compose file location in your repository:<span
-                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                    <div class="flex gap-1">
+                        Compose file location in your repository:<span
+                            class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                    </div>
+                @else
+                    <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
+                        helper="Directory to use as root. Useful for monorepos." />
                 @endif
                 @if ($show_is_static)
                     <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />

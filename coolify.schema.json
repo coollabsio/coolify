@@ -1,0 +1,553 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+        "build"
+    ],
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "description": {
+            "type": "string"
+        },
+        "coolify": {
+            "type": "object",
+            "properties": {
+                "project_uuid": {
+                    "type": "string"
+                },
+                "environment_uuid": {
+                    "type": "string"
+                },
+                "destination_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "source": {
+            "type": "object",
+            "properties": {
+                "git_repository": {
+                    "type": "string"
+                },
+                "git_branch": {
+                    "type": "string"
+                },
+                "git_commit_sha": {
+                    "type": "string"
+                },
+                "repository_project_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "build": {
+            "type": "object",
+            "required": [
+                "build_pack"
+            ],
+            "properties": {
+                "build_pack": {
+                    "type": "string",
+                    "enum": [
+                        "nixpacks",
+                        "static",
+                        "dockerfile",
+                        "dockercompose"
+                    ]
+                },
+                "static_image": {
+                    "type": "string"
+                },
+                "base_directory": {
+                    "type": "string"
+                },
+                "publish_directory": {
+                    "type": "string"
+                },
+                "install_command": {
+                    "type": "string"
+                },
+                "build_command": {
+                    "type": "string"
+                },
+                "start_command": {
+                    "type": "string"
+                },
+                "watch_paths": {
+                    "type": "string"
+                },
+                "dockerfile": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string"
+                        },
+                        "target_build": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "docker_compose": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string"
+                        },
+                        "domains": {
+                            "type": "string"
+                        },
+                        "custom_start_command": {
+                            "type": "string"
+                        },
+                        "custom_build_command": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "docker": {
+                    "type": "object",
+                    "properties": {
+                        "custom_options": {
+                            "type": "string"
+                        },
+                        "custom_labels": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "docker_custom_options": {
+            "type": "string"
+        },
+        "labels": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "deployment": {
+            "type": "object",
+            "properties": {
+                "pre_deployment": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string"
+                        },
+                        "container": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "post_deployment": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string"
+                        },
+                        "container": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "network": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "object",
+                    "properties": {
+                        "fqdn": {
+                            "type": "string",
+                            "pattern": "^(http://|https://).+",
+                            "examples": [
+                                "http://myapp.example.com",
+                                "https://myapp.example.com"
+                            ]
+                        },
+                        "redirect": {
+                            "type": "string",
+                            "enum": [
+                                "www",
+                                "non-www",
+                                "both"
+                            ]
+                        },
+                        "custom_nginx_configuration": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "ports": {
+                    "type": "object",
+                    "properties": {
+                        "expose": {
+                            "type": "string"
+                        },
+                        "mappings": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "health_check": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "return_code": {
+                    "type": "integer"
+                },
+                "scheme": {
+                    "type": "string",
+                    "enum": [
+                        "http",
+                        "https"
+                    ]
+                },
+                "response_text": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "integer"
+                },
+                "timeout": {
+                    "type": "integer"
+                },
+                "retries": {
+                    "type": "integer"
+                },
+                "start_period": {
+                    "type": "integer"
+                }
+            }
+        },
+        "resources": {
+            "type": "object",
+            "properties": {
+                "memory": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "string"
+                        },
+                        "swap": {
+                            "type": "string"
+                        },
+                        "swappiness": {
+                            "type": "integer"
+                        },
+                        "reservation": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "cpu": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "string"
+                        },
+                        "set": {
+                            "type": "string"
+                        },
+                        "shares": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        },
+        "preview": {
+            "type": "object",
+            "properties": {
+                "url_template": {
+                    "type": "string"
+                }
+            }
+        },
+        "environment_variables": {
+            "type": "object",
+            "properties": {
+                "production": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "key",
+                            "value"
+                        ],
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "value": {
+                                "type": "string"
+                            },
+                            "is_required": {
+                                "type": "boolean"
+                            },
+                            "is_build_time": {
+                                "type": "boolean"
+                            },
+                            "is_preview": {
+                                "type": "boolean"
+                            },
+                            "is_multiline": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                },
+                "preview": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "key",
+                            "value"
+                        ],
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "value": {
+                                "type": "string"
+                            },
+                            "is_build_time": {
+                                "type": "boolean"
+                            },
+                            "is_preview": {
+                                "type": "boolean"
+                            },
+                            "is_multiline": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "settings": {
+            "type": "object",
+            "properties": {
+                "deployment": {
+                    "type": "object",
+                    "properties": {
+                        "auto_deploy": {
+                            "type": "boolean"
+                        },
+                        "preview_deployments": {
+                            "type": "boolean"
+                        },
+                        "preserve_repository": {
+                            "type": "boolean"
+                        },
+                        "build_server": {
+                            "type": "boolean"
+                        },
+                        "debug_mode": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "git": {
+                    "type": "object",
+                    "properties": {
+                        "lfs_enabled": {
+                            "type": "boolean"
+                        },
+                        "submodules_enabled": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "docker": {
+                    "type": "object",
+                    "properties": {
+                        "network": {
+                            "type": "object",
+                            "properties": {
+                                "connect": {
+                                    "type": "boolean"
+                                },
+                                "custom_internal_name": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "container": {
+                            "type": "object",
+                            "properties": {
+                                "consistent_name": {
+                                    "type": "boolean"
+                                },
+                                "label_escape": {
+                                    "type": "boolean"
+                                },
+                                "label_readonly": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "build": {
+                            "type": "object",
+                            "properties": {
+                                "disable_cache": {
+                                    "type": "boolean"
+                                },
+                                "raw_compose_deployment": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                },
+                "gpu": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "driver": {
+                            "type": "string",
+                            "enum": [
+                                "nvidia"
+                            ]
+                        }
+                    }
+                },
+                "logging": {
+                    "type": "object",
+                    "properties": {
+                        "drain_enabled": {
+                            "type": "boolean"
+                        },
+                        "include_timestamps": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "environment": {
+                    "type": "object",
+                    "properties": {
+                        "sort_variables": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "proxy": {
+                    "type": "object",
+                    "properties": {
+                        "force_https": {
+                            "type": "boolean"
+                        },
+                        "gzip": {
+                            "type": "boolean"
+                        },
+                        "stripprefix": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "type": {
+                    "type": "object",
+                    "properties": {
+                        "static": {
+                            "type": "boolean"
+                        }
+                    }
+                }
+            }
+        },
+        "persistent_storages": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "mount_path",
+                    "host_path"
+                ],
+                "properties": {
+                    "mount_path": {
+                        "type": "string"
+                    },
+                    "host_path": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "scheduled_tasks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "command",
+                    "frequency"
+                ],
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "command": {
+                        "type": "string"
+                    },
+                    "frequency": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "tags": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "webhooks": {
+            "type": "object",
+            "properties": {
+                "secrets": {
+                    "type": "object",
+                    "properties": {
+                        "github": {
+                            "type": "string"
+                        },
+                        "gitlab": {
+                            "type": "string"
+                        },
+                        "bitbucket": {
+                            "type": "string"
+                        },
+                        "gitea": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

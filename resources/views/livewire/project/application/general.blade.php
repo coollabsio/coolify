@@ -9,10 +9,6 @@
             {{-- <x-forms.button wire:click="downloadConfig">
                 Download Config
             </x-forms.button> --}}
-            {{-- <x-modal-input buttonTitle="Upload Config" title="Upload Config" :closeOutside="false">
-                <livewire:project.shared.upload-config :applicationId="$application->id" />
-            </x-modal-input> --}}
-
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
