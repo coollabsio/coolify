@@ -43,12 +43,11 @@ class EditDomain extends Component
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
-            } else {
-                ! $warning && $this->dispatch('success', 'Service saved.');
             }
             $this->application->service->parse();
             $this->dispatch('refresh');
             $this->dispatch('configurationChanged');
+            $this->dispatch('refreshStatus');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {

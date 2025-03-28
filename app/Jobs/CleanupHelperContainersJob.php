@@ -20,7 +20,7 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
     public function handle(): void
     {
         try {
-            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("ghcr.io/coollabsio/coolify-helper")))\''], $this->server, false);
+            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("'.config('constants.coolify.registry_url').'/coollabsio/coolify-helper")))\''], $this->server, false);
             $containerIds = collect(json_decode($containers))->pluck('ID');
             if ($containerIds->count() > 0) {
                 foreach ($containerIds as $containerId) {

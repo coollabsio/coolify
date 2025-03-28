@@ -1211,7 +1211,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->container_name) {
                 $counter = 1;
                 $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
-                if ($this->full_healthcheck_url) {
+                if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
                 $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
@@ -1718,8 +1718,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'save' => 'dockerfile_from_repo',
                 'ignore_errors' => true,
             ]);
-            $dockerfile = collect(str($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
-            $this->application->parseHealthcheckFromDockerfile($dockerfile);
+            $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
         $docker_compose = [
             'services' => [

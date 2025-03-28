@@ -369,6 +369,9 @@ class General extends Component
             if ($this->application->isDirty('redirect')) {
                 $this->setRedirect();
             }
+            if ($this->application->isDirty('dockerfile')) {
+                $this->application->parseHealthcheckFromDockerfile($this->application->dockerfile);
+            }
 
             $this->checkFqdns();
 

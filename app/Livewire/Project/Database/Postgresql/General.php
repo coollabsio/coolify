@@ -4,9 +4,13 @@ namespace App\Livewire\Project\Database\Postgresql;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Helpers\SslHelper;
 use App\Models\Server;
+use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
@@ -23,10 +27,15 @@ class General extends Component
 
     public ?string $db_url_public = null;
 
+    public ?Carbon $certificateValidUntil = null;
+
     public function getListeners()
     {
+        $userId = Auth::id();
+
         return [
-            'refresh',
+            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
+            'refresh' => '$refresh',
             'save_init_script',
             'delete_init_script',
         ];
@@ -48,6 +57,8 @@ class General extends Component
         'database.public_port' => 'nullable|integer',
         'database.is_log_drain_enabled' => 'nullable|boolean',
         'database.custom_docker_run_options' => 'nullable',
+        'database.enable_ssl' => 'boolean',
+        'database.ssl_mode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
     ];
 
     protected $validationAttributes = [
@@ -65,6 +76,8 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
         'database.custom_docker_run_options' => 'Custom Docker Run Options',
+        'database.enable_ssl' => 'Enable SSL',
+        'database.ssl_mode' => 'SSL Mode',
     ];
 
     public function mount()
@@ -72,6 +85,12 @@ class General extends Component
         $this->db_url = $this->database->internal_db_url;
         $this->db_url_public = $this->database->external_db_url;
         $this->server = data_get($this->database, 'destination.server');
+
+        $existingCert = $this->database->sslCertificates()->first();
+
+        if ($existingCert) {
+            $this->certificateValidUntil = $existingCert->valid_until;
+        }
     }
 
     public function instantSaveAdvanced()
@@ -86,6 +105,53 @@ class General extends Component
             $this->database->save();
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function updatedDatabaseSslMode()
+    {
+        $this->instantSaveSSL();
+    }
+
+    public function instantSaveSSL()
+    {
+        try {
+            $this->database->save();
+            $this->dispatch('success', 'SSL configuration updated.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function regenerateSslCertificate()
+    {
+        try {
+            $existingCert = $this->database->sslCertificates()->first();
+
+            if (! $existingCert) {
+                $this->dispatch('error', 'No existing SSL certificate found for this database.');
+
+                return;
+            }
+
+            $caCert = SslCertificate::where('server_id', $existingCert->server_id)->where('is_ca_certificate', true)->first();
+
+            SslHelper::generateSslCertificate(
+                commonName: $existingCert->common_name,
+                subjectAlternativeNames: $existingCert->subject_alternative_names ?? [],
+                resourceType: $existingCert->resource_type,
+                resourceId: $existingCert->resource_id,
+                serverId: $existingCert->server_id,
+                caCert: $caCert->ssl_certificate,
+                caKey: $caCert->ssl_private_key,
+                configurationDir: $existingCert->configuration_dir,
+                mountPath: $existingCert->mount_path,
+                isPemKeyFileRequired: true,
+            );
+
+            $this->dispatch('success', 'SSL certificates have been regenerated. Please restart the database for changes to take effect.');
         } catch (Exception $e) {
             return handleError($e, $this);
         }
@@ -143,7 +209,7 @@ class General extends Component
             $delete_command = "rm -f $old_file_path";
             try {
                 instant_remote_process([$delete_command], $this->server);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('error', 'Failed to remove old init script from server: '.$e->getMessage());
 
                 return;
@@ -184,7 +250,7 @@ class General extends Component
             $command = "rm -f $file_path";
             try {
                 instant_remote_process([$command], $this->server);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('error', 'Failed to remove init script from server: '.$e->getMessage());
 
                 return;
@@ -201,14 +267,9 @@ class General extends Component
 
             $this->database->init_scripts = $updatedScripts;
             $this->database->save();
-            $this->refresh();
+            $this->dispatch('refresh')->self();
             $this->dispatch('success', 'Init script deleted from the database and the server.');
         }
-    }
-
-    public function refresh(): void
-    {
-        $this->database->refresh();
     }
 
     public function save_new_init_script()

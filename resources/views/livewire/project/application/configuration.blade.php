@@ -15,8 +15,7 @@
                 href="{{ route('project.application.advanced', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Advanced</a>
             @if ($application->destination->server->isSwarm())
-                <a class="menu-item"
-                    wire:current.exact="menu-item-active"
+                <a class="menu-item" wire:current.exact="menu-item-active"
                     href="{{ route('project.application.swarm', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                     wire:navigate>Swarm Configuration</a>
             @endif
@@ -60,21 +59,22 @@
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Preview Deployments</a>
-            <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
-                wire:navigate>Healthcheck</a>
+            @if ($application->build_pack !== 'dockercompose')
+                <a class="menu-item" wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
+                    wire:navigate>Healthcheck</a>
+            @endif
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.rollback', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Rollback</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.resource-limits', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Resource Limits</a>
-
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Resource Operations</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}" >Metrics</a>
+                href="{{ route('project.application.metrics', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Metrics</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}"
                 wire:navigate>Tags</a>
@@ -103,7 +103,7 @@
                 <livewire:project.shared.webhooks :resource="$application" />
             @elseif ($currentRoute === 'project.application.preview-deployments')
                 <livewire:project.application.previews :application="$application" />
-            @elseif ($currentRoute === 'project.application.healthcheck')
+            @elseif ($currentRoute === 'project.application.healthcheck' && $application->build_pack !== 'dockercompose')
                 <livewire:project.shared.health-checks :resource="$application" />
             @elseif ($currentRoute === 'project.application.rollback')
                 <livewire:project.application.rollback :application="$application" />

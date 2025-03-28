@@ -7,6 +7,10 @@
                 <h2>{{ Str::headline($database->name) }}</h2>
             @endif
             <x-forms.button type="submit">Save</x-forms.button>
+            <x-modal-confirmation title="Confirm Service Database Deletion?" buttonTitle="Delete" isErrorButton
+                submitAction="delete" :actions="['The selected service database container will be stopped and permanently deleted.']" confirmationText="{{ Str::headline($database->name) }}"
+                confirmationLabel="Please confirm the execution of the actions by entering the Service Database Name below"
+                shortConfirmationLabel="Service Database Name" step3ButtonText="Permanently Delete" />
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">

@@ -18,6 +18,7 @@ use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -811,6 +812,11 @@ class ApplicationsController extends Controller
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
             ];
+            // ports_exposes is not required for dockercompose
+            if ($request->build_pack === 'dockercompose') {
+                $validationRules['ports_exposes'] = 'string';
+                $request->offsetSet('ports_exposes', '80');
+            }
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
@@ -822,10 +828,6 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
-            if ($request->build_pack === 'dockercompose') {
-                $request->offsetSet('ports_exposes', '80');
-            }
-
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
@@ -848,7 +850,13 @@ class ApplicationsController extends Controller
             if ($dockerComposeDomainsJson->count() > 0) {
                 $application->docker_compose_domains = $dockerComposeDomainsJson;
             }
-
+            $repository_url_parsed = Url::fromString($request->git_repository);
+            $git_host = $repository_url_parsed->getHost();
+            if ($git_host === 'github.com') {
+                $application->source_type = GithubApp::class;
+                $application->source_id = GithubApp::find(0)->id;
+            }
+            $application->git_repository = $repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2);
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
@@ -924,10 +932,31 @@ class ApplicationsController extends Controller
             if (! $githubApp) {
                 return response()->json(['message' => 'Github App not found.'], 404);
             }
+            $token = generateGithubInstallationToken($githubApp);
+            if (! $token) {
+                return response()->json(['message' => 'Failed to generate Github App token.'], 400);
+            }
+
+            $repositories = collect();
+            $page = 1;
+            $repositories = loadRepositoryByPage($githubApp, $token, $page);
+            if ($repositories['total_count'] > 0) {
+                while (count($repositories['repositories']) < $repositories['total_count']) {
+                    $page++;
+                    $repositories = loadRepositoryByPage($githubApp, $token, $page);
+                }
+            }
+
             $gitRepository = $request->git_repository;
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
+            $gitRepositoryFound = collect($repositories['repositories'])->firstWhere('full_name', $gitRepository);
+            if (! $gitRepositoryFound) {
+                return response()->json(['message' => 'Repository not found.'], 404);
+            }
+            $repository_project_id = data_get($gitRepositoryFound, 'id');
+
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
@@ -958,6 +987,8 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->source_type = $githubApp->getMorphClass();
             $application->source_id = $githubApp->id;
+            $application->repository_project_id = $repository_project_id;
+
             $application->save();
             $application->refresh();
             if (isset($useBuildServer)) {
@@ -1302,7 +1333,6 @@ class ApplicationsController extends Controller
             $service->destination_type = $destination->getMorphClass();
             $service->save();
 
-            $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
             if ($instantDeploy) {
                 StartService::dispatch($service);

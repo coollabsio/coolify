@@ -114,19 +114,24 @@ class SettingsEmail extends Component
     public function instantSave(string $type)
     {
         try {
+            $currentSmtpEnabled = $this->settings->smtp_enabled;
+            $currentResendEnabled = $this->settings->resend_enabled;
             $this->resetErrorBag();
 
             if ($type === 'SMTP') {
                 $this->submitSmtp();
+                $this->resendEnabled = $this->settings->resend_enabled = false;
             } elseif ($type === 'Resend') {
                 $this->submitResend();
+                $this->smtpEnabled = $this->settings->smtp_enabled = false;
             }
+            $this->settings->save();
 
         } catch (\Throwable $e) {
             if ($type === 'SMTP') {
-                $this->smtpEnabled = false;
+                $this->smtpEnabled = $currentSmtpEnabled;
             } elseif ($type === 'Resend') {
-                $this->resendEnabled = false;
+                $this->resendEnabled = $currentResendEnabled;
             }
 
             return handleError($e, $this);
@@ -155,9 +160,6 @@ class SettingsEmail extends Component
                 'smtpPort.numeric' => 'SMTP Port must be a number.',
                 'smtpEncryption.required' => 'Encryption type is required.',
             ]);
-
-            $this->resendEnabled = false;
-            $this->settings->resend_enabled = false;
 
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_host = $this->smtpHost;
@@ -193,9 +195,6 @@ class SettingsEmail extends Component
                 'smtpFromAddress.email' => 'Please enter a valid email address.',
                 'smtpFromName.required' => 'From Name is required.',
             ]);
-
-            $this->smtpEnabled = false;
-            $this->settings->smtp_enabled = false;
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;

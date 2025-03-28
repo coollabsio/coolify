@@ -4,7 +4,10 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Models\InstanceSettings;
 use App\Models\ServiceDatabase;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class Database extends Component
@@ -14,6 +17,8 @@ class Database extends Component
     public ?string $db_url_public = null;
 
     public $fileStorages;
+
+    public $parameters;
 
     protected $listeners = ['refreshFileStorages'];
 
@@ -34,10 +39,31 @@ class Database extends Component
 
     public function mount()
     {
+        $this->parameters = get_route_parameters();
         if ($this->database->is_public) {
             $this->db_url_public = $this->database->getServiceDatabaseUrl();
         }
         $this->refreshFileStorages();
+    }
+
+    public function delete($password)
+    {
+        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+            if (! Hash::check($password, Auth::user()->password)) {
+                $this->addError('password', 'The provided password is incorrect.');
+
+                return;
+            }
+        }
+
+        try {
+            $this->database->delete();
+            $this->dispatch('success', 'Database deleted.');
+
+            return redirect()->route('project.service.configuration', $this->parameters);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSaveExclude()

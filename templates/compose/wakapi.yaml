@@ -1,0 +1,60 @@
+# documentation: https://wakapi.dev/
+# slogan: A minimalist, self-hosted WakaTime-compatible backend for coding statistics 
+# tags: productivity, self-hosted, developer-tools, time-tracker, wakatime, wakatime-api, coding-statistics, statistics, timetracking, analytics
+# logo: svgs/wakapi.svg
+# port: 3000
+
+services:
+  wakapi:
+    image: ghcr.io/muety/wakapi:latest
+    environment:
+      - SERVICE_FQDN_WAKAPI_3000
+      - TZ=${TIMEZONE:-Europe/Berlin}
+
+      - WAKAPI_SERVER_LISTEN_IPV6="-"
+      - WAKAPI_ENV=${WAKAPI_ENVIRONMENT:-production}
+      - WAKAPI_SECURITY_PASSWORD_SALT=${SERVICE_BASE64_64_PASSWORDSALT}
+      - WAKAPI_SECURITY_EXPOSE_METRICS=${WAKAPI_SECURITY_EXPOSE_METRICS:-false}
+
+      # Database configuration
+      - WAKAPI_DB_TYPE=postgres
+      - WAKAPI_DB_NAME=${WAKAPI_DB_NAME:-wakapi}
+      - WAKAPI_DB_USER=${SERVICE_USER_DATABASE}
+      - WAKAPI_DB_PASSWORD=${SERVICE_PASSWORD_DATABASE}
+      - WAKAPI_DB_HOST=${WAKAPI_DB_HOST:-postgres}
+      - WAKAPI_DB_PORT=${WAKAPI_DB_PORT:-5432}
+
+      # SMTP configuration
+      - WAKAPI_MAIL_ENABLED=${WAKAPI_MAIL_ENABLED:-false}
+      - WAKAPI_MAIL_PROVIDER=smtp #only smtp supported
+      - WAKAPI_MAIL_SENDER=${WAKAPI_MAIL_SENDER}
+      - WAKAPI_MAIL_SMTP_HOST=${WAKAPI_MAIL_SMTP_HOST}
+      - WAKAPI_MAIL_SMTP_PORT=${WAKAPI_MAIL_SMTP_PORT:-587}
+      - WAKAPI_MAIL_SMTP_USERNAME=${WAKAPI_MAIL_SMTP_USERNAME}
+      - WAKAPI_MAIL_SMTP_PASSWORD=${WAKAPI_MAIL_SMTP_PASSWORD} 
+    
+    volumes:
+      - wakapi-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - wakapi-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_DATABASE}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DATABASE}
+      - POSTGRES_DB=${WAKAPI_DB_NAME:-wakapi}
+      - POSTGRES_PORT=${WAKAPI_DB_PORT:-5432}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
