@@ -50,13 +50,6 @@ arch('Concerns')
     ->toHaveLineCountLessThan(100)
     ->toHavePrefix('Has');
 
-arch('Traits')
-    ->expect('App\Traits')
-    ->toBeTraits()
-    ->toExtendNothing()
-    ->toImplementNothing()
-    ->toHaveLineCountLessThan(100);
-
 arch('Commands')
     ->expect('App\Console\Commands')
     ->toBeClasses()
@@ -65,6 +58,13 @@ arch('Commands')
     ->not->toHavePublicMethodsBesides(['handle'])
     ->toHaveLineCountLessThan(150)
     ->toHaveSuffix('Command');
+
+arch('Contracts')
+    ->expect('App\Contracts')
+    ->toBeInterfaces()
+    ->toExtendNothing()
+    ->toImplementNothing()
+    ->toHaveLineCountLessThan(100);
 
 arch('Enums')
     ->expect('App\Enums')
@@ -98,12 +98,14 @@ arch('Exceptions')
 
 arch('Http')
     ->expect('App\Http')
+    ->toBeClasses()
     ->toOnlyBeUsedIn('App\Http');
 
 arch('Controllers')
     ->expect('App\Http\Controllers')
     ->toBeClasses()
     ->not->toHavePublicMethodsBesides(['__construct', '__invoke', 'index', 'show', 'create', 'store', 'edit', 'update', 'destroy', 'middleware'])
+    ->toOnlyBeUsedIn('App\Http\Controllers')
     ->toHaveLineCountLessThan(250)
     ->ignoring('App\Http\Controllers\Api')
     ->toHaveSuffix('Controller');
@@ -119,6 +121,7 @@ arch('Requests')
     ->toBeClasses()
     ->toExtend('Illuminate\Foundation\Http\FormRequest')
     ->toHaveMethod('rules')
+    ->toOnlyBeUsedIn('App\Http\Controllers')
     ->toHaveLineCountLessThan(150)
     ->toHaveSuffix('Request');
 
@@ -146,7 +149,8 @@ arch('Mail')
 arch('Models')
     ->expect('App\Models')
     ->toBeClasses()
-    ->ignoring('App\Models\Scopes')
+    ->toOnlyUse('Illuminate\Database')
+    ->not->toUseTrait('Illuminate\Database\Eloquent\SoftDeletes')
     ->toHaveLineCountLessThan(250)
     ->not->toHaveSuffix('Model');
 
@@ -168,16 +172,28 @@ arch('Providers')
     ->toBeClasses()
     ->toHaveSuffix('ServiceProvider')
     ->toExtend('Illuminate\Support\ServiceProvider')
-    ->toHaveLineCountLessThan(250)
-    ->not->toBeUsed();
+    ->not->toBeUsed()
+    ->toHaveLineCountLessThan(250);
 
 arch('Queries')
     ->expect('App\Queries')
     ->toBeClasses()
     ->toExtend('Illuminate\Database\Eloquent\Builder')
-    ->not->toHavePublicMethodsBesides(['build'])
+    ->not->toHavePublicMethodsBesides(['__construct', 'builder'])
     ->toHaveLineCountLessThan(150);
 
+arch('Services')
+    ->expect('App\Services')
+    ->toBeClasses()
+    ->toHaveLineCountLessThan(250);
+
+arch('Traits')
+    ->expect('App\Traits')
+    ->toBeTraits()
+    ->toExtendNothing()
+    ->toImplementNothing()
+    ->toHaveLineCountLessThan(100);
+
 arch('Functions')
-    ->expect(['dd', 'ddd', 'dump', 'env', 'exit', 'ray'])
+    ->expect(['dd', 'ddd', 'dump', 'env', 'exit'])
     ->not->toBeUsed();
