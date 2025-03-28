@@ -1,6 +1,6 @@
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    image: "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -61,7 +61,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.6'
+    image: '${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.6'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"

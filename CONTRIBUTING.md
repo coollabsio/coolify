@@ -136,6 +136,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    - Password: `password`
 
 2. Additional development tools:
+
    | Tool | URL | Note |
    |------|-----|------|
    | Laravel Horizon (scheduler) | `http://localhost:8000/horizon` | Only accessible when logged in as root user |

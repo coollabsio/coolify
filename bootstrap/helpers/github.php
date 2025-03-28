@@ -129,3 +129,27 @@ function getPermissionsPath(GithubApp $source)
 
     return "$github->html_url/settings/apps/$name/permissions";
 }
+
+function loadRepositoryByPage(GithubApp $source, string $token, int $page)
+{
+    $response = Http::withToken($token)->get("{$source->api_url}/installation/repositories?per_page=100&page={$page}");
+    $json = $response->json();
+    if ($response->status() !== 200) {
+        return [
+            'total_count' => 0,
+            'repositories' => [],
+        ];
+    }
+
+    if ($json['total_count'] === 0) {
+        return [
+            'total_count' => 0,
+            'repositories' => [],
+        ];
+    }
+
+    return [
+        'total_count' => $json['total_count'],
+        'repositories' => $json['repositories'],
+    ];
+}
