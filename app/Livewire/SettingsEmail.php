@@ -235,7 +235,7 @@ class SettingsEmail extends Component
                 throw new \Exception('Too many messages sent!');
             }
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 }
