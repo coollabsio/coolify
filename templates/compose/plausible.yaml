@@ -15,6 +15,8 @@ services:
       - BASE_URL=${SERVICE_FQDN_PLAUSIBLE}
       - SECRET_KEY_BASE=${SERVICE_BASE64_64_PLAUSIBLE}
       - TOTP_VAULT_KEY=${SERVICE_REALBASE64_32_TOTP}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     depends_on:
       plausible-db:
         condition: service_healthy
