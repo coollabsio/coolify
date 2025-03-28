@@ -257,7 +257,7 @@ class ServicesController extends Controller
             'environment_name' => 'string|nullable',
             'environment_uuid' => 'string|nullable',
             'server_uuid' => 'string|required',
-            'destination_uuid' => 'string',
+            'destination_uuid' => 'string|nullable',
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
