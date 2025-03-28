@@ -1254,9 +1254,8 @@ function isAnyDeploymentInprogress()
     foreach ($runningJobs as $runningJob) {
         $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
         if ($horizonJobStatus === 'unknown') {
-            return true;
+            $horizonJobIds[] = $runningJob->horizon_job_id;
         }
-        $horizonJobIds[] = $runningJob->horizon_job_id;
     }
     if (count($horizonJobIds) === 0) {
         echo "No deployments in progress.\n";
