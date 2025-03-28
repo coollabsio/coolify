@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(database)* Disable MongoDB SSL by default in migration
+
+### 🚜 Refactor
+
+- *(proxy)* Improve port availability checks with multiple methods
+- *(database)* Update MongoDB SSL configuration for improved security
+- *(database)* Enhance SSL configuration handling for various databases
+- *(notifications)* Update Telegram button URL for staging environment
+- *(models)* Remove unnecessary cloud check in isEnabled method
+- *(database)* Streamline event listeners in Redis General component
+- *(database)* Remove redundant database status display in MongoDB view
+- *(database)* Update import statements for Auth in database components
+- *(database)* Require PEM key file for SSL certificate regeneration
+- *(database)* Change MySQL daemon command to MariaDB daemon
+
+## [4.0.0-beta.399] - 2025-03-25
+
+### 🚀 Features
+
 - *(service)* Neon
 - *(migration)* Add `ssl_certificates` table and model
 - *(migration)* Add ssl setting to `standalone_postgresqls` table
@@ -159,12 +178,15 @@ All notable changes to this project will be documented in this file.
 - *(invite-link)* Adjust layout for better responsiveness in form
 - *(invite-link)* Enhance form layout for improved responsiveness
 - *(network)* Enhance docker network creation with ipv6 fallback
+- *(network)* Check for existing coolify network before creation
+- *(database)* Enhance encryption process for local file volumes
 
 ### 📚 Documentation
 
 - Update changelog
 - Update changelog
 - *(CONTRIBUTING)* Add note about Laravel Horizon accessibility
+- Update changelog
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -176,6 +198,7 @@ All notable changes to this project will be documented in this file.
 - *(ui)* Improve valid until handling
 - Improve code quality suggested by code rabbit
 - *(supabase)* Update Supabase service template and Postgres image version
+- *(versions)* Update version numbers for coolify and nightly
 
 ## [4.0.0-beta.398] - 2025-03-01
 
