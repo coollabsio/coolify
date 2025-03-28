@@ -51,7 +51,6 @@ class EmailChannel
             $fromEmail = $settings->smtp_from_address ?? 'noreply@localhost';
             $fromName = $settings->smtp_from_name ?? 'System';
             $from = new \Symfony\Component\Mime\Address($fromEmail, $fromName);
-
             $email = (new \Symfony\Component\Mime\Email)
                 ->from($from)
                 ->to(...$recipients)
