@@ -173,6 +173,8 @@ services:
       - BATCH_INTERVAL=${OPENPANEL_BATCH_INTERVAL:-10000}
       # URLs
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@op-kv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://op-ch:8123/openpanel}
       - SERVICE_FQDN_OPENPANEL
       # Set coolify FQDN domain
       - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPENPANELAPI
