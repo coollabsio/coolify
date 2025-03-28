@@ -138,8 +138,6 @@ services:
       # Common
       - NODE_ENV=production
       - SELF_HOSTED=true
-      - BATCH_SIZE=${OPENPANEL_BATCH_SIZE:-5000}
-      - BATCH_INTERVAL=${OPENPANEL_BATCH_INTERVAL:-10000}
       # URLs
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
       - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
@@ -169,8 +167,6 @@ services:
       # Common
       - NODE_ENV=production
       - SELF_HOSTED=true
-      - BATCH_SIZE=${OPENPANEL_BATCH_SIZE:-5000}
-      - BATCH_INTERVAL=${OPENPANEL_BATCH_INTERVAL:-10000}
       # URLs
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
       - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@op-kv:6379
@@ -194,8 +190,6 @@ services:
       # Common
       - NODE_ENV=production
       - SELF_HOSTED=true
-      - BATCH_SIZE=${OPENPANEL_BATCH_SIZE:-5000}
-      - BATCH_INTERVAL=${OPENPANEL_BATCH_INTERVAL:-10000}
       # URLs
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
       - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
