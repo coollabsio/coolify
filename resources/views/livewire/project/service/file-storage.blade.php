@@ -1,16 +1,9 @@
-<div class="py-4 ">
+<div class="">
     <div class="flex flex-col justify-center pb-4 text-sm select-text">
-        {{-- @if (data_get($resource, 'build_pack') === 'dockercompose')
-            <h4>{{ data_get($resource, 'name', 'unknown') }}</h4>
-        @endif --}}
-        @if ($fileStorage->is_directory)
-            <h4 class="dark:text-white pt-4 border-t dark:border-coolgray-200">Directory Mount</h4>
-        @else
-            <h4 class="dark:text-white pt-4 border-t dark:border-coolgray-200">File Mount</h4>
-        @endif
-
-        <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
-        <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
+        <div class="flex gap-2  md:flex-row flex-col pt-4">
+            <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
+            <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
+        </div>
     </div>
     <form wire:submit='submit' class="flex flex-col gap-2">
         <div class="flex gap-2">
