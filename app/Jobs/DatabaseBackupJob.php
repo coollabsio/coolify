@@ -484,6 +484,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $fullImageName = $this->getFullImageName();
 
+            $containerExists = instant_remote_process(["docker ps -a -q -f name=backup-of-{$this->backup->uuid}"], $this->server, false);
+            if (filled($containerExists)) {
+                instant_remote_process(["docker rm -f backup-of-{$this->backup->uuid}"], $this->server, false);
+            }
+
             if (isDev()) {
                 if ($this->database->name === 'coolify-db') {
                     $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
