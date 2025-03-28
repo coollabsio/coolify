@@ -2,69 +2,68 @@
 
 namespace App\Notifications\Channels;
 
-use App\Services\ConfigurationRepository;
-use Exception;
-use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Mail;
+use Resend;
 
 class EmailChannel
 {
-    private ConfigurationRepository $configRepository;
-
-    public function __construct(ConfigurationRepository $configRepository)
-    {
-        $this->configRepository = $configRepository;
-    }
+    public function __construct() {}
 
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
-        try {
-            $this->bootConfigs($notifiable);
+        $useInstanceEmailSettings = $notifiable->emailNotificationSettings->use_instance_email_settings;
+        $customEmails = data_get($notification, 'emails', null);
+        if ($useInstanceEmailSettings) {
+            $settings = instanceSettings();
+        } else {
+            $settings = $notifiable->emailNotificationSettings;
+        }
+        $isResendEnabled = $settings->resend_enabled;
+        $isSmtpEnabled = $settings->smtp_enabled;
+        if ($customEmails) {
+            $recipients = [$customEmails];
+        } else {
             $recipients = $notifiable->getRecipients();
-            if (count($recipients) === 0) {
-                throw new Exception('No email recipients found');
-            }
+        }
+        $mailMessage = $notification->toMail($notifiable);
 
-            $mailMessage = $notification->toMail($notifiable);
-            Mail::send(
-                [],
-                [],
-                fn (Message $message) => $message
-                    ->to($recipients)
-                    ->subject($mailMessage->subject)
-                    ->html((string) $mailMessage->render())
+        if ($isResendEnabled) {
+            $resend = Resend::client($settings->resend_api_key);
+            $from = "{$settings->smtp_from_name} <{$settings->smtp_from_address}>";
+            $resend->emails->send([
+                'from' => $from,
+                'to' => $recipients,
+                'subject' => $mailMessage->subject,
+                'html' => (string) $mailMessage->render(),
+            ]);
+        } elseif ($isSmtpEnabled) {
+            $encryption = match (strtolower($settings->smtp_encryption)) {
+                'starttls' => null,
+                'tls' => 'tls',
+                'none' => null,
+                default => null,
+            };
+
+            $transport = new \Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport(
+                $settings->smtp_host,
+                $settings->smtp_port,
+                $encryption
             );
-        } catch (Exception $e) {
-            $error = $e->getMessage();
-            if ($error === 'No email settings found.') {
-                throw $e;
-            }
-            $message = "EmailChannel error: {$e->getMessage()}. Failed to send email to:";
-            if (isset($recipients)) {
-                $message .= implode(', ', $recipients);
-            }
-            if (isset($mailMessage)) {
-                $message .= " with subject: {$mailMessage->subject}";
-            }
-            send_internal_notification($message);
-            throw $e;
+            $transport->setUsername($settings->smtp_username);
+            $transport->setPassword($settings->smtp_password);
+
+            $mailer = new \Symfony\Component\Mailer\Mailer($transport);
+
+            $fromEmail = $settings->smtp_from_address ?? 'noreply@localhost';
+            $fromName = $settings->smtp_from_name ?? 'System';
+            $from = new \Symfony\Component\Mime\Address($fromEmail, $fromName);
+            $email = (new \Symfony\Component\Mime\Email)
+                ->from($from)
+                ->to(...$recipients)
+                ->subject($mailMessage->subject)
+                ->html((string) $mailMessage->render());
+
+            $mailer->send($email);
         }
-    }
-
-    private function bootConfigs($notifiable): void
-    {
-        $emailSettings = $notifiable->emailNotificationSettings;
-
-        if ($emailSettings->use_instance_email_settings) {
-            $type = set_transanctional_email_settings();
-            if (blank($type)) {
-                throw new Exception('No email settings found.');
-            }
-
-            return;
-        }
-
-        $this->configRepository->updateMailConfig($emailSettings);
     }
 }

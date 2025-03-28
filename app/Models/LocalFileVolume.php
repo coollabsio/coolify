@@ -176,4 +176,19 @@ class LocalFileVolume extends BaseModel
 
         return instant_remote_process($commands, $server);
     }
+
+    // Accessor for convenient access
+    protected function plainMountPath(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->mount_path,
+            set: fn ($value) => $this->mount_path = $value
+        );
+    }
+
+    // Scope for searching
+    public function scopeWherePlainMountPath($query, $path)
+    {
+        return $query->get()->where('plain_mount_path', $path);
+    }
 }

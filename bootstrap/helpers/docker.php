@@ -8,6 +8,7 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
@@ -834,7 +835,15 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         if (! $server) {
             throw new \Exception('Server not found');
         }
-        $base64_compose = base64_encode($compose);
+        $yaml_compose = Yaml::parse($compose);
+        foreach ($yaml_compose['services'] as $service_name => $service) {
+            foreach ($service['volumes'] as $volume_name => $volume) {
+                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
+                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
+                }
+            }
+        }
+        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
         instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
             "chmod 600 /tmp/{$uuid}.yml",
