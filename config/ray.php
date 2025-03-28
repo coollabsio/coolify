@@ -6,7 +6,7 @@ return [
     *
     * By default, `ray()` will only transmit data in non-production environments.
     */
-    'enable' => env('RAY_ENABLED', true),
+    'enable' => env('RAY_ENABLED', false),
 
     /*
     * When enabled, all cache events  will automatically be sent to Ray.
