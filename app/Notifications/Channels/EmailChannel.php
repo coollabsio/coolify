@@ -12,6 +12,7 @@ class EmailChannel
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $useInstanceEmailSettings = $notifiable->emailNotificationSettings->use_instance_email_settings;
+        $customEmails = data_get($notification, 'emails', null);
         if ($useInstanceEmailSettings) {
             $settings = instanceSettings();
         } else {
@@ -19,7 +20,11 @@ class EmailChannel
         }
         $isResendEnabled = $settings->resend_enabled;
         $isSmtpEnabled = $settings->smtp_enabled;
-        $recipients = $notifiable->getRecipients();
+        if ($customEmails) {
+            $recipients = [$customEmails];
+        } else {
+            $recipients = $notifiable->getRecipients();
+        }
         $mailMessage = $notification->toMail($notifiable);
 
         if ($isResendEnabled) {
