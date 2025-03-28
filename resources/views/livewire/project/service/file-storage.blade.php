@@ -39,6 +39,7 @@
                         confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                         shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to directory" />
                 @endif
+                <x-forms.button type="button" wire:click="loadStorageOnServer">Load from server</x-forms.button>
                 <x-modal-confirmation :ignoreWire="false" title="Confirm File Deletion?" buttonTitle="Delete"
                     isErrorButton submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']"
                     confirmationText="{{ $fs_path }}"
