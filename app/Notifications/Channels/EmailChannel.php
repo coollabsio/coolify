@@ -29,8 +29,9 @@ class EmailChannel
 
         if ($isResendEnabled) {
             $resend = Resend::client($settings->resend_api_key);
+            $from = "{$settings->smtp_from_name} <{$settings->smtp_from_address}>";
             $resend->emails->send([
-                'from' => $settings->smtp_from_address,
+                'from' => $from,
                 'to' => $recipients,
                 'subject' => $mailMessage->subject,
                 'html' => (string) $mailMessage->render(),
