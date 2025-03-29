@@ -1,7 +1,8 @@
 <?php
 
-return [
+declare(strict_types=1);
 
+return [
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -34,12 +35,4 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
-    'zitadel' => [
-        'client_id' => env('ZITADEL_CLIENT_ID'),
-        'client_secret' => env('ZITADEL_CLIENT_SECRET'),
-        'redirect' => env('ZITADEL_REDIRECT_URI'),
-        'base_url' => env('ZITADEL_BASE_URL'),
-    ],
-
 ];
