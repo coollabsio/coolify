@@ -5,11 +5,11 @@
 # port: 3000
 
 services:
-  op-db:
+  opdb:
     image: postgres:16-alpine
     restart: always
     volumes:
-      - op-db-data:/var/lib/postgresql/data
+      - opdb-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=${OPENPANEL_POSTGRES_DB:-openpanel-db}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -20,11 +20,11 @@ services:
       timeout: 5s
       retries: 5
 
-  op-kv:
+  opkv:
     image: redis:7.4-alpine
     restart: always
     volumes:
-      - op-kv-data:/data
+      - opkv-data:/data
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     healthcheck:
       test: [CMD, redis-cli, -a, '${SERVICE_PASSWORD_REDIS}', ping]
@@ -32,16 +32,16 @@ services:
       timeout: 5s
       retries: 5
 
-  op-geo:
+  opgeo:
     image: observabilitystack/geoip-api:latest
     restart: always
 
-  op-ch:
+  opch:
     image: clickhouse/clickhouse-server:24.3.2-alpine
     restart: always
     volumes:
-      - op-ch-data:/var/lib/clickhouse
-      - op-ch-logs:/var/log/clickhouse-server
+      - opch-data:/var/lib/clickhouse
+      - opch-logs:/var/log/clickhouse-server
       - type: bind
         source: ./clickhouse-config.xml
         target: /etc/clickhouse-server/config.d/op-config.xml
@@ -64,7 +64,7 @@ services:
               <part_log remove="remove"/>
               <listen_host>0.0.0.0</listen_host>
               <interserver_listen_host>0.0.0.0</interserver_listen_host>
-              <interserver_http_host>op-ch</interserver_http_host>
+              <interserver_http_host>opch</interserver_http_host>
               <!-- Disable cgroup memory observer -->
               <cgroups_memory_usage_observer_wait_time>0</cgroups_memory_usage_observer_wait_time>
               <!-- Not used anymore, but kept for backwards compatibility -->
@@ -107,19 +107,19 @@ services:
         soft: 262144
         hard: 262144
 
-  op-api:
+  opapi:
     image: lindesvard/openpanel-api:1.0.0
     restart: always
     command: >
       sh -c "
         echo 'Waiting for PostgreSQL to be ready...'
-        while ! nc -z op-db 5432; do
+        while ! nc -z opdb 5432; do
           sleep 1
         done
         echo 'PostgreSQL is ready'
 
         echo 'Waiting for ClickHouse to be ready...'
-        while ! nc -z op-ch 8123; do
+        while ! nc -z opch 8123; do
           sleep 1
         done
         echo 'ClickHouse is ready'
@@ -130,27 +130,24 @@ services:
         pnpm start
       "
     depends_on:
-      - op-db
-      - op-ch
-      - op-kv
-      - op-geo
+      - opdb
+      - opch
+      - opkv
+      - opgeo
     environment:
       # Common
       - NODE_ENV=production
       - SELF_HOSTED=true
       # URLs
-      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
-      - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
-      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@op-kv:6379
-      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://op-ch:8123/openpanel}
-      - GEO_IP_HOST=${OPENPANEL_GEO_IP_HOST:-http://op-geo:8080}
-      - SERVICE_FQDN_OPENPANELAPI=/api
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@opkv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://opch:8123/openpanel}
+      - GEO_IP_HOST=${OPENPANEL_GEO_IP_HOST:-http://opgeo:8080}
+      - SERVICE_FQDN_OPAPI=/api
       # Set coolify FQDN domain
-      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPENPANELAPI
-      - NEXT_PUBLIC_DASHBOARD_URL=$SERVICE_FQDN_OPENPANEL
-      # Set custom domain
-      # - NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL:-https://your-domain.com}
-      # - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://your-domain.com/api}
+      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPAPI
+      - NEXT_PUBLIC_DASHBOARD_URL=$SERVICE_FQDN_OPDASHBOARD
       # Others
       - COOKIE_SECRET=${SERVICE_BASE64_COOKIESECRET}
       - ALLOW_REGISTRATION=${OPENPANEL_ALLOW_REGISTRATION:-false}
@@ -158,32 +155,29 @@ services:
       - EMAIL_SENDER=${OPENPANEL_EMAIL_SENDER}
       - RESEND_API_KEY=${RESEND_API_KEY}
 
-  op-dashboard:
+  opdashboard:
     image: lindesvard/openpanel-dashboard:1.0.0
     restart: always
     depends_on:
-      - op-api
+      - opapi
     environment:
       # Common
       - NODE_ENV=production
       - SELF_HOSTED=true
       # URLs
-      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
-      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@op-kv:6379
-      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://op-ch:8123/openpanel}
-      - SERVICE_FQDN_OPENPANEL
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@opkv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://opch:8123/openpanel}
+      - SERVICE_FQDN_OPDASHBOARD
       # Set coolify FQDN domain
-      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPENPANELAPI
-      - NEXT_PUBLIC_DASHBOARD_URL=$SERVICE_FQDN_OPENPANEL
-      # Set custom domain
-      # - NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL:-https://your-domain.com}
-      # - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://your-domain.com/api}
+      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPAPI
+      - NEXT_PUBLIC_DASHBOARD_URL=$SERVICE_FQDN_OPDASHBOARD
 
-  op-worker:
+  opworker:
     image: lindesvard/openpanel-worker:1.0.0
     restart: always
     depends_on:
-      - op-api
+      - opapi
     environment:
       # FQDN
       - SERVICE_FQDN_BULLBOARD
@@ -191,24 +185,22 @@ services:
       - NODE_ENV=production
       - SELF_HOSTED=true
       # URLs
-      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
-      - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@op-db:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
-      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@op-kv:6379
-      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://op-ch:8123/openpanel}
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@opkv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://opch:8123/openpanel}
       # Set coolify FQDN domain
-      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPENPANELAPI
-      # Set custom domain
-      # - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://your-domain.com/api}
+      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPAPI
     deploy:
       mode: replicated
       replicas: ${OPENPANEL_WORKER_REPLICAS:-1}
 
 volumes:
-  op-db-data:
+  opdb-data:
     driver: local
-  op-kv-data:
+  opkv-data:
     driver: local
-  op-ch-data:
+  opch-data:
     driver: local
-  op-ch-logs:
+  opch-logs:
     driver: local
