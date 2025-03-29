@@ -49,8 +49,8 @@ final class AppServiceProvider extends ServiceProvider
     {
         if (App::isProduction()) {
             Password::defaults(fn () => Password::min(12)
-                ->mixedCase()
                 ->letters()
+                ->mixedCase()
                 ->numbers()
                 ->symbols()
                 ->uncompromised());
