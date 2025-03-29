@@ -180,7 +180,7 @@ services:
       - opapi
     environment:
       # FQDN
-      - SERVICE_FQDN_BULLBOARD
+      - SERVICE_FQDN_OPBULLBOARD
       # Common
       - NODE_ENV=production
       - SELF_HOSTED=true
