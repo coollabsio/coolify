@@ -3175,6 +3175,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
     }
 
+    $serviceAppsLogDrainEnabledMap = collect([]);
+    if ($resource instanceof Service) {
+        $serviceAppsLogDrainEnabledMap = $resource->applications()->get()->keyBy('name')->map(function ($app) {
+            return $app->isLogDrainEnabled();
+        });
+    }
+
     // Parse the rest of the services
     foreach ($services as $serviceName => $service) {
         $image = data_get_str($service, 'image');
@@ -3183,6 +3190,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         if ($server->isLogDrainEnabled()) {
             if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
+                $logging = generate_fluentd_configuration();
+            }
+            if ($resource instanceof Service && $serviceAppsLogDrainEnabledMap->get($serviceName)) {
                 $logging = generate_fluentd_configuration();
             }
         }
