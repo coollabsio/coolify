@@ -1,43 +1,45 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     /*
-    * This setting controls whether data should be sent to Ray.
-    *
-    * By default, `ray()` will only transmit data in non-production environments.
-    */
+     * This setting controls whether data should be sent to Ray.
+     *
+     * By default, `ray()` will only transmit data in non-production environments.
+     */
     'enable' => env('RAY_ENABLED', false),
 
     /*
-    * When enabled, all cache events  will automatically be sent to Ray.
-    */
+     * When enabled, all cache events  will automatically be sent to Ray.
+     */
     'send_cache_to_ray' => env('SEND_CACHE_TO_RAY', false),
 
     /*
-    * When enabled, all things passed to `dump` or `dd`
-    * will be sent to Ray as well.
-    */
+     * When enabled, all things passed to `dump` or `dd`
+     * will be sent to Ray as well.
+     */
     'send_dumps_to_ray' => env('SEND_DUMPS_TO_RAY', true),
 
     /*
-    * When enabled all job events will automatically be sent to Ray.
-    */
+     * When enabled all job events will automatically be sent to Ray.
+     */
     'send_jobs_to_ray' => env('SEND_JOBS_TO_RAY', false),
 
     /*
-    * When enabled all mails will automatically be sent to Ray.
-    */
+     * When enabled all mails will automatically be sent to Ray.
+     */
     'send_mails_to_ray' => env('SEND_MAILS_TO_RAY', false),
 
     /*
-    * When enabled, all things logged to the application log
-    * will be sent to Ray as well.
-    */
+     * When enabled, all things logged to the application log
+     * will be sent to Ray as well.
+     */
     'send_log_calls_to_ray' => env('SEND_LOG_CALLS_TO_RAY', true),
 
     /*
-    * When enabled, all queries will automatically be sent to Ray.
-    */
+     * When enabled, all queries will automatically be sent to Ray.
+     */
     'send_queries_to_ray' => env('SEND_QUERIES_TO_RAY', false),
 
     /**
@@ -76,8 +78,8 @@ return [
     'send_select_queries_to_ray' => env('SEND_SELECT_QUERIES_TO_RAY', false),
 
     /*
-    * When enabled, all requests made to this app will automatically be sent to Ray.
-    */
+     * When enabled, all requests made to this app will automatically be sent to Ray.
+     */
     'send_requests_to_ray' => env('SEND_REQUESTS_TO_RAY', false),
 
     /**
@@ -86,8 +88,8 @@ return [
     'send_http_client_requests_to_ray' => env('SEND_HTTP_CLIENT_REQUESTS_TO_RAY', false),
 
     /*
-    * When enabled, all views that are rendered automatically be sent to Ray.
-    */
+     * When enabled, all views that are rendered automatically be sent to Ray.
+     */
     'send_views_to_ray' => env('SEND_VIEWS_TO_RAY', false),
 
     /*
@@ -101,17 +103,17 @@ return [
     'send_deprecated_notices_to_ray' => env('SEND_DEPRECATED_NOTICES_TO_RAY', false),
 
     /*
-    * The host used to communicate with the Ray app.
-    * When using Docker on Mac or Windows, you can replace localhost with 'host.docker.internal'
-    * When using Docker on Linux, you can replace localhost with '172.17.0.1'
-    * When using Homestead with the VirtualBox provider, you can replace localhost with '10.0.2.2'
-    * When using Homestead with the Parallels provider, you can replace localhost with '10.211.55.2'
-    */
+     * The host used to communicate with the Ray app.
+     * When using Docker on Mac or Windows, you can replace localhost with 'host.docker.internal'
+     * When using Docker on Linux, you can replace localhost with '172.17.0.1'
+     * When using Homestead with the VirtualBox provider, you can replace localhost with '10.0.2.2'
+     * When using Homestead with the Parallels provider, you can replace localhost with '10.211.55.2'
+     */
     'host' => env('RAY_HOST', 'localhost'),
 
     /*
-    * The port number used to communicate with the Ray app.
-    */
+     * The port number used to communicate with the Ray app.
+     */
     'port' => env('RAY_PORT', 23517),
 
     /*
