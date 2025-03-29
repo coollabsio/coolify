@@ -1,0 +1,206 @@
+# documentation: https://openpanel.dev/docs
+# slogan: Open source alternative to Mixpanel and Plausible for product analytics
+# tags: analytics, insights, privacy, mixpanel, plausible, google, alternative
+# logo: svgs/openpanel.svg
+# port: 3000
+
+services:
+  opdb:
+    image: postgres:16-alpine
+    restart: always
+    volumes:
+      - opdb-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${OPENPANEL_POSTGRES_DB:-openpanel-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  opkv:
+    image: redis:7.4-alpine
+    restart: always
+    volumes:
+      - opkv-data:/data
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    healthcheck:
+      test: [CMD, redis-cli, -a, '${SERVICE_PASSWORD_REDIS}', ping]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  opgeo:
+    image: observabilitystack/geoip-api:latest
+    restart: always
+
+  opch:
+    image: clickhouse/clickhouse-server:24.3.2-alpine
+    restart: always
+    volumes:
+      - opch-data:/var/lib/clickhouse
+      - opch-logs:/var/log/clickhouse-server
+      - type: bind
+        source: ./clickhouse-config.xml
+        target: /etc/clickhouse-server/config.d/op-config.xml
+        read_only: true
+        content: |
+          <clickhouse>
+              <logger>
+                  <level>warning</level>
+                  <console>true</console>
+              </logger>
+              <keep_alive_timeout>10</keep_alive_timeout>
+              <!-- Stop all the unnecessary logging -->
+              <query_thread_log remove="remove"/>
+              <query_log remove="remove"/>
+              <text_log remove="remove"/>
+              <trace_log remove="remove"/>
+              <metric_log remove="remove"/>
+              <asynchronous_metric_log remove="remove"/>
+              <session_log remove="remove"/>
+              <part_log remove="remove"/>
+              <listen_host>0.0.0.0</listen_host>
+              <interserver_listen_host>0.0.0.0</interserver_listen_host>
+              <interserver_http_host>opch</interserver_http_host>
+              <!-- Disable cgroup memory observer -->
+              <cgroups_memory_usage_observer_wait_time>0</cgroups_memory_usage_observer_wait_time>
+              <!-- Not used anymore, but kept for backwards compatibility -->
+              <macros>
+                  <shard>1</shard>
+                  <replica>replica1</replica>
+                  <cluster>openpanel_cluster</cluster>
+              </macros>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse-user-config.xml
+        target: /etc/clickhouse-server/users.d/op-user-config.xml
+        read_only: true
+        content: |
+          <clickhouse>
+              <profiles>
+                  <default>
+                      <log_queries>0</log_queries>
+                      <log_query_threads>0</log_query_threads>
+                  </default>
+              </profiles>
+          </clickhouse>
+      - type: bind
+        source: ./init-db.sh
+        target: /docker-entrypoint-initdb.d/init-db.sh
+        content: |
+          #!/bin/sh
+          set -e
+
+          clickhouse client -n <<-EOSQL
+            CREATE DATABASE IF NOT EXISTS openpanel;
+          EOSQL
+    healthcheck:
+      test: [CMD-SHELL, 'clickhouse-client --query "SELECT 1"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  opapi:
+    image: lindesvard/openpanel-api:1.0.0
+    restart: always
+    command: >
+      sh -c "
+        echo 'Waiting for PostgreSQL to be ready...'
+        while ! nc -z opdb 5432; do
+          sleep 1
+        done
+        echo 'PostgreSQL is ready'
+
+        echo 'Waiting for ClickHouse to be ready...'
+        while ! nc -z opch 8123; do
+          sleep 1
+        done
+        echo 'ClickHouse is ready'
+
+        echo 'Running migrations...'
+        CI=true pnpm -r run migrate:deploy
+
+        pnpm start
+      "
+    depends_on:
+      - opdb
+      - opch
+      - opkv
+      - opgeo
+    environment:
+      # Common
+      - NODE_ENV=production
+      - SELF_HOSTED=true
+      # URLs
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@opkv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://opch:8123/openpanel}
+      - GEO_IP_HOST=${OPENPANEL_GEO_IP_HOST:-http://opgeo:8080}
+      - SERVICE_FQDN_OPAPI=/api
+      # Set coolify FQDN domain
+      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPAPI
+      - NEXT_PUBLIC_DASHBOARD_URL=$SERVICE_FQDN_OPDASHBOARD
+      # Others
+      - COOKIE_SECRET=${SERVICE_BASE64_COOKIESECRET}
+      - ALLOW_REGISTRATION=${OPENPANEL_ALLOW_REGISTRATION:-false}
+      - ALLOW_INVITATION=${OPENPANEL_ALLOW_INVITATION:-true}
+      - EMAIL_SENDER=${OPENPANEL_EMAIL_SENDER}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+
+  opdashboard:
+    image: lindesvard/openpanel-dashboard:1.0.0
+    restart: always
+    depends_on:
+      - opapi
+    environment:
+      # Common
+      - NODE_ENV=production
+      - SELF_HOSTED=true
+      # URLs
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@opkv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://opch:8123/openpanel}
+      - SERVICE_FQDN_OPDASHBOARD
+      # Set coolify FQDN domain
+      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPAPI
+      - NEXT_PUBLIC_DASHBOARD_URL=$SERVICE_FQDN_OPDASHBOARD
+
+  opworker:
+    image: lindesvard/openpanel-worker:1.0.0
+    restart: always
+    depends_on:
+      - opapi
+    environment:
+      # FQDN
+      - SERVICE_FQDN_OPBULLBOARD
+      # Common
+      - NODE_ENV=production
+      - SELF_HOSTED=true
+      # URLs
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - DATABASE_URL_DIRECT=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@opdb:5432/${OPENPANEL_POSTGRES_DB:-openpanel-db}?schema=public
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@opkv:6379
+      - CLICKHOUSE_URL=${OPENPANEL_CLICKHOUSE_URL:-http://opch:8123/openpanel}
+      # Set coolify FQDN domain
+      - NEXT_PUBLIC_API_URL=$SERVICE_FQDN_OPAPI
+    deploy:
+      mode: replicated
+      replicas: ${OPENPANEL_WORKER_REPLICAS:-1}
+
+volumes:
+  opdb-data:
+    driver: local
+  opkv-data:
+    driver: local
+  opch-data:
+    driver: local
+  opch-logs:
+    driver: local
