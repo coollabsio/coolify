@@ -86,7 +86,6 @@ return new class extends Migration
                         'fs_path' => $volume['fs_path'],
                         'mount_path' => $volume['mount_path'],
                     ]);
-                    echo "Updated volume {$volume['id']}\n";
                 } catch (\Exception $e) {
                     echo "Error updating volume {$volume['id']}: {$e->getMessage()}\n";
                     Log::error("Error updating volume {$volume['id']}: ".$e->getMessage());
