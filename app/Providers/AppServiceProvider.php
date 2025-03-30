@@ -37,7 +37,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureHttps(): void
     {
-        if (App::isProduction() && config('app.force_https')) {
+        if (App::isProduction() && (bool) config('app.force_https')) {
             URL::forceScheme('https');
         }
     }
