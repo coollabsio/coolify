@@ -1,14 +1,35 @@
 includes:
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
     - vendor/larastan/larastan/extension.neon
     - vendor/nesbot/carbon/extension.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
 
 parameters:
+    level: max
+    checkModelProperties: true
+    checkOctaneCompatibility: true
+    checkMissingCallableSignature: true
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    rememberPossiblyImpureFunctionValues: false
+    checkBenevolentUnionTypes: true
+    reportPossiblyNonexistentGeneralArrayOffset: true
+    reportPossiblyNonexistentConstantArrayOffset: true
+    reportAlwaysTrueInLastCondition: true
+    reportAnyTypeWideningInVarTag: true
+    tipsOfTheDay: false
+    tmpDir: ./storage/phpstan
     paths:
         - app
         - bootstrap
         - config
         - database
+        - public
         - resources
         - routes
-
-    level: max
+    excludePaths:
+        - bootstrap/cache
+    strictRules:
+        strictArrayFilter: false
+    ignoreErrors:
+        - '#Dynamic call to static method Illuminate\\Http\\Request::validate\(\)#'
