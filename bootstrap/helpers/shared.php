@@ -1250,13 +1250,23 @@ function get_public_ips()
 function isAnyDeploymentInprogress()
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
+    $basicDetails = $runningJobs->map(function ($job) {
+        return [
+            'id' => $job->id,
+            'created_at' => $job->created_at,
+            'application_id' => $job->application_id,
+            'server_id' => $job->server_id,
+            'horizon_job_id' => $job->horizon_job_id,
+            'status' => $job->status,
+        ];
+    });
+    echo 'Running jobs: '.json_encode($basicDetails)."\n";
     $horizonJobIds = [];
     foreach ($runningJobs as $runningJob) {
         $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
-        if ($horizonJobStatus === 'unknown') {
-            return true;
+        if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
+            $horizonJobIds[] = $runningJob->horizon_job_id;
         }
-        $horizonJobIds[] = $runningJob->horizon_job_id;
     }
     if (count($horizonJobIds) === 0) {
         echo "No deployments in progress.\n";
@@ -1665,6 +1675,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                                 return $volume;
                             }
+
                             LocalFileVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
