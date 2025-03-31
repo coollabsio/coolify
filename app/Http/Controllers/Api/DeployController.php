@@ -328,7 +328,7 @@ class DeployController extends Controller
         summary: 'List application deployments',
         description: 'List application deployments by using the app uuid',
         path: '/deployments/applications/{uuid}',
-        operationId: 'list-deployments',
+        operationId: 'list-deployments-by-app-uuid',
         security: [
             ['bearerAuth' => []],
         ],
