@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(file-storage)* Double save on compose volumes
+
+### 🚜 Refactor
+
+- *(nightly)* Update version numbers and enhance upgrade script
+- *(versions)* Update version numbers for coolify and nightly
+- *(email)* Validate team membership for email recipients
+- *(shared)* Simplify deployment status check logic
+- *(shared)* Add logging for running deployment jobs
+- *(shared)* Enhance job status check to include 'reserved'
+- *(email)* Improve error handling by passing context to handleError
+- *(email)* Streamline email sending logic and improve configuration handling
+- *(email)* Remove unnecessary whitespace in email sending logic
+- *(email)* Allow custom email recipients in email sending logic
+- *(email)* Enhance sender information formatting in email logic
+- *(proxy)* Remove redundant stop call in restart method
+- *(file-storage)* Add loadStorageOnServer method for improved error handling
+- *(docker)* Parse and sanitize YAML compose file before encoding
+- *(file-storage)* Improve layout and structure of input fields
+- *(email)* Update label for test email recipient input
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.400] - 2025-03-27
+
+### 🚀 Features
+
+- *(database)* Disable MongoDB SSL by default in migration
+
+### 🚜 Refactor
+
+- *(proxy)* Improve port availability checks with multiple methods
+- *(database)* Update MongoDB SSL configuration for improved security
+- *(database)* Enhance SSL configuration handling for various databases
+- *(notifications)* Update Telegram button URL for staging environment
+- *(models)* Remove unnecessary cloud check in isEnabled method
+- *(database)* Streamline event listeners in Redis General component
+- *(database)* Remove redundant database status display in MongoDB view
+- *(database)* Update import statements for Auth in database components
+- *(database)* Require PEM key file for SSL certificate regeneration
+- *(database)* Change MySQL daemon command to MariaDB daemon
+
+## [4.0.0-beta.399] - 2025-03-25
+
+
 ### 🚀 Features
 
 - *(database)* Disable MongoDB SSL by default in migration

@@ -1530,7 +1530,6 @@ class Application extends BaseModel
                 $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
                 $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
                 $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
-                $start_interval = str($healthcheckCommand)->match('/--start-interval=([0-9]+[a-zµ]*)/');
                 $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
 
                 if ($interval->isNotEmpty()) {
@@ -1542,13 +1541,10 @@ class Application extends BaseModel
                 if ($start_period->isNotEmpty()) {
                     $this->health_check_start_period = parseDockerfileInterval($start_period);
                 }
-                if ($start_interval->isNotEmpty()) {
-                    $this->health_check_start_interval = parseDockerfileInterval($start_interval);
-                }
                 if ($retries->isNotEmpty()) {
                     $this->health_check_retries = $retries->toInteger();
                 }
-                if ($interval || $timeout || $start_period || $start_interval || $retries) {
+                if ($interval || $timeout || $start_period || $retries) {
                     $this->custom_healthcheck_found = true;
                     $this->save();
                 }
