@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\Application;
 use App\Models\Server;
 use App\Models\Tag;
 use Illuminate\Http\Request;
@@ -313,5 +314,75 @@ class DeployController extends Controller
         }
 
         return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
+    }
+
+    #[OA\Get(
+        summary: 'List application deployments',
+        description: 'List application deployments by using the app uuid',
+        path: '/deployments/applications/{uuid}',
+        operationId: 'list-deployments',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Deployments'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List application deployments by using the app uuid.',
+                content: [
+
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Application'),
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function get_application_deployments(Request $request)
+    {
+        $request->validate([
+            'skip' => ['nullable', 'integer', 'min:0'],
+            'take' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $app_uuid = $request->route('uuid', null);
+        $skip = $request->get('skip', 0);
+        $take = $request->get('take', 10);
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $servers = Server::whereTeamId($teamId)->get();
+
+        if (is_null($app_uuid)) {
+            return response()->json(['message' => 'Application uuid is required'], 400);
+        }
+
+        $application = Application::where('uuid', $app_uuid)->first();
+
+        if (is_null($application)) {
+            return response()->json(['message' => 'Application not found'], 404);
+        }
+
+        $team = $application->team();
+        if ($team->id != $teamId) {
+            return response()->json(['message' => 'Application not found'], 404);
+        }
+
+        $deployments = $application->deployments($skip, $take);
+
+        return response()->json($deployments);
     }
 }
