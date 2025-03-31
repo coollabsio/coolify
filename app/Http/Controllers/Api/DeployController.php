@@ -185,6 +185,11 @@ class DeployController extends Controller
     public function deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
         $uuids = $request->query->get('uuid');
         $tags = $request->query->get('tag');
         $force = $request->query->get('force') ?? false;
@@ -192,9 +197,6 @@ class DeployController extends Controller
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
-        }
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
         }
         if ($tags && $pr) {
             return response()->json(['message' => 'You can only use tag or pr, not both.'], 400);
