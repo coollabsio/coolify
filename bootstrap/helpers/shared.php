@@ -4067,7 +4067,7 @@ function defaultNginxConfiguration(): string
     location / {
         root /usr/share/nginx/html;
         index index.html index.htm;
-        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ =404;
+        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ /index.html /index.htm =404;
     }
 
     # Handle 404 errors
