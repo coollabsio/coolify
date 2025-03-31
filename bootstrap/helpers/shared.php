@@ -1363,15 +1363,21 @@ function parseServiceVolumes($serviceVolumes, $resource, $topLevelVolumes, $pull
                 $source = $source."-pr-$pull_request_id";
             }
             if (! $resource?->settings?->is_preserve_repository_enabled || $foundConfig?->is_based_on_git) {
-                $volume = LocalFileVolume::wherePlainMountPath($target)->first() ?? new LocalFileVolume;
-                $volume->fill([
-                    'fs_path' => $source,
-                    'mount_path' => $target,
-                    'content' => $content,
-                    'is_directory' => $isDirectory,
-                    'resource_id' => $resource->id,
-                    'resource_type' => get_class($resource),
-                ])->save();
+                LocalFileVolume::updateOrCreate(
+                    [
+                        'mount_path' => $target,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ],
+                    [
+                        'fs_path' => $source,
+                        'mount_path' => $target,
+                        'content' => $content,
+                        'is_directory' => $isDirectory,
+                        'resource_id' => $resource->id,
+                        'resource_type' => get_class($resource),
+                    ]
+                );
             }
         } elseif ($type->value() === 'volume') {
             if ($topLevelVolumes->has($source->value())) {
@@ -1670,27 +1676,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 return $volume;
                             }
 
-                            $existingVolume = LocalFileVolume::wherePlainMountPath($target)->first();
-
-                            if ($existingVolume) {
-                                $existingVolume->update([
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $target,
+                                    'resource_id' => $savedService->id,
+                                    'resource_type' => get_class($savedService),
+                                ],
+                                [
                                     'fs_path' => $source,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService),
-                                ]);
-                            } else {
-                                LocalFileVolume::create([
-                                    'fs_path' => $source,
-                                    'mount_path' => $target,
-                                    'content' => $content,
-                                    'is_directory' => $isDirectory,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService),
-                                ]);
-                            }
+                                ]
+                            );
                         } elseif ($type->value() === 'volume') {
                             if ($topLevelVolumes->has($source->value())) {
                                 $v = $topLevelVolumes->get($source->value());
@@ -3328,15 +3328,21 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         if ($isApplication && $isPullRequest) {
                             $source = $source."-pr-$pullRequestId";
                         }
-                        $volume = LocalFileVolume::wherePlainMountPath($target)->first() ?? new LocalFileVolume;
-                        $volume->fill([
-                            'fs_path' => $source,
-                            'mount_path' => $target,
-                            'content' => $content,
-                            'is_directory' => $isDirectory,
-                            'resource_id' => $originalResource->id,
-                            'resource_type' => get_class($originalResource),
-                        ])->save();
+                        LocalFileVolume::updateOrCreate(
+                            [
+                                'mount_path' => $target,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ],
+                            [
+                                'fs_path' => $source,
+                                'mount_path' => $target,
+                                'content' => $content,
+                                'is_directory' => $isDirectory,
+                                'resource_id' => $originalResource->id,
+                                'resource_type' => get_class($originalResource),
+                            ]
+                        );
                         if (isDev()) {
                             if ((int) $resource->compose_parsing_version >= 4) {
                                 if ($isApplication) {
