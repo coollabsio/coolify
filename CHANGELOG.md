@@ -52,6 +52,7 @@ All notable changes to this project will be documented in this file.
 
 ## [4.0.0-beta.399] - 2025-03-25
 
+
 ### 🚀 Features
 
 - *(database)* Disable MongoDB SSL by default in migration
