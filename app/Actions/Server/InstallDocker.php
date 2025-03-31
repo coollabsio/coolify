@@ -2,7 +2,9 @@
 
 namespace App\Actions\Server;
 
+use App\Helpers\SslHelper;
 use App\Models\Server;
+use App\Models\SslCertificate;
 use App\Models\StandaloneDocker;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -17,6 +19,27 @@ class InstallDocker
         if (! $supported_os_type) {
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/installation#manually">documentation</a>.');
         }
+
+        if (! SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->exists()) {
+            $serverCert = SslHelper::generateSslCertificate(
+                commonName: 'Coolify CA Certificate',
+                serverId: $server->id,
+                isCaCertificate: true,
+                validityDays: 10 * 365
+            );
+            $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+
+            $commands = collect([
+                "mkdir -p $caCertPath",
+                "chown -R 9999:root $caCertPath",
+                "chmod -R 700 $caCertPath",
+                "rm -rf $caCertPath/coolify-ca.crt",
+                "echo '{$serverCert->ssl_certificate}' > $caCertPath/coolify-ca.crt",
+                "chmod 644 $caCertPath/coolify-ca.crt",
+            ]);
+            remote_process($commands, $server);
+        }
+
         $config = base64_encode('{
             "log-driver": "json-file",
             "log-opts": {

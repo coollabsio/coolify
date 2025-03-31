@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Http\Controllers\Controller;
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Models\Tag;
@@ -142,6 +143,7 @@ class DeployController extends Controller
             new OA\Parameter(name: 'tag', in: 'query', description: 'Tag name(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'uuid', in: 'query', description: 'Resource UUID(s). Comma separated list is also accepted.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild (without cache)', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'pr', in: 'query', description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.', schema: new OA\Schema(type: 'integer')),
         ],
 
         responses: [
@@ -184,26 +186,32 @@ class DeployController extends Controller
     public function deploy(Request $request)
     {
         $teamId = getTeamIdFromToken();
+
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
         $uuids = $request->query->get('uuid');
         $tags = $request->query->get('tag');
         $force = $request->query->get('force') ?? false;
+        $pr = $request->query->get('pr') ? max((int) $request->query->get('pr'), 0) : 0;
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
         }
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
+        if ($tags && $pr) {
+            return response()->json(['message' => 'You can only use tag or pr, not both.'], 400);
         }
         if ($tags) {
             return $this->by_tags($tags, $teamId, $force);
         } elseif ($uuids) {
-            return $this->by_uuids($uuids, $teamId, $force);
+            return $this->by_uuids($uuids, $teamId, $force, $pr);
         }
 
         return response()->json(['message' => 'You must provide uuid or tag.'], 400);
     }
 
-    private function by_uuids(string $uuid, int $teamId, bool $force = false)
+    private function by_uuids(string $uuid, int $teamId, bool $force = false, int $pr = 0)
     {
         $uuids = explode(',', $uuid);
         $uuids = collect(array_filter($uuids));
@@ -216,7 +224,7 @@ class DeployController extends Controller
         foreach ($uuids as $uuid) {
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
-                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force);
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force, $pr);
                 if ($deployment_uuid) {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
                 } else {
@@ -281,7 +289,7 @@ class DeployController extends Controller
         return response()->json(['message' => 'No resources found with this tag.'], 404);
     }
 
-    public function deploy_resource($resource, bool $force = false): array
+    public function deploy_resource($resource, bool $force = false, int $pr = 0): array
     {
         $message = null;
         $deployment_uuid = null;
@@ -295,6 +303,7 @@ class DeployController extends Controller
                     application: $resource,
                     deployment_uuid: $deployment_uuid,
                     force_rebuild: $force,
+                    pull_request_id: $pr,
                 );
                 $message = "Application {$resource->name} deployment queued.";
                 break;
@@ -313,5 +322,69 @@ class DeployController extends Controller
         }
 
         return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
+    }
+
+    #[OA\Get(
+        summary: 'List application deployments',
+        description: 'List application deployments by using the app uuid',
+        path: '/deployments/applications/{uuid}',
+        operationId: 'list-deployments-by-app-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Deployments'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List application deployments by using the app uuid.',
+                content: [
+
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/Application'),
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function get_application_deployments(Request $request)
+    {
+        $request->validate([
+            'skip' => ['nullable', 'integer', 'min:0'],
+            'take' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $app_uuid = $request->route('uuid', null);
+        $skip = $request->get('skip', 0);
+        $take = $request->get('take', 10);
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $servers = Server::whereTeamId($teamId)->get();
+
+        if (is_null($app_uuid)) {
+            return response()->json(['message' => 'Application uuid is required'], 400);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $app_uuid)->first();
+
+        if (is_null($application)) {
+            return response()->json(['message' => 'Application not found'], 404);
+        }
+        $deployments = $application->deployments($skip, $take);
+
+        return response()->json($deployments);
     }
 }

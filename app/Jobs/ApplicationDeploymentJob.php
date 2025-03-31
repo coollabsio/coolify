@@ -1211,7 +1211,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->container_name) {
                 $counter = 1;
                 $this->application_deployment_queue->addLogEntry('Waiting for healthcheck to pass on the new container.');
-                if ($this->full_healthcheck_url) {
+                if ($this->full_healthcheck_url && ! $this->application->custom_healthcheck_found) {
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
                 $this->application_deployment_queue->addLogEntry("Waiting for the start period ({$this->application->health_check_start_period} seconds) before starting healthcheck.");
@@ -1718,8 +1718,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 'save' => 'dockerfile_from_repo',
                 'ignore_errors' => true,
             ]);
-            $dockerfile = collect(str($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
-            $this->application->parseHealthcheckFromDockerfile($dockerfile);
+            $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
         $docker_compose = [
             'services' => [
@@ -2028,7 +2027,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);
                 } else {
-                    $nginx_config = base64_encode(defaultNginxConfiguration());
+                    if ($this->application->settings->is_spa) {
+                        $nginx_config = base64_encode(defaultNginxConfiguration('spa'));
+                    } else {
+                        $nginx_config = base64_encode(defaultNginxConfiguration());
+                    }
                 }
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
@@ -2095,7 +2098,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);
                 } else {
-                    $nginx_config = base64_encode(defaultNginxConfiguration());
+                    if ($this->application->settings->is_spa) {
+                        $nginx_config = base64_encode(defaultNginxConfiguration('spa'));
+                    } else {
+                        $nginx_config = base64_encode(defaultNginxConfiguration());
+                    }
                 }
             }
             $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";

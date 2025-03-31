@@ -20,12 +20,15 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="w-32">
+        <div class="w-48">
             <x-forms.checkbox instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
+            <x-forms.checkbox instantSave="instantSaveDiscordPingEnabled" id="discordPingEnabled"
+                helper="If enabled, a ping (@here) will be sent to the notification when a critical event happens."
+                label="Ping Enabled" />
         </div>
         <x-forms.input type="password"
-            helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>" required
-            id="discordWebhookUrl" label="Webhook" />
+            helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
+            required id="discordWebhookUrl" label="Webhook" />
     </form>
     <h2 class="mt-4">Notification Settings</h2>
     <p class="mb-4">
