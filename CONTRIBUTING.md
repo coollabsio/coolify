@@ -243,4 +243,4 @@ To add a new service to Coolify, please refer to our documentation:
 ### Contributing to Documentation
 
 To contribute to the Coolify documentation, please refer to this guide:
-[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/docs/get-started/contribute/documentation.md)
+[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/readme.md)
