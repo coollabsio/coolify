@@ -3152,6 +3152,12 @@ paths:
           description: 'Force rebuild (without cache)'
           schema:
             type: boolean
+        -
+          name: pr
+          in: query
+          description: 'Pull request id'
+          schema:
+            type: integer
       responses:
         '200':
           description: "Get deployment(s) UUID's"
