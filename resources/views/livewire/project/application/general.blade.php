@@ -69,6 +69,17 @@
                 <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
                     Configuration</x-forms.button>
             @endif
+            <div class="w-96 pb-8">
+                @if ($application->could_set_build_commands())
+                    <x-forms.checkbox instantSave id="application.settings.is_static" label="Is it a static site?"
+                        helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                @endif
+                @if ($application->settings->is_static && $application->build_pack !== 'static')
+                    <x-forms.checkbox label="Is it a SPA (Single Page Application)?"
+                        helper="If your application is a SPA, enable this." id="application.settings.is_spa"
+                        instantSave></x-forms.checkbox>
+                @endif
+            </div>
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
@@ -272,13 +283,6 @@
                                         helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         instantSave id="application.settings.is_build_server_enabled"
                                         label="Use a Build Server?" />
-                                </div>
-                            @endif
-                            @if ($application->could_set_build_commands())
-                                <div class="w-96">
-                                    <x-forms.checkbox instantSave id="application.settings.is_static"
-                                        label="Is it a static site?"
-                                        helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                                 </div>
                             @endif
                         @endif
