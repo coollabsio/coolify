@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Service\StartService;
 use App\Http\Controllers\Controller;
-use App\Models\ApplicationDeploymentQueue;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use App\Models\Tag;
 use Illuminate\Http\Request;
@@ -370,17 +370,11 @@ class DeployController extends Controller
             return response()->json(['message' => 'Application uuid is required'], 400);
         }
 
-        $application = Application::where('uuid', $app_uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $app_uuid)->first();
 
         if (is_null($application)) {
             return response()->json(['message' => 'Application not found'], 404);
         }
-
-        $team = $application->team();
-        if ($team->id != $teamId) {
-            return response()->json(['message' => 'Application not found'], 404);
-        }
-
         $deployments = $application->deployments($skip, $take);
 
         return response()->json($deployments);
