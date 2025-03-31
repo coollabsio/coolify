@@ -188,8 +188,7 @@ class DeployController extends Controller
         $uuids = $request->query->get('uuid');
         $tags = $request->query->get('tag');
         $force = $request->query->get('force') ?? false;
-        $pr = $request->query->get('pr') ? (int) $request->query->get('pr') : 0;
-
+        $pr = $request->query->get('pr') ? max((int) $request->query->get('pr'), 0) : 0;
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
