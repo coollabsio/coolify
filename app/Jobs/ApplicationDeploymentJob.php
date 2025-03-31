@@ -2027,7 +2027,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);
                 } else {
-                    $nginx_config = base64_encode(defaultNginxConfiguration());
+                    if ($this->application->settings->is_spa) {
+                        $nginx_config = base64_encode(defaultNginxConfiguration('spa'));
+                    } else {
+                        $nginx_config = base64_encode(defaultNginxConfiguration());
+                    }
                 }
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
@@ -2094,7 +2098,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (str($this->application->custom_nginx_configuration)->isNotEmpty()) {
                     $nginx_config = base64_encode($this->application->custom_nginx_configuration);
                 } else {
-                    $nginx_config = base64_encode(defaultNginxConfiguration());
+                    if ($this->application->settings->is_spa) {
+                        $nginx_config = base64_encode(defaultNginxConfiguration('spa'));
+                    } else {
+                        $nginx_config = base64_encode(defaultNginxConfiguration());
+                    }
                 }
             }
             $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";

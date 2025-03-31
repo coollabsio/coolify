@@ -4071,9 +4071,35 @@ function isEmailRateLimited(string $limiterKey, int $decaySeconds = 3600, ?calla
     return $rateLimited;
 }
 
-function defaultNginxConfiguration(): string
+function defaultNginxConfiguration(string $type = 'static'): string
 {
-    return 'server {
+    if ($type === 'spa') {
+        return <<<'NGINX'
+server {
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+}
+NGINX;
+    } else {
+        return <<<'NGINX'
+server {
     location / {
         root /usr/share/nginx/html;
         index index.html index.htm;
@@ -4093,7 +4119,9 @@ function defaultNginxConfiguration(): string
         root /usr/share/nginx/html;
         internal;
     }
-}';
+}
+NGINX;
+    }
 }
 
 function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp $source = null): array
