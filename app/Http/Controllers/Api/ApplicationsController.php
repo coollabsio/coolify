@@ -2881,198 +2881,198 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Post(
-        summary: 'Execute Command',
-        description: "Execute a command on the application's current container.",
-        path: '/applications/{uuid}/execute',
-        operationId: 'execute-command-application',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Applications'],
-        parameters: [
-            new OA\Parameter(
-                name: 'uuid',
-                in: 'path',
-                description: 'UUID of the application.',
-                required: true,
-                schema: new OA\Schema(
-                    type: 'string',
-                    format: 'uuid',
-                )
-            ),
-        ],
-        requestBody: new OA\RequestBody(
-            required: true,
-            description: 'Command to execute.',
-            content: new OA\MediaType(
-                mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'command' => ['type' => 'string', 'description' => 'Command to execute.'],
-                    ],
-                ),
-            ),
-        ),
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: "Execute a command on the application's current container.",
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Command executed.'],
-                                'response' => ['type' => 'string'],
-                            ]
-                        )
-                    ),
-                ]
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-            new OA\Response(
-                response: 404,
-                ref: '#/components/responses/404',
-            ),
-        ]
-    )]
-    public function execute_command_by_uuid(Request $request)
-    {
-        // TODO: Need to review this from security perspective, to not allow arbitrary command execution
-        $allowedFields = ['command'];
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        $uuid = $request->route('uuid');
-        if (! $uuid) {
-            return response()->json(['message' => 'UUID is required.'], 400);
-        }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
-        if (! $application) {
-            return response()->json(['message' => 'Application not found.'], 404);
-        }
-        $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
-            return $return;
-        }
-        $validator = customApiValidator($request->all(), [
-            'command' => 'string|required',
-        ]);
+    // #[OA\Post(
+    //     summary: 'Execute Command',
+    //     description: "Execute a command on the application's current container.",
+    //     path: '/applications/{uuid}/execute',
+    //     operationId: 'execute-command-application',
+    //     security: [
+    //         ['bearerAuth' => []],
+    //     ],
+    //     tags: ['Applications'],
+    //     parameters: [
+    //         new OA\Parameter(
+    //             name: 'uuid',
+    //             in: 'path',
+    //             description: 'UUID of the application.',
+    //             required: true,
+    //             schema: new OA\Schema(
+    //                 type: 'string',
+    //                 format: 'uuid',
+    //             )
+    //         ),
+    //     ],
+    //     requestBody: new OA\RequestBody(
+    //         required: true,
+    //         description: 'Command to execute.',
+    //         content: new OA\MediaType(
+    //             mediaType: 'application/json',
+    //             schema: new OA\Schema(
+    //                 type: 'object',
+    //                 properties: [
+    //                     'command' => ['type' => 'string', 'description' => 'Command to execute.'],
+    //                 ],
+    //             ),
+    //         ),
+    //     ),
+    //     responses: [
+    //         new OA\Response(
+    //             response: 200,
+    //             description: "Execute a command on the application's current container.",
+    //             content: [
+    //                 new OA\MediaType(
+    //                     mediaType: 'application/json',
+    //                     schema: new OA\Schema(
+    //                         type: 'object',
+    //                         properties: [
+    //                             'message' => ['type' => 'string', 'example' => 'Command executed.'],
+    //                             'response' => ['type' => 'string'],
+    //                         ]
+    //                     )
+    //                 ),
+    //             ]
+    //         ),
+    //         new OA\Response(
+    //             response: 401,
+    //             ref: '#/components/responses/401',
+    //         ),
+    //         new OA\Response(
+    //             response: 400,
+    //             ref: '#/components/responses/400',
+    //         ),
+    //         new OA\Response(
+    //             response: 404,
+    //             ref: '#/components/responses/404',
+    //         ),
+    //     ]
+    // )]
+    // public function execute_command_by_uuid(Request $request)
+    // {
+    //     // TODO: Need to review this from security perspective, to not allow arbitrary command execution
+    //     $allowedFields = ['command'];
+    //     $teamId = getTeamIdFromToken();
+    //     if (is_null($teamId)) {
+    //         return invalidTokenResponse();
+    //     }
+    //     $uuid = $request->route('uuid');
+    //     if (! $uuid) {
+    //         return response()->json(['message' => 'UUID is required.'], 400);
+    //     }
+    //     $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+    //     if (! $application) {
+    //         return response()->json(['message' => 'Application not found.'], 404);
+    //     }
+    //     $return = validateIncomingRequest($request);
+    //     if ($return instanceof \Illuminate\Http\JsonResponse) {
+    //         return $return;
+    //     }
+    //     $validator = customApiValidator($request->all(), [
+    //         'command' => 'string|required',
+    //     ]);
 
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
-            $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
-            }
+    //     $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+    //     if ($validator->fails() || ! empty($extraFields)) {
+    //         $errors = $validator->errors();
+    //         if (! empty($extraFields)) {
+    //             foreach ($extraFields as $field) {
+    //                 $errors->add($field, 'This field is not allowed.');
+    //             }
+    //         }
 
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ], 422);
-        }
+    //         return response()->json([
+    //             'message' => 'Validation failed.',
+    //             'errors' => $errors,
+    //         ], 422);
+    //     }
 
-        $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
-        $status = getContainerStatus($application->destination->server, $container['Names']);
+    //     $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
+    //     $status = getContainerStatus($application->destination->server, $container['Names']);
 
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Application is not running.',
-            ], 400);
-        }
+    //     if ($status !== 'running') {
+    //         return response()->json([
+    //             'message' => 'Application is not running.',
+    //         ], 400);
+    //     }
 
-        $commands = collect([
-            executeInDocker($container['Names'], $request->command),
-        ]);
+    //     $commands = collect([
+    //         executeInDocker($container['Names'], $request->command),
+    //     ]);
 
-        $res = instant_remote_process(command: $commands, server: $application->destination->server);
+    //     $res = instant_remote_process(command: $commands, server: $application->destination->server);
 
-        return response()->json([
-            'message' => 'Command executed.',
-            'response' => $res,
-        ]);
-    }
+    //     return response()->json([
+    //         'message' => 'Command executed.',
+    //         'response' => $res,
+    //     ]);
+    // }
 
-    private function validateDataApplications(Request $request, Server $server)
-    {
-        $teamId = getTeamIdFromToken();
+    // private function validateDataApplications(Request $request, Server $server)
+    // {
+    //     $teamId = getTeamIdFromToken();
 
-        // Validate ports_mappings
-        if ($request->has('ports_mappings')) {
-            $ports = [];
-            foreach (explode(',', $request->ports_mappings) as $portMapping) {
-                $port = explode(':', $portMapping);
-                if (in_array($port[0], $ports)) {
-                    return response()->json([
-                        'message' => 'Validation failed.',
-                        'errors' => [
-                            'ports_mappings' => 'The first number before : should be unique between mappings.',
-                        ],
-                    ], 422);
-                }
-                $ports[] = $port[0];
-            }
-        }
-        // Validate custom_labels
-        if ($request->has('custom_labels')) {
-            if (! isBase64Encoded($request->custom_labels)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'custom_labels' => 'The custom_labels should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-            $customLabels = base64_decode($request->custom_labels);
-            if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'custom_labels' => 'The custom_labels should be base64 encoded.',
-                    ],
-                ], 422);
-            }
-        }
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
-            $uuid = $request->uuid;
-            $fqdn = $request->domains;
-            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-            $errors = [];
-            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                    $errors[] = 'Invalid domain: '.$domain;
-                }
+    //     // Validate ports_mappings
+    //     if ($request->has('ports_mappings')) {
+    //         $ports = [];
+    //         foreach (explode(',', $request->ports_mappings) as $portMapping) {
+    //             $port = explode(':', $portMapping);
+    //             if (in_array($port[0], $ports)) {
+    //                 return response()->json([
+    //                     'message' => 'Validation failed.',
+    //                     'errors' => [
+    //                         'ports_mappings' => 'The first number before : should be unique between mappings.',
+    //                     ],
+    //                 ], 422);
+    //             }
+    //             $ports[] = $port[0];
+    //         }
+    //     }
+    //     // Validate custom_labels
+    //     if ($request->has('custom_labels')) {
+    //         if (! isBase64Encoded($request->custom_labels)) {
+    //             return response()->json([
+    //                 'message' => 'Validation failed.',
+    //                 'errors' => [
+    //                     'custom_labels' => 'The custom_labels should be base64 encoded.',
+    //                 ],
+    //             ], 422);
+    //         }
+    //         $customLabels = base64_decode($request->custom_labels);
+    //         if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+    //             return response()->json([
+    //                 'message' => 'Validation failed.',
+    //                 'errors' => [
+    //                     'custom_labels' => 'The custom_labels should be base64 encoded.',
+    //                 ],
+    //             ], 422);
+    //         }
+    //     }
+    //     if ($request->has('domains') && $server->isProxyShouldRun()) {
+    //         $uuid = $request->uuid;
+    //         $fqdn = $request->domains;
+    //         $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+    //         $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+    //         $errors = [];
+    //         $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+    //             if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+    //                 $errors[] = 'Invalid domain: '.$domain;
+    //             }
 
-                return str($domain)->trim()->lower();
-            });
-            if (count($errors) > 0) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => $errors,
-                ], 422);
-            }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
-                return response()->json([
-                    'message' => 'Validation failed.',
-                    'errors' => [
-                        'domains' => 'One of the domain is already used.',
-                    ],
-                ], 422);
-            }
-        }
-    }
+    //             return str($domain)->trim()->lower();
+    //         });
+    //         if (count($errors) > 0) {
+    //             return response()->json([
+    //                 'message' => 'Validation failed.',
+    //                 'errors' => $errors,
+    //             ], 422);
+    //         }
+    //         if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+    //             return response()->json([
+    //                 'message' => 'Validation failed.',
+    //                 'errors' => [
+    //                     'domains' => 'One of the domain is already used.',
+    //                 ],
+    //             ], 422);
+    //         }
+    //     }
+    // }
 }
