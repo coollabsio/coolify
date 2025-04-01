@@ -15,6 +15,8 @@ class SettingsBackup extends Component
 {
     public InstanceSettings $settings;
 
+    public Server $server;
+
     public ?StandalonePostgresql $database = null;
 
     public ScheduledDatabaseBackup|null|array $backup = [];
@@ -46,6 +48,7 @@ class SettingsBackup extends Component
             return redirect()->route('dashboard');
         } else {
             $settings = instanceSettings();
+            $this->server = Server::findOrFail(0);
             $this->database = StandalonePostgresql::whereName('coolify-db')->first();
             $s3s = S3Storage::whereTeamId(0)->get() ?? [];
             if ($this->database) {
@@ -60,6 +63,10 @@ class SettingsBackup extends Component
                     $this->database->save();
                 }
                 $this->backup = $this->database->scheduledBackups->first();
+                if ($this->backup && ! $this->server->isFunctional()) {
+                    $this->backup->enabled = false;
+                    $this->backup->save();
+                }
                 $this->executions = $this->backup->executions;
             }
             $this->settings = $settings;
