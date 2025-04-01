@@ -7,7 +7,9 @@ use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\RegenerateSslCertJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
@@ -1336,5 +1338,42 @@ $schema://$host {
     {
         $configRepository = app(ConfigurationRepository::class);
         $configRepository->disableSshMux();
+    }
+
+    public function generateCaCertificate()
+    {
+        try {
+            ray('Generating CA certificate for server', $this->id);
+            SslHelper::generateSslCertificate(
+                commonName: 'Coolify CA Certificate',
+                serverId: $this->id,
+                isCaCertificate: true,
+                validityDays: 10 * 365
+            );
+            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            ray('CA certificate generated', $caCertificate);
+            if ($caCertificate) {
+                $certificateContent = $caCertificate->ssl_certificate;
+                $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+
+                $commands = collect([
+                    "mkdir -p $caCertPath",
+                    "chown -R 9999:root $caCertPath",
+                    "chmod -R 700 $caCertPath",
+                    "rm -rf $caCertPath/coolify-ca.crt",
+                    "echo '{$certificateContent}' > $caCertPath/coolify-ca.crt",
+                    "chmod 644 $caCertPath/coolify-ca.crt",
+                ]);
+
+                instant_remote_process($commands, $this, false);
+
+                dispatch(new RegenerateSslCertJob(
+                    server_id: $this->id,
+                    force_regeneration: true
+                ));
+            }
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
     }
 }

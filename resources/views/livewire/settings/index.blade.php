@@ -90,8 +90,6 @@
 
         </div>
         <h4 class="pt-6">API</h4>
-        <div class="pb-4">For API documentation, please visit <a class="dark:text-warning underline"
-                href="/docs/api">/docs/api</a></div>
         <div class="md:w-96 pb-2">
             <x-forms.checkbox instantSave id="is_api_enabled" label="Enabled" />
         </div>
