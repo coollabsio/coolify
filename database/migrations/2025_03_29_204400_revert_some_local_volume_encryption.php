@@ -12,13 +12,19 @@ return new class extends Migration
      */
     public function up(): void
     {
+        echo "Starting local file volumes migration...\n";
+
         if (DB::table('local_file_volumes')->exists()) {
+            echo "Found local_file_volumes table, proceeding with migration...\n";
             // First, get all volumes and decrypt their values
             $decryptedVolumes = collect();
+            $totalVolumes = DB::table('local_file_volumes')->count();
+            echo "Total volumes to process: {$totalVolumes}\n";
 
             DB::table('local_file_volumes')
                 ->orderBy('id')
                 ->chunk(100, function ($volumes) use (&$decryptedVolumes) {
+                    echo 'Processing chunk of '.count($volumes)." volumes...\n";
                     foreach ($volumes as $volume) {
                         try {
                             $fs_path = $volume->fs_path;
@@ -29,6 +35,7 @@ return new class extends Migration
                                     $fs_path = Crypt::decryptString($fs_path);
                                 }
                             } catch (\Exception $e) {
+                                echo "Warning: Could not decrypt fs_path for volume {$volume->id}\n";
                             }
 
                             try {
@@ -36,6 +43,7 @@ return new class extends Migration
                                     $mount_path = Crypt::decryptString($mount_path);
                                 }
                             } catch (\Exception $e) {
+                                echo "Warning: Could not decrypt mount_path for volume {$volume->id}\n";
                             }
 
                             $decryptedVolumes->push([
@@ -53,6 +61,8 @@ return new class extends Migration
                     }
                 });
 
+            echo 'Finished processing all volumes. Found '.$decryptedVolumes->count()." total volumes.\n";
+
             // Group by the unique constraint fields and keep only the first occurrence
             $uniqueVolumes = $decryptedVolumes->groupBy(function ($volume) {
                 return $volume['mount_path'].'|'.$volume['resource_id'].'|'.$volume['resource_type'];
@@ -60,12 +70,15 @@ return new class extends Migration
                 return $group->first();
             });
 
+            echo 'After deduplication, found '.$uniqueVolumes->count()." unique volumes.\n";
+
             // Get IDs to delete (all except the ones we're keeping)
             $idsToKeep = $uniqueVolumes->pluck('id')->toArray();
             $idsToDelete = $decryptedVolumes->pluck('id')->diff($idsToKeep)->toArray();
 
             // Delete duplicate records
             if (! empty($idsToDelete)) {
+                echo "\nFound ".count($idsToDelete)." duplicate volumes to delete.\n";
                 // Show details of volumes being deleted
                 $volumesToDelete = $decryptedVolumes->whereIn('id', $idsToDelete);
                 echo "\nVolumes to be deleted:\n";
@@ -79,6 +92,8 @@ return new class extends Migration
                 echo 'Deleted '.count($idsToDelete)." duplicate volume(s)\n";
             }
 
+            echo "\nUpdating remaining volumes with decrypted values...\n";
+            $updateCount = 0;
             // Update the remaining records with decrypted values
             foreach ($uniqueVolumes as $volume) {
                 try {
@@ -86,12 +101,18 @@ return new class extends Migration
                         'fs_path' => $volume['fs_path'],
                         'mount_path' => $volume['mount_path'],
                     ]);
+                    $updateCount++;
                 } catch (\Exception $e) {
                     echo "Error updating volume {$volume['id']}: {$e->getMessage()}\n";
                     Log::error("Error updating volume {$volume['id']}: ".$e->getMessage());
                 }
             }
+            echo "Successfully updated {$updateCount} volumes.\n";
+        } else {
+            echo "No local_file_volumes table found, skipping migration.\n";
         }
+
+        echo "Migration completed successfully.\n";
     }
 
     /**
