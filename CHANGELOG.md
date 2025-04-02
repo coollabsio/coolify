@@ -4,21 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
-### 🐛 Bug Fixes
-
-- *(database)* Custom config for MongoDB (#5471)
-
-### 📚 Documentation
-
-- Update changelog
-- Update changelog
-
-### ⚙️ Miscellaneous Tasks
-
-- *(versions)* Bump version to 403 (#5520)
-
-## [4.0.0-beta.402] - 2025-04-01
-
 ### 🚀 Features
 
 - Use tags in update
@@ -3120,6 +3105,7 @@ All notable changes to this project will be documented in this file.
 - *(DeployController)* Cast 'pr' query parameter to integer
 - *(deploy)* Validate team ID before deployment
 - *(wakapi)* Typo in env variables and add some useful variables to wakapi.yaml (#5424)
+- *(database)* Custom config for MongoDB (#5471)
 
 ### 💼 Other
 
@@ -3827,6 +3813,9 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
 
 ### 🎨 Styling
 
@@ -4386,6 +4375,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Add google variables to plausible.yaml (#5429)
 - *(service)* Update authentik.yaml versions (#5373)
 - *(core)* Remove redocs
+- *(versions)* Bump version to 403 (#5520)
 
 ### ◀️ Revert
 
