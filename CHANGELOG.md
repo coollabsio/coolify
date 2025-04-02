@@ -4,12 +4,67 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(deployments)* Add list application deployments api route
+- *(deploy)* Add pull request ID parameter to deploy endpoint
+- *(api)* Add pull request ID parameter to applications endpoint
+- *(api)* Add endpoints for retrieving application logs and deployments
+- *(lang)* Added Norwegian language (#5280)
+- *(dep)* Bump all dependencies
+
 ### 🐛 Bug Fixes
 
-- *(file-storage)* Double save on compose volumes
+- Only get apps for the current team
+- *(DeployController)* Cast 'pr' query parameter to integer
+- *(deploy)* Validate team ID before deployment
+- *(wakapi)* Typo in env variables and add some useful variables to wakapi.yaml (#5424)
 
 ### 🚜 Refactor
 
+- *(dev)* Remove OpenAPI generation functionality
+- *(migration)* Enhance local file volumes migration with logging
+
+### ⚙️ Miscellaneous Tasks
+
+- *(service)* Update minecraft service ENVs
+- *(service)* Add more vars to infisical.yaml (#5418)
+- *(service)* Add google variables to plausible.yaml (#5429)
+- *(service)* Update authentik.yaml versions (#5373)
+- *(core)* Remove redocs
+
+## [4.0.0-beta.401] - 2025-03-28
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.400] - 2025-03-27
+
+### 🚀 Features
+
+- *(database)* Disable MongoDB SSL by default in migration
+- *(database)* Add CA certificate generation for database servers
+- *(application)* Add SPA configuration and update Nginx generation logic
+
+### 🐛 Bug Fixes
+
+- *(file-storage)* Double save on compose volumes
+- *(parser)* Add logging support for applications in services
+
+### 🚜 Refactor
+
+- *(proxy)* Improve port availability checks with multiple methods
+- *(database)* Update MongoDB SSL configuration for improved security
+- *(database)* Enhance SSL configuration handling for various databases
+- *(notifications)* Update Telegram button URL for staging environment
+- *(models)* Remove unnecessary cloud check in isEnabled method
+- *(database)* Streamline event listeners in Redis General component
+- *(database)* Remove redundant database status display in MongoDB view
+- *(database)* Update import statements for Auth in database components
+- *(database)* Require PEM key file for SSL certificate regeneration
+- *(database)* Change MySQL daemon command to MariaDB daemon
 - *(nightly)* Update version numbers and enhance upgrade script
 - *(versions)* Update version numbers for coolify and nightly
 - *(email)* Validate team membership for email recipients
@@ -26,29 +81,22 @@ All notable changes to this project will be documented in this file.
 - *(docker)* Parse and sanitize YAML compose file before encoding
 - *(file-storage)* Improve layout and structure of input fields
 - *(email)* Update label for test email recipient input
+- *(database-backup)* Remove existing Docker container before backup upload
+- *(database)* Improve decryption and deduplication of local file volumes
+- *(database)* Remove debug output from volume update process
 
 ### 📚 Documentation
 
 - Update changelog
+- Update changelog
 
-## [4.0.0-beta.400] - 2025-03-27
+### ⚙️ Miscellaneous Tasks
 
-### 🚀 Features
+- *(versions)* Update version numbers for coolify and nightly
 
-- *(database)* Disable MongoDB SSL by default in migration
+### ◀️ Revert
 
-### 🚜 Refactor
-
-- *(proxy)* Improve port availability checks with multiple methods
-- *(database)* Update MongoDB SSL configuration for improved security
-- *(database)* Enhance SSL configuration handling for various databases
-- *(notifications)* Update Telegram button URL for staging environment
-- *(models)* Remove unnecessary cloud check in isEnabled method
-- *(database)* Streamline event listeners in Redis General component
-- *(database)* Remove redundant database status display in MongoDB view
-- *(database)* Update import statements for Auth in database components
-- *(database)* Require PEM key file for SSL certificate regeneration
-- *(database)* Change MySQL daemon command to MariaDB daemon
+- Encrypting mount and fs_path
 
 ## [4.0.0-beta.399] - 2025-03-25
 
