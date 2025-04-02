@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(database)* Custom config for MongoDB (#5471)
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.402] - 2025-04-01
+
 ### 🚀 Features
 
 - *(deployments)* Add list application deployments api route
