@@ -704,6 +704,7 @@ All notable changes to this project will be documented in this file.
 - *(api)* Add endpoints for retrieving application logs and deployments
 - *(lang)* Added Norwegian language (#5280)
 - *(dep)* Bump all dependencies
+- *(proxy)* Enhance proxy handling and port conflict detection
 
 ### 🐛 Bug Fixes
 
@@ -3804,6 +3805,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(CONTRIBUTING)* Add note about Laravel Horizon accessibility
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
