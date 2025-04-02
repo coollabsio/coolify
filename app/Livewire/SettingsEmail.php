@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
-use App\Notifications\Test;
+use App\Notifications\TransactionalEmails\Test;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;

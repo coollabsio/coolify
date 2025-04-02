@@ -8,9 +8,10 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class Test extends CustomEmailNotification
 {
-    public function __construct(public string $emails)
+    public function __construct(public string $emails, public string $isTransactionalEmail)
     {
         $this->onQueue('high');
+        $this->isTransactionalEmail = true;
     }
 
     public function via(): array

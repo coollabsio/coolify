@@ -16,9 +16,10 @@ class InvitationLink extends CustomEmailNotification
         return [TransactionalEmailChannel::class];
     }
 
-    public function __construct(public User $user)
+    public function __construct(public User $user, public bool $isTransactionalEmail)
     {
         $this->onQueue('high');
+        $this->isTransactionalEmail = true;
     }
 
     public function toMail(): MailMessage
