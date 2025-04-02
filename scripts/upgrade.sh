@@ -41,8 +41,8 @@ fi
 
 # Check if Docker config file exists
 DOCKER_CONFIG_MOUNT=""
-if [ -f /etc/docker/config.json ]; then
-    DOCKER_CONFIG_MOUNT="-v /etc/docker/config.json:/root/.docker/config.json"
+if [ -f /root/.docker/config.json ]; then
+    DOCKER_CONFIG_MOUNT="-v /root/.docker/config.json:/root/.docker/config.json"
 fi
 
 if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
