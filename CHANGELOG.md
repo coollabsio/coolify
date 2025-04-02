@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 403 (#5520)
 
 ## [4.0.0-beta.402] - 2025-04-01
 
