@@ -1,0 +1,777 @@
+# documentation: https://docs.appflowy.io/docs/guides/appflowy-cloud/self-hosting
+# slogan: Open Source Alternative to Notion - Self-hosted Collaborative Knowledge Base
+# tags: productivity,notes,knowledge-base,collaboration,document
+# logo: svgs/appflowy.svg
+# port: 80
+#
+# Note: This docker-compose.yml file is optimized for deployment with Coolify.
+# The 'exclude_from_hc' property is a Coolify-specific feature that allows
+# certain one-time execution services to be excluded from health checks.
+# This may cause validation warnings with standard docker compose tools.
+
+# Define reusable environment variable defaults using YAML anchors
+  FQDN: "${SERVICE_FQDN_APPFLOWY}"
+  SCHEME: "${SERVICE_SCHEME:-http}"
+  APPFLOWY_BASE_URL: "${SERVICE_URL_APPFLOWY}"
+
+  # PostgreSQL Settings
+  POSTGRES_HOST: "postgres"
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "${SERVICE_PASSWORD_POSTGRES:-password}"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "postgres"
+  SUPABASE_PASSWORD: "${SERVICE_PASSWORD_SUPABASE:-root}"
+
+  # Redis Settings
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  # Minio Host
+  MINIO_HOST: "minio"
+  MINIO_PORT: "9000"
+  APPFLOWY_S3_ACCESS_KEY: "${SERVICE_USER_MINIO:-minioadmin}"
+  APPFLOWY_S3_SECRET_KEY: "${SERVICE_PASSWORD_MINIO:-minioadmin}"
+  APPFLOWY_S3_BUCKET: "appflowy"
+  
+  # AppFlowy Cloud
+  APPFLOWY_GOTRUE_BASE_URL: "http://gotrue:9999"
+  APPFLOWY_DATABASE_URL: "postgres://postgres:${SERVICE_PASSWORD_POSTGRES:-password}@postgres:5432/postgres"
+  APPFLOWY_ACCESS_CONTROL: "true"
+  APPFLOWY_REDIS_URI: "redis://redis:6379"
+  APPFLOWY_WEBSOCKET_MAILBOX_SIZE: "6000"
+  APPFLOWY_DATABASE_MAX_CONNECTIONS: "40"
+  
+  # Authentication
+  GOTRUE_JWT_SECRET: "${SERVICE_PASSWORD_64_JWT:-your-super-secret-jwt-token-with-at-least-32-characters-long}"
+  GOTRUE_JWT_EXP: "7200"
+  GOTRUE_ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
+  GOTRUE_ADMIN_PASSWORD: "${ADMIN_PASSWORD:-password}"
+  GOTRUE_DISABLE_SIGNUP: "false"
+  GOTRUE_RATE_LIMIT_EMAIL_SENT: "100"
+  
+  # GoTrue SMTP
+  GOTRUE_SMTP_HOST: "smtp4dev"
+  GOTRUE_SMTP_PORT: "25"
+  GOTRUE_SMTP_USER: "${SMTP_USER:-test@example.com}"
+  GOTRUE_SMTP_PASS: "${SMTP_PASSWORD:-password}"
+  GOTRUE_SMTP_ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
+  GOTRUE_SMTP_SECURE_SMTP: "false"
+  GOTRUE_MAILER_AUTOCONFIRM: "true"
+  
+  # S3 Storage
+  APPFLOWY_S3_CREATE_BUCKET: "true"
+  APPFLOWY_S3_USE_MINIO: "true"
+  APPFLOWY_S3_MINIO_URL: "http://minio:9000"
+  APPFLOWY_S3_REGION: "${APPFLOWY_S3_REGION}"
+  APPFLOWY_S3_PRESIGNED_URL_ENDPOINT: "${SERVICE_URL_APPFLOWY}/minio-api"
+  
+  # OAuth Providers
+  GOTRUE_EXTERNAL_GOOGLE_ENABLED: "${GOTRUE_EXTERNAL_GOOGLE_ENABLED:-false}"
+  GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: "${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID}"
+  GOTRUE_EXTERNAL_GOOGLE_SECRET: "${GOTRUE_EXTERNAL_GOOGLE_SECRET}"
+  GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: "${SERVICE_URL_APPFLOWY}/gotrue/callback"
+  GOTRUE_EXTERNAL_GITHUB_ENABLED: "${GOTRUE_EXTERNAL_GITHUB_ENABLED:-false}"
+  GOTRUE_EXTERNAL_GITHUB_CLIENT_ID: "${GOTRUE_EXTERNAL_GITHUB_CLIENT_ID}"
+  GOTRUE_EXTERNAL_GITHUB_SECRET: "${GOTRUE_EXTERNAL_GITHUB_SECRET}"
+  GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI: "${SERVICE_URL_APPFLOWY}/gotrue/callback"
+  GOTRUE_EXTERNAL_DISCORD_ENABLED: "${GOTRUE_EXTERNAL_DISCORD_ENABLED:-false}"
+  GOTRUE_EXTERNAL_DISCORD_CLIENT_ID: "${GOTRUE_EXTERNAL_DISCORD_CLIENT_ID}"
+  GOTRUE_EXTERNAL_DISCORD_SECRET: "${GOTRUE_EXTERNAL_DISCORD_SECRET}"
+  GOTRUE_EXTERNAL_DISCORD_REDIRECT_URI: "${SERVICE_URL_APPFLOWY}/gotrue/callback"
+  
+  # AppFlowy Cloud Mailer
+  APPFLOWY_MAILER_SMTP_HOST: "smtp4dev"
+  APPFLOWY_MAILER_SMTP_PORT: "25"
+  APPFLOWY_MAILER_SMTP_USERNAME: "test@example.com"
+  APPFLOWY_MAILER_SMTP_EMAIL: "test@example.com"
+  APPFLOWY_MAILER_SMTP_PASSWORD: "password"
+  APPFLOWY_MAILER_SMTP_TLS_KIND: "none"
+  
+  # AI Service
+  AI_SERVER_PORT: "5001"
+  AI_SERVER_HOST: "ai"
+  AI_DATABASE_URL: "postgresql+psycopg://postgres:${SERVICE_PASSWORD_POSTGRES:-password}@postgres:5432/postgres"
+  AI_REDIS_URL: "redis://redis:6379"
+  AI_OPENAI_API_KEY: "${AI_OPENAI_API_KEY:-}"
+  AI_APPFLOWY_BUCKET_NAME: "appflowy"
+  AI_APPFLOWY_HOST: "${SERVICE_URL_APPFLOWY}"
+  AI_MINIO_URL: "http://minio:9000"
+  LOCAL_AI_TEST_ENABLED: "true"
+  
+  # AppFlowy Indexer
+  APPFLOWY_INDEXER_ENABLED: "true"
+  APPFLOWY_INDEXER_DATABASE_URL: "postgres://postgres:${SERVICE_PASSWORD_POSTGRES:-password}@postgres:5432/postgres"
+  APPFLOWY_INDEXER_REDIS_URL: "redis://redis:6379"
+  APPFLOWY_INDEXER_EMBEDDING_BUFFER_SIZE: "5000"
+  
+  # AppFlowy Collaborate
+  APPFLOWY_COLLABORATE_MULTI_THREAD: "false"
+  APPFLOWY_COLLABORATE_REMOVE_BATCH_SIZE: "100"
+  
+  # External URL
+  API_EXTERNAL_URL: "${SERVICE_URL_APPFLOWY}/gotrue"
+  
+  # Admin frontend
+  ADMIN_FRONTEND_REDIS_URL: "redis://redis:6379"
+  ADMIN_FRONTEND_GOTRUE_URL: "http://gotrue:9999"
+  ADMIN_FRONTEND_APPFLOWY_CLOUD_URL: "http://appflowy_cloud:8000"
+  ADMIN_FRONTEND_PATH_PREFIX: "/console"
+  
+  # NGINX
+  NGINX_PORT: "80"
+  NGINX_TLS_PORT: "443"
+  
+  # Log Levels
+  RUST_LOG: "info"
+  LOG_LEVEL: "debug"
+  
+  # Versions
+  GOTRUE_VERSION: "${GOTRUE_VERSION:-latest}"
+  APPFLOWY_CLOUD_VERSION: "${APPFLOWY_CLOUD_VERSION:-latest}"
+  APPFLOWY_ADMIN_FRONTEND_VERSION: "${APPFLOWY_ADMIN_FRONTEND_VERSION:-latest}"
+  APPFLOWY_WORKER_VERSION: "${APPFLOWY_WORKER_VERSION:-latest}"
+  APPFLOWY_WEB_VERSION: "${APPFLOWY_WEB_VERSION:-latest}"
+  APPFLOWY_AI_VERSION: "${APPFLOWY_AI_VERSION:-latest}"
+
+services:
+  smtp4dev:
+    restart: on-failure
+    image: rnwood/smtp4dev:v3
+    command: --urls=http://*:9087 --smtpport=25 --debugsettings
+    volumes:
+      - smtp4dev:/smtp4dev
+    environment:
+      - ServerOptions__BasePath=/smtp4dev
+      - ServerOptions__HostName=smtp4dev
+      - ServerOptions__AllowRemoteConnections=true
+      - ServerOptions__TlsMode=None
+      - ServerOptions__NumberOfMessagesToShow=100
+      - ServerOptions__NumberOfSessionsToShow=100
+      - ServerOptions__WebTheme=superhero
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9087/smtp4dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  # MinIO for S3-compatible storage
+  minio:
+    restart: on-failure
+    image: minio/minio
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO:-minioadmin}
+      - MINIO_BROWSER_REDIRECT_URL=${SERVICE_FQDN_APPFLOWY}/minio/ui/
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL database
+  postgres:
+    restart: on-failure
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES:-password}
+      - POSTGRES_DB=postgres
+      # Explicitly set trust method (only for initial setup)
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - SUPABASE_PASSWORD=${SERVICE_PASSWORD_SUPABASE:-root}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Init script to create required roles
+      - type: bind
+        source: ./postgres-init.sh
+        target: /docker-entrypoint-initdb.d/init.sh
+        content: |
+          #!/bin/bash
+          set -e
+          
+          # Create auth roles
+          psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+            -- Create auth schema and roles
+            CREATE SCHEMA IF NOT EXISTS auth;
+            CREATE SCHEMA IF NOT EXISTS public;
+            
+            -- Create the auth roles if they don't exist
+            DO \$\$ 
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                CREATE ROLE anon;
+              END IF;
+              
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                CREATE ROLE authenticated;
+              END IF;
+            END
+            \$\$;
+            
+            -- Create supabase_auth_admin user with enhanced privileges
+            DO \$\$ BEGIN 
+              IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'supabase_auth_admin') THEN 
+                CREATE USER supabase_auth_admin WITH BYPASSRLS NOINHERIT CREATEROLE LOGIN NOREPLICATION PASSWORD '${SERVICE_PASSWORD_SUPABASE:-root}';
+              END IF;
+            END \$\$;
+            
+            -- Create an alias for main postgres user if it doesn't match 'postgres'
+            DO \$\$ BEGIN
+              -- Create the postgres role as an alias if using a different username
+              IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'postgres') THEN
+                CREATE USER postgres WITH SUPERUSER PASSWORD '${POSTGRES_PASSWORD:-password}';
+              END IF;
+            END \$\$;
+            
+            -- Create required extensions that AppFlowy Cloud migrations need
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+            CREATE EXTENSION IF NOT EXISTS vector;
+            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+            
+            -- Grant full permissions to supabase_auth_admin
+            GRANT ALL ON DATABASE postgres TO supabase_auth_admin;
+            GRANT ALL ON SCHEMA public TO supabase_auth_admin;
+            GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
+            GRANT ALL ON SCHEMA public TO postgres;
+            GRANT ALL ON SCHEMA public TO "$POSTGRES_USER";
+            GRANT ALL ON SCHEMA public TO public;
+            
+            -- Add explicit USAGE grants for schemas
+            GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+            GRANT USAGE ON SCHEMA auth TO supabase_auth_admin;
+            GRANT USAGE ON SCHEMA public TO postgres;
+            GRANT USAGE ON SCHEMA public TO "$POSTGRES_USER";
+            
+            -- Allow supabase_auth_admin to create and modify tables in public schema
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO supabase_auth_admin;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO supabase_auth_admin;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO supabase_auth_admin;
+            
+            -- Allow supabase_auth_admin to create and modify tables in auth schema
+            ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO supabase_auth_admin;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO supabase_auth_admin;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON FUNCTIONS TO supabase_auth_admin;
+            
+            -- Add default privileges for main postgres user in both schemas
+            ALTER DEFAULT PRIVILEGES FOR ROLE "$POSTGRES_USER" IN SCHEMA public 
+            GRANT ALL ON TABLES TO supabase_auth_admin;
+            
+            ALTER DEFAULT PRIVILEGES FOR ROLE "$POSTGRES_USER" IN SCHEMA auth 
+            GRANT ALL ON TABLES TO supabase_auth_admin;
+            
+            -- Set search path for auth admin to include both auth and public schemas
+            ALTER USER supabase_auth_admin SET search_path = auth, public;
+            
+            -- Important: We're NOT creating any application tables manually.
+            -- Instead, let AppFlowy Cloud's internal migration system handle all table creation
+          EOSQL
+    
+  # Redis for caching and messaging
+  redis:
+    restart: on-failure
+    image: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # GoTrue authentication service
+  gotrue:
+    restart: on-failure
+    image: appflowyinc/gotrue:${GOTRUE_VERSION:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    environment:
+      - PORT=9999
+      - DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_SUPABASE:-root}@postgres:5432/postgres?sslmode=disable&search_path=auth,public
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_SITE_URL=${SERVICE_FQDN_APPFLOWY}
+      - GOTRUE_URI_ALLOW_LIST=*
+      - GOTRUE_DISABLE_SIGNUP=${GOTRUE_DISABLE_SIGNUP:-false}
+      - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_64_JWT:-your-super-secret-jwt-token-with-at-least-32-characters-long}
+      - GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
+      - GOTRUE_JWT_ALGORITHM=HS256
+      - GOTRUE_SMTP_HOST=smtp4dev
+      - GOTRUE_SMTP_PORT=25
+      - GOTRUE_SMTP_USER=${SMTP_USER:-test@example.com}
+      - GOTRUE_SMTP_PASS=${SMTP_PASSWORD:-password}
+      - GOTRUE_SMTP_ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - GOTRUE_MAILER_AUTOCONFIRM=${GOTRUE_MAILER_AUTOCONFIRM:-true}
+      - GOTRUE_MAILER_URLPATHS_CONFIRMATION=/gotrue/verify
+      - GOTRUE_MAILER_URLPATHS_INVITE=/gotrue/verify
+      - GOTRUE_MAILER_URLPATHS_RECOVERY=/gotrue/verify
+      - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/gotrue/verify
+      - GOTRUE_JWT_ADMIN_GROUP_NAME=supabase_admin
+      - API_EXTERNAL_URL=${SERVICE_FQDN_APPFLOWY}/gotrue
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - GOTRUE_LOG_LEVEL=${LOG_LEVEL:-debug}
+      # OAuth Providers
+      - GOTRUE_EXTERNAL_GOOGLE_ENABLED=${GOTRUE_EXTERNAL_GOOGLE_ENABLED:-false}
+      - GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID}
+      - GOTRUE_EXTERNAL_GOOGLE_SECRET=${GOTRUE_EXTERNAL_GOOGLE_SECRET}
+      - GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=${SERVICE_FQDN_APPFLOWY}/gotrue/callback
+      - GOTRUE_EXTERNAL_GITHUB_ENABLED=${GOTRUE_EXTERNAL_GITHUB_ENABLED:-false}
+      - GOTRUE_EXTERNAL_GITHUB_CLIENT_ID=${GOTRUE_EXTERNAL_GITHUB_CLIENT_ID}
+      - GOTRUE_EXTERNAL_GITHUB_SECRET=${GOTRUE_EXTERNAL_GITHUB_SECRET}
+      - GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI=${SERVICE_FQDN_APPFLOWY}/gotrue/callback
+      - GOTRUE_EXTERNAL_DISCORD_ENABLED=${GOTRUE_EXTERNAL_DISCORD_ENABLED:-false}
+      - GOTRUE_EXTERNAL_DISCORD_CLIENT_ID=${GOTRUE_EXTERNAL_DISCORD_CLIENT_ID}
+      - GOTRUE_EXTERNAL_DISCORD_SECRET=${GOTRUE_EXTERNAL_DISCORD_SECRET}
+      - GOTRUE_EXTERNAL_DISCORD_REDIRECT_URI=${SERVICE_FQDN_APPFLOWY}/gotrue/callback
+
+  # AppFlowy Cloud API service
+  appflowy_cloud:
+    restart: on-failure
+    image: appflowyinc/appflowy_cloud:${APPFLOWY_CLOUD_VERSION:-latest}
+    environment:
+      - APPFLOWY_GOTRUE_BASE_URL=http://gotrue:9999
+      - APPFLOWY_DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES:-password}@postgres:5432/postgres?sslmode=disable
+      - APPFLOWY_ACCESS_CONTROL=true
+      - APPFLOWY_REDIS_URI=redis://redis:6379
+      - APPFLOWY_WEBSOCKET_MAILBOX_SIZE=6000
+      - APPFLOWY_DATABASE_MAX_CONNECTIONS=40
+      - APPFLOWY_S3_CREATE_BUCKET=true
+      - APPFLOWY_S3_USE_MINIO=true
+      - APPFLOWY_S3_MINIO_URL=http://minio:9000
+      - APPFLOWY_S3_ACCESS_KEY=${SERVICE_USER_MINIO:-minioadmin}
+      - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO:-minioadmin}
+      - APPFLOWY_S3_BUCKET=appflowy
+      - APPFLOWY_MAILER_SMTP_HOST=smtp4dev
+      - APPFLOWY_MAILER_SMTP_PORT=25
+      - APPFLOWY_MAILER_SMTP_USERNAME=test@example.com
+      - APPFLOWY_MAILER_SMTP_EMAIL=test@example.com
+      - APPFLOWY_MAILER_SMTP_PASSWORD=password
+      - APPFLOWY_MAILER_SMTP_TLS_KIND=none
+      - RUST_LOG=info,sqlx=warn
+      - APPFLOWY_WEB_URL=${SERVICE_FQDN_APPFLOWY}
+      - APPFLOWY_ENVIRONMENT=production
+      - APPFLOWY_GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_64_JWT:-your-super-secret-jwt-token-with-at-least-32-characters-long}
+      - APPFLOWY_GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
+      - APPFLOWY_GOTRUE_EXT_URL=${SERVICE_FQDN_APPFLOWY}/gotrue
+      - APPFLOWY_GOTRUE_ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - APPFLOWY_GOTRUE_ADMIN_PASSWORD=${ADMIN_PASSWORD:-password}
+      - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION}
+      - APPFLOWY_S3_PRESIGNED_URL_ENDPOINT=${SERVICE_FQDN_APPFLOWY}/minio-api
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      gotrue:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Admin frontend
+  admin_frontend:
+    restart: on-failure
+    image: appflowyinc/admin_frontend:${APPFLOWY_ADMIN_FRONTEND_VERSION:-latest}
+    environment:
+      - ADMIN_FRONTEND_REDIS_URL=redis://redis:6379
+      - ADMIN_FRONTEND_GOTRUE_URL=http://gotrue:9999
+      - ADMIN_FRONTEND_APPFLOWY_CLOUD_URL=http://appflowy_cloud:8000
+      - ADMIN_FRONTEND_PATH_PREFIX=/console
+    depends_on:
+      appflowy_cloud:
+        condition: service_started
+
+  # AI service
+  ai:
+    restart: on-failure
+    image: appflowyinc/appflowy_ai:${APPFLOWY_AI_VERSION:-latest}
+    environment:
+      - AI_SERVER_PORT=5001
+      - AI_SERVER_HOST=ai
+      - AI_DATABASE_URL=postgresql+psycopg://postgres:${SERVICE_PASSWORD_POSTGRES:-password}@postgres:5432/postgres
+      - AI_REDIS_URL=redis://redis:6379
+      - AI_OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
+      - AI_APPFLOWY_BUCKET_NAME=appflowy
+      - AI_APPFLOWY_HOST=${SERVICE_FQDN_APPFLOWY}
+      - AI_MINIO_URL=http://minio:9000
+      - LOCAL_AI_TEST_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    exclude_from_hc: true
+
+  # Background worker service
+  appflowy_worker:
+    restart: on-failure
+    image: appflowyinc/appflowy_worker:${APPFLOWY_WORKER_VERSION:-latest}
+    environment:
+      - APPFLOWY_WORKER_REDIS_URL=redis://redis:6379
+      - APPFLOWY_WORKER_DATABASE_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES:-password}@postgres:5432/postgres?sslmode=disable
+      - APPFLOWY_WORKER_DATABASE_NAME=postgres
+      - APPFLOWY_WORKER_IMPORT_TICK_INTERVAL=30
+      - APPFLOWY_WORKER_ENVIRONMENT=production
+      - RUST_LOG=info,sqlx=warn
+      - APPFLOWY_S3_USE_MINIO=true
+      - APPFLOWY_S3_MINIO_URL=http://minio:9000
+      - APPFLOWY_S3_ACCESS_KEY=${SERVICE_USER_MINIO:-minioadmin}
+      - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO:-minioadmin}
+      - APPFLOWY_S3_BUCKET=appflowy
+      - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION}
+      - APPFLOWY_MAILER_SMTP_HOST=smtp4dev
+      - APPFLOWY_MAILER_SMTP_PORT=25
+      - APPFLOWY_MAILER_SMTP_USERNAME=test@example.com
+      - APPFLOWY_MAILER_SMTP_EMAIL=test@example.com
+      - APPFLOWY_MAILER_SMTP_PASSWORD=password
+      - APPFLOWY_MAILER_SMTP_TLS_KIND=none
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Web frontend
+  appflowy_web:
+    restart: on-failure
+    image: appflowyinc/appflowy_web:${APPFLOWY_WEB_VERSION:-latest}
+    depends_on:
+      - appflowy_cloud
+    environment:
+      - AF_BASE_URL=${SERVICE_FQDN_APPFLOWY}
+      - AF_GOTRUE_URL=${SERVICE_FQDN_APPFLOWY}/gotrue
+
+  # Main NGINX service - this is what Coolify will expose
+  nginx:
+    image: nginx:alpine
+    environment:
+      - SERVICE_FQDN_APPFLOWY_80
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/nginx.conf
+        content: |
+          worker_processes auto;
+          
+          events {
+            worker_connections 1024;
+          }
+          
+          http {
+            include       /etc/nginx/mime.types;
+            default_type  application/octet-stream;
+            
+            # docker dns resolver
+            resolver 127.0.0.11 valid=10s;
+            
+            map $http_upgrade $connection_upgrade {
+                default upgrade;
+                '' close;
+            }
+
+            map $http_origin $cors_origin {
+                # AppFlowy Web origin
+                "~^http://localhost:3000$" $http_origin;
+                default "null";
+            }
+            
+            sendfile on;
+            keepalive_timeout 65;
+            
+            server {
+              listen 8080;
+
+              # https://github.com/nginxinc/nginx-prometheus-exporter
+              location = /stub_status {
+                  stub_status;
+              }
+            }
+            
+            server {
+              listen 80;
+              
+              # Allow large file uploads
+              client_max_body_size 100M;
+              
+              underscores_in_headers on;
+              set $appflowy_cloud_backend "http://appflowy_cloud:8000";
+              set $gotrue_backend "http://gotrue:9999";
+              set $admin_frontend_backend "http://admin_frontend:3000";
+              set $appflowy_web_backend "http://appflowy_web:80";
+              set $appflowy_ai_backend "http://ai:5001";
+              set $minio_backend "http://minio:9001";
+              set $minio_api_backend "http://minio:9000";
+              set $smtp4dev_backend "http://smtp4dev:9087";
+              # Host name for minio, used internally within docker compose
+              set $minio_internal_host "minio:9000";
+              set $portainer_backend "http://portainer:9000";
+              set $pgadmin_backend "http://pgadmin:80";
+              
+              # GoTrue Auth API
+              location /gotrue/ {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                    add_header 'Access-Control-Allow-Credentials' 'true' always;
+                    add_header 'Access-Control-Allow-Headers' '*' always;
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+                    add_header 'Access-Control-Max-Age' 3600 always;
+                    add_header 'Content-Type' 'text/plain charset=UTF-8' always;
+                    add_header 'Content-Length' 0 always;
+                    return 204;
+                }
+
+                proxy_pass $gotrue_backend;
+
+                rewrite ^/gotrue(/.*)$ $1 break;
+
+                # Allow headers like redirect_to to be handed over to the gotrue
+                proxy_set_header Host $http_host;
+                proxy_pass_request_headers on;
+              }
+              
+              # WebSocket
+              location /ws {
+                  proxy_pass $appflowy_cloud_backend;
+
+                proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "Upgrade";
+                proxy_set_header Host $host;
+                  proxy_read_timeout 86400;
+              }
+              
+              # AppFlowy Cloud API
+              location /api {
+                proxy_pass $appflowy_cloud_backend;
+                proxy_set_header X-Request-Id $request_id;
+                proxy_set_header Host $http_host;
+
+                # Set CORS headers for other requests
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+                    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept, Client-Version, Device-Id' always;
+                    add_header 'Access-Control-Max-Age' 3600 always;
+                    return 204;
+                }
+
+                add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept, Client-Version, Device-Id' always;
+                add_header 'Access-Control-Max-Age' 3600 always;
+
+                # Specialized location for publishing workspace
+                location ~* ^/api/workspace/([a-zA-Z0-9_-]+)/publish$ {
+                    proxy_pass $appflowy_cloud_backend;
+                    proxy_request_buffering off;
+                    client_max_body_size 256M;
+                    if ($request_method = 'OPTIONS') {
+                        add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+                        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept, Client-Version, Device-Id' always;
+                        add_header 'Access-Control-Max-Age' 3600 always;
+                        return 204;
+                    }
+
+                    add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+                    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept, Client-Version, Device-Id' always;
+                    add_header 'Access-Control-Max-Age' 3600 always;
+                }
+
+                # Chat API with streaming support
+                location /api/chat {
+                    proxy_pass $appflowy_cloud_backend;
+
+                    proxy_http_version 1.1;
+                    proxy_set_header Connection "";
+                    chunked_transfer_encoding on;
+                    proxy_buffering off;
+                    proxy_cache off;
+
+                    proxy_read_timeout 600s;
+                    proxy_connect_timeout 600s;
+                    proxy_send_timeout 600s;
+                }
+
+                # Import API with large file upload support
+                location /api/import {
+                    proxy_pass $appflowy_cloud_backend;
+
+                    # Set headers
+                    proxy_set_header X-Request-Id $request_id;
+                    proxy_set_header Host $http_host;
+
+                    # Handle CORS
+                    add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+                    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept, Device-Id' always;
+                    add_header 'Access-Control-Max-Age' 3600 always;
+
+                    # Timeouts
+                    proxy_read_timeout 600s;
+                    proxy_connect_timeout 600s;
+                    proxy_send_timeout 600s;
+
+                    # Disable buffering for large file uploads
+                    proxy_request_buffering off;
+                    proxy_buffering off;
+                    proxy_cache off;
+                    client_max_body_size 2G;
+                }
+              }
+              
+              # AppFlowy AI
+              location /ai {
+                  proxy_pass $appflowy_ai_backend;
+                  proxy_set_header Host $host;
+                  proxy_pass_request_headers on;
+              }
+
+              # Minio Web UI
+              location /minio/ui/ {
+                  proxy_pass $minio_backend;
+
+                  rewrite ^/minio/ui/(.*) /$1 break;
+                  proxy_set_header Host $http_host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_set_header X-NginX-Proxy true;
+
+                  ## This is necessary to pass the correct IP to be hashed
+                  real_ip_header X-Real-IP;
+
+                  proxy_connect_timeout 300;
+
+                  ## To support websockets in MinIO versions released after January 2023
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+
+                  chunked_transfer_encoding off;
+              }
+
+              # Minio API
+              location /minio-api/ {
+                  proxy_pass $minio_api_backend;
+
+                  # Set the host to internal host because the presigned url was signed against the internal host
+                  proxy_set_header Host $minio_internal_host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+
+                  rewrite ^/minio-api/(.*) /$1 break;
+
+                  proxy_connect_timeout 300;
+                  # Default is HTTP/1, keepalive is only enabled in HTTP/1.1
+                  proxy_http_version 1.1;
+                  proxy_set_header Connection "";
+                  chunked_transfer_encoding off;
+              }
+
+              # PgAdmin
+              location /pgadmin/ {
+                  set $pgadmin pgadmin;
+                  proxy_pass $pgadmin_backend;
+
+                  proxy_set_header X-Script-Name /pgadmin;
+                  proxy_set_header X-Scheme $scheme;
+                  proxy_set_header Host $host;
+                  proxy_redirect off;
+              }
+
+              # Portainer
+              location /portainer/ {
+                  proxy_pass $portainer_backend;
+                  rewrite ^/portainer/(.*) /$1 break;
+              }
+              
+              # SMTP4Dev Web UI - main location
+              location /smtp4dev {
+                  # Use explicit URL instead of variable to avoid the proxy_redirect default issue
+                  proxy_pass http://smtp4dev:9087/smtp4dev;
+                  
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_set_header X-Forwarded-Host $host;
+                  proxy_set_header X-Forwarded-Path /smtp4dev;
+                  proxy_set_header X-Script-Name /smtp4dev;
+                  
+                  # Important for WebSockets
+                  proxy_read_timeout 3600;
+                  proxy_buffering off;
+              }
+              
+              # Handle SMTP4Dev assets
+              location /smtp4dev/ {
+                  # Use explicit URL instead of variable to avoid issues
+                  proxy_pass http://smtp4dev:9087/smtp4dev/;
+                  
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_set_header X-Forwarded-Host $host;
+                  proxy_set_header X-Forwarded-Path /smtp4dev;
+                  proxy_set_header X-Script-Name /smtp4dev;
+              }
+              
+              # Admin Frontend - Console
+              location /console {
+                proxy_pass $admin_frontend_backend;
+                proxy_set_header X-Scheme $scheme;
+                proxy_set_header Host $host;
+              }
+              
+              # Admin Panel - direct access to admin
+              location /admin {
+                proxy_pass $admin_frontend_backend;
+                proxy_set_header X-Scheme $scheme;
+                proxy_set_header Host $host;
+              }
+              
+              # AppFlowy Web
+              location / {
+                proxy_pass $appflowy_web_backend;
+                proxy_set_header X-Scheme $scheme;
+                proxy_set_header Host $host;
+              }
+              
+              # Health check endpoint
+              location /health {
+                return 200 'AppFlowy Cloud is running';
+                add_header Content-Type text/plain;
+              }
+            }
+          }
+    depends_on:
+      - appflowy_cloud
+      - appflowy_web
+      - gotrue
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  minio-data:
+  postgres-data:
+
