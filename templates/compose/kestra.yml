@@ -17,8 +17,8 @@ services:
       - postgres-data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: kestra
-      POSTGRES_USER: kestra
-      POSTGRES_PASSWORD: k3str4
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 30s
@@ -43,14 +43,14 @@ services:
           postgres:
             url: jdbc:postgresql://postgres:5432/kestra
             driverClassName: org.postgresql.Driver
-            username: kestra
-            password: k3str4
+            username: ${SERVICE_USER_POSTGRES}
+            password: ${SERVICE_PASSWORD_POSTGRES}
         kestra:
           server:
             basicAuth:
               enabled: false
-              username: "admin@localhost.dev" # it must be a valid email address
-              password: kestra
+              username: ${KESTRA_EMAIL} # it must be a valid email address
+              password: ${SERVICE_PASSWORD_KESTRA}
           repository:
             type: postgres
           storage:
@@ -62,7 +62,7 @@ services:
           tasks:
             tmpDir:
               path: /tmp/kestra-wd/tmp
-          url: http://localhost:8080/
+          url: http://0.0.0.0:8080/
     ports:
       - "8080:8080"
       - "8081:8081"
