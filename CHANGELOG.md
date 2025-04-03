@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 404
+
+## [4.0.0-beta.404] - 2025-04-03
+
 ### 🚀 Features
 
 - *(lang)* Added Azerbaijani language updated turkish language. (#5497)
@@ -25,6 +31,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
