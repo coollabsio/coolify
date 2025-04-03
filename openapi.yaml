@@ -1905,52 +1905,6 @@ paths:
       security:
         -
           bearerAuth: []
-  '/applications/{uuid}/execute':
-    post:
-      tags:
-        - Applications
-      summary: 'Execute Command'
-      description: "Execute a command on the application's current container."
-      operationId: execute-command-application
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the application.'
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        description: 'Command to execute.'
-        required: true
-        content:
-          application/json:
-            schema:
-              properties:
-                command:
-                  type: string
-                  description: 'Command to execute.'
-              type: object
-      responses:
-        '200':
-          description: "Execute a command on the application's current container."
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Command executed.' }
-                  response: { type: string }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
   /databases:
     get:
       tags:
@@ -4037,7 +3991,6 @@ paths:
                 - project_uuid
                 - environment_name
                 - environment_uuid
-                - type
               properties:
                 type:
                   description: 'The one-click service type'
@@ -4070,6 +4023,9 @@ paths:
                   type: boolean
                   default: false
                   description: 'Start the service immediately after creation.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
               type: object
       responses:
         '201':
