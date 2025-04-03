@@ -17,11 +17,10 @@ class ResetPassword extends Notification
 
     public InstanceSettings $settings;
 
-    public function __construct($token, public bool $isTransactionalEmail)
+    public function __construct($token, public bool $isTransactionalEmail = true)
     {
         $this->settings = instanceSettings();
         $this->token = $token;
-        $this->isTransactionalEmail = true;
     }
 
     public static function createUrlUsing($callback)
