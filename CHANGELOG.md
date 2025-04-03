@@ -4,17 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(lang)* Added Azerbaijani language updated turkish language. (#5497)
+- *(lang)* Added Portuguese from Brazil language (#5500)
+- *(lang)* Add Indonesian language translations (#5513)
+
 ### 🐛 Bug Fixes
 
+- *(docs)* Comment out execute for now
+- *(installation)* Mount the docker config
+- *(installation)* Path to config file for docker login
+- *(service)* Add health check to Bugsink service (#5512)
+- *(email)* Emails are not sent in multiple cases
+- *(deployments)* Use graceful shutdown instead of `rm`
+- *(docs)* Contribute service url (#5517)
+- *(proxy)* Proxy restart does not work on domain
+- *(ui)* Only show copy button on https
 - *(database)* Custom config for MongoDB (#5471)
 
 ### 📚 Documentation
 
 - Update changelog
 - Update changelog
+- Update changelog
 
 ### ⚙️ Miscellaneous Tasks
 
+- *(service)* Remove unused code in Bugsink service
+- *(versions)* Update version to 404
 - *(versions)* Bump version to 403 (#5520)
 
 ## [4.0.0-beta.402] - 2025-04-01
@@ -34,6 +52,7 @@ All notable changes to this project will be documented in this file.
 - *(DeployController)* Cast 'pr' query parameter to integer
 - *(deploy)* Validate team ID before deployment
 - *(wakapi)* Typo in env variables and add some useful variables to wakapi.yaml (#5424)
+- *(ui)* Instance Backup settings
 
 ### 🚜 Refactor
 
@@ -47,6 +66,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Add google variables to plausible.yaml (#5429)
 - *(service)* Update authentik.yaml versions (#5373)
 - *(core)* Remove redocs
+- *(versions)* Update coolify version numbers to 4.0.0-beta.403 and 4.0.0-beta.404
 
 ## [4.0.0-beta.401] - 2025-03-28
 
