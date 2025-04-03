@@ -27,5 +27,13 @@
     "input.code": "Tek Kullanımlık Kod",
     "input.recovery_code": "Kurtarma Kodu",
     "button.save": "Kaydet",
-    "repository.url": "<span class='text-helper'>Örnekler</span><br>Halka açık depolar için <span class='text-helper'>https://...</span> kullanın.<br>Özel depolar için <span class='text-helper'>git@...</span> kullanın.<br><br>https://github.com/coollabsio/coolify-examples <span class='text-helper'>main</span> dalı seçilecek<br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify <span class='text-helper'>nodejs-fastify</span> dalı seçilecek.<br>https://gitea.com/sedlav/expressjs.git <span class='text-helper'>main</span> dalı seçilecek.<br>https://gitlab.com/andrasbacsai/nodejs-example.git <span class='text-helper'>main</span> dalı seçilecek."
+    "repository.url": "<span class='text-helper'>Örnekler</span><br>Halka açık depolar için <span class='text-helper'>https://...</span> kullanın.<br>Özel depolar için <span class='text-helper'>git@...</span> kullanın.<br><br>https://github.com/coollabsio/coolify-examples <span class='text-helper'>main</span> dalı seçilecek<br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify <span class='text-helper'>nodejs-fastify</span> dalı seçilecek.<br>https://gitea.com/sedlav/expressjs.git <span class='text-helper'>main</span> dalı seçilecek.<br>https://gitlab.com/andrasbacsai/nodejs-example.git <span class='text-helper'>main</span> dalı seçilecek.",
+    "service.stop": "Bu servis durdurulacak.",
+    "resource.docker_cleanup": "Docker temizliği çalıştır (kullanılmayan imajları ve oluşturucu önbelleğini kaldır).",
+    "resource.non_persistent": "Tüm kalıcı olmayan veriler silinecek.",
+    "resource.delete_volumes": "Bu kaynakla ilişkili tüm hacimler kalıcı olarak silinecek.",
+    "resource.delete_connected_networks": "Bu kaynakla ilişkili önceden tanımlanmamış tüm ağlar kalıcı olarak silinecek.",
+    "resource.delete_configurations": "Sunucudaki tüm yapılandırma dosyaları kalıcı olarak silinecek.",
+    "database.delete_backups_locally": "Tüm yedekler yerel depolamadan kalıcı olarak silinecek.",
+    "warning.sslipdomain": "Yapılandırmanız kaydedildi, ancak sslip domain ile https <span class='dark:text-red-500 text-red-500 font-bold'>ÖNERİLMEZ</span>, çünkü Let's Encrypt sunucuları bu genel domain ile sınırlandırılmıştır (SSL sertifikası doğrulaması başarısız olur). <br><br>Bunun yerine kendi domaininizi kullanın."
 }

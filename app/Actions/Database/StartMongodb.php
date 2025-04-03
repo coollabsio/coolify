@@ -181,6 +181,7 @@ class StartMongodb
                     'read_only' => true,
                 ]]
             );
+            $docker_compose['services'][$container_name]['command'] = ['mongod', '--config', '/etc/mongo/mongod.conf'];
         }
 
         $this->add_default_database();

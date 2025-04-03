@@ -329,13 +329,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    'hidden' => true,
-                    'ignore_errors' => true,
-                ]
-            );
+            $this->application_deployment_queue->addLogEntry("Starting graceful shutdown container: {$this->deployment_uuid}");
+            $this->graceful_shutdown_container($this->deployment_uuid);
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
@@ -1366,13 +1361,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
-        $this->execute_remote_command(
-            [
-                'command' => "docker rm -f {$this->deployment_uuid}",
-                'ignore_errors' => true,
-                'hidden' => true,
-            ]
-        );
+        $this->application_deployment_queue->addLogEntry("Starting graceful shutdown container: {$this->deployment_uuid}");
+        $this->graceful_shutdown_container($this->deployment_uuid);
         $this->execute_remote_command(
             [
                 $runCommand,
