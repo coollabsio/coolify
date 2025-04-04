@@ -451,17 +451,17 @@ class General extends Component
         }
     }
 
-    public function downloadConfig()
-    {
-        $config = GenerateConfig::run($this->application, true);
-        $fileName = str($this->application->name)->slug()->append('_config.json');
-        dd($config);
+    // public function downloadConfig()
+    // {
+    //     $config = GenerateConfig::run($this->application, true);
+    //     $fileName = str($this->application->name)->slug()->append('_config.json');
+    //     dd($config);
 
-        return response()->streamDownload(function () use ($config) {
-            echo $config;
-        }, $fileName, [
-            'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename='.$fileName,
-        ]);
-    }
+    //     return response()->streamDownload(function () use ($config) {
+    //         echo $config;
+    //     }, $fileName, [
+    //         'Content-Type' => 'application/json',
+    //         'Content-Disposition' => 'attachment; filename='.$fileName,
+    //     ]);
+    // }
 }
