@@ -3836,6 +3836,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - Update changelog
+- Update changelog
 
 ### 🎨 Styling
 
@@ -4400,6 +4401,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Remove unused code in Bugsink service
 - *(versions)* Update version to 404
 - *(versions)* Bump version to 404
+- *(versions)* Bump version to 406
 
 ### ◀️ Revert
 
