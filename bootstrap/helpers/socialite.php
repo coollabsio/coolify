@@ -52,6 +52,7 @@ function get_socialite_provider(string $provider)
         'github' => \Laravel\Socialite\Two\GithubProvider::class,
         'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
         'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
+        'discord' => \SocialiteProviders\Discord\Provider::class,
     ];
 
     return Socialite::buildProvider(

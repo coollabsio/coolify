@@ -2,6 +2,7 @@
     "auth.login": "Giriş",
     "auth.login.azure": "Microsoft ile Giriş Yap",
     "auth.login.bitbucket": "Bitbucket ile Giriş Yap",
+    "auth.login.discord": "Discord ile Giriş Yap",
     "auth.login.github": "GitHub ile Giriş Yap",
     "auth.login.gitlab": "GitLab ile Giriş Yap",
     "auth.login.google": "Google ile Giriş Yap",

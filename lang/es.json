@@ -2,6 +2,7 @@
     "auth.login": "Iniciar Sesión",
     "auth.login.azure": "Acceder con Microsoft",
     "auth.login.bitbucket": "Acceder con Bitbucket",
+    "auth.login.discord": "Acceder con Discord",
     "auth.login.github": "Acceder con GitHub",
     "auth.login.gitlab": "Acceder con Gitlab",
     "auth.login.google": "Acceder con Google",
