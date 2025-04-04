@@ -1,0 +1,36 @@
+# documentation: https://github.com/eduardolat/pgbackweb
+# slogan: Effortless PostgreSQL backups with a user-friendly web interface!
+# tags: backup, postgresql, web-interface
+# logo: svgs/pgbackweb.svg
+# port: 8085
+
+version: '3.8'
+services:
+  pgbackweb:
+    image: eduardolat/pgbackweb:latest
+    volumes:
+      - ./backups:/backups
+    environment:
+      - SERVICE_FQDN_PGBACKWEB_8085
+      - PBW_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_PGBACKWEB}
+      - PBW_POSTGRES_CONN_STRING=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/pgbackweb?sslmode=disable
+      - TZ=UTC
+    depends_on:
+      postgres:
+        condition: service_healthy
+        
+  postgres:
+    image: postgres:17
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=pgbackweb
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
