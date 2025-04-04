@@ -28,9 +28,9 @@ class EventServiceProvider extends ServiceProvider
         SocialiteWasCalled::class => [
             AzureExtendSocialite::class.'@handle',
             AuthentikExtendSocialite::class.'@handle',
+            DiscordExtendSocialite::class.'@handle',
             GoogleExtendSocialite::class.'@handle',
             InfomaniakExtendSocialite::class.'@handle',
-            DiscordExtendSocialite::class.'@handle',
         ],
         ProxyStarted::class => [
             ProxyStartedNotification::class,
