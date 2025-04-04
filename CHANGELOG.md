@@ -4,9 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(api)* Update OpenAPI spec for services (#5448)
+
+### 🐛 Bug Fixes
+
+- *(api)* Used ssh keys can be deleted
+- *(email)* Transactional emails not sending
+
+### 📚 Documentation
+
+- Update changelog
+
 ### ⚙️ Miscellaneous Tasks
 
-- *(versions)* Bump version to 404
+- *(versions)* Bump version to 406
 
 ## [4.0.0-beta.404] - 2025-04-03
 
@@ -41,6 +54,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Remove unused code in Bugsink service
 - *(versions)* Update version to 404
 - *(versions)* Bump version to 403 (#5520)
+- *(versions)* Bump version to 404
 
 ## [4.0.0-beta.402] - 2025-04-01
 
