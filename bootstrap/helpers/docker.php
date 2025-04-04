@@ -702,6 +702,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit',
         '--device',
         '--shm-size',
+        '--hostname',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -715,6 +716,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ip' => 'ip',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
+        '--hostname' => 'hostname'
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
