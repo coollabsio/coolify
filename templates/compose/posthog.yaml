@@ -438,7 +438,7 @@ services:
             You can either move the settings to the right place inside "users.xml" file
             or add <skip_check_for_incorrect_settings>1</skip_check_for_incorrect_settings> here.
           -->
-          <yandex>
+          <clickhouse>
               <logger>
                   <!-- Possible levels [1]:
 
@@ -1105,46 +1105,30 @@ services:
                   https://clickhouse.com/docs/en/operations/table_engines/distributed/
                 -->
               <remote_servers>
-
-                  <!-- Test only shard config for testing distributed storage -->
                   <posthog>
-                      <!-- Inter-server per-cluster secret for Distributed queries
-                          default: no secret (no authentication will be performed)
-
-                          If set, then Distributed queries will be validated on shards, so at least:
-                          - such cluster should exist on the shard,
-                          - such cluster should have the same secret.
-
-                          And also (and which is more important), the initial_user will
-                          be used as current user for the query.
-
-                          Right now the protocol is pretty simple and it only takes into account:
-                          - cluster name
-                          - query
-
-                          Also it will be nice if the following will be implemented:
-                          - source hostname (see interserver_http_host), but then it will depends from DNS,
-                            it can use IP address instead, but then the you need to get correct on the initiator node.
-                          - target hostname / ip address (same notes as for source hostname)
-                          - time-based security tokens
-                      -->
-                      <!-- <secret></secret> -->
-
                       <shard>
-                          <!-- Optional. Whether to write data to just one of the replicas. Default: false
-                          (write data to all replicas). -->
-                          <!-- <internal_replication>false</internal_replication> -->
-                          <!-- Optional. Shard weight when writing data. Default: 1. -->
-                          <!-- <weight>1</weight> -->
-                          <replica>
-                              <host>localhost</host>
+                         <replica>
+                              <host>clickhouse</host>
                               <port>9000</port>
-                              <!-- Optional. Priority of the replica for load_balancing. Default: 1 (less
-                              value has more priority). -->
-                              <!-- <priority>1</priority> -->
                           </replica>
                       </shard>
                   </posthog>
+                  <posthog_single_shard>
+                      <shard>
+                          <replica>
+                              <host>clickhouse</host>
+                              <port>9000</port>
+                          </replica>
+                      </shard>
+                  </posthog_single_shard>
+                  <posthog_migrations>
+                      <shard>
+                          <replica>
+                              <host>clickhouse</host>
+                              <port>9000</port>
+                          </replica>
+                      </shard>
+                  </posthog_migrations>
               </remote_servers>
 
               <!-- The list of hosts allowed to use in URL-related storage engines and table functions.
@@ -1203,8 +1187,9 @@ services:
               <macros>
                   <shard>01</shard>
                   <replica>ch1</replica>
+                  <hostClusterType>online</hostClusterType>
+                  <hostClusterRole>data</hostClusterRole>
               </macros>
-
 
               <!-- Reloading interval for embedded dictionaries, in seconds. Default: 3600. -->
               <builtin_dictionaries_reload_interval>3600</builtin_dictionaries_reload_interval>
@@ -1700,13 +1685,13 @@ services:
                   </tables>
               </rocksdb>
               -->
-          </yandex>
+          </clickhouse>
       - type: bind
         source: ./docker/clickhouse/users.xml
         target: /etc/clickhouse-server/users.xml
         content: |
           <?xml version="1.0"?>
-          <yandex>
+          <clickhouse>
               <!-- See also the files in users.d directory where the settings can be overridden. -->
 
               <!-- Profiles of settings. -->
@@ -1842,7 +1827,7 @@ services:
                       </interval>
                   </default>
               </quotas>
-          </yandex>
+          </clickhouse>
       - clickhouse-data:/var/lib/clickhouse
     depends_on:
       - kafka
