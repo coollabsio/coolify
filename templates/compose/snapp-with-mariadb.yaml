@@ -1,0 +1,52 @@
+# documentation: https://github.com/urania-dev/snapp
+# slogan: If you're seeking a self-hosted URL shortening solution, Snapp might be what you need.
+# tags: url, snapp, short, shortcode, urls, shortner, shortener, links, analytics, link, short-url, localized, i18n
+# logo: svgs/snapp.svg
+# port: 3000
+
+services:
+  snapp:
+    image: "uraniadev/snapp:latest"
+    environment:
+      - SERVICE_FQDN_SNAPP_3000
+      - PUBLIC_URL=$SERVICE_FQDN_SNAPP
+      - ORIGIN=$SERVICE_FQDN_SNAPP
+      - DATABASE_PROVIDER=mysql
+      - "DATABASE_URL=mysql://$SERVICE_USER_MARIADB:$SERVICE_PASSWORD_MARIADB@mariadb:3306/${MARIADB_DATABASE:-snapp}"
+      - TOKEN_SECRET=$SERVICE_BASE64_SNAPP
+      - 'ADMIN_USERNAME=${SERVICE_USER_ADMINSNAPP:-admin}'
+      - "ADMIN_EMAIL=${SNAPP_ADMIN_EMAIL:-admin@example.com}"
+      - "ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMINSNAPP"
+      - DISABLE_HOME=true
+      - ENABLE_SIGNUP=true
+      - PORT=3000
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://0.0.0.0:3000/health"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  mariadb:
+    image: "mariadb:latest"
+    volumes:
+      - "snapp_mariadb_data:/var/lib/mysql"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MARIADB_DATABASE:-snapp}
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  snapp_mariadb_data:
