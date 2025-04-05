@@ -297,7 +297,7 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
     exit
@@ -326,7 +326,7 @@ case "$OS_TYPE" in
 arch)
     pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
     ;;
-alpine)
+alpine | postmarketos)
     sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
     apk update >/dev/null
     apk add curl wget git jq openssl >/dev/null
@@ -388,7 +388,7 @@ if [ "$SSH_DETECTED" = "false" ]; then
         systemctl enable sshd >/dev/null 2>&1
         systemctl start sshd >/dev/null 2>&1
         ;;
-    alpine)
+    alpine | postmarketos)
         apk add openssh >/dev/null
         rc-update add sshd default >/dev/null 2>&1
         service sshd start >/dev/null 2>&1
@@ -472,7 +472,7 @@ if ! [ -x "$(command -v docker)" ]; then
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
         ;;
-    "alpine")
+    "alpine" | "postmarketos")
         apk add docker docker-cli-compose >/dev/null 2>&1
         rc-update add docker default >/dev/null 2>&1
         service docker start >/dev/null 2>&1
