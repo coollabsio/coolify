@@ -2,6 +2,7 @@
     "auth.login": "Entrar",
     "auth.login.azure": "Entrar com Microsoft",
     "auth.login.bitbucket": "Entrar com Bitbucket",
+    "auth.login.clerk": "Entrar com Clerk",
     "auth.login.github": "Entrar com GitHub",
     "auth.login.gitlab": "Entrar com Gitlab",
     "auth.login.google": "Entrar com Google",
