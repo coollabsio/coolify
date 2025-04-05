@@ -3798,6 +3798,7 @@ All notable changes to this project will be documented in this file.
 - *(database)* Remove debug output from volume update process
 - *(dev)* Remove OpenAPI generation functionality
 - *(migration)* Enhance local file volumes migration with logging
+- *(CheckProxy)* Replace 'which' with 'command -v' for command availability checks
 
 ### 📚 Documentation
 
@@ -3822,6 +3823,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(CONTRIBUTING)* Add note about Laravel Horizon accessibility
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
@@ -4402,6 +4404,7 @@ All notable changes to this project will be documented in this file.
 - *(versions)* Update version to 404
 - *(versions)* Bump version to 404
 - *(versions)* Bump version to 406
+- *(versions)* Bump version to 407
 
 ### ◀️ Revert
 
