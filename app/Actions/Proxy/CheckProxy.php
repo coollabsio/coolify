@@ -144,7 +144,7 @@ class CheckProxy
                     // Get listening process details
                     "ss_output=\$(ss -tuln state listening sport = :$port 2>/dev/null) && echo \"\$ss_output\"",
                     // Count IPv4 listeners
-                    "echo \"\$ss_output\" | grep -c 'LISTEN.*:$port'",
+                    "echo \"\$ss_output\" | grep -c ':$port '",
                 ],
             ],
             // Set 2: Use netstat as alternative to ss
@@ -154,7 +154,7 @@ class CheckProxy
                     // Get listening process details
                     "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep ':$port '",
                     // Count listeners
-                    "echo \"\$netstat_output\" | grep ':$port' | grep -c 'LISTEN'",
+                    "echo \"\$netstat_output\" | grep ':$port ' | grep -c 'LISTEN'",
                 ],
             ],
             // Set 3: Use lsof as last resort
