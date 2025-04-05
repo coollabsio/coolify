@@ -152,7 +152,7 @@ class CheckProxy
                 'available' => 'command -v netstat >/dev/null 2>&1',
                 'check' => [
                     // Get listening process details
-                    "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep ':$port'",
+                    "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep ':$port '",
                     // Count listeners
                     "echo \"\$netstat_output\" | grep ':$port' | grep -c 'LISTEN'",
                 ],
