@@ -139,7 +139,7 @@ class CheckProxy
         $commandSets = [
             // Set 1: Use ss to check listener counts by protocol stack
             [
-                'available' => 'which ss >/dev/null 2>&1',
+                'available' => 'command -v ss >/dev/null 2>&1',
                 'check' => [
                     // Get listening process details
                     "ss_output=\$(ss -tuln state listening sport = :$port 2>/dev/null) && echo \"\$ss_output\"",
@@ -149,7 +149,7 @@ class CheckProxy
             ],
             // Set 2: Use netstat as alternative to ss
             [
-                'available' => 'which netstat >/dev/null 2>&1',
+                'available' => 'command -v netstat >/dev/null 2>&1',
                 'check' => [
                     // Get listening process details
                     "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep ':$port'",
@@ -159,7 +159,7 @@ class CheckProxy
             ],
             // Set 3: Use lsof as last resort
             [
-                'available' => 'which lsof >/dev/null 2>&1',
+                'available' => 'command -v lsof >/dev/null 2>&1',
                 'check' => [
                     // Get process using the port
                     "lsof -i :$port -P -n | grep 'LISTEN'",
