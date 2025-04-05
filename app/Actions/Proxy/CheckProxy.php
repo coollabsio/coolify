@@ -27,7 +27,7 @@ class CheckProxy
             return false;
         }
         $proxyType = $server->proxyType();
-        if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
+        if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) && ! $fromUI) {
             return false;
         }
         if (! $server->isProxyShouldRun()) {
@@ -65,7 +65,6 @@ class CheckProxy
             if ($server->id === 0) {
                 $ip = 'host.docker.internal';
             }
-
             $portsToCheck = ['80', '443'];
 
             foreach ($portsToCheck as $port) {

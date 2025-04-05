@@ -34,6 +34,9 @@ class Status extends Component
     public function checkProxy(bool $notification = false)
     {
         try {
+            if ($this->server->proxy->force_stop) {
+                return;
+            }
             if ($this->polling) {
                 if ($this->numberOfPolls >= 10) {
                     $this->polling = false;
