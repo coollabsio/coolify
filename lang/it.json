@@ -3,6 +3,7 @@
     "auth.login.authentik": "Accedi con Authentik",
     "auth.login.azure": "Accedi con Microsoft",
     "auth.login.bitbucket": "Accedi con Bitbucket",
+    "auth.login.discord": "Accedi con Discord",
     "auth.login.github": "Accedi con GitHub",
     "auth.login.gitlab": "Accedi con Gitlab",
     "auth.login.google": "Accedi con Google",
