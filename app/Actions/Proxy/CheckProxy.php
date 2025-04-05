@@ -142,7 +142,7 @@ class CheckProxy
                 'available' => 'command -v ss >/dev/null 2>&1',
                 'check' => [
                     // Get listening process details
-                    "ss_output=\$(ss -tuln state listening sport = :$port 2>/dev/null) && echo \"\$ss_output\"",
+                    "ss_output=\$(ss -Htuln state listening sport = :$port 2>/dev/null) && echo \"\$ss_output\"",
                     // Count IPv4 listeners
                     "echo \"\$ss_output\" | grep -c ':$port '",
                 ],
