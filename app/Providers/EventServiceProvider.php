@@ -14,6 +14,7 @@ use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Google\GoogleExtendSocialite;
 use SocialiteProviders\Infomaniak\InfomaniakExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\Zitadel\ZitadelExtendSocialite;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -29,6 +30,7 @@ class EventServiceProvider extends ServiceProvider
             AuthentikExtendSocialite::class.'@handle',
             GoogleExtendSocialite::class.'@handle',
             InfomaniakExtendSocialite::class.'@handle',
+            ZitadelExtendSocialite::class.'@handle',
         ],
         ProxyStarted::class => [
             ProxyStartedNotification::class,
