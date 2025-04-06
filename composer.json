@@ -1,26 +1,39 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "coollabsio/coolify",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Coolify a free, open-source & self-hostable PaaS alternative to Heroku, Netlify, Vercel and Railway.",
+    "homepage": "https://coolify.io",
     "keywords": [
-        "laravel",
-        "framework"
+        "coolify",
+        "deployment",
+        "self-hosted",
+        "open-source",
+        "docker",
+        "podman"
     ],
-    "license": "MIT",
+    "license": "AGPL-3.0",
     "require": {
-        "php": "^8.2",
-        "laravel/framework": "^12.0",
+        "php": "^8.4",
+        "laravel/framework": "^12.9.2",
         "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.23",
+        "driftingly/rector-laravel": "^2.0.4",
+        "fakerphp/faker": "^1.24.1",
+        "larastan/larastan": "^3.4.0",
         "laravel/pail": "^1.2.2",
-        "laravel/pint": "^1.13",
-        "laravel/sail": "^1.41",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^11.5.3"
+        "laravel/pint": "^1.22.0",
+        "mockery/mockery": "^1.6.12",
+        "nunomaduro/collision": "^8.8",
+        "peckphp/peck": "^0.1.3",
+        "pestphp/pest": "^3.8.2",
+        "pestphp/pest-plugin-laravel": "^3.2",
+        "pestphp/pest-plugin-type-coverage": "^3.5.1",
+        "phpstan/phpstan-deprecation-rules": "^2.0.1",
+        "phpstan/phpstan-strict-rules": "^2.0.4",
+        "rector/rector": "^2.0.11",
+        "spatie/laravel-ray": "^1.40.2"
     },
     "autoload": {
         "psr-4": {
@@ -50,9 +63,37 @@
             "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force",
+            "npm install",
+            "npm run build"
+        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+        ],
+        "refactor": "rector",
+        "lint": "pint",
+        "test": "pest",
+        "test:refactor": "rector --dry-run",
+        "test:lint": "pint --test",
+        "test:typos": "peck",
+        "test:types": "phpstan --memory-limit=1G",
+        "test:test-coverage": "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100",
+        "test:type-coverage": "pest --type-coverage --memory-limit=1G --min=100",
+        "test:all": [
+            "@php artisan config:clear --ansi",
+            "@test:refactor",
+            "@test:lint",
+            "@test:types",
+            "@test:test-coverage",
+            "@test:type-coverage"
         ]
     },
     "extra": {
