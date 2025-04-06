@@ -1,26 +1,39 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "coollabsio/coolify",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "homepage": "https://coolify.io",
+    "description": "Coolify an open-source & self-hostable Heroku, Netlify, Vercel and Railway alternative.",
     "keywords": [
-        "laravel",
-        "framework"
+        "coolify",
+        "deployment",
+        "self-hosted",
+        "open-source",
+        "docker",
+        "podman"
     ],
-    "license": "MIT",
+    "license": "Apache-2.0",
     "require": {
-        "php": "^8.2",
-        "laravel/framework": "^12.0",
+        "php": "^8.4",
+        "laravel/framework": "^12.3",
         "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.23",
+        "driftingly/rector-laravel": "^2.0.2",
+        "fakerphp/faker": "^1.24.1",
+        "larastan/larastan": "^3.2",
         "laravel/pail": "^1.2.2",
-        "laravel/pint": "^1.13",
-        "laravel/sail": "^1.41",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^11.5.3"
+        "laravel/pint": "^1.21.2",
+        "mockery/mockery": "^1.6.12",
+        "nunomaduro/collision": "^8.7",
+        "peckphp/peck": "^0.1.2",
+        "pestphp/pest": "^3.7.4",
+        "pestphp/pest-plugin-laravel": "^3.1",
+        "pestphp/pest-plugin-type-coverage": "^3.4",
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "rector/rector": "^2.0.11",
+        "spatie/laravel-ray": "^1.40.2"
     },
     "autoload": {
         "psr-4": {
@@ -53,6 +66,22 @@
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
+        ],
+        "refactor": "rector",
+        "types": "phpstan --memory-limit=1G",
+        "lint": "pint",
+        "test": "pest",
+        "test:test-coverage": "pest --parallel --coverage --exactly=100",
+        "test:type-coverage": "pest --type-coverage --memory-limit=1G --min=100",
+        "test:refactor": "rector --dry-run",
+        "test:types": "phpstan --memory-limit=1G",
+        "test:lint": "pint --test",
+        "test:all": [
+            "@test:refactor",
+            "@test:types",
+            "@test:lint",
+            "@test:test-coverage",
+            "@test:type-coverage"
         ]
     },
     "extra": {
