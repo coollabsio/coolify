@@ -1,16 +1,16 @@
 {
+    "name": "coolify",
     "private": true,
     "type": "module",
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.1.3",
+        "concurrently": "^9.1.2",
+        "laravel-vite-plugin": "^1.2.0",
+        "tailwindcss": "^4.1.3",
+        "vite": "^6.2.5"
+    },
     "scripts": {
         "build": "vite build",
         "dev": "vite"
-    },
-    "devDependencies": {
-        "@tailwindcss/vite": "^4.0.0",
-        "axios": "^1.7.4",
-        "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^1.2.0",
-        "tailwindcss": "^4.0.0",
-        "vite": "^6.0.11"
     }
 }
