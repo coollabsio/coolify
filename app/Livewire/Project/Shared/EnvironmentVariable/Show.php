@@ -4,10 +4,13 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
+use App\Traits\EnvironmentVariableProtection;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use EnvironmentVariableProtection;
+
     public $parameters;
 
     public ModelsEnvironmentVariable|SharedEnvironmentVariable $env;
@@ -175,11 +178,24 @@ class Show extends Component
     public function delete()
     {
         try {
-            if ($this->is_redis_credential) {
-                $this->dispatch('error', 'Cannot delete Redis credentials.');
+            // Check if the variable is protected
+            if ($this->isProtectedEnvironmentVariable($this->env->key)) {
+                $this->dispatch('error', "Cannot delete system environment variable '{$this->env->key}'.");
 
                 return;
             }
+
+            // Check if the variable is used in Docker Compose
+            if ($this->type === 'service' || $this->type === 'application' && $this->env->resource()?->docker_compose) {
+                [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resource()?->docker_compose);
+
+                if ($isUsed) {
+                    $this->dispatch('error', "Cannot delete environment variable '{$this->env->key}' <br><br>Please remove it from the Docker Compose file first.");
+
+                    return;
+                }
+            }
+
             $this->env->delete();
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');
