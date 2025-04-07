@@ -5900,8 +5900,7 @@
                                     "server_uuid",
                                     "project_uuid",
                                     "environment_name",
-                                    "environment_uuid",
-                                    "type"
+                                    "environment_uuid"
                                 ],
                                 "properties": {
                                     "type": {
@@ -6030,6 +6029,10 @@
                                         "type": "boolean",
                                         "default": false,
                                         "description": "Start the service immediately after creation."
+                                    },
+                                    "docker_compose_raw": {
+                                        "type": "string",
+                                        "description": "The Docker Compose raw content."
                                     }
                                 },
                                 "type": "object"

@@ -40,6 +40,8 @@ class Show extends Component
 
     public bool $is_really_required = false;
 
+    public bool $is_redis_credential = false;
+
     protected $listeners = [
         'refreshEnvs' => 'refresh',
         'refresh',
@@ -65,7 +67,9 @@ class Show extends Component
         }
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
-
+        if ($this->type === 'standalone-redis' && ($this->env->key === 'REDIS_PASSWORD' || $this->env->key === 'REDIS_USERNAME')) {
+            $this->is_redis_credential = true;
+        }
     }
 
     public function refresh()
@@ -171,6 +175,11 @@ class Show extends Component
     public function delete()
     {
         try {
+            if ($this->is_redis_credential) {
+                $this->dispatch('error', 'Cannot delete Redis credentials.');
+
+                return;
+            }
             $this->env->delete();
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');
