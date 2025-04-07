@@ -1465,7 +1465,7 @@ services:
         target: /var/lib/clickhouse/
 
   signoz:
-    image: signoz/signoz:${DOCKER_TAG:-v0.76.2}
+    image: signoz/signoz:${VERSION:-v0.77.0}
     container_name: signoz
     depends_on:
       clickhouse:
@@ -1546,7 +1546,7 @@ services:
       retries: 3
 
   otel-collector:
-    image: signoz/signoz-otel-collector:${OTELCOL_TAG:-v0.111.34}
+    image: signoz/signoz-otel-collector:${OTELCOL_TAG:-v0.111.37}
     container_name: signoz-otel-collector
     depends_on:
       clickhouse:
@@ -1691,7 +1691,7 @@ services:
       retries: 3
 
   schema-migrator-sync:
-    image: signoz/signoz-schema-migrator:${OTELCOL_TAG:-v0.111.34}
+    image: signoz/signoz-schema-migrator:${OTELCOL_TAG:-v0.111.37}
     container_name: schema-migrator-sync
     command:
       - sync
@@ -1707,7 +1707,7 @@ services:
         max-file: "3"
 
   schema-migrator-async:
-    image: signoz/signoz-schema-migrator:${OTELCOL_TAG:-v0.111.34}
+    image: signoz/signoz-schema-migrator:${OTELCOL_TAG:-v0.111.37}
     container_name: schema-migrator-async
     depends_on:
       clickhouse:
