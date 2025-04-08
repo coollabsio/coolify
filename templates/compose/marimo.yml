@@ -24,9 +24,11 @@ services:
     healthcheck:
       test:
         - CMD
-        - bash
-        - -c
-        - "pip install --upgrade pip -q; pip install requests -q; python -c 'import requests as r;r.get(\"http://0.0.0.0:8080\").raise_for_status()'"
+        - uvx
+        - --with
+        - httpx[cli]
+        - httpx
+        - http://localhost:8080/health
       interval: 5s
       timeout: 5s
       retries: 3
