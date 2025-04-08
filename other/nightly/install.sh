@@ -9,6 +9,7 @@
 ## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
 ## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
+## REGISTRY_URL - Custom registry URL for Docker images (default: ghcr.io)
 
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
@@ -17,7 +18,9 @@ set -o pipefail # Cause a pipeline to return the status of the last command that
 CDN="https://cdn.coollabs.io/coolify-nightly"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
-VERSION="1.8"
+OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+ENV_FILE="/data/coolify/source/.env"
+VERSION="20"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -35,6 +38,18 @@ echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/in
 ROOT_USERNAME=${ROOT_USERNAME:-}
 ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
 ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
+
+if [ -n "${REGISTRY_URL+x}" ]; then
+    echo "Using registry URL from environment variable: $REGISTRY_URL"
+else
+    if [ -f "$ENV_FILE" ] && grep -q "^REGISTRY_URL=" "$ENV_FILE"; then
+        REGISTRY_URL=$(grep "^REGISTRY_URL=" "$ENV_FILE" | cut -d '=' -f2)
+        echo "Using registry URL from .env: $REGISTRY_URL"
+    else
+        REGISTRY_URL="ghcr.io"
+        echo "Using default registry URL: $REGISTRY_URL"
+    fi
+fi
 
 # Docker address pool configuration defaults
 DOCKER_ADDRESS_POOL_BASE_DEFAULT="10.0.0.0/8"
@@ -227,8 +242,6 @@ getAJoke() {
         echo -e "$JOKES\n"
     fi
 }
-OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
-ENV_FILE="/data/coolify/source/.env"
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
@@ -305,6 +318,7 @@ echo "| Coolify           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
+echo "| Registry URL      | $REGISTRY_URL"
 echo -e "---------------------------------------------\n"
 echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
@@ -432,7 +446,7 @@ if [ -x "$(command -v snap)" ]; then
 fi
 
 install_docker() {
-    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1
+    curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1 || true
     if ! [ -x "$(command -v docker)" ]; then
         curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
         if ! [ -x "$(command -v docker)" ]; then
@@ -481,7 +495,7 @@ if ! [ -x "$(command -v docker)" ]; then
         dnf install docker -y >/dev/null 2>&1
         DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
         mkdir -p $DOCKER_CONFIG/cli-plugins >/dev/null 2>&1
-        curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
+        curl -sL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
         chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
         systemctl start docker >/dev/null 2>&1
         systemctl enable docker >/dev/null 2>&1
@@ -718,6 +732,16 @@ if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASS
     fi
 fi
 
+# Add registry URL to .env file
+if [ -n "${REGISTRY_URL+x}" ]; then
+    # Only update if REGISTRY_URL was explicitly provided
+    if grep -q "^REGISTRY_URL=" "$ENV_FILE-$DATE"; then
+        sed -i "s|^REGISTRY_URL=.*|REGISTRY_URL=$REGISTRY_URL|" "$ENV_FILE-$DATE"
+    else
+        echo "REGISTRY_URL=$REGISTRY_URL" >>"$ENV_FILE-$DATE"
+    fi
+fi
+
 # Merge .env and .env.production. New values will be added to .env
 echo -e "7. Propagating .env with new values - if necessary."
 awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production >$ENV_FILE
@@ -778,7 +802,11 @@ echo -e " - It could take a while based on your server's performance, network sp
 echo -e " - Please wait."
 getAJoke
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}"
+if [[ $- == *x* ]]; then
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+else
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+fi
 echo " - Coolify installed successfully."
 rm -f $ENV_FILE-$DATE
 
@@ -794,8 +822,17 @@ echo -e "\033[0;35m
   \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
                    |___/
 \033[0m"
+
+IPV4_PUBLIC_IP=$(curl -4s https://ifconfig.io || true)
+IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
+
 echo -e "\nYour instance is ready to use!\n"
-echo -e "You can access Coolify through your Public IP: http://$(curl -4s https://ifconfig.io):8000"
+if [ -n "$IPV4_PUBLIC_IP" ]; then
+    echo -e "You can access Coolify through your Public IPV4: http://$(curl -4s https://ifconfig.io):8000"
+fi
+if [ -n "$IPV6_PUBLIC_IP" ]; then
+    echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"
+fi
 
 set +e
 DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')

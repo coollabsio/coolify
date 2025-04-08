@@ -7,9 +7,12 @@ use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\RegenerateSslCertJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
+use App\Services\ConfigurationRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -484,7 +487,7 @@ $schema://$host {
         $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
-        // TODO: should use /traefik for already exisiting configurations?
+        // TODO: should use /traefik for already existing configurations?
         // Should move everything except /caddy and /nginx to /traefik
         // The code needs to be modified as well, so maybe it does not worth it
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
@@ -543,7 +546,7 @@ $schema://$host {
         $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
-        Storage::disk('ssh-mux')->delete($this->muxFilename());
+        $this->disableSshMux();
     }
 
     public function sentinelHeartbeat(bool $isReset = false)
@@ -922,7 +925,7 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && $this->settings->force_disabled === false && $this->ip !== '1.2.3.4';
+        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && $this->ip !== '1.2.3.4';
 
         if ($isFunctional === false) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());
@@ -1103,7 +1106,7 @@ $schema://$host {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        config()->set('constants.ssh.mux_enabled', false);
+        $this->disableSshMux();
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
@@ -1329,5 +1332,48 @@ $schema://$host {
         return $this->applications()->count() == 0 &&
             $this->databases()->count() == 0 &&
             $this->services()->count() == 0;
+    }
+
+    private function disableSshMux(): void
+    {
+        $configRepository = app(ConfigurationRepository::class);
+        $configRepository->disableSshMux();
+    }
+
+    public function generateCaCertificate()
+    {
+        try {
+            ray('Generating CA certificate for server', $this->id);
+            SslHelper::generateSslCertificate(
+                commonName: 'Coolify CA Certificate',
+                serverId: $this->id,
+                isCaCertificate: true,
+                validityDays: 10 * 365
+            );
+            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            ray('CA certificate generated', $caCertificate);
+            if ($caCertificate) {
+                $certificateContent = $caCertificate->ssl_certificate;
+                $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+
+                $commands = collect([
+                    "mkdir -p $caCertPath",
+                    "chown -R 9999:root $caCertPath",
+                    "chmod -R 700 $caCertPath",
+                    "rm -rf $caCertPath/coolify-ca.crt",
+                    "echo '{$certificateContent}' > $caCertPath/coolify-ca.crt",
+                    "chmod 644 $caCertPath/coolify-ca.crt",
+                ]);
+
+                instant_remote_process($commands, $this, false);
+
+                dispatch(new RegenerateSslCertJob(
+                    server_id: $this->id,
+                    force_regeneration: true
+                ));
+            }
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
     }
 }

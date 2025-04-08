@@ -1494,6 +1494,49 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/logs':
+    get:
+      tags:
+        - Applications
+      summary: 'Get application logs.'
+      description: 'Get application logs by UUID.'
+      operationId: get-application-logs-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: lines
+          in: query
+          description: 'Number of lines to show from the end of the logs.'
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 100
+      responses:
+        '200':
+          description: 'Get application logs by UUID.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  logs: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}/envs':
     get:
       tags:
@@ -1852,52 +1895,6 @@ paths:
                 properties:
                   message: { type: string, example: 'Restart request queued.' }
                   deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
-  '/applications/{uuid}/execute':
-    post:
-      tags:
-        - Applications
-      summary: 'Execute Command'
-      description: "Execute a command on the application's current container."
-      operationId: execute-command-application
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the application.'
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        description: 'Command to execute.'
-        required: true
-        content:
-          application/json:
-            schema:
-              properties:
-                command:
-                  type: string
-                  description: 'Command to execute.'
-              type: object
-      responses:
-        '200':
-          description: "Execute a command on the application's current container."
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Command executed.' }
-                  response: { type: string }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3109,6 +3106,12 @@ paths:
           description: 'Force rebuild (without cache)'
           schema:
             type: boolean
+        -
+          name: pr
+          in: query
+          description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.'
+          schema:
+            type: integer
       responses:
         '200':
           description: "Get deployment(s) UUID's"
@@ -3118,6 +3121,29 @@ paths:
                 properties:
                   deployments: { type: array, items: { properties: { message: { type: string }, resource_uuid: { type: string }, deployment_uuid: { type: string } }, type: object } }
                 type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/deployments/applications/{uuid}':
+    get:
+      tags:
+        - Deployments
+      summary: 'List application deployments'
+      description: 'List application deployments by using the app uuid'
+      operationId: list-deployments-by-app-uuid
+      responses:
+        '200':
+          description: 'List application deployments by using the app uuid.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -3952,8 +3978,8 @@ paths:
     post:
       tags:
         - Services
-      summary: Create
-      description: 'Create a one-click service'
+      summary: 'Create service'
+      description: 'Create a one-click / custom service'
       operationId: create-service
       requestBody:
         required: true
@@ -3965,7 +3991,6 @@ paths:
                 - project_uuid
                 - environment_name
                 - environment_uuid
-                - type
               properties:
                 type:
                   description: 'The one-click service type'
@@ -3998,10 +4023,13 @@ paths:
                   type: boolean
                   default: false
                   description: 'Start the service immediately after creation.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
               type: object
       responses:
         '201':
-          description: 'Create a service.'
+          description: 'Service created successfully.'
           content:
             application/json:
               schema:
@@ -4101,6 +4129,76 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Service deletion request queued.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Services
+      summary: Update
+      description: 'Update service by UUID.'
+      operationId: update-service-by-uuid
+      requestBody:
+        description: 'Service updated.'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+                - docker_compose_raw
+              properties:
+                name:
+                  type: string
+                  description: 'The service name.'
+                description:
+                  type: string
+                  description: 'The service description.'
+                project_uuid:
+                  type: string
+                  description: 'The project UUID.'
+                environment_name:
+                  type: string
+                  description: 'The environment name.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID.'
+                server_uuid:
+                  type: string
+                  description: 'The server UUID.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID.'
+                instant_deploy:
+                  type: boolean
+                  description: 'The flag to indicate if the service should be deployed instantly.'
+                connect_to_docker_network:
+                  type: boolean
+                  default: false
+                  description: 'Connect the service to the predefined docker network.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
+              type: object
+      responses:
+        '200':
+          description: 'Service updated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string, description: 'Service UUID.' }
+                  domains: { type: array, items: { type: string }, description: 'Service domains.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'

@@ -56,6 +56,7 @@ Route::group([
     Route::match(['get', 'post'], '/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:write,deploy']);
     Route::get('/deployments', [DeployController::class, 'deployments'])->middleware(['api.ability:read']);
     Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/deployments/applications/{uuid}', [DeployController::class, 'get_application_deployments'])->middleware(['api.ability:read']);
 
     Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);
@@ -116,7 +117,7 @@ Route::group([
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid'])->middleware(['api.ability:read']);
-    // Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['ability:write']);
+    Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['ability:write']);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}/envs', [ServicesController::class, 'envs'])->middleware(['api.ability:read']);

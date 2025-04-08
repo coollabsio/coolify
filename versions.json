@@ -1,13 +1,13 @@
 {
     "coolify": {
         "v4": {
-            "version": "4.0.0-beta.399"
+            "version": "4.0.0-beta.407"
         },
         "nightly": {
-            "version": "4.0.0-beta.400"
+            "version": "4.0.0-beta.408"
         },
         "helper": {
-            "version": "1.0.7"
+            "version": "1.0.8"
         },
         "realtime": {
             "version": "1.0.6"

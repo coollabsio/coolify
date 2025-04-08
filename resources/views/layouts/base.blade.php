@@ -37,7 +37,7 @@
     @env('local')
     <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/x-icon" />
 @else
-    <link rel="icon" href="{{ asset('coolify-transparent.png') }}" type="image/x-icon" />
+    <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/x-icon" />
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])

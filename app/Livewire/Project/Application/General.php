@@ -87,6 +87,7 @@ class General extends Component
         'application.post_deployment_command_container' => 'nullable',
         'application.custom_nginx_configuration' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
+        'application.settings.is_spa' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.settings.is_container_label_readonly_enabled' => 'boolean|required',
@@ -126,6 +127,7 @@ class General extends Component
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
         'application.custom_nginx_configuration' => 'Custom Nginx configuration',
         'application.settings.is_static' => 'Is static',
+        'application.settings.is_spa' => 'Is SPA',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
         'application.settings.is_container_label_readonly_enabled' => 'Is container label readonly',
@@ -173,6 +175,9 @@ class General extends Component
 
     public function instantSave()
     {
+        if ($this->application->settings->isDirty('is_spa')) {
+            $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
+        }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
         $this->application->refresh();
@@ -192,6 +197,7 @@ class General extends Component
         if ($this->application->settings->is_container_label_readonly_enabled) {
             $this->resetDefaultLabels(false);
         }
+
     }
 
     public function loadComposeFile($isInit = false)
@@ -289,9 +295,9 @@ class General extends Component
         }
     }
 
-    public function generateNginxConfiguration()
+    public function generateNginxConfiguration($type = 'static')
     {
-        $this->application->custom_nginx_configuration = defaultNginxConfiguration();
+        $this->application->custom_nginx_configuration = defaultNginxConfiguration($type);
         $this->application->save();
         $this->dispatch('success', 'Nginx configuration generated.');
     }
@@ -371,6 +377,9 @@ class General extends Component
             if ($this->application->isDirty('redirect')) {
                 $this->setRedirect();
             }
+            if ($this->application->isDirty('dockerfile')) {
+                $this->application->parseHealthcheckFromDockerfile($this->application->dockerfile);
+            }
 
             $this->checkFqdns();
 
@@ -448,7 +457,6 @@ class General extends Component
     {
         $config = GenerateConfig::run($this->application, true);
         $fileName = str($this->application->name)->slug()->append('_config.json');
-        dd($config);
 
         return response()->streamDownload(function () use ($config) {
             echo $config;

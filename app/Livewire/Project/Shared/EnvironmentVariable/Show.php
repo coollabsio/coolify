@@ -4,10 +4,13 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
+use App\Traits\EnvironmentVariableProtection;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use EnvironmentVariableProtection;
+
     public $parameters;
 
     public ModelsEnvironmentVariable|SharedEnvironmentVariable $env;
@@ -40,6 +43,8 @@ class Show extends Component
 
     public bool $is_really_required = false;
 
+    public bool $is_redis_credential = false;
+
     protected $listeners = [
         'refreshEnvs' => 'refresh',
         'refresh',
@@ -65,7 +70,9 @@ class Show extends Component
         }
         $this->parameters = get_route_parameters();
         $this->checkEnvs();
-
+        if ($this->type === 'standalone-redis' && ($this->env->key === 'REDIS_PASSWORD' || $this->env->key === 'REDIS_USERNAME')) {
+            $this->is_redis_credential = true;
+        }
     }
 
     public function refresh()
@@ -171,6 +178,24 @@ class Show extends Component
     public function delete()
     {
         try {
+            // Check if the variable is protected
+            if ($this->isProtectedEnvironmentVariable($this->env->key)) {
+                $this->dispatch('error', "Cannot delete system environment variable '{$this->env->key}'.");
+
+                return;
+            }
+
+            // Check if the variable is used in Docker Compose
+            if ($this->type === 'service' || $this->type === 'application' && $this->env->resource()?->docker_compose) {
+                [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resource()?->docker_compose);
+
+                if ($isUsed) {
+                    $this->dispatch('error', "Cannot delete environment variable '{$this->env->key}' <br><br>Please remove it from the Docker Compose file first.");
+
+                    return;
+                }
+            }
+
             $this->env->delete();
             $this->dispatch('environmentVariableDeleted');
             $this->dispatch('success', 'Environment variable deleted successfully.');

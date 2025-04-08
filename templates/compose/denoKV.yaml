@@ -1,7 +1,7 @@
 # documentation: https://docs.deno.com/deploy/kv/manual/
 # slogan: The Denoland key-value database
 # tags: deno, kv, key-value, database
-# logo: svgs/deno.svg
+# logo: svgs/denoKV.svg
 # port: 4512
 
 services:

@@ -1250,13 +1250,23 @@ function get_public_ips()
 function isAnyDeploymentInprogress()
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
+    $basicDetails = $runningJobs->map(function ($job) {
+        return [
+            'id' => $job->id,
+            'created_at' => $job->created_at,
+            'application_id' => $job->application_id,
+            'server_id' => $job->server_id,
+            'horizon_job_id' => $job->horizon_job_id,
+            'status' => $job->status,
+        ];
+    });
+    echo 'Running jobs: '.json_encode($basicDetails)."\n";
     $horizonJobIds = [];
     foreach ($runningJobs as $runningJob) {
         $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
-        if ($horizonJobStatus === 'unknown') {
-            return true;
+        if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
+            $horizonJobIds[] = $runningJob->horizon_job_id;
         }
-        $horizonJobIds[] = $runningJob->horizon_job_id;
     }
     if (count($horizonJobIds) === 0) {
         echo "No deployments in progress.\n";
@@ -1665,6 +1675,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                                 return $volume;
                             }
+
                             LocalFileVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
@@ -3164,6 +3175,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
     }
 
+    $serviceAppsLogDrainEnabledMap = collect([]);
+    if ($resource instanceof Service) {
+        $serviceAppsLogDrainEnabledMap = $resource->applications()->get()->keyBy('name')->map(function ($app) {
+            return $app->isLogDrainEnabled();
+        });
+    }
+
     // Parse the rest of the services
     foreach ($services as $serviceName => $service) {
         $image = data_get_str($service, 'image');
@@ -3172,6 +3190,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
 
         if ($server->isLogDrainEnabled()) {
             if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
+                $logging = generate_fluentd_configuration();
+            }
+            if ($resource instanceof Service && $serviceAppsLogDrainEnabledMap->get($serviceName)) {
                 $logging = generate_fluentd_configuration();
             }
         }
@@ -4050,9 +4071,35 @@ function isEmailRateLimited(string $limiterKey, int $decaySeconds = 3600, ?calla
     return $rateLimited;
 }
 
-function defaultNginxConfiguration(): string
+function defaultNginxConfiguration(string $type = 'static'): string
 {
-    return 'server {
+    if ($type === 'spa') {
+        return <<<'NGINX'
+server {
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+}
+NGINX;
+    } else {
+        return <<<'NGINX'
+server {
     location / {
         root /usr/share/nginx/html;
         index index.html index.htm;
@@ -4072,7 +4119,9 @@ function defaultNginxConfiguration(): string
         root /usr/share/nginx/html;
         internal;
     }
-}';
+}
+NGINX;
+    }
 }
 
 function convertGitUrl(string $gitRepository, string $deploymentType, ?GithubApp $source = null): array
@@ -4136,4 +4185,36 @@ function getJobStatus(?string $jobId = null)
     }
 
     return $jobFound->first()->status;
+}
+
+function parseDockerfileInterval(string $something)
+{
+    $value = preg_replace('/[^0-9]/', '', $something);
+    $unit = preg_replace('/[0-9]/', '', $something);
+
+    // Default to seconds if no unit specified
+    $unit = $unit ?: 's';
+
+    // Convert to seconds based on unit
+    $seconds = (int) $value;
+    switch ($unit) {
+        case 'ns':
+            $seconds = (int) ($value / 1000000000);
+            break;
+        case 'us':
+        case 'µs':
+            $seconds = (int) ($value / 1000000);
+            break;
+        case 'ms':
+            $seconds = (int) ($value / 1000);
+            break;
+        case 'm':
+            $seconds = (int) ($value * 60);
+            break;
+        case 'h':
+            $seconds = (int) ($value * 3600);
+            break;
+    }
+
+    return $seconds;
 }
