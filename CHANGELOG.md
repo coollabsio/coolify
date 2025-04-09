@@ -6,6 +6,30 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(EnvironmentVariable)* Add handling for Redis credentials in the environment variable component
+- *(EnvironmentVariable)* Implement protection for critical environment variables and enhance deletion logic
+- *(Application)* Add networkAliases attribute for handling network aliases as JSON or comma-separated values
+
+### 🐛 Bug Fixes
+
+- *(General)* Change redis_password property to nullable string
+
+### 🚜 Refactor
+
+- *(Application)* Rename network_aliases to custom_network_aliases across the application for clarity and consistency
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 407 and 408 for coolify and nightly
+
+## [4.0.0-beta.406] - 2025-04-05
+
+### 🚀 Features
+
 - *(Deploy)* Add info dispatch for proxy check initiation
 
 ### 🐛 Bug Fixes
