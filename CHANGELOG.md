@@ -4,12 +4,184 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(EnvironmentVariable)* Add handling for Redis credentials in the environment variable component
+- *(EnvironmentVariable)* Implement protection for critical environment variables and enhance deletion logic
+- *(Application)* Add networkAliases attribute for handling network aliases as JSON or comma-separated values
+
 ### 🐛 Bug Fixes
 
-- *(file-storage)* Double save on compose volumes
+- *(General)* Change redis_password property to nullable string
 
 ### 🚜 Refactor
 
+- *(Application)* Rename network_aliases to custom_network_aliases across the application for clarity and consistency
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 407 and 408 for coolify and nightly
+
+## [4.0.0-beta.406] - 2025-04-05
+
+### 🚀 Features
+
+- *(Deploy)* Add info dispatch for proxy check initiation
+
+### 🐛 Bug Fixes
+
+- *(CheckProxy)* Update port conflict check to ensure accurate grep matching
+- *(CheckProxy)* Refine port conflict detection with improved grep patterns
+- *(CheckProxy)* Enhance port conflict detection by adjusting ss command for better output
+- *(api)* Add back validateDataApplications (#5539)
+- *(CheckProxy, Status)* Prevent proxy checks when force_stop is active; remove debug statement in General
+- *(Status)* Conditionally check proxy status and refresh button based on force_stop state
+
+### 🚜 Refactor
+
+- *(Server)* Use data_get for safer access to settings properties in isFunctional method
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 406
+
+## [4.0.0-beta.405] - 2025-04-04
+
+### 🚀 Features
+
+- *(api)* Update OpenAPI spec for services (#5448)
+
+### 🐛 Bug Fixes
+
+- *(api)* Used ssh keys can be deleted
+- *(email)* Transactional emails not sending
+
+### 🚜 Refactor
+
+- *(CheckProxy)* Replace 'which' with 'command -v' for command availability checks
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 406
+- *(versions)* Bump version to 407
+
+## [4.0.0-beta.404] - 2025-04-03
+
+### 🚀 Features
+
+- *(proxy)* Enhance proxy handling and port conflict detection
+- *(lang)* Added Azerbaijani language updated turkish language. (#5497)
+- *(lang)* Added Portuguese from Brazil language (#5500)
+- *(lang)* Add Indonesian language translations (#5513)
+
+### 🐛 Bug Fixes
+
+- *(database)* Custom config for MongoDB (#5471)
+- *(ui)* Instance Backup settings
+- *(docs)* Comment out execute for now
+- *(installation)* Mount the docker config
+- *(installation)* Path to config file for docker login
+- *(service)* Add health check to Bugsink service (#5512)
+- *(email)* Emails are not sent in multiple cases
+- *(deployments)* Use graceful shutdown instead of `rm`
+- *(docs)* Contribute service url (#5517)
+- *(proxy)* Proxy restart does not work on domain
+- *(ui)* Only show copy button on https
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump version to 403 (#5520)
+- *(versions)* Update coolify version numbers to 4.0.0-beta.403 and 4.0.0-beta.404
+- *(service)* Remove unused code in Bugsink service
+- *(versions)* Update version to 404
+- *(versions)* Bump version to 404
+
+## [4.0.0-beta.402] - 2025-04-01
+
+### 🚀 Features
+
+- *(deployments)* Add list application deployments api route
+- *(deploy)* Add pull request ID parameter to deploy endpoint
+- *(api)* Add pull request ID parameter to applications endpoint
+- *(api)* Add endpoints for retrieving application logs and deployments
+- *(lang)* Added Norwegian language (#5280)
+- *(dep)* Bump all dependencies
+
+### 🐛 Bug Fixes
+
+- Only get apps for the current team
+- *(DeployController)* Cast 'pr' query parameter to integer
+- *(deploy)* Validate team ID before deployment
+- *(wakapi)* Typo in env variables and add some useful variables to wakapi.yaml (#5424)
+
+### 🚜 Refactor
+
+- *(dev)* Remove OpenAPI generation functionality
+- *(migration)* Enhance local file volumes migration with logging
+
+### ⚙️ Miscellaneous Tasks
+
+- *(service)* Update minecraft service ENVs
+- *(service)* Add more vars to infisical.yaml (#5418)
+- *(service)* Add google variables to plausible.yaml (#5429)
+- *(service)* Update authentik.yaml versions (#5373)
+- *(core)* Remove redocs
+
+## [4.0.0-beta.401] - 2025-03-28
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.400] - 2025-03-27
+
+### 🚀 Features
+
+- *(database)* Disable MongoDB SSL by default in migration
+- *(database)* Add CA certificate generation for database servers
+- *(application)* Add SPA configuration and update Nginx generation logic
+
+### 🐛 Bug Fixes
+
+- *(file-storage)* Double save on compose volumes
+- *(parser)* Add logging support for applications in services
+
+### 🚜 Refactor
+
+- *(proxy)* Improve port availability checks with multiple methods
+- *(database)* Update MongoDB SSL configuration for improved security
+- *(database)* Enhance SSL configuration handling for various databases
+- *(notifications)* Update Telegram button URL for staging environment
+- *(models)* Remove unnecessary cloud check in isEnabled method
+- *(database)* Streamline event listeners in Redis General component
+- *(database)* Remove redundant database status display in MongoDB view
+- *(database)* Update import statements for Auth in database components
+- *(database)* Require PEM key file for SSL certificate regeneration
+- *(database)* Change MySQL daemon command to MariaDB daemon
 - *(nightly)* Update version numbers and enhance upgrade script
 - *(versions)* Update version numbers for coolify and nightly
 - *(email)* Validate team membership for email recipients
@@ -26,49 +198,22 @@ All notable changes to this project will be documented in this file.
 - *(docker)* Parse and sanitize YAML compose file before encoding
 - *(file-storage)* Improve layout and structure of input fields
 - *(email)* Update label for test email recipient input
+- *(database-backup)* Remove existing Docker container before backup upload
+- *(database)* Improve decryption and deduplication of local file volumes
+- *(database)* Remove debug output from volume update process
 
 ### 📚 Documentation
 
 - Update changelog
+- Update changelog
 
-## [4.0.0-beta.400] - 2025-03-27
+### ⚙️ Miscellaneous Tasks
 
-### 🚀 Features
+- *(versions)* Update version numbers for coolify and nightly
 
-- *(database)* Disable MongoDB SSL by default in migration
+### ◀️ Revert
 
-### 🚜 Refactor
-
-- *(proxy)* Improve port availability checks with multiple methods
-- *(database)* Update MongoDB SSL configuration for improved security
-- *(database)* Enhance SSL configuration handling for various databases
-- *(notifications)* Update Telegram button URL for staging environment
-- *(models)* Remove unnecessary cloud check in isEnabled method
-- *(database)* Streamline event listeners in Redis General component
-- *(database)* Remove redundant database status display in MongoDB view
-- *(database)* Update import statements for Auth in database components
-- *(database)* Require PEM key file for SSL certificate regeneration
-- *(database)* Change MySQL daemon command to MariaDB daemon
-
-## [4.0.0-beta.399] - 2025-03-25
-
-
-### 🚀 Features
-
-- *(database)* Disable MongoDB SSL by default in migration
-
-### 🚜 Refactor
-
-- *(proxy)* Improve port availability checks with multiple methods
-- *(database)* Update MongoDB SSL configuration for improved security
-- *(database)* Enhance SSL configuration handling for various databases
-- *(notifications)* Update Telegram button URL for staging environment
-- *(models)* Remove unnecessary cloud check in isEnabled method
-- *(database)* Streamline event listeners in Redis General component
-- *(database)* Remove redundant database status display in MongoDB view
-- *(database)* Update import statements for Auth in database components
-- *(database)* Require PEM key file for SSL certificate regeneration
-- *(database)* Change MySQL daemon command to MariaDB daemon
+- Encrypting mount and fs_path
 
 ## [4.0.0-beta.399] - 2025-03-25
 

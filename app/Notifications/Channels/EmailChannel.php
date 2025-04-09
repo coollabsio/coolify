@@ -12,8 +12,9 @@ class EmailChannel
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $useInstanceEmailSettings = $notifiable->emailNotificationSettings->use_instance_email_settings;
+        $isTransactionalEmail = data_get($notification, 'isTransactionalEmail', false);
         $customEmails = data_get($notification, 'emails', null);
-        if ($useInstanceEmailSettings) {
+        if ($useInstanceEmailSettings || $isTransactionalEmail) {
             $settings = instanceSettings();
         } else {
             $settings = $notifiable->emailNotificationSettings;
@@ -49,8 +50,8 @@ class EmailChannel
                 $settings->smtp_port,
                 $encryption
             );
-            $transport->setUsername($settings->smtp_username);
-            $transport->setPassword($settings->smtp_password);
+            $transport->setUsername($settings->smtp_username ?? '');
+            $transport->setPassword($settings->smtp_password ?? '');
 
             $mailer = new \Symfony\Component\Mailer\Mailer($transport);
 

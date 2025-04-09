@@ -329,13 +329,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    'hidden' => true,
-                    'ignore_errors' => true,
-                ]
-            );
+            $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
+            $this->graceful_shutdown_container($this->deployment_uuid);
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
@@ -1366,13 +1361,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
-        $this->execute_remote_command(
-            [
-                'command' => "docker rm -f {$this->deployment_uuid}",
-                'ignore_errors' => true,
-                'hidden' => true,
-            ]
-        );
+        $this->graceful_shutdown_container($this->deployment_uuid);
         $this->execute_remote_command(
             [
                 $runCommand,
@@ -1720,6 +1709,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
+        $custom_network_aliases = [];
+        if (is_array($this->application->custom_network_aliases) && count($this->application->custom_network_aliases) > 0) {
+            $custom_network_aliases = $this->application->custom_network_aliases;
+        }
         $docker_compose = [
             'services' => [
                 $this->container_name => [
@@ -1729,9 +1722,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network => [
-                            'aliases' => [
-                                $this->container_name,
-                            ],
+                            'aliases' => array_merge(
+                                [$this->container_name],
+                                $custom_network_aliases
+                            ),
                         ],
                     ],
                     'mem_limit' => $this->application->limits_memory,
