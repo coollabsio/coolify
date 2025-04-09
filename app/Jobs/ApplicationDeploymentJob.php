@@ -329,7 +329,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->application_deployment_queue->addLogEntry("Starting graceful shutdown container: {$this->deployment_uuid}");
+            $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
             $this->graceful_shutdown_container($this->deployment_uuid);
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
@@ -1709,11 +1709,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
-        $network_aliases = [];
-        if (is_array($this->application->network_aliases) && count($this->application->network_aliases) > 0) {
-            $network_aliases = $this->application->network_aliases;
+        $custom_network_aliases = [];
+        if (is_array($this->application->custom_network_aliases) && count($this->application->custom_network_aliases) > 0) {
+            $custom_network_aliases = $this->application->custom_network_aliases;
         }
-        ray($network_aliases);
         $docker_compose = [
             'services' => [
                 $this->container_name => [
@@ -1725,7 +1724,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $this->destination->network => [
                             'aliases' => array_merge(
                                 [$this->container_name],
-                                $network_aliases
+                                $custom_network_aliases
                             ),
                         ],
                     ],

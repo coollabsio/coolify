@@ -9,14 +9,14 @@ return new class extends Migration
     public function up()
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->text('network_aliases')->nullable();
+            $table->text('custom_network_aliases')->nullable();
         });
     }
 
     public function down()
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->dropColumn('network_aliases');
+            $table->dropColumn('custom_network_aliases');
         });
     }
 };

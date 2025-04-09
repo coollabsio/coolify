@@ -343,9 +343,9 @@
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
                     @if (!$application->destination->server->isSwarm())
-                        <x-forms.input id="application.network_aliases" label="Network Aliases"
+                        <x-forms.input id="application.custom_network_aliases" label="Network Aliases"
                             helper="A comma separated list of custom network aliases you would like to add for container in Docker network.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>api.internal,api.local"
-                            wire:model="application.network_aliases" />
+                            wire:model="application.custom_network_aliases" />
                     @endif
                 </div>
 

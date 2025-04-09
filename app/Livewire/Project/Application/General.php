@@ -68,7 +68,7 @@ class General extends Component
         'application.publish_directory' => 'nullable',
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
-        'application.network_aliases' => 'nullable',
+        'application.custom_network_aliases' => 'nullable',
         'application.dockerfile' => 'nullable',
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
