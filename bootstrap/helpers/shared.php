@@ -2987,7 +2987,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $predefinedPort = '8000';
             }
             if ($isDatabase) {
-                $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
                 if ($applicationFound) {
                     $savedService = $applicationFound;
                     $savedService = ServiceDatabase::firstOrCreate([
@@ -2999,17 +2999,22 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 } else {
                     $savedService = ServiceDatabase::firstOrCreate([
                         'name' => $serviceName,
-                        'image' => $image,
                         'service_id' => $resource->id,
                     ]);
                 }
             } else {
                 $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
+
+            // Check if image changed
+            if ($savedService->image !== $image) {
+                $savedService->image = $image;
+                $savedService->save();
+            }
+
             $environment = collect(data_get($service, 'environment', []));
             $buildArgs = collect(data_get($service, 'build.args', []));
             $environment = $environment->merge($buildArgs);
