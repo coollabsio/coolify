@@ -333,6 +333,40 @@ class DeployController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Deployments'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'skip',
+                in: 'query',
+                description: 'Number of records to skip.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                )
+            ),
+            new OA\Parameter(
+                name: 'take',
+                in: 'query',
+                description: 'Number of records to take.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    default: 10,
+                )
+            ),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
