@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -297,17 +298,21 @@ class DeployController extends Controller
             return ['message' => "Resource ($resource) not found.", 'deployment_uuid' => $deployment_uuid];
         }
         switch ($resource?->getMorphClass()) {
-            case \App\Models\Application::class:
+            case Application::class:
                 $deployment_uuid = new Cuid2;
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,
                     force_rebuild: $force,
                     pull_request_id: $pr,
                 );
-                $message = "Application {$resource->name} deployment queued.";
+                if ($result['status'] === 'skipped') {
+                    $message = $result['message'];
+                } else {
+                    $message = "Application {$resource->name} deployment queued.";
+                }
                 break;
-            case \App\Models\Service::class:
+            case Service::class:
                 StartService::run($resource);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
                 break;

@@ -1392,7 +1392,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
         foreach ($destination_ids as $destination_id) {
-            $destination = StandaloneDocker::find($destination_id);
+            $destination = StandaloneDocker::find($destination_id)->first();
             $server = $destination->server;
             if ($server->team_id !== $this->mainServer->team_id) {
                 $this->application_deployment_queue->addLogEntry("Skipping deployment to {$server->name}. Not in the same team?!");

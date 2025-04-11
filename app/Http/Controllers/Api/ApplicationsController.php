@@ -880,12 +880,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1004,12 +1009,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1101,12 +1111,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1190,12 +1205,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             }
 
             return response()->json(serializeApiResponse([
@@ -1254,12 +1274,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             }
 
             return response()->json(serializeApiResponse([
@@ -1896,11 +1921,16 @@ class ApplicationsController extends Controller
         if ($instantDeploy) {
             $deployment_uuid = new Cuid2;
 
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 application: $application,
                 deployment_uuid: $deployment_uuid,
                 is_api: true,
             );
+            if ($result['status'] === 'skipped') {
+                return response()->json([
+                    'message' => $result['message'],
+                ], 200);
+            }
         }
 
         return response()->json([
@@ -2717,13 +2747,21 @@ class ApplicationsController extends Controller
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
             force_rebuild: $force,
             is_api: true,
             no_questions_asked: $instant_deploy
         );
+        if ($result['status'] === 'skipped') {
+            return response()->json(
+                [
+                    'message' => $result['message'],
+                ],
+                200
+            );
+        }
 
         return response()->json(
             [
@@ -2878,12 +2916,17 @@ class ApplicationsController extends Controller
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
             restart_only: true,
             is_api: true,
         );
+        if ($result['status'] === 'skipped') {
+            return response()->json([
+                'message' => $result['message'],
+            ], 200);
+        }
 
         return response()->json(
             [
