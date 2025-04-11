@@ -133,7 +133,7 @@ class DeployController extends Controller
 
     #[OA\Get(
         summary: 'Deploy',
-        description: 'Deploy by tag or uuid. `Post` request also accepted.',
+        description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.',
         path: '/deploy',
         operationId: 'deploy-by-tag-or-uuid',
         security: [
@@ -192,10 +192,10 @@ class DeployController extends Controller
             return invalidTokenResponse();
         }
 
-        $uuids = $request->query->get('uuid');
-        $tags = $request->query->get('tag');
-        $force = $request->query->get('force') ?? false;
-        $pr = $request->query->get('pr') ? max((int) $request->query->get('pr'), 0) : 0;
+        $uuids = $request->input('uuid');
+        $tags = $request->input('tag');
+        $force = $request->input('force') ?? false;
+        $pr = $request->input('pr') ? max((int) $request->input('pr'), 0) : 0;
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
