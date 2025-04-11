@@ -2459,20 +2459,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function next(string $status)
     {
         queue_next_deployment($this->application);
-        // If the deployment is cancelled by the user, don't update the status
-        if (
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value &&
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
-        ) {
-            $this->application_deployment_queue->update([
-                'status' => $status,
-            ]);
+
+        // Never allow changing status from FAILED or CANCELLED_BY_USER to anything else
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value ||
+            $this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+            return;
         }
-        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
+
+        $this->application_deployment_queue->update([
+            'status' => $status,
+        ]);
+
+        if ($status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
 
             return;
         }
+
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
