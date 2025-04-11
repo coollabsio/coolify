@@ -225,7 +225,7 @@ class StartMariadb
             if ($persistentStorage->host_path !== '' && $persistentStorage->host_path !== null) {
                 $local_persistent_volumes[] = $persistentStorage->host_path.':'.$persistentStorage->mount_path;
             } else {
-                $volume_name = $persistentStorage->name;
+                $volume_name = $this->database->uuid . '_' . $persistentStorage->name;
                 $local_persistent_volumes[] = $volume_name.':'.$persistentStorage->mount_path;
             }
         }
@@ -240,9 +240,8 @@ class StartMariadb
             if ($persistentStorage->host_path) {
                 continue;
             }
-            $name = $persistentStorage->name;
+            $name = $this->database->uuid . '_' . $persistentStorage->name;
             $local_persistent_volumes_names[$name] = [
-                'name' => $name,
                 'external' => false,
             ];
         }
