@@ -17,6 +17,8 @@ use phpseclib3\Crypt\PublicKeyLoader;
         'name' => ['type' => 'string'],
         'description' => ['type' => 'string'],
         'private_key' => ['type' => 'string', 'format' => 'private-key'],
+        'public_key' => ['type' => 'string'],
+        'fingerprint' => ['type' => 'string'],
         'is_git_related' => ['type' => 'boolean'],
         'team_id' => ['type' => 'integer'],
         'created_at' => ['type' => 'string'],
