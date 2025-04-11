@@ -84,11 +84,16 @@ class Heading extends Component
             return;
         }
         $this->setDeploymentUuid();
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $this->application,
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force_rebuild,
         );
+        if ($result['status'] === 'skipped') {
+            $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+            return;
+        }
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
@@ -126,11 +131,16 @@ class Heading extends Component
             return;
         }
         $this->setDeploymentUuid();
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $this->application,
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );
+        if ($result['status'] === 'skipped') {
+            $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+            return;
+        }
 
         return $this->redirectRoute('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],

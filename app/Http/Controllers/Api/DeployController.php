@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -132,7 +133,7 @@ class DeployController extends Controller
 
     #[OA\Get(
         summary: 'Deploy',
-        description: 'Deploy by tag or uuid. `Post` request also accepted.',
+        description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.',
         path: '/deploy',
         operationId: 'deploy-by-tag-or-uuid',
         security: [
@@ -191,10 +192,10 @@ class DeployController extends Controller
             return invalidTokenResponse();
         }
 
-        $uuids = $request->query->get('uuid');
-        $tags = $request->query->get('tag');
-        $force = $request->query->get('force') ?? false;
-        $pr = $request->query->get('pr') ? max((int) $request->query->get('pr'), 0) : 0;
+        $uuids = $request->input('uuid');
+        $tags = $request->input('tag');
+        $force = $request->input('force') ?? false;
+        $pr = $request->input('pr') ? max((int) $request->input('pr'), 0) : 0;
 
         if ($uuids && $tags) {
             return response()->json(['message' => 'You can only use uuid or tag, not both.'], 400);
@@ -297,17 +298,21 @@ class DeployController extends Controller
             return ['message' => "Resource ($resource) not found.", 'deployment_uuid' => $deployment_uuid];
         }
         switch ($resource?->getMorphClass()) {
-            case \App\Models\Application::class:
+            case Application::class:
                 $deployment_uuid = new Cuid2;
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,
                     force_rebuild: $force,
                     pull_request_id: $pr,
                 );
-                $message = "Application {$resource->name} deployment queued.";
+                if ($result['status'] === 'skipped') {
+                    $message = $result['message'];
+                } else {
+                    $message = "Application {$resource->name} deployment queued.";
+                }
                 break;
-            case \App\Models\Service::class:
+            case Service::class:
                 StartService::run($resource);
                 $message = "Service {$resource->name} started. It could take a while, be patient.";
                 break;
@@ -333,6 +338,40 @@ class DeployController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Deployments'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'skip',
+                in: 'query',
+                description: 'Number of records to skip.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                )
+            ),
+            new OA\Parameter(
+                name: 'take',
+                in: 'query',
+                description: 'Number of records to take.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    default: 10,
+                )
+            ),
+        ],
         responses: [
             new OA\Response(
                 response: 200,

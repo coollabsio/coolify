@@ -267,6 +267,18 @@ class ProjectController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the project.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Project updated.',
