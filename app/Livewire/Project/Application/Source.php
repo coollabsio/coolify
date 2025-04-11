@@ -75,7 +75,7 @@ class Source extends Component
         // filter the current source out
         $this->sources = currentTeam()->sources()->whereNotNull('app_id')->reject(function ($source) {
             return $source->id === $this->application->source_id;
-        });
+        })->sortBy('name');
     }
 
     public function setPrivateKey(int $privateKeyId)
@@ -113,6 +113,7 @@ class Source extends Component
                 'source_type' => $sourceType,
             ]);
             $this->application->refresh();
+            $this->getSources();
             $this->dispatch('success', 'Source updated!');
         } catch (\Throwable $e) {
             return handleError($e, $this);

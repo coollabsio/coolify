@@ -38,33 +38,37 @@
             </div>
         </div>
 
-        @if (filled($sources) && $sources->count() > 0)
-            <div class="pt-4">
-                <h3 class="pb-2">Change Git Source</h3>
-                <div class="grid grid-cols-1 gap-2">
-                    @foreach ($sources as $source)
+        <div class="pt-4">
+            <h3 class="pb-2">Change Git Source</h3>
+            <div class="grid grid-cols-1 gap-2">
+                @forelse ($sources as $source)
+                    <div wire:key="{{ $source->name }}">
                         <x-modal-confirmation title="Change Git Source" :actions="['Change git source to ' . $source->name]" :buttonFullWidth="true"
                             :isHighlightedButton="$application->source_id === $source->id" :disabled="$application->source_id === $source->id"
-                            submitAction="changeSource('{{ $source->id }}', '{{ $source->getMorphClass() }}')"
+                            submitAction="changeSource({{ $source->id }}, {{ $source->getMorphClass() }})"
                             :confirmWithText="true" confirmationText="Change Git Source"
                             confirmationLabel="Please confirm changing the git source by entering the text below"
                             shortConfirmationLabel="Confirmation Text" :confirmWithPassword="false">
                             <x-slot:customButton>
-                                <div class="box-title">
-                                    {{ $source->name }}
-                                    @if ($application->source_id === $source->id)
-                                        <span class="text-xs">(current)</span>
-                                    @endif
-                                </div>
-                                <div class="box-description">
-                                    {{ $source->organization_name ?? 'Personal Account' }}
+                                <div class="flex items-center gap-2">
+                                    <div class="box-title">
+                                        {{ $source->name }}
+                                        @if ($application->source_id === $source->id)
+                                            <span class="text-xs">(current)</span>
+                                        @endif
+                                    </div>
+                                    <div class="box-description">
+                                        {{ $source->organization ?? 'Personal Account' }}
+                                    </div>
                                 </div>
                             </x-slot:customButton>
                         </x-modal-confirmation>
-                    @endforeach
-                </div>
+                    </div>
+                @empty
+                    <div class="text-center">No sources found</div>
+                @endforelse
             </div>
-        @endif
+        </div>
 
         @if ($privateKeyId)
             <h3 class="pt-4">Deploy Key</h3>
