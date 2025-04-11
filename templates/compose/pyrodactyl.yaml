@@ -1,0 +1,63 @@
+# documentation: https://pyrodactyl.dev/
+# slogan: Pyrodactyl is an open, secure, and scalable servers platform. It's the world's best Pterodactyl panel with incredible performance and unmatched features.
+# tags: game, game server, management, panel, minecraft
+# logo: svgs/pyrodactyl.png
+# port: 8080
+
+services:
+  pyrodactyl-panel:
+    image: 'ghcr.io/pyrohost/pyrodactyl:main'
+    restart: always
+    ports:
+      - '8080:80'
+    volumes:
+      - 'pyrovar:/app/var/'
+      - 'pyronginx:/etc/nginx/http.d/'
+      - 'pyrologs:/app/storage/logs'
+    environment:
+      - APP_ENV=production
+      - APP_ENVIRONMENT_ONLY=false
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_DRIVER=redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_CONNECTION=mariadb
+      - DB_HOST=database
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-pyrodactyl}
+      - DB_USERNAME=${DB_USERNAME:-pyrodactyl}
+      - DB_PASSWORD=${SERVICE_PASSWORD_DATABASE}
+      - HASHIDS_LENGTH=${HASHIDS_LENGTH:-8}
+      - HASHIDS_SALT=${SERVICE_HASHIDS_SALT}
+      - APP_URL=${APP_URL}
+      - APP_TIMEZONE=${APP_TIMEZONE:-UTC}
+      - APP_THEME=${APP_THEME:-pterodactyl}
+      - SERVICE_FQDN_PYRODACTYL=${SERVICE_FQDN_PYRODACTYL}
+    networks:
+      - coolify
+
+  database:
+    image: 'mariadb:10.5'
+    restart: always
+    environment:
+      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_DATABASE_ROOT}
+      - MARIADB_DATABASE=${DB_DATABASE:-pyrodactyl}
+      - MARIADB_USER=${DB_USERNAME:-pyrodactyl}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_DATABASE}
+    volumes:
+      - 'database:/var/lib/mysql'
+    networks:
+      - coolify
+
+  redis:
+    image: 'redis:alpine'
+    restart: always
+    volumes:
+      - 'redis:/data'
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true
