@@ -177,7 +177,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -207,7 +207,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->resendEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
