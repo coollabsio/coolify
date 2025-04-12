@@ -1,0 +1,2 @@
+#!/bin/bash
+journalctl -u epicyon | grep "invalid header\|invalid characters\|leech bounced\|LLM scraper\|suspicious\|bad path"

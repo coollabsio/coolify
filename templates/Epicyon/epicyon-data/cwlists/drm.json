@@ -1,0 +1,10 @@
+{
+    "name": "DRM",
+    "warning": "Digitally Restricted Media",
+    "description": "Media may be deliberately prevented from playing on free software systems",
+    "words": [],
+    "hashtags": [],
+    "domains": [
+	      "podcasts.apple.com"
+    ]
+}

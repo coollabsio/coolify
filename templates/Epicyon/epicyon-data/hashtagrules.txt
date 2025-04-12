@@ -1,0 +1,45 @@
+Epicyon news rules processing
+=============================
+
+As news arrives via RSS or Atom feeds it can be processed to add or remove hashtags, in accordance to some rules which you can define.
+
+On the newswire edit screen, available to moderators, you can define the news processing rules. There is one rule per line.
+
+Syntax
+------
+
+if [conditions] then [action]
+
+Logical Operators
+-----------------
+
+The following operators are available:
+
+    not, and, or, xor, from, contains
+
+Examples
+--------
+
+A simple example is:
+
+    if moderated and not #oxfordimc then block
+
+For moderated feeds this will only allow items through if they have the #oxfordimc hashtag.
+
+If you want to add hashtags an example is:
+
+    if contains "garden" or contains "lawn" then add #gardening
+
+So if incoming news contains the word "garden" either in its title or description then it will automatically be assigned the hashtag #gardening. You can also add hashtags based upon other hashtags.
+
+    if #garden or #lawn then add #gardening
+
+You can also remove hashtags.
+
+    if #garden or #lawn then remove #gardening
+
+Which will remove #gardening if it exists as a hashtag within the news post.
+
+You can add tags based upon the RSS link, such as:
+
+    if from "mycatsite.com" then add #cats

@@ -1,0 +1,182 @@
+# How to install Epicyon
+
+You will need python version 3.7 or later.
+
+On a Debian based system:
+
+    sudo apt install -y tor python3-socks imagemagick python3-setuptools python3-cryptography python3-dateutil python3-idna python3-requests python3-flake8 python3-django-timezone-field python3-pyqrcode python3-png python3-bandit libimage-exiftool-perl certbot nginx wget
+
+The following instructions install Epicyon to the /opt directory. It's not essential that it be installed there, and it could be in any other preferred directory.
+
+Clone the repo, or if you downloaded the tarball then extract it into the /opt directory.
+
+    cd /opt
+    git clone --depth 1 https://gitlab.com/bashrc2/epicyon
+
+Create a user for the server to run as:
+
+    sudo su
+    adduser --system --home=/opt/epicyon --group epicyon
+    chown -R epicyon:epicyon /opt/epicyon
+
+Link news mirrors:
+
+    mkdir /var/www/YOUR_DOMAIN
+    mkdir -p /opt/epicyon/accounts/newsmirror
+    ln -s /opt/epicyon/accounts/newsmirror /var/www/YOUR_DOMAIN/newsmirror
+
+Create a daemon:
+
+    nano /etc/systemd/system/epicyon.service
+
+Paste the following:
+
+    [Unit]
+    Description=epicyon
+    After=syslog.target
+    After=network.target
+
+    [Service]
+    Type=simple
+    User=epicyon
+    Group=epicyon
+    WorkingDirectory=/opt/epicyon
+    ExecStart=/usr/bin/python3 /opt/epicyon/epicyon.py --port 443 --proxy 7156 --domain YOUR_DOMAIN --registration open
+    Environment=USER=epicyon
+    Environment=PYTHONUNBUFFERED=true
+    Environment=PYTHONIOENCODING=utf-8
+    Restart=always
+    StandardError=syslog
+    CPUQuota=80%
+    ProtectHome=true
+    ProtectKernelTunables=true
+    ProtectKernelModules=true
+    ProtectControlGroups=true
+    ProtectKernelLogs=true
+    ProtectHostname=true
+    ProtectClock=true
+    ProtectProc=invisible
+    ProcSubset=pid
+    PrivateTmp=true
+    PrivateUsers=true
+    PrivateDevices=true
+    PrivateIPC=true
+    MemoryDenyWriteExecute=true
+    NoNewPrivileges=true
+    LockPersonality=true
+    RestrictRealtime=true
+    RestrictSUIDSGID=true
+    RestrictNamespaces=true
+    SystemCallArchitectures=native
+
+    [Install]
+    WantedBy=multi-user.target
+
+Activate the daemon:
+
+    systemctl enable epicyon
+    systemctl start epicyon
+
+Create a web server configuration:
+
+    nano /etc/nginx/sites-available/YOUR_DOMAIN
+
+And paste the following:
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name YOUR_DOMAIN;
+        access_log /dev/null;
+        error_log /dev/null;
+        client_max_body_size 31m;
+        client_body_buffer_size 128k;
+
+        index index.html;
+        rewrite ^ https://$server_name$request_uri? permanent;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name YOUR_DOMAIN;
+
+        ssl_stapling off;
+        ssl_stapling_verify off;
+        ssl on;
+        ssl_certificate /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;
+        #ssl_dhparam /etc/ssl/certs/YOUR_DOMAIN.dhparam;
+
+        ssl_session_cache builtin:1000 shared:SSL:10m;
+        ssl_session_timeout 60m;
+        ssl_prefer_server_ciphers on;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS';
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header X-Download-Options noopen;
+        add_header X-Permitted-Cross-Domain-Policies none;
+
+        add_header X-Robots-Tag "noindex, nofollow, nosnippet, noarchive";
+        add_header Strict-Transport-Security max-age=15768000;
+
+        access_log /dev/null;
+        error_log /dev/null;
+
+        index index.html;
+
+        location /newsmirror {
+          root /var/www/YOUR_DOMAIN;
+          try_files $uri =404;
+        }
+
+        keepalive_timeout 70;
+        sendfile on;
+
+        location / {
+            proxy_http_version 1.1;
+            client_max_body_size 31M;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forward-Proto http;
+            proxy_set_header X-Nginx-Proxy true;
+            proxy_temp_file_write_size 64k;
+            proxy_connect_timeout 10080s;
+            proxy_send_timeout 10080;
+            proxy_read_timeout 10080;
+            proxy_buffer_size 64k;
+            proxy_buffers 16 32k;
+            proxy_busy_buffers_size 64k;
+            proxy_redirect off;
+            proxy_request_buffering off;
+            proxy_buffering off;
+            proxy_pass http://localhost:7156;
+            tcp_nodelay on;
+        }
+    }
+
+Enable the site:
+
+    ln -s /etc/nginx/sites-available/YOUR_DOMAIN /etc/nginx/sites-enabled/
+
+Forward port 443 from your internet router to your server. If you have dynamic DNS make sure its configured. Add a TLS certificate:
+
+    systemctl stop nginx
+    certbot certonly -n --server https://acme-v02.api.letsencrypt.org/directory --standalone -d YOUR_DOMAIN --renew-by-default --agree-tos --email YOUR_EMAIL
+    systemctl start nginx
+
+Restart your web server:
+
+    systemctl restart nginx
+
+If you are using the Caddy web server then see caddy.example.conf
+
+Now you can navigate to your domain and register an account. The first account becomes the administrator.
+
+## Installing on Onion or i2p domains
+
+If you don't have access to the clearnet, or prefer not to use it, then it's possible to run an Epicyon instance easily from your laptop. There are scripts within the deploy directory which can be used to install an instance on a Debian or Arch/Parabola operating system. With some modification of package names they could be also used with other distros.
+
+Please be aware that such installations will not federate with ordinary fediverse instances on the clearnet, unless those instances have been specially modified to do so. But onion instances will federate with other onion instances and i2p instances with other i2p instances.

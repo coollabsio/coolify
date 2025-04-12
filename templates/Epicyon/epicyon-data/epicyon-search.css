@@ -1,0 +1,421 @@
+@charset "UTF-8";
+
+:root {
+    --main-bg-color: #282c37;
+    --link-bg-color: #282c37;
+    --main-fg-color: #dddddd;
+    --main-link-color: #999;
+    --main-link-color-hover: #bbb;
+    --main-visited-color: #888;
+    --border-color: #505050;
+    --font-size-header: 18px;
+    --font-color-header: #ccc;
+    --cw-color: #dddddd;
+    --cw-style: normal;
+    --font-size: 40px;
+    --font-size2: 24px;
+    --font-size3: 38px;
+    --font-size4: 22px;
+    --font-size5: 20px;
+    --text-entry-foreground: #ccc;
+    --text-entry-background: #111;
+    --time-color: #aaa;
+    --button-text: #FFFFFF;
+    --button-background-hover: #777;
+    --button-background: #999;
+    --button-selected: #666;
+    --hashtag-margin: 2%;
+    --hashtag-vertical-spacing1: 50px;
+    --hashtag-vertical-spacing2: 100px;
+    --hashtag-vertical-spacing3: 100px;
+    --hashtag-vertical-spacing4: 150px;
+    --hashtag-size1: 30px;
+    --hashtag-size2: 40px;
+    --follow-text-size1: 24px;
+    --follow-text-size2: 40px;
+    --follow-text-entry-width: 90%;
+    --focus-color: white;
+    --search-banner-height: 30vh;
+    --search-banner-height-mobile: 20vh;
+    --title-color: #999;
+    --header-font: 'Arial, Helvetica, sans-serif';
+    --rendering: normal;
+}
+
+@font-face {
+    font-family: 'Bedstead';
+    font-style: italic;
+    font-weight: normal;
+    font-display: block;
+    src: url('./fonts/bedstead.otf') format('opentype');
+}
+@font-face {
+    font-family: 'Bedstead';
+    font-style: normal;
+    font-weight: normal;
+    font-display: block;
+    src: url('./fonts/bedstead.otf') format('opentype');
+}
+
+body, html {
+    background-color: var(--main-bg-color);
+    color: var(--main-fg-color);
+
+    height: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    max-width: 100%;
+    min-width: 600px;
+    image-rendering: var(--rendering);
+}
+
+h1 {
+    font-family: var(--header-font);
+    font-size: var(--font-size);
+    color: var(--title-color);
+}
+
+a, u {
+    color: var(--main-fg-color);
+}
+
+a:visited{
+    color: var(--main-visited-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link {
+    color: var(--main-link-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:visited:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:focus {
+    border: 2px solid var(--focus-color);
+}
+
+.transparent {
+    color: transparent;
+    background: transparent;
+    font-size: 0px;
+    line-height: 0px;
+    height: 0px;
+}
+
+.cw {
+    font-style: var(--cw-style);
+    color: var(--cw-color);
+}
+
+.domainHistogramLeft {
+    float: right;
+}
+.domainHistogramRight {
+    float: left;
+}
+
+.follow {
+    background-image: url("follow-background.jpg");
+    background-size: cover;
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    height: 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    position: relative;
+    background-color: var(--main-bg-color);
+}
+
+.followAvatar {
+    margin: 0% 0;
+}
+
+.followAvatar img {
+    border-radius: 10%;
+    width: 20%;
+    min-width: 200px;
+}
+
+.followText {
+    font-size: var(--font-size);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.imText {
+    font-size: var(--font-size4);
+    font-family: Arial, Helvetica, sans-serif;
+    color: var(--main-link-color);
+    background: var(--link-bg-color);
+}
+
+.pgp {
+    font-size: var(--font-size5);
+    font-family: Arial, Helvetica, sans-serif;
+    color: var(--main-link-color);
+    background: var(--link-bg-color);
+    font-family: 'monospace';
+}
+
+.button {
+    border-radius: 4px;
+    background-color: var(--button-background);
+    border: none;
+    color: var(--button-text);
+    text-align: center;
+    padding: 10px;
+    font-size: var(--font-size);
+    font-family: Arial, Helvetica, sans-serif;
+    width: 20%;
+    max-width: 200px;
+    min-width: 100px;
+    cursor: pointer;
+    margin: 30px;
+}
+
+.button:hover {
+    background-color: var(--button-background-hover);
+}
+
+input[type=text] {
+    width: var(--follow-text-entry-width);
+    clear: both;
+    font-size: var(--font-size);
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+    color: var(--text-entry-foreground);
+    background-color: var(--text-entry-background);
+}
+
+.cwButton {
+    border-radius: 4px;
+    background-color: #999;
+    border: none;
+    color: var(--button-text);
+    text-align: center;
+    font-size: var(--font-size);
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 2px;
+    cursor: pointer;
+    margin: 5px;
+}
+
+.cwText {
+    display: none;
+}
+
+.options {
+    font-size: var(--font-size);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.options img {
+    width: 15%;
+}
+
+@media screen and (min-width: 400px) {
+    details {
+        font-size: var(--hashtag-size1);
+    }
+    .domainHistogram {
+        border: 0;
+        font-size: var(--hashtag-size1);
+    }
+    .timeline-banner {
+        object-fit: cover;
+        width: 98vw;
+        max-height: var(--search-banner-height);
+    }
+    .hashtagswarm {
+        font-size: var(--hashtag-size1);
+        font-family: Arial, Helvetica, sans-serif;
+        margin: var(--hashtag-margin);
+        line-height: var(--hashtag-vertical-spacing1);
+    }
+    .followText {
+        font-size: var(--follow-text-size1);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    input[type=text] {
+        width: var(--follow-text-entry-width);
+        clear: both;
+        font-size: 24px;
+        font-family: Arial, Helvetica, sans-serif;
+        text-align: center;
+        color: var(--text-entry-foreground);
+        background-color: var(--text-entry-background);
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: 24px;
+        font-family: Arial, Helvetica, sans-serif;
+        width: 20%;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 10px;
+        margin: 20px 30px;
+    }
+}
+
+@media screen and (max-width: 1000px) {
+    details {
+        font-size: var(--hashtag-size2);
+    }
+    .domainHistogram {
+        border: 0;
+        font-size: var(--hashtag-size2);
+    }
+    .timeline-banner {
+        object-fit: cover;
+        width: 98vw;
+        max-height: var(--search-banner-height-mobile);
+    }
+    .hashtagswarm {
+        font-size: var(--hashtag-size2);
+        font-family: Arial, Helvetica, sans-serif;
+        margin: var(--hashtag-margin);
+        line-height: var(--hashtag-vertical-spacing3);
+    }
+    .followText {
+        font-size: var(--follow-text-size2);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    input[type=text] {
+        width: var(--follow-text-entry-width);
+        clear: both;
+        font-size: 40px;
+        font-family: Arial, Helvetica, sans-serif;
+        text-align: center;
+        color: var(--text-entry-foreground);
+        background-color: var(--text-entry-background);
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: 40px;
+        font-family: Arial, Helvetica, sans-serif;
+        width: 20%;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 20px;
+        margin: 30px 40px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    body, html {
+        min-width: 400px;
+    }
+    details {
+        font-size: var(--hashtag-size3);
+    }
+    .domainHistogram {
+        border: 0;
+        font-size: var(--hashtag-size3);
+    }
+    .timeline-banner {
+        object-fit: cover;
+        width: 98vw;
+        max-height: var(--search-banner-height-mobile);
+    }
+    .hashtagswarm {
+        font-size: var(--font-size2);
+        font-family: 'NimbusSanL';
+        margin: var(--hashtag-margin);
+        line-height: var(--hashtag-vertical-spacing3);
+    }
+    .followText {
+        font-size: var(--follow-text-size3);
+        font-family: 'NimbusSanL';
+    }
+    input[type=text] {
+        width: var(--follow-text-entry-width);
+        clear: both;
+        font-size: 40px;
+        font-family: 'NimbusSanL';
+        text-align: center;
+        color: var(--text-entry-foreground);
+        background-color: var(--text-entry-background);
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: 40px;
+        font-family: 'NimbusSanL';
+        width: 20%;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 20px;
+        margin: 30px 40px;
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: var(--font-size2);
+        font-family: 'NimbusSanL';
+        width: 20%;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+}

@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="en">
+  <meta charset="utf-8">
+  <script type="application/ld+json">
+    {
+        "@context" : "http://schema.org",
+        "@type" : "SoftwareApplication",
+        "name" : "Epicyon",
+        "image" : "https://libreserver.org/epicyon/images/logo.png",
+        "url" : "https://libreserver.org/epicyon",
+        "author" : {
+            "@type" : "Person",
+            "name" : "Bob Mottram",
+            "email": "bob@libreserver.org",
+            "url": "https://epicyon.libreserver.org/users/bob"
+        },
+        "applicationCategory" : ["server", "instance", "software", "activitypub", "fediverse", "self-hosting", "microblog"],
+        "downloadUrl" : "https://libreserver.org/epicyon/epicyon.tar.gz"
+    }
+  </script>
+  <meta name="description" content="ActivityPub server written in Python, HTML and CSS, and suitable for self-hosting on single board computers">
+  <meta name="keywords" content="ActivityPub, Fediverse, Instance, Python, HTML, CSS, SmallWeb, SelfHosting, Microblog">
+  <meta name="author" content="Bob Mottram">
+  <style>
+    @charset "UTF-8";
+
+    :root {
+        --main-bg-color: #282c37;
+        --dropdown-bg-color: #111;
+        --dropdown-bg-color-hover: #333;
+        --main-bg-color-reply: #212c37;
+        --main-bg-color-dm: #222;
+        --main-bg-color-report: #221c27;
+        --main-header-color-roles: #282237;
+        --main-fg-color: #dddddd;
+        --main-link-color: #999;
+        --main-visited-color: #888;
+        --border-color: #505050;
+        --font-size-header: 18px;
+        --font-color-header: #ccc;
+        --font-size: 30px;
+        --text-entry-foreground: #ccc;
+        --text-entry-background: #111;
+    }
+
+    body, html {
+        background-color: var(--main-bg-color);
+        color: var(--main-fg-color);
+
+        height: 100%;
+        font-family: Arial, Helvetica, sans-serif;
+        max-width: 80%;
+        min-width: 950px;
+        margin: 0 auto;
+        font-size: var(--font-size);
+    }
+
+   .features {
+       margin-left: 20%;
+   }
+
+    a, u {
+        color: var(--main-fg-color);
+    }
+
+    a:visited{
+        color: var(--main-visited-color);
+        font-weight: bold;
+    }
+
+    a:link {
+        color: var(--main-link-color);
+        font-weight: bold;
+    }
+
+    .cwButton {
+        border-radius: 4px;
+        background-color: #999;
+        border: none;
+        color: #FFFFFF;
+        text-align: center;
+        font-size: 26px;
+        padding: 2px;
+        cursor: pointer;
+        margin: 5px;
+    }
+
+    .cwText {
+        display: none;
+    }
+
+    .pageicon {
+        width: 8%;
+    }
+
+    .timeline-banner {
+        background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("img/banner.png");
+        height: 10%;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .hero-image {
+        background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("image.png");
+        height: 50%;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        position: relative;
+    }
+
+    .hero-text {
+        text-align: center;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: var(--font-color-header);
+        font-size: var(--font-size-header);
+    }
+
+    .new-post-text {
+        font-size: 24px;
+        padding: 4px 0;
+    }
+
+    .new-post-subtext {
+        font-size: 18px;
+        padding: 4px 0;
+    }
+
+    .highlight {
+        width: 2%;
+    }
+
+    .roles {
+        text-align: center;
+        left: 35%;
+        background-color: var(--main-header-color-roles);
+    }
+
+    .roles-inner {
+        padding: 10px 25px;
+        background-color: var(--main-bg-color);
+    }
+
+    .hero-text img {
+        border-radius: 1%;
+        width: 30%;
+        min-width: 200px;
+    }
+
+    .hero-text img.emoji {
+        width: 50px;
+        padding: 0 0;
+        margin: 0 0;
+        float: none;
+    }
+
+    .hero-text button {
+        border: none;
+        outline: 0;
+        display: inline-block;
+        padding: 10px 25px;
+        color: black;
+        background-color: #ddd;
+        text-align: center;
+        cursor: pointer;
+    }
+
+    .hero-text button:hover {
+        background-color: #555;
+        color: white;
+    }
+
+    .button {
+        border-radius: 4px;
+        background-color: #999;
+        border: none;
+        color: #FFFFFF;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 10%;
+        max-width: 100px;
+        min-width: 80px;
+        transition: all 0.5s;
+        cursor: pointer;
+        margin: 5px;
+    }
+
+    .buttonunfollow {
+        border-radius: 4px;
+        background-color: #999;
+        border: none;
+        color: #FFFFFF;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 20%;
+        max-width: 200px;
+        min-width: 100px;
+        transition: all 0.5s;
+        cursor: pointer;
+        margin: 5px;
+        float: right;
+    }
+
+    .buttonhighlighted {
+        border-radius: 4px;
+        background-color: green;
+        border: none;
+        color: white;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 10%;
+        max-width: 100px;
+        min-width: 80px;
+        transition: all 0.5s;
+        cursor: pointer;
+        margin: 5px;
+    }
+
+    .timelineIcon {
+        width: 10%;
+    }
+
+    .followApprove {
+        border-radius: 4px;
+        background-color: darkgreen;
+        border: none;
+        color: #FFFFFF;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 15%;
+        max-width: 150px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 0 15px;
+        float: right;
+    }
+
+    .followDeny {
+        border-radius: 4px;
+        background-color: darkred;
+        border: none;
+        color: #FFFFFF;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 15%;
+        max-width: 150px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 0 15px;
+        float: right;
+    }
+
+    .followRequestHandle {
+        padding: 0px 20px;
+    }
+
+    .button span {
+        cursor: pointer;
+        display: inline-block;
+        position: relative;
+        transition: 0.5s;
+    }
+
+    .button span:after {
+        content: '\00bb';
+        position: absolute;
+        opacity: 0;
+        top: 0;
+        right: -20px;
+        transition: 0.5s;
+    }
+
+    .button:hover span {
+        padding-right: 25px;
+    }
+
+    .button:hover span:after {
+        opacity: 1;
+        right: 0;
+    }
+
+    .buttonselected {
+        border-radius: 4px;
+        background-color: #666;
+        border: none;
+        color: #FFFFFF;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 10%;
+        max-width: 100px;
+        min-width: 80px;
+        transition: all 0.5s;
+        cursor: pointer;
+        margin: 5px;
+    }
+
+    .buttonselectedhighlighted {
+        border-radius: 4px;
+        background-color: darkgreen;
+        border: none;
+        color: white;
+        text-align: center;
+        font-size: 18px;
+        padding: 10px;
+        width: 10%;
+        max-width: 100px;
+        min-width: 80px;
+        transition: all 0.5s;
+        cursor: pointer;
+        margin: 5px;
+    }
+
+    .buttonselected span {
+        cursor: pointer;
+        display: inline-block;
+        position: relative;
+        transition: 0.5s;
+    }
+
+    .buttonselected span:after {
+        content: '\00bb';
+        position: absolute;
+        opacity: 0;
+        top: 0;
+        right: -20px;
+        transition: 0.5s;
+    }
+
+    .buttonselected:hover span {
+        padding-right: 25px;
+    }
+
+    .buttonselected:hover span:after {
+        opacity: 1;
+        right: 0;
+    }
+
+    .container {
+        border: 2px solid var(--border-color);
+        background-color: var(--main-bg-color);
+        border-radius: 5px;
+        padding: 20px;
+        margin: 10px 0;
+    }
+
+    .media {
+        width: 80%;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    .message {
+        margin-left: 7%;
+        width: 90%;
+    }
+
+    .container p.administeredby {
+        font-size: 18px;
+    }
+
+    .container::after {
+        content: "";
+        clear: both;
+        display: table;
+    }
+
+    .container img {
+        float: left;
+        max-width: 400px;
+        width: 5%;
+        padding: 0px 7px;
+        margin-right: 20px;
+        border-radius: 10%;
+    }
+
+    .searchEmoji {
+        -ms-transform: translateY(30%);
+        transform: translateY(30%);
+        float: none;
+        width: 80px;
+        margin: 0px 10px;
+        padding: 0px 0px;
+        border-radius: 0px;
+    }
+
+    .container img.emoji {
+        float: none;
+        width: 50px;
+        margin-left: 0px;
+        margin-right: 0px;
+        padding-right: 0px;
+        border-radius: 0px;
+    }
+
+    .containericons {
+        padding: 0px 0px;
+        margin: 0px 0px;
+    }
+
+    .containericons img {
+        float: right;
+        max-width: 200px;
+        width: 6%;
+        border-radius: 0%;
+    }
+
+    .replyingto {
+        color: var(--main-fg-color);
+    }
+
+    .container img.announceOrReply {
+        float: none;
+        width: 30px;
+        margin: 0 0;
+        padding: 0 0;
+        border-radius: 0;
+        -ms-transform: translateY(25%);
+        transform: translateY(25%);
+    }
+
+    .container img.DMicon {
+        float: none;
+        width: 40px;
+        margin: 0 0;
+        padding: 0 0;
+        border-radius: 0;
+        -ms-transform: translateY(25%);
+        transform: translateY(25%);
+    }
+
+    .darker {
+        background-color: var(--main-bg-color-reply);
+    }
+
+    .dm {
+        background-color: var(--main-bg-color-dm);
+    }
+
+    .report {
+        border-color: #255;
+        background-color: var(--main-bg-color-report);
+    }
+
+    .container img.attachment {
+        max-width: 100%;
+        margin-left: 25%;
+        width: 50%;
+        border-radius: 10%;
+    }
+    .container img.right {
+        float: right;
+        margin-left: 0px;
+        margin-right:0;
+        padding: 0 0;
+        margin: 0 0;
+    }
+    .containericons img.right {
+        float: right;
+        margin-left: 20px;
+        margin-right: 0;
+    }
+
+    .time-right {
+        float: right;
+        color: #aaa;
+        margin: 4px 20px;
+    }
+
+    .post-title {
+        margin-top: 0px;
+        color: #444;
+    }
+
+    .share-title {
+        margin-top: 0px;
+        color: var(--main-fg-color);
+    }
+
+    .skill-title {
+        margin-left: 25%;
+        text-align: left;
+        font-size: 24px;
+        font-weight: bold;
+        color: #666;
+        line-height: 40px;
+    }
+
+    #myProgress {
+        float: left;
+        width: 70%;
+        background-color: #f1f1f1;
+    }
+
+    #myBar {
+        float: left;
+        width: 10%;
+        height: 30px;
+        background-color: #999;
+    }
+
+    .question {
+        font-size: var(--font-size);
+    }
+
+    input[type=radio] {
+        width: 32px;
+    }
+
+    input[type=text], select, textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        margin-top: 6px;
+        margin-bottom: 16px;
+        resize: vertical;
+        font-size: 24px;
+        background-color: var(--main-bg-color-reply);
+        color: var(--main-fg-color);
+    }
+
+    input[type=number] {
+        width: 10%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        margin-top: 6px;
+        margin-bottom: 16px;
+        resize: vertical;
+        font-size: 18px;
+    }
+
+    .labels {
+        font-size: 18px;
+    }
+
+    input[type=submit] {
+        background-color: #555;
+        color: white;
+        float: right;
+        margin: 10px 10px;
+        padding: 12px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+        width: 120px;
+    }
+
+    input.vote[type=submit] {
+        background-color: #555;
+        color: white;
+        float: left;
+        margin: 10px 10px;
+        padding: 12px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+        width: 120px;
+    }
+
+    .cancelbtn {
+        background-color: #555;
+        color: white;
+        float: right;
+        margin: 10px 10px;
+        padding: 12px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+        width: 120px;
+    }
+
+    .loginButton {
+        background-color: #2965;
+        color: #000;
+        float: none;
+        margin: 0px 10px;
+        padding: 12px 40px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 24px;
+        opacity: 0.7;
+    }
+
+    input[type=file] {
+        background-color: #555;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+    }
+
+    input[type=submit]:hover {
+        background-color: #555;
+    }
+
+    .vertical-center {
+        max-width: 90%;
+        min-width: 600px;
+        margin: 0 auto;
+        padding: 5% 0px;
+    }
+
+    /* The container <div> - needed to position the dropdown content */
+    .dropdown {
+        margin: 10px auto;
+        padding: 0px 14px;
+        position: relative;
+        display: inline-block;
+    }
+
+    .dropdown img {
+        opacity: 1.0;
+        width: 32px;
+        height: 32px;
+        padding: 0px 16px;
+        -ms-transform: translateY(-10%);
+        transform: translateY(-10%);
+    }
+
+    .timeline-avatar {
+        margin: 10px auto;
+        padding: 0px 0px;
+    }
+
+    .search-result-text {
+        font-size: var(--font-size);
+    }
+
+    .search-result img {
+        width: 7%;
+        padding: 0px 30px;
+    }
+
+    .timeline-avatar img {
+        opacity: 1.0;
+        width: 8%;
+        height: 8%;
+        padding: 0px 0px;
+        -ms-transform: translateY(-10%);
+        transform: translateY(-10%);
+    }
+
+    .scope-desc {
+        font-size: 18px;
+    }
+
+    /* Dropdown Content (Hidden by Default) */
+    .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: var(--dropdown-bg-color);
+        min-width: 600px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+        z-index: 1;
+    }
+
+    /* Links inside the dropdown */
+    .dropdown-content a {
+        color: var(--main-fg-color);
+        padding: 12px 16px;
+        text-decoration: none;
+        display: block;
+    }
+
+    .dropdown-content img {
+        width: 32px;
+        height: 32px;
+        padding: 0px 0px;
+    }
+
+    /* Change color of dropdown links on hover */
+    .dropdown-content a:hover {background-color: var(--dropdown-bg-color-hover);}
+
+    /* Show the dropdown menu on hover */
+    .show {display: block;}
+
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 10px;
+        margin: 10px 5px;
+    }
+
+    .slider {
+        -webkit-appearance: none;
+        width: 57%;
+        height: 25px;
+        background: #d3d3d3;
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+        float: right;
+        margin: 5px 0;
+        padding: 12px 0;
+    }
+
+    .slider:hover {
+        opacity: 1;
+    }
+
+    .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        background: var(--main-bg-color);
+        cursor: pointer;
+    }
+
+    .slider::-moz-range-thumb {
+        width: 25px;
+        height: 25px;
+        background: var(--main-bg-color);
+        cursor: pointer;
+    }
+
+    .dropbtn {
+        margin: 3%;
+        padding: 0px 14px;
+        position: relative;
+        display: inline-block;
+        border: none;
+        cursor: pointer;
+    }
+
+    .dropbtn img {
+        opacity: 1.0;
+        width: 3%;
+        height: 3%;
+        min-width: 40px;
+        padding: 0px 16px;
+        -ms-transform: translateY(-10%);
+        transform: translateY(-10%);
+    }
+
+    .intro {
+        font-size: 24px;
+        color: #999;
+    }
+
+    .matrix {
+        font-size: 24px;
+        color: #ddd;
+    }
+
+    .headerlink {
+        font-size: 30px;
+        color: white;
+    }
+
+    .siteheader {
+        font-size: 30px;
+        color: white;
+    }
+
+    .releaseheader {
+        font-size: 30px;
+	font-weight: bold;
+        color: yellow;
+    }
+
+    .releaseheader a:link {
+        color: yellow;
+        font-weight: bold;
+    }
+
+    footer {
+        float: right;
+        font-size: 18px;
+    }
+
+    @media screen and (min-width: 400px) {
+        body, html {
+            font-size: 22px;
+        }
+        .container img {
+            float: left;
+            max-width: 400px;
+            width: 5%;
+            padding: 0px 7px;
+            margin-right: 20px;
+            border-radius: 10%;
+        }
+        .container img.emojisearch {
+            float: right;
+            max-width: 400px;
+            width: 8%;
+            padding: 0px 7px;
+            margin-right: 20px;
+            border-radius: 10%;
+        }
+        .containericons img {
+            float: right;
+            max-width: 200px;
+            width: 3%;
+            margin: 0px 1%;
+            border-radius: 0%;
+        }
+        .timeline-avatar img {
+            opacity: 1.0;
+            width: 8%;
+            height: 8%;
+            padding: 0px 0px;
+            -ms-transform: translateY(-10%);
+            transform: translateY(-10%);
+        }
+        .cwButton {
+            border-radius: 4px;
+            background-color: #555;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 20px;
+            padding: 2px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button {
+            border-radius: 4px;
+            background-color: #999;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 18px;
+            padding: 10px;
+            width: 10%;
+            max-width: 100px;
+            min-width: 80px;
+            transition: all 0.5s;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .buttonselected {
+            border-radius: 4px;
+            background-color: #666;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 18px;
+            padding: 10px;
+            width: 10%;
+            max-width: 100px;
+            min-width: 80px;
+            transition: all 0.5s;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .pageicon {
+            width: 4%;
+        }
+        .time-right {
+            float: right;
+            color: #aaa;
+            margin: 4px 20px;
+        }
+        input[type=text], select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-top: 6px;
+            margin-bottom: 16px;
+            resize: vertical;
+            font-size: 24px;
+            background-color: var(--main-bg-color-reply);
+            color: var(--main-fg-color);
+        }
+        input[type=button], input[type=submit] {
+            background-color: #555;
+            color: white;
+            float: right;
+            padding: 10px;
+            margin: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-size);
+            width: 20%;
+        }
+        input.vote[type=submit] {
+            background-color: #555;
+            color: white;
+            float: left;
+            padding: 10px;
+            margin: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-size);
+            width: 20%;
+        }
+        input[type=file] {
+            background-color: #555;
+            color: white;
+            padding: 20px;
+            margin: 0px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-size);
+            width: 96%;
+        }
+        .cancelbtn {
+            background-color: #555;
+            color: white;
+            float: right;
+            padding: 10px;
+            margin: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: var(--font-size);
+            width: 20%;
+        }
+        .scope-desc {
+            font-size: 32px;
+        }
+        .buttonunfollow {
+            border-radius: 4px;
+            background-color: #999;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 18px;
+            padding: 10px;
+            width: 20%;
+            max-width: 200px;
+            min-width: 100px;
+            transition: all 0.5s;
+            cursor: pointer;
+            margin: 5px;
+            float: right;
+        }
+        .intro {
+            font-size: 24px;
+            color: #999;
+        }
+
+        .headerlink {
+            font-size: 30px;
+            color: white;
+        }
+
+        .siteheader {
+            font-size: 30px;
+            color: white;
+        }
+
+        footer {
+            float: right;
+            font-size: 18px;
+        }
+    }
+
+    @media screen and (max-width: 1000px) {
+        body, html {
+            font-size: 35px;
+        }
+        .container img {
+            float: left;
+            max-width: 400px;
+            width: 15%;
+            padding: 0px 7px;
+            margin-right: 20px;
+            border-radius: 10%;
+        }
+        .container img.emojisearch {
+            float: right;
+            max-width: 400px;
+            width: 12%;
+            padding: 0px 7px;
+            margin-right: 20px;
+            border-radius: 10%;
+        }
+        .containericons img {
+            float: right;
+            max-width: 200px;
+            width: 7%;
+            margin: 1% 3%;
+            border-radius: 0%;
+        }
+        .timeline-avatar img {
+            opacity: 1.0;
+            width: 15%;
+            height: 15%;
+            padding: 0px 0px;
+            -ms-transform: translateY(-10%);
+            transform: translateY(-10%);
+        }
+        .cwButton {
+            border-radius: 4px;
+            background-color: #555;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 32px;
+            padding: 2px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button {
+            border-radius: 4px;
+            background-color: #999;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 32px;
+            padding: 10px;
+            width: 20%;
+            max-width: 400px;
+            min-width: 80px;
+            transition: all 0.5s;
+            cursor: pointer;
+            margin: 15px;
+        }
+        .buttonselected {
+            border-radius: 4px;
+            background-color: #666;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 32px;
+            padding: 10px;
+            width: 20%;
+            max-width: 400px;
+            min-width: 80px;
+            transition: all 0.5s;
+            cursor: pointer;
+            margin: 15px;
+        }
+        .pageicon {
+            width: 8%;
+        }
+        .time-right {
+            float: right;
+            color: #aaa;
+            margin: 25px 20px;
+        }
+        input[type=text], select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-top: 6px;
+            margin-bottom: 16px;
+            resize: vertical;
+            font-size: 30px;
+            background-color: var(--main-bg-color-reply);
+            color: var(--main-fg-color);
+        }
+        input[type=button], input[type=submit] {
+            background-color: #555;
+            color: white;
+            float: right;
+            padding: 10px;
+            margin: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 30px;
+            width: 20%;
+        }
+        input.vote[type=submit] {
+            background-color: #555;
+            color: white;
+            float: left;
+            padding: 10px;
+            margin: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 30px;
+            width: 20%;
+        }
+        input[type=file] {
+            background-color: #555;
+            color: white;
+            padding: 20px;
+            margin: 0px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 30px;
+            width: 95.4%;
+        }
+        .cancelbtn {
+            background-color: #555;
+            color: white;
+            float: right;
+            padding: 10px;
+            margin: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 30px;
+            width: 20%;
+        }
+        .scope-desc {
+            font-size: 30px;
+        }
+        .buttonunfollow {
+            border-radius: 4px;
+            background-color: #999;
+            border: none;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 30px;
+            padding: 10px;
+            width: 20%;
+            max-width: 200px;
+            min-width: 100px;
+            transition: all 0.5s;
+            cursor: pointer;
+            margin: 5px;
+            float: right;
+        }
+        .intro {
+            font-size: 32px;
+            color: #999;
+        }
+
+        .headerlink {
+            font-size: 40px;
+            color: white;
+        }
+
+        .siteheader {
+            font-size: 40px;
+            color: white;
+        }
+
+        footer {
+            float: right;
+            font-size: 24px;
+        }
+    }
+
+    .imageright {
+        float: right;
+    }
+
+    .shell {
+        margin: 30px 30px;
+        width: 100%;
+        float: left;
+        font-family: Courier;
+        background-color: black;
+    }
+
+  </style>
+  <head>
+    <title>Epicyon ActivityPub server</title>
+  </head>
+  <body>
+    <div class="timeline-banner"></div>
+    <center>
+      <br>
+      <table style="margin:1% 0%;width:90%" border="0">
+        <tr>
+          <th><a href="epicyon.tar.gz"><span class="headerlink">Download</span></a></th>
+          <th><a href="#install"><span class="headerlink">Install</span></a></th>
+          <th><a href="https://gitlab.com/bashrc2/epicyon"><span class="headerlink">Repo</span></a></th>
+          <th><a href="https://www.patreon.com/freedombone"><span class="headerlink">Donate</span></a></th>
+        </tr>
+      </table>
+      <p class="matrix">Matrix room: <b>#epicyon:conduit.libreserver.org<br>gemini://libreserver.org/epicyon</b></p>
+      <p class="intro">Current release <a href="v1_6_0.html">v1.6.0</a></p>
+      <p class="intro">Epicyon is a <a href="https://en.wikipedia.org/wiki/Fediverse">fediverse</a> server suitable for self-hosting a small number of accounts on low power systems.</p>
+    </center>
+
+      <div class="features">
+      <p class="intro">Key features:</p>
+      <ul class="features_list">
+          <li>Open standards: HTML, CSS, ActivityPub S2S and C2S, RSS, CalDAV.</li>
+          <li>Supports common web browsers and <a href="https://lynx.invisible-island.net">shell browsers</a>.</li>
+          <li>Will not drain your mobile or laptop battery.</li>
+          <li>Customisable themes. It doesn't have to look bland.</li>
+          <li>Does not require much RAM, either on server or client.</li>
+          <li>Suitable for installation on single board computers.</li>
+          <li>No timeline algorithms.</li>
+          <li>No javascript.</li>
+          <li>No database. Data stored as ordinary files.</li>
+          <li>No fashionable web frameworks. <i>"Boring by design"</i>.</li>
+          <li>No blockchain garbage.</li>
+          <li>Written in Python, with few dependencies.</li>
+          <li>AGPL license, which big tech hates.</li>
+      </ul>
+      </div>
+
+      <center>
+      <p class="intro">Epicyon is for people who are tired of <i>big anything</i> and just want to DIY their online social experience without much fuss or expense. Think <i>water cooler discussions</i> rather than <i>shouting into the void</i>, in which you're mainly just reading and responding to the posts of people that you're following.</p>
+
+      <p class="siteheader">An Internet of People, Not Corporate Manipulation</p>
+      <p class="intro">
+Ever feel like corporate social media is deliberately pressing your buttons or grinding your gears, leaving you stressed and angry? On the open web there is no pressure to perform the way a timeline algorithm wants you to. Experience the astonishingly novel concept of <i>just hanging out with friends</i>, without any artificial agendas.
+      </p>
+
+      <p class="siteheader">Small Tech Design</p>
+      <p class="intro">
+        Epicyon is written in Python with a HTML+CSS web interface and uses <a href="https://www.youtube.com/watch?v=Uo3cL4nrGOk">no javascript</a> which makes display in a web browser very lightweight. It can run as a <a href="https://en.wikipedia.org/wiki/Progressive_web_application">Progressive Web App</a> on mobile.
+      </p>
+
+      <table style="margin:0% 0%;width:100%" border="0">
+        <tr>
+          <th><a href="img/screenshot_purple.jpg"><img width="90%" src="img/screenshot_purple.jpg" alt="Purple theme timeline screenshot" /></a></th>
+          <th><a href="img/screenshot_profile.jpg"><img width="90%" src="img/screenshot_profile.jpg" alt="Starlight theme profile page" /></a></th>
+        </tr>
+        <tr>
+          <th><a href="img/screenshot_rc3.jpg"><img width="120%" src="img/screenshot_rc3.jpg" alt="various screenshots" /></a></th>
+          <th><img width="50%" src="img/mobile.jpg" alt="mobile screenshot" /></th>
+        </tr>
+        <tr>
+          <th><img width="90%" src="img/screenshot_login.jpg" alt="login screen" /></th>
+          <th><img width="90%" src="img/screenshot_emojisearch.jpg" alt="emoji search" /></th>
+        </tr>
+      </table>
+
+      <p class="intro">
+        Emojis, hashtags, photos, video and audio attachments, instance and account level blocking controls, moderation functions and reports are all supported. Build the community you want and avoid the stuff you don't. No ads. No blockchains or other Silicon Valley garbage.
+      </p>
+
+      <p class="siteheader">Community not Audience</p>
+      <p class="intro">
+          Corporate social media gives you an audience, with reach, celebrity, spectacle, lack of control, professional influencers, anxiety, alienation and competition. It's designed for fast growth regardless of social consequences, often where the contents of your feed or timeline <a href="https://www.forbes.com/sites/emilybaker-white/2023/01/20/tiktoks-secret-heating-button-can-make-anyone-go-viral">is rigged</a> rather than having anything to do with what you are interested in. Epicyon is designed for community, in which you have more control over who you're associating with. The community approach is the better way to build a habitable internet for the long term.
+      </p>
+
+      <p class="siteheader">Message Scopes</p>
+      <p class="intro">
+        Define the scope of your messages to reach the right people.
+      </p>
+      <img width="60%" src="img/messagescope.jpg" />
+
+      <p class="siteheader">Scheduled Posts</p>
+      <p class="intro">
+        Schedule posts to be published at some time in the future. This can be useful for reminding yourself to do things (send your future self a direct message) or for creating a series of posts promoting some event, such as a festival or wedding.
+      </p>
+
+      <p class="siteheader">Text Search</p>
+      <p class="intro">
+        Want to be reminded about what you said about a topic a month ago? The search screen allows you to do full text search <i>on your own posts</i>. Search on other posts can be done via the use of hashtags.
+      </p>
+
+      <p class="siteheader">Federated Blogging</p>
+      <img width="10%" src="img/icons/logorss.png" alt="RSS 2.0"/>
+      <p class="intro">
+        You don't need a separate blog system. Blog posts can be added and edited, and are federated as ActivityPub articles. They also have RSS version 2.0 feeds. People can comment on blog posts, but unlike other systems the moderation settings apply just the same as they do for any other fediverse post arriving at your server. This makes blog spam much easier to keep control over. You can subscribe to other people's blogs and they will appear in the right hand newswire column.
+      </p>
+
+      <p class="siteheader">International and Customizable</p>
+      <p class="intro">
+        Epicyon supports many languages. Translations and emoji can easily be added. Alter the logo, backgrounds, terms of service and style to create a unique personality for your instance. Choose from a few different themes, or make a new one.
+      </p>
+      <img width="100%" src="img/screenshot_light.jpg" alt="light theme timeline screenshot"/>
+
+      <p class="siteheader">Calendar Events</p>
+      <p class="intro">
+        When creating a new post you can optionally also add a date, time and place. This will show up on the calendars of your followers, and makes organizing meetups or other community events simple. You can use message scopes to set up public events or private ones. To create reminders you can send yourself a DM with an event and it will appear on only your calendar.
+      </p>
+      <img width="70%" src="img/calendar.jpg" alt="calendar screenshot"/>
+
+      <p class="siteheader">Noone Left Behind</p>
+      <p class="intro">
+        Epicyon's absence of javascript makes it much more usable in shell based web browsers such as <a href="https://en.wikipedia.org/wiki/Lynx_%28web_browser%29">Lynx</a>. As new web systems are deployed we should not be leaving anyone with minority use cases behind.
+      </p>
+      <img width="70%" src="img/screenshot_lynx.jpg" alt="lynx screenshot"/>
+      <img width="100%" src="img/desktop_client.jpg" alt="C2S desktop client screenshot"/>
+
+      <p class="siteheader">Media Timeline</p>
+      <p class="intro">
+        Some posts contain images and some don't. The media timeline enables you to view all your pet photos in one place.
+      </p>
+      <img width="100%" src="img/screenshot_media.jpg" alt="media timeline screenshot"/>
+      <img width="70%" src="img/screenshot_media3.jpg" alt="media timeline screenshot"/>
+      <p class="intro">
+        If you want your instance to be primarily about posting and interacting with media then you can also enable the <b>media instance</b> option.
+      </p>
+      <p class="siteheader">Genuine Sharing Economy</p>
+      <p class="intro">
+        Barter and gift physical items or services with other people on your instance. Search for shared items which you might want or post items you no longer have a use for. Promote ride shares or available accomodation without any unnecessary companies in the middle. Pool resources between trusted friends to build solidarity and have fun.
+      </p>
+      <img width="70%" src="img/screenshot_shares.jpg" />
+      <p class="siteheader">Promote Your Skills and Build Teams</p>
+      <p class="intro">
+        Define a set of skills in your profile and search for other people who have the skills you need. Organize teams who can get things done!
+      </p>
+      <table style="margin:1% 10%;width:90%" border="0">
+        <tr>
+          <th><img width="90%" src="img/skills.jpg" /></th>
+          <th><img width="90%" src="img/skillssearch.jpg" /></th>
+        </tr>
+      </table>
+      <p class="siteheader">Bookmarks</p>
+      <p class="intro">
+        Want to remember a particular link or reply to something later? Bookmark your favorite posts and view them on the <i>Saves</i> timeline.
+      </p>
+      <img width="70%" src="img/screenshot_bookmarks.jpg" />
+
+      <p class="siteheader">Hashtags</p>
+      <p class="intro">
+        Stay informed about the topics which people that you follow are highlighting. On the search screen there is a hashtag swarm.
+      </p>
+      <img width="70%" src="img/screenshot_tagswarm.jpg" />
+
+      <p class="siteheader">News integration</p>
+      <p class="intro">
+        Want to read the news from an RSS feed, or run your own Independent Media Center producing news and federating it through the network? Both of those are possible. The newswire gives you the capability of collectively moderating news as it arrives, and publishing your own articles. The administrator can assign moderator and editor roles to other users on an instance. Organize your community to overcome the limitations of corporate media.
+      </p>
+
+      <p id="install" class="siteheader">Install</p>
+    </center>
+    <p class="intro">You will need python version 3.7 or later.</p>
+    <p class="intro">On a Debian based system:</p>
+    <div class="shell">
+      <p>sudo apt install -y tor python3-socks imagemagick python3-setuptools python3-cryptography python3-dateutil python3-idna python3-requests python3-flake8 python3-django-timezone-field python3-pyqrcode python3-png python3-bandit libimage-exiftool-perl certbot nginx wget</p>
+    </div>
+
+    <p class="intro">
+      The following instructions install Epicyon to the <b>/opt</b> directory. It's not essential that it be installed there, and it could be in any other preferred directory.
+    </p>
+
+    <p class="intro">
+      Clone the repo, or if you downloaded the tarball then extract it into the <b>/opt</b> directory.
+    </p>
+    <div class="shell">
+      <p>cd /opt</p>
+      <p>git clone --depth 1 https://gitlab.com/bashrc2/epicyon</p>
+    </div>
+
+    <p class="intro">
+      Create a user for the server to run as:
+    </p>
+    <div class="shell">
+      <p>sudo su</p>
+      <p>adduser --system --home=/opt/epicyon --group epicyon</p>
+      <p>chown -R epicyon:epicyon /opt/epicyon</p>
+    </div>
+
+    <p class="intro">
+      Link news mirrors:
+    </p>
+    <div class="shell">
+      <p>mkdir /var/www/YOUR_DOMAIN</p>
+      <p>mkdir -p /opt/epicyon/accounts/newsmirror</p>
+      <p>ln -s /opt/epicyon/accounts/newsmirror /var/www/YOUR_DOMAIN/newsmirror</p>
+    </div>
+
+    <p class="intro">
+      Create a daemon:
+    </p>
+    <div class="shell">
+      <p>nano /etc/systemd/system/epicyon.service</p>
+    </div>
+    <p class="intro">
+      Paste the following:
+    </p>
+    <div class="shell">
+        [Unit]<br>
+        Description=epicyon<br>
+        After=syslog.target<br>
+        After=network.target<br>
+        <br>
+        [Service]<br>
+        Type=simple<br>
+        User=epicyon<br>
+        Group=epicyon<br>
+        WorkingDirectory=/opt/epicyon<br>
+        ExecStart=/usr/bin/python3 /opt/epicyon/epicyon.py --port 443 --proxy 7156 --domain YOUR_DOMAIN --registration open --log_login_failures<br>
+        Environment=USER=epicyon<br>
+        Environment=PYTHONUNBUFFERED=true<br>
+        Environment=PYTHONIOENCODING=utf-8<br>
+        Restart=always<br>
+      StandardError=syslog<br>
+      CPUQuota=80%<br>
+      ProtectHome=true<br>
+      ProtectKernelTunables=true<br>
+      ProtectKernelModules=true<br>
+      ProtectControlGroups=true<br>
+      ProtectKernelLogs=true<br>
+      ProtectHostname=true<br>
+      ProtectClock=true<br>
+      ProtectProc=invisible<br>
+      ProcSubset=pid<br>
+      PrivateTmp=true<br>
+      PrivateUsers=true<br>
+      PrivateDevices=true<br>
+      PrivateIPC=true<br>
+      MemoryDenyWriteExecute=true<br>
+      NoNewPrivileges=true<br>
+      LockPersonality=true<br>
+      RestrictRealtime=true<br>
+      RestrictSUIDSGID=true<br>
+      RestrictNamespaces=true<br>
+      SystemCallArchitectures=native<br>
+      <br>
+      [Install]<br>
+      WantedBy=multi-user.target
+    </div>
+    <p class="intro">
+      Activate the daemon:
+    </p>
+    <div class="shell">
+      systemctl enable epicyon<br>
+      systemctl start epicyon
+    </div>
+    <p class="intro">
+      Create a web server configuration:
+    </p>
+    <div class="shell">
+      nano /etc/nginx/sites-available/YOUR_DOMAIN
+    </div>
+    <p class="intro">
+      And paste the following:
+    </p>
+    <div class="shell">
+      server {<br>
+        listen 80;<br>
+        listen [::]:80;<br>
+        server_name YOUR_DOMAIN;<br>
+        access_log /dev/null;<br>
+        error_log /dev/null;<br>
+        client_max_body_size 31m;<br>
+        client_body_buffer_size 128k;<br>
+        <br>
+        limit_conn conn_limit_per_ip 10;<br>
+        limit_req zone=req_limit_per_ip burst=10 nodelay;<br>
+        <br>
+        index index.html;<br>
+        rewrite ^ https://$server_name$request_uri? permanent;<br>
+      }<br>
+      <br>
+      server {<br>
+        listen 443 ssl http2;<br>
+        server_name YOUR_DOMAIN;<br>
+        <br>
+        gzip on;<br>
+        gzip_disable "msie6";<br>
+        gzip_vary on;<br>
+        gzip_proxied any;<br>
+        gzip_min_length 1024;<br>
+        gzip_comp_level 6;<br>
+        gzip_buffers 16 8k;<br>
+        gzip_http_version 1.1;<br>
+        gzip_types text/plain text/css text/vcard text/vcard+xml application/json application/ld+json application/javascript text/xml application/xml application/rdf+xml application/xml+rss text/javascript;<br>
+        <br>
+        ssl_stapling off;<br>
+        ssl_stapling_verify off;<br>
+        ssl on;<br>
+        ssl_certificate /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;<br>
+        ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;<br>
+        #ssl_dhparam /etc/ssl/certs/YOUR_DOMAIN.dhparam;<br>
+        <br>
+        ssl_protocols TLSv1.2 TLSv1.3;<br>
+        ssl_ciphers HIGH:!MEDIUM:!LOW:!aNULL:!NULL:!SHA;<br>
+        ssl_prefer_server_ciphers on;<br>
+        ssl_session_cache shared:SSL:10m;<br>
+        ssl_session_tickets off;<br>
+        <br>
+        add_header Content-Security-Policy "default-src https:; script-src https: 'unsafe-inline'; style-src https: 'unsafe-inline'";<br>
+        add_header X-Frame-Options DENY;<br>
+        add_header X-Content-Type-Options nosniff;<br>
+        add_header X-XSS-Protection "1; mode=block";<br>
+        add_header X-Download-Options noopen;<br>
+        add_header X-Permitted-Cross-Domain-Policies none;<br>
+        add_header Strict-Transport-Security "max-age=15768000; includeSubDomains; preload" always;<br>
+        <br>
+        access_log /dev/null;<br>
+        error_log /dev/null;<br>
+        <br>
+        index index.html;<br>
+        <br>
+        location /newsmirror {<br>
+          root /var/www/YOUR_DOMAIN;<br>
+          try_files $uri =404;<br>
+        }<br>
+        <br>
+        keepalive_timeout 70;<br>
+        sendfile on;<br>
+        <br>
+        location / {<br>
+        proxy_http_version 1.1;<br>
+        client_max_body_size 31M;<br>
+        proxy_set_header Host $http_host;<br>
+        proxy_set_header X-Real-IP $remote_addr;<br>
+        proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;<br>
+        proxy_set_header X-Forward-Proto http;<br>
+        proxy_set_header X-Nginx-Proxy true;<br>
+        proxy_temp_file_write_size 64k;<br>
+        proxy_connect_timeout 10080s;<br>
+        proxy_send_timeout 10080;<br>
+        proxy_read_timeout 10080;<br>
+        proxy_buffer_size 64k;<br>
+        proxy_buffers 16 32k;<br>
+        proxy_busy_buffers_size 64k;<br>
+        proxy_redirect off;<br>
+        proxy_request_buffering off;<br>
+        proxy_buffering off;<br>
+        proxy_pass http://localhost:7156;<br>
+        tcp_nodelay on;<br>
+        }<br>
+      }
+    </div>
+
+    <p class="intro">
+      Enable the site:
+    </p>
+    <div class="shell">
+      ln -s /etc/nginx/sites-available/YOUR_DOMAIN /etc/nginx/sites-enabled/<br>
+    </div>
+
+    <p class="intro">
+      Forward port 443 from your internet router to your server. If you have dynamic DNS make sure its configured. Add a TLS certificate:
+    </p>
+    <div class="shell">
+        systemctl stop nginx<br>
+        certbot certonly -n --server https://acme-v02.api.letsencrypt.org/directory --standalone -d YOUR_DOMAIN --renew-by-default --agree-tos --email YOUR_EMAIL<br>
+        systemctl start nginx
+    </div>
+    <p class="intro">
+      Restart your web server:
+    </p>
+    <div class="shell">
+      systemctl restart nginx
+    </div>
+    <p class="intro">
+      If you need to use <a href="https://www.fail2ban.org">fail2ban</a> then failed login attempts can be found in <b>accounts/loginfailures.log</b>.
+    </p>
+    <p class="intro">
+      If you are using the <a href="https://caddyserver.com">Caddy web server</a> then see <a href="https://code.libreserver.org/bashrc/epicyon/raw/main/caddy.example.conf">caddy.example.conf</a>
+    </p>
+    <p class="intro">
+      Now you can navigate to your domain and register an account. The first account becomes the administrator.
+    </p>
+
+    <center>
+      <p id="install" class="siteheader">Installing on Onion or i2p domains</p>
+      <p class="intro">
+        If you don't have access to the clearnet, or prefer not to use it, then it's possible to run an Epicyon instance easily from your laptop. There are scripts within the <i>deploy</i> directory which can be used to install an instance on a Debian or Arch/Parabola operating system. With some modification of package names they could be also used with other distros.
+      </p>
+      <p class="intro">
+Please be aware that such installations will not federate with ordinary fediverse instances on the clearnet, unless those instances have been specially modified to do so. But onion instances will federate with other onion instances and i2p instances with other i2p instances.
+      </p>
+
+      <p id="upgrade" class="siteheader">Upgrade</p>
+    </center>
+    <p class="intro">
+      To subsequently upgrade:
+    </p>
+    <div class="shell">
+      cd /opt/epicyon<br>
+      git pull<br>
+      chown -R epicyon:epicyon *<br>
+      systemctl restart epicyon
+    </div>
+  </body>
+  <footer>
+    <p>By: Bob Mottram <a href="mailto:bob@libreserver.org">bob@libreserver.org</a></p>
+  </footer>
+</html>

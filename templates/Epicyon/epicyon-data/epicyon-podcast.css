@@ -1,0 +1,416 @@
+@charset "UTF-8";
+
+:root {
+    --avatar-rounding: 10%;
+    --options-bg-color: #282c37;
+    --options-link-bg-color: transparent;
+    --options-fg-color: #dddddd;
+    --options-main-link-color: #999;
+    --options-main-visited-color: #888;
+    --border-color: #505050;
+    --font-size-header: 18px;
+    --font-color-header: #ccc;
+    --font-size: 40px;
+    --font-size2: 24px;
+    --font-size3: 38px;
+    --font-size4: 22px;
+    --font-size5: 20px;
+    --text-entry-foreground: #ccc;
+    --text-entry-background: #111;
+    --time-color: #aaa;
+    --button-text: #FFFFFF;
+    --button-small-text: #FFFFFF;
+    --button-background-hover: #777;
+    --button-background: #999;
+    --button-small-background: #999;
+    --hashtag-margin: 2%;
+    --hashtag-vertical-spacing1: 50px;
+    --hashtag-vertical-spacing2: 100px;
+    --hashtag-vertical-spacing3: 100px;
+    --hashtag-vertical-spacing4: 150px;
+    --hashtag-size1: 30px;
+    --hashtag-size2: 40px;
+    --follow-text-size1: 24px;
+    --follow-text-size2: 40px;
+    --follow-text-entry-width: 90%;
+    --focus-color: white;
+    --petname-width-chars: 16ch;
+    --options-main-link-color-hover: #bbb;
+    --rendering: normal;
+}
+
+@font-face {
+  font-family: 'Bedstead';
+  font-style: italic;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/bedstead.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Bedstead';
+  font-style: normal;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/bedstead.otf') format('opentype');
+}
+
+body, html {
+    background-image: url("podcast-background.jpg");
+    background-size: cover;
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: var(--options-bg-color);
+    color: var(--options-fg-color);
+
+    height: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    max-width: 100%;
+    min-width: 600px;
+    image-rendering: var(--rendering);
+}
+
+audio {
+    width: 90%;
+}
+
+video {
+    width: 90%;
+}
+
+a, u {
+    color: var(--options-fg-color);
+}
+
+a:visited{
+    color: var(--options-main-visited-color);
+    background: var(--options-link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link {
+    color: var(--options-main-link-color);
+    background: var(--options-link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link[type=application/activity+json]::before {
+    content: '\2B5A '; /*⭚ */
+}
+
+a:link:hover {
+    color: var(--options-main-link-color-hover);
+}
+
+a:visited:hover {
+    color: var(--options-main-link-color-hover);
+}
+
+a:focus {
+    border: 2px solid var(--focus-color);
+}
+
+.transparent {
+    color: transparent;
+    background: transparent;
+    font-size: 0px;
+    line-height: 0px;
+    height: 0px;
+}
+
+.follow {
+    height: 100%;
+    position: relative;
+    background-color: var(--options-bg-color);
+}
+
+.followAvatar {
+    margin: 0% 0;
+}
+
+.followAvatar img {
+    border-radius: 10%;
+    width: 20%;
+    min-width: 200px;
+}
+
+.imText {
+    font-size: var(--font-size4);
+    color: var(--options-main-link-color);
+}
+
+.pgp {
+    font-size: var(--font-size5);
+    color: var(--options-main-link-color);
+    background: var(--options-link-bg-color);
+}
+
+.button:hover {
+    background-color: var(--button-background-hover);
+}
+
+.options {
+    font-size: var(--font-size);
+}
+
+.options img {
+    border-radius: var(--avatar-rounding);
+    background-color: var(--options-bg-color);
+    width: 15%;
+}
+
+.performers {
+    display: flex;
+}
+
+@media screen and (min-width: 400px) {
+    textarea {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: var(--font-size4);
+        width: 90%;
+        background-color: var(--text-entry-background);
+        color: var(--text-entry-foreground);
+    }
+    .followText {
+        font-size: var(--follow-text-size1);
+    }
+    input[type=text] {
+        width: var(--follow-text-entry-width);
+        clear: both;
+        max-width: 30%;
+        min-width: var(--petname-width-chars);
+        font-size: 24px;
+        text-align: center;
+        color: var(--text-entry-foreground);
+        background-color: var(--text-entry-background);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: 24px;
+        width: 10ch;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    .buttonIcon {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px 65px;
+        font-size: 24px;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+    }
+    .buttonsmall {
+        border-radius: 4px;
+        background-color: var(--button-small-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-small-text);
+        text-align: center;
+        padding: 10px;
+        font-size: 24px;
+        width: 7ch;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 10px;
+        margin: 20px 30px;
+    }
+    .performers img {
+        width: 20%;
+    }
+    .chapters img {
+        width: 10%;
+    }
+}
+
+@media screen and (max-width: 1000px) {
+    textarea {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: var(--font-size);
+        width: 90%;
+        background-color: var(--text-entry-background);
+        color: var(--text-entry-foreground);
+    }
+    .followText {
+        font-size: var(--follow-text-size2);
+    }
+    input[type=text] {
+        width: var(--follow-text-entry-width);
+        clear: both;
+        font-size: var(--font-size);
+        text-align: center;
+        max-width: 50%;
+        min-width: var(--petname-width-chars);
+        color: var(--text-entry-foreground);
+        background-color: var(--text-entry-background);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: var(--font-size);
+        width: 10ch;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    .buttonIcon {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 6px 80px;
+        font-size: var(--font-size);
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+    }
+    .buttonsmall {
+        border-radius: 4px;
+        background-color: var(--button-small-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-small-text);
+        text-align: center;
+        padding: 10px;
+        font-size: var(--font-size);
+        width: 7ch;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 20px;
+        margin: 30px 40px;
+    }
+    .performers img {
+        width: 30%;
+    }
+    .chapters img {
+        width: 15%;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    textarea {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: var(--font-size2);
+        width: 90%;
+        background-color: var(--text-entry-background);
+        color: var(--text-entry-foreground);
+    }
+    .followText {
+        font-size: var(--follow-text-size2);
+    }
+    input[type=text] {
+        width: var(--follow-text-entry-width);
+        clear: both;
+        font-size: var(--font-size2);
+        text-align: center;
+        max-width: 50%;
+        min-width: var(--petname-width-chars);
+        color: var(--text-entry-foreground);
+        background-color: var(--text-entry-background);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    .button {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 10px;
+        font-size: var(--font-size2);
+        width: 10ch;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    .buttonIcon {
+        border-radius: 4px;
+        background-color: var(--button-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-text);
+        text-align: center;
+        padding: 6px 80px;
+        font-size: var(--font-size2);
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+    }
+    .buttonsmall {
+        border-radius: 4px;
+        background-color: var(--button-small-background);
+        font-family: Arial, Helvetica, sans-serif;
+        border: none;
+        color: var(--button-small-text);
+        text-align: center;
+        padding: 10px;
+        font-size: var(--font-size2);
+        width: 7ch;
+        max-width: 200px;
+        min-width: 100px;
+        cursor: pointer;
+        margin: 30px;
+    }
+    input[type=checkbox]
+    {
+        -ms-transform: scale(2);
+        -moz-transform: scale(2);
+        -webkit-transform: scale(2);
+        -o-transform: scale(2);
+        transform: scale(2);
+        padding: 20px;
+        margin: 30px 40px;
+    }
+    .performers img {
+        width: 30%;
+    }
+    .chapters img {
+        width: 15%;
+    }
+}

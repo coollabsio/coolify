@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:dfc-u="http://static.datafoodconsortium.org/data/units.rdf#"
+         xmlns:dfc-b="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#">
+
+  <dfc-b:Unit rdf:about="http://static.datafoodconsortium.org/data/unit.rdf#kg">
+    <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">kilogramme</rdfs:label>
+  </dfc-b:Unit>
+
+  <dfc-b:Unit rdf:about="http://static.datafoodconsortium.org/data/unit.rdf#u">
+    <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">unité</rdfs:label>
+  </dfc-b:Unit>
+
+  <dfc-b:Unit rdf:about="http://static.datafoodconsortium.org/data/unit.rdf#g">
+    <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">gramme</rdfs:label>
+  </dfc-b:Unit>
+
+  <dfc-b:Unit rdf:about="http://static.datafoodconsortium.org/data/unit.rdf#l">
+    <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">litre</rdfs:label>
+  </dfc-b:Unit>
+
+</rdf:RDF>

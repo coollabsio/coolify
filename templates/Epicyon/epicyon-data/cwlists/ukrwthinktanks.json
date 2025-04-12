@@ -1,0 +1,25 @@
+{
+    "name": "UK Right Wing Think Tank",
+    "warning": "UK Right Wing Think Tank",
+    "description": "Biased towards UK right wing agendas",
+    "words": [
+	      "Adam Smith Institute",
+	      "Bow Group",
+	      "Centre for Policy Studies",
+	      "Centre for Social Justice",
+	      "Chatham House",
+	      "Institute of Economic Affairs",
+	      "Legatum Institute",
+	      "Policy Exchange"
+    ],
+    "domains": [
+	      "adamsmith.org",
+	      "bowgroup.org",
+	      "cps.org.uk",
+	      "centreforsocialjustice.org.uk",
+	      "chathamhouse.org",
+	      "iea.org.uk",
+	      "https://li.com",
+	      "policyexchange.org.uk"
+    ]
+}

@@ -1,0 +1,549 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl">
+    <Prefix name="" IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl"/>
+    <Prefix name="cc" IRI="http://creativecommons.org/ns#"/>
+    <Prefix name="dc" IRI="http://purl.org/dc/terms/"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="xsp" IRI="http://www.owl-ontologies.com/2005/08/07/xsp.owl#"/>
+    <Prefix name="foaf" IRI="http://xmlns.com/foaf/0.1/"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="swrl" IRI="http://www.w3.org/2003/11/swrl#"/>
+    <Prefix name="vann" IRI="http://purl.org/vocab/vann/"/>
+    <Prefix name="swrlb" IRI="http://www.w3.org/2003/11/swrlb#"/>
+    <Prefix name="protege" IRI="http://protege.stanford.edu/plugins/owl/protege#"/>
+    <Import>http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl</Import>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="cc:license"/>
+        <IRI>https://www.gnu.org/licenses/agpl-3.0.en.html</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:contributor"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#rachelA</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:contributor"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#simonL</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:creator"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#bernardC</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:description"/>
+        <Literal xml:lang="en">A common vocabulary for digital food platforms (Product Glossary Part)</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:issued"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2018-05-28</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:modified"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2019-10-21</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:publisher"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:title"/>
+        <Literal xml:lang="en">Data Food Consortium Product</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespacePrefix"/>
+        <Literal>dfc-p</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <Literal xml:lang="en">A common vocabulary for digital food platforms (Product Glossary Part)</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="owl:versionInfo"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#decimal">4.0</Literal>
+    </Annotation>
+    <Declaration>
+        <Class IRI="#Certification"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_ProductGlossary_Measure"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_ProductGlossary_Type"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Dimension"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#GlobalGenericOrigin"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#NatureOrigin"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#PartOrigin"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Process"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ProductType"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#TerritorialOrigin"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Unit"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#DFC_ProductGlossary_ObjectProperty"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#generalizes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#measuredBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#measures"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#specializes"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#bernardC"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#rachelA"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:contributor"/>
+    </Declaration>
+    <SubClassOf>
+        <Class IRI="#Certification"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Certification"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#Certification"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Certification"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#Certification"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+        <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#DFC_ProductGlossary_Facet"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#DFC_ProductGlossary_Facet"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#specializes"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Measure"/>
+        <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Type"/>
+        <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Type"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#DFC_ProductGlossary_Type"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Type"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#DFC_ProductGlossary_Type"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_ProductGlossary_Type"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#specializes"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Dimension"/>
+        <Class IRI="#DFC_ProductGlossary_Measure"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Dimension"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#measuredBy"/>
+            <Class IRI="#Unit"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#GlobalGenericOrigin"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#GlobalGenericOrigin"/>
+        <ObjectSomeValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#GlobalGenericOrigin"/>
+        </ObjectSomeValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#GlobalGenericOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#GlobalGenericOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#NatureOrigin"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#NatureOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#NatureOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#NatureOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#NatureOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PartOrigin"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PartOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#PartOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PartOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#PartOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Process"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Process"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#Process"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Process"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#Process"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductType"/>
+        <Class IRI="#DFC_ProductGlossary_Type"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductType"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#ProductType"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductType"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#ProductType"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TerritorialOrigin"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TerritorialOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#generalizes"/>
+            <Class IRI="#TerritorialOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TerritorialOrigin"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#specializes"/>
+            <Class IRI="#TerritorialOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Unit"/>
+        <Class IRI="#DFC_ProductGlossary_Measure"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Unit"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#measures"/>
+            <Class IRI="#Dimension"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Unit"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#measures"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#bernardC"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Organization"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#rachelA"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#simonL"/>
+    </ClassAssertion>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#generalizes"/>
+        <ObjectProperty IRI="#DFC_ProductGlossary_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#measuredBy"/>
+        <ObjectProperty IRI="#DFC_ProductGlossary_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#measures"/>
+        <ObjectProperty IRI="#DFC_ProductGlossary_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#specializes"/>
+        <ObjectProperty IRI="#DFC_ProductGlossary_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#generalizes"/>
+        <ObjectProperty IRI="#specializes"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#measuredBy"/>
+        <ObjectProperty IRI="#measures"/>
+    </InverseObjectProperties>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#generalizes"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#measuredBy"/>
+        <Class IRI="#Dimension"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#measures"/>
+        <Class IRI="#Unit"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#specializes"/>
+        <Class IRI="#DFC_ProductGlossary_Facet"/>
+    </ObjectPropertyDomain>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Certification</IRI>
+        <Literal xml:lang="en">certification</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Certification</IRI>
+        <Literal xml:lang="fr">certification</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_ProductGlossary_Facet</IRI>
+        <Literal xml:lang="en">Subject of the facets thesaurus</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_ProductGlossary_Facet</IRI>
+        <Literal xml:lang="fr">Sujet du Thésaurus à Facettes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_ProductGlossary_Measure</IRI>
+        <Literal xml:lang="fr">thesaurus des unités de mesure</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_ProductGlossary_Measure</IRI>
+        <Literal xml:lang="en">unit of measures thesaurus</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Dimension</IRI>
+        <Literal xml:lang="en">dimension</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Dimension</IRI>
+        <Literal xml:lang="fr">dimension</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#GlobalGenericOrigin</IRI>
+        <Literal xml:lang="en">Global generic origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#GlobalGenericOrigin</IRI>
+        <Literal xml:lang="fr">Origines génériques globales</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#NatureOrigin</IRI>
+        <Literal xml:lang="en">natural &quot;living&quot; origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#NatureOrigin</IRI>
+        <Literal xml:lang="fr">source &quot;vivante&quot; d&apos;origine</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PartOrigin</IRI>
+        <Literal xml:lang="en">part of natural &quot;living&quot; origin concerned</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PartOrigin</IRI>
+        <Literal xml:lang="fr">partie de la source &quot;vivante&quot; d&apos;origine concernée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Process</IRI>
+        <Literal xml:lang="en">process applied</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Process</IRI>
+        <Literal xml:lang="fr">procédé appliqué</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ProductType</IRI>
+        <Literal xml:lang="en">product type (general taxonomy)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ProductType</IRI>
+        <Literal xml:lang="fr">type de produit (classification générale)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TerritorialOrigin</IRI>
+        <Literal xml:lang="fr">origine territoriale</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TerritorialOrigin</IRI>
+        <Literal xml:lang="en">territorial origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Unit</IRI>
+        <Literal xml:lang="en">unit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Unit</IRI>
+        <Literal xml:lang="fr">unité</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#generalizes</IRI>
+        <Literal xml:lang="en">generalizes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#generalizes</IRI>
+        <Literal xml:lang="fr">généralise</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#measuredBy</IRI>
+        <Literal xml:lang="en">measured by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#measuredBy</IRI>
+        <Literal xml:lang="fr">mesuré en</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#measures</IRI>
+        <Literal xml:lang="en">measures</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#measures</IRI>
+        <Literal xml:lang="fr">mesure</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#specializes</IRI>
+        <Literal xml:lang="en">specializes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#specializes</IRI>
+        <Literal xml:lang="fr">spécialise</Literal>
+    </AnnotationAssertion>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi -->
+

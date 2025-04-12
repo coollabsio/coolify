@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep 'required positional arguments' > .missing_arguments.txt
+if [ ! -f .missing_arguments.txt ]; then
+    echo 'No missing arguments'
+else
+    cat .missing_arguments.txt
+fi

@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep 'image binary\|favicon is not an image' > .image.txt
+if [ ! -f .image.txt ]; then
+    echo 'No image warnings'
+else
+    cat .image.txt
+fi

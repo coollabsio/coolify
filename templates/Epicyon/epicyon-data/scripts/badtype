@@ -1,0 +1,2 @@
+#!/bin/bash
+journalctl -u epicyon -r | grep "WARN: type from\|is not a string\|should be a string\|should be lists\|should be strings\|has no valid context\|should be a list"

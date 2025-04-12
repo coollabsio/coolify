@@ -1,0 +1,428 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl"
+     xml:base="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl"
+     xmlns:cc="http://creativecommons.org/ns#"
+     xmlns:dc="http://purl.org/dc/terms/"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:xsp="http://www.owl-ontologies.com/2005/08/07/xsp.owl#"
+     xmlns:foaf="http://xmlns.com/foaf/0.1/"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:swrl="http://www.w3.org/2003/11/swrl#"
+     xmlns:vann="http://purl.org/vocab/vann/"
+     xmlns:swrlb="http://www.w3.org/2003/11/swrlb#"
+     xmlns:protege="http://protege.stanford.edu/plugins/owl/protege#">
+    <owl:Ontology rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl">
+        <rdf:type rdf:resource="http://purl.org/vocommons/voaf#Vocabulary"/>
+        <vann:preferredNamespacePrefix>dfc-p</vann:preferredNamespacePrefix>
+        <vann:preferredNamespaceUri>http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#</vann:preferredNamespaceUri>
+        <owl:imports rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl"/>
+        <cc:license rdf:resource="https://www.gnu.org/licenses/agpl-3.0.en.html"/>
+        <dc:contributor rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#rachelA"/>
+        <dc:contributor rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#simonL"/>
+        <dc:creator rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#bernardC"/>
+        <dc:description xml:lang="en">A common vocabulary for digital food platforms (Product Glossary Part)</dc:description>
+        <dc:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2018-05-28</dc:issued>
+        <dc:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2019-10-21</dc:modified>
+        <dc:publisher rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium"/>
+        <dc:title xml:lang="en">Data Food Consortium Product</dc:title>
+        <rdfs:comment xml:lang="en">A common vocabulary for digital food platforms (Product Glossary Part)</rdfs:comment>
+        <owl:versionInfo rdf:datatype="http://www.w3.org/2001/XMLSchema#decimal">4.0</owl:versionInfo>
+    </owl:Ontology>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Annotation properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://purl.org/dc/terms/contributor -->
+
+    <owl:AnnotationProperty rdf:about="http://purl.org/dc/terms/contributor"/>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_ObjectProperty -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_ObjectProperty"/>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:label xml:lang="en">generalizes</rdfs:label>
+        <rdfs:label xml:lang="fr">généralise</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measuredBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measuredBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measures"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Dimension"/>
+        <rdfs:label xml:lang="en">measured by</rdfs:label>
+        <rdfs:label xml:lang="fr">mesuré en</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measures -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measures">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Unit"/>
+        <rdfs:label xml:lang="en">measures</rdfs:label>
+        <rdfs:label xml:lang="fr">mesure</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:label xml:lang="en">specializes</rdfs:label>
+        <rdfs:label xml:lang="fr">spécialise</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Certification -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Certification">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Certification"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Certification"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">certification</rdfs:label>
+        <rdfs:label xml:lang="fr">certification</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Subject of the facets thesaurus</rdfs:label>
+        <rdfs:label xml:lang="fr">Sujet du Thésaurus à Facettes</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Measure -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Measure">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+        <rdfs:label xml:lang="fr">thesaurus des unités de mesure</rdfs:label>
+        <rdfs:label xml:lang="en">unit of measures thesaurus</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Type -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Type">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Type"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Type"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Dimension -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Dimension">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Measure"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measuredBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Unit"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">dimension</rdfs:label>
+        <rdfs:label xml:lang="fr">dimension</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#GlobalGenericOrigin -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#GlobalGenericOrigin">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:someValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#GlobalGenericOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#GlobalGenericOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Global generic origin</rdfs:label>
+        <rdfs:label xml:lang="fr">Origines génériques globales</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#NatureOrigin -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#NatureOrigin">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#NatureOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#NatureOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">natural &quot;living&quot; origin</rdfs:label>
+        <rdfs:label xml:lang="fr">source &quot;vivante&quot; d&apos;origine</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#PartOrigin -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#PartOrigin">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#PartOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#PartOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">part of natural &quot;living&quot; origin concerned</rdfs:label>
+        <rdfs:label xml:lang="fr">partie de la source &quot;vivante&quot; d&apos;origine concernée</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Process -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Process">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Process"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Process"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">process applied</rdfs:label>
+        <rdfs:label xml:lang="fr">procédé appliqué</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#ProductType -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#ProductType">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Type"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#ProductType"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#ProductType"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">product type (general taxonomy)</rdfs:label>
+        <rdfs:label xml:lang="fr">type de produit (classification générale)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#TerritorialOrigin -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#TerritorialOrigin">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Facet"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#generalizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#TerritorialOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#specializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#TerritorialOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">origine territoriale</rdfs:label>
+        <rdfs:label xml:lang="en">territorial origin</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Unit -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Unit">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#DFC_ProductGlossary_Measure"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measures"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Dimension"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#measures"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">unit</rdfs:label>
+        <rdfs:label xml:lang="fr">unité</rdfs:label>
+    </owl:Class>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Individuals
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#bernardC -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#bernardC">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium -->
+
+    <rdf:Description rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
+    </rdf:Description>
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#rachelA -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#rachelA">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#simonL -->
+
+    <rdf:Description rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#simonL">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    </rdf:Description>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi -->

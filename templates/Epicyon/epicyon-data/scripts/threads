@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep 'THREAD:' > .threads.txt
+if [ ! -f .threads.txt ]; then
+    echo 'No thread events'
+else
+    cat .threads.txt
+fi

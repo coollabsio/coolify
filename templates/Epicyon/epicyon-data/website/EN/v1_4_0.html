@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+    <meta charset="utf-8">
+    <script type="application/ld+json">
+     {
+         "@context" : "http://schema.org",
+         "@type" : "SoftwareApplication",
+         "name" : "Epicyon",
+         "image" : "https://libreserver.org/epicyon/images/logo.png",
+         "url" : "https://libreserver.org/epicyon",
+         "author" : {
+             "@type" : "Person",
+             "name" : "Bob Mottram",
+             "email": "bob@libreserver.org",
+             "url": "https://epicyon.libreserver.org/users/bob"
+         },
+         "applicationCategory" : ["server", "instance", "software", "activitypub", "fediverse", "self-hosting", "microblog"],
+         "downloadUrl" : "https://libreserver.org/epicyon/epicyon.tar.gz"
+     }
+    </script>
+    <meta name="description" content="ActivityPub server written in Python, HTML and CSS, and suitable for self-hosting on single board computers">
+    <meta name="keywords" content="ActivityPub, Fediverse, Instance, Python, HTML, CSS, SmallWeb, SelfHosting, Microblog">
+    <meta name="author" content="Bob Mottram">
+    <style>
+     @charset "UTF-8";
+
+     :root {
+         --main-bg-color: #282c37;
+         --dropdown-bg-color: #111;
+         --dropdown-bg-color-hover: #333;
+         --main-bg-color-reply: #212c37;
+         --main-bg-color-dm: #222;
+         --main-bg-color-report: #221c27;
+         --main-header-color-roles: #282237;
+         --main-fg-color: #dddddd;
+         --main-link-color: #999;
+         --main-visited-color: #888;
+         --border-color: #505050;
+         --font-size-header: 18px;
+         --font-color-header: #ccc;
+         --font-size: 30px;
+         --text-entry-foreground: #ccc;
+         --text-entry-background: #111;
+         --quote-font-weight: normal;
+         --quote-font-size: 120%;
+     }
+
+     @font-face {
+         font-family: 'Rooters';
+         font-style: normal;
+         font-weight: normal;
+         font-display: block;
+         src: url('./fonts/Rooters.ttf') format('truetype');
+     }
+
+     body, html {
+         background-color: var(--main-bg-color);
+         color: var(--main-fg-color);
+
+         height: 100%;
+         font-family: Arial, Helvetica, sans-serif;
+         max-width: 80%;
+         min-width: 950px;
+         margin: 0 auto;
+         font-size: var(--font-size);
+     }
+
+     a, u {
+         color: var(--main-fg-color);
+     }
+
+     a:visited{
+         color: var(--main-visited-color);
+         font-weight: bold;
+     }
+
+     a:link {
+         color: var(--main-link-color);
+         font-weight: bold;
+     }
+
+     blockquote {
+         border-left: 10px;
+         margin: 1.5em 10px;
+         padding: 0.5em 10px;
+         font-weight: var(--quote-font-weight);
+         font-style: italic;
+         font-size: var(--quote-font-size);
+         quotes: "\201C""\201D""\2018""\2019";
+         color: lightblue;
+     }
+
+     .cwButton {
+         border-radius: 4px;
+         background-color: #999;
+         border: none;
+         color: #FFFFFF;
+         text-align: center;
+         font-size: 26px;
+         padding: 2px;
+         cursor: pointer;
+         margin: 5px;
+     }
+
+     .cwText {
+         display: none;
+     }
+
+     .pageicon {
+         width: 8%;
+     }
+
+     .timeline-banner {
+         background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("img/banner.png");
+         height: 10%;
+         background-position: center;
+         background-repeat: no-repeat;
+         background-size: cover;
+         position: relative;
+     }
+
+     .hero-image {
+         background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("image.png");
+         height: 50%;
+         background-position: center;
+         background-repeat: no-repeat;
+         background-size: cover;
+         position: relative;
+     }
+
+     .hero-text {
+         text-align: center;
+         position: absolute;
+         top: 50%;
+         left: 50%;
+         transform: translate(-50%, -50%);
+         color: var(--font-color-header);
+         font-size: var(--font-size-header);
+     }
+
+     .new-post-text {
+         font-size: 24px;
+         padding: 4px 0;
+     }
+
+     .new-post-subtext {
+         font-size: 18px;
+         padding: 4px 0;
+     }
+
+     .highlight {
+         width: 2%;
+     }
+
+     .roles {
+         text-align: center;
+         left: 35%;
+         background-color: var(--main-header-color-roles);
+     }
+
+     .roles-inner {
+         padding: 10px 25px;
+         background-color: var(--main-bg-color);
+     }
+
+     .hero-text img {
+         border-radius: 1%;
+         width: 30%;
+         min-width: 200px;
+     }
+
+     .hero-text img.emoji {
+         width: 50px;
+         padding: 0 0;
+         margin: 0 0;
+         float: none;
+     }
+
+     .hero-text button {
+         border: none;
+         outline: 0;
+         display: inline-block;
+         padding: 10px 25px;
+         color: black;
+         background-color: #ddd;
+         text-align: center;
+         cursor: pointer;
+     }
+
+     .hero-text button:hover {
+         background-color: #555;
+         color: white;
+     }
+
+     .button {
+         border-radius: 4px;
+         background-color: #999;
+         border: none;
+         color: #FFFFFF;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 10%;
+         max-width: 100px;
+         min-width: 80px;
+         transition: all 0.5s;
+         cursor: pointer;
+         margin: 5px;
+     }
+
+     .buttonunfollow {
+         border-radius: 4px;
+         background-color: #999;
+         border: none;
+         color: #FFFFFF;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 20%;
+         max-width: 200px;
+         min-width: 100px;
+         transition: all 0.5s;
+         cursor: pointer;
+         margin: 5px;
+         float: right;
+     }
+
+     .buttonhighlighted {
+         border-radius: 4px;
+         background-color: green;
+         border: none;
+         color: white;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 10%;
+         max-width: 100px;
+         min-width: 80px;
+         transition: all 0.5s;
+         cursor: pointer;
+         margin: 5px;
+     }
+
+     .timelineIcon {
+         width: 10%;
+     }
+
+     .followApprove {
+         border-radius: 4px;
+         background-color: darkgreen;
+         border: none;
+         color: #FFFFFF;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 15%;
+         max-width: 150px;
+         min-width: 100px;
+         cursor: pointer;
+         margin: 0 15px;
+         float: right;
+     }
+
+     .followDeny {
+         border-radius: 4px;
+         background-color: darkred;
+         border: none;
+         color: #FFFFFF;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 15%;
+         max-width: 150px;
+         min-width: 100px;
+         cursor: pointer;
+         margin: 0 15px;
+         float: right;
+     }
+
+     .followRequestHandle {
+         padding: 0px 20px;
+     }
+
+     .button span {
+         cursor: pointer;
+         display: inline-block;
+         position: relative;
+         transition: 0.5s;
+     }
+
+     .button span:after {
+         content: '\00bb';
+         position: absolute;
+         opacity: 0;
+         top: 0;
+         right: -20px;
+         transition: 0.5s;
+     }
+
+     .button:hover span {
+         padding-right: 25px;
+     }
+
+     .button:hover span:after {
+         opacity: 1;
+         right: 0;
+     }
+
+     .buttonselected {
+         border-radius: 4px;
+         background-color: #666;
+         border: none;
+         color: #FFFFFF;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 10%;
+         max-width: 100px;
+         min-width: 80px;
+         transition: all 0.5s;
+         cursor: pointer;
+         margin: 5px;
+     }
+
+     .buttonselectedhighlighted {
+         border-radius: 4px;
+         background-color: darkgreen;
+         border: none;
+         color: white;
+         text-align: center;
+         font-size: 18px;
+         padding: 10px;
+         width: 10%;
+         max-width: 100px;
+         min-width: 80px;
+         transition: all 0.5s;
+         cursor: pointer;
+         margin: 5px;
+     }
+
+     .buttonselected span {
+         cursor: pointer;
+         display: inline-block;
+         position: relative;
+         transition: 0.5s;
+     }
+
+     .buttonselected span:after {
+         content: '\00bb';
+         position: absolute;
+         opacity: 0;
+         top: 0;
+         right: -20px;
+         transition: 0.5s;
+     }
+
+     .buttonselected:hover span {
+         padding-right: 25px;
+     }
+
+     .buttonselected:hover span:after {
+         opacity: 1;
+         right: 0;
+     }
+
+     .container {
+         border: 2px solid var(--border-color);
+         background-color: var(--main-bg-color);
+         border-radius: 5px;
+         padding: 20px;
+         margin: 10px 0;
+     }
+
+     .media {
+         width: 80%;
+         border-radius: 5px;
+         padding: 10px;
+         margin: 10px 0;
+     }
+
+     .message {
+         margin-left: 7%;
+         width: 90%;
+     }
+
+     .container p.administeredby {
+         font-size: 18px;
+     }
+
+     .container::after {
+         content: "";
+         clear: both;
+         display: table;
+     }
+
+     .container img {
+         float: left;
+         max-width: 400px;
+         width: 5%;
+         padding: 0px 7px;
+         margin-right: 20px;
+         border-radius: 10%;
+     }
+
+     .searchEmoji {
+         -ms-transform: translateY(30%);
+         transform: translateY(30%);
+         float: none;
+         width: 80px;
+         margin: 0px 10px;
+         padding: 0px 0px;
+         border-radius: 0px;
+     }
+
+     .container img.emoji {
+         float: none;
+         width: 50px;
+         margin-left: 0px;
+         margin-right: 0px;
+         padding-right: 0px;
+         border-radius: 0px;
+     }
+
+     .containericons {
+         padding: 0px 0px;
+         margin: 0px 0px;
+     }
+
+     .containericons img {
+         float: right;
+         max-width: 200px;
+         width: 6%;
+         border-radius: 0%;
+     }
+
+     .replyingto {
+         color: var(--main-fg-color);
+     }
+
+     .container img.announceOrReply {
+         float: none;
+         width: 30px;
+         margin: 0 0;
+         padding: 0 0;
+         border-radius: 0;
+         -ms-transform: translateY(25%);
+         transform: translateY(25%);
+     }
+
+     .container img.DMicon {
+         float: none;
+         width: 40px;
+         margin: 0 0;
+         padding: 0 0;
+         border-radius: 0;
+         -ms-transform: translateY(25%);
+         transform: translateY(25%);
+     }
+
+     .darker {
+         background-color: var(--main-bg-color-reply);
+     }
+
+     .dm {
+         background-color: var(--main-bg-color-dm);
+     }
+
+     .report {
+         border-color: #255;
+         background-color: var(--main-bg-color-report);
+     }
+
+     .container img.attachment {
+         max-width: 100%;
+         margin-left: 25%;
+         width: 50%;
+         border-radius: 10%;
+     }
+     .container img.right {
+         float: right;
+         margin-left: 0px;
+         margin-right:0;
+         padding: 0 0;
+         margin: 0 0;
+     }
+     .containericons img.right {
+         float: right;
+         margin-left: 20px;
+         margin-right: 0;
+     }
+
+     .time-right {
+         float: right;
+         color: #aaa;
+         margin: 4px 20px;
+     }
+
+     .post-title {
+         margin-top: 0px;
+         color: #444;
+     }
+
+     .share-title {
+         margin-top: 0px;
+         color: var(--main-fg-color);
+     }
+
+     .skill-title {
+         margin-left: 25%;
+         text-align: left;
+         font-size: 24px;
+         font-weight: bold;
+         color: #666;
+         line-height: 40px;
+     }
+
+     #myProgress {
+         float: left;
+         width: 70%;
+         background-color: #f1f1f1;
+     }
+
+     #myBar {
+         float: left;
+         width: 10%;
+         height: 30px;
+         background-color: #999;
+     }
+
+     .question {
+         font-size: var(--font-size);
+     }
+
+     input[type=radio] {
+         width: 32px;
+     }
+
+     input[type=text], select, textarea {
+         width: 100%;
+         padding: 12px;
+         border: 1px solid #ccc;
+         border-radius: 4px;
+         box-sizing: border-box;
+         margin-top: 6px;
+         margin-bottom: 16px;
+         resize: vertical;
+         font-size: 24px;
+         background-color: var(--main-bg-color-reply);
+         color: var(--main-fg-color);
+     }
+
+     input[type=number] {
+         width: 10%;
+         padding: 12px;
+         border: 1px solid #ccc;
+         border-radius: 4px;
+         box-sizing: border-box;
+         margin-top: 6px;
+         margin-bottom: 16px;
+         resize: vertical;
+         font-size: 18px;
+     }
+
+     .labels {
+         font-size: 18px;
+     }
+
+     input[type=submit] {
+         background-color: #555;
+         color: white;
+         float: right;
+         margin: 10px 10px;
+         padding: 12px 10px;
+         border: none;
+         border-radius: 4px;
+         cursor: pointer;
+         font-size: 18px;
+         width: 120px;
+     }
+
+     input.vote[type=submit] {
+         background-color: #555;
+         color: white;
+         float: left;
+         margin: 10px 10px;
+         padding: 12px 10px;
+         border: none;
+         border-radius: 4px;
+         cursor: pointer;
+         font-size: 18px;
+         width: 120px;
+     }
+
+     .cancelbtn {
+         background-color: #555;
+         color: white;
+         float: right;
+         margin: 10px 10px;
+         padding: 12px 10px;
+         border: none;
+         border-radius: 4px;
+         cursor: pointer;
+         font-size: 18px;
+         width: 120px;
+     }
+
+     .loginButton {
+         background-color: #2965;
+         color: #000;
+         float: none;
+         margin: 0px 10px;
+         padding: 12px 40px;
+         border: none;
+         border-radius: 4px;
+         cursor: pointer;
+         font-size: 24px;
+         opacity: 0.7;
+     }
+
+     input[type=file] {
+         background-color: #555;
+         color: white;
+         padding: 12px 20px;
+         border: none;
+         border-radius: 4px;
+         cursor: pointer;
+         font-size: 18px;
+     }
+
+     input[type=submit]:hover {
+         background-color: #555;
+     }
+
+     .vertical-center {
+         max-width: 90%;
+         min-width: 600px;
+         margin: 0 auto;
+         padding: 5% 0px;
+     }
+
+     /* The container <div> - needed to position the dropdown content */
+     .dropdown {
+         margin: 10px auto;
+         padding: 0px 14px;
+         position: relative;
+         display: inline-block;
+     }
+
+     .dropdown img {
+         opacity: 1.0;
+         width: 32px;
+         height: 32px;
+         padding: 0px 16px;
+         -ms-transform: translateY(-10%);
+         transform: translateY(-10%);
+     }
+
+     .timeline-avatar {
+         margin: 10px auto;
+         padding: 0px 0px;
+     }
+
+     .search-result-text {
+         font-size: var(--font-size);
+     }
+
+     .search-result img {
+         width: 7%;
+         padding: 0px 30px;
+     }
+
+     .timeline-avatar img {
+         opacity: 1.0;
+         width: 8%;
+         height: 8%;
+         padding: 0px 0px;
+         -ms-transform: translateY(-10%);
+         transform: translateY(-10%);
+     }
+
+     .scope-desc {
+         font-size: 18px;
+     }
+
+     /* Dropdown Content (Hidden by Default) */
+     .dropdown-content {
+         display: none;
+         position: absolute;
+         background-color: var(--dropdown-bg-color);
+         min-width: 600px;
+         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+         z-index: 1;
+     }
+
+     /* Links inside the dropdown */
+     .dropdown-content a {
+         color: var(--main-fg-color);
+         padding: 12px 16px;
+         text-decoration: none;
+         display: block;
+     }
+
+     .dropdown-content img {
+         width: 32px;
+         height: 32px;
+         padding: 0px 0px;
+     }
+
+     /* Change color of dropdown links on hover */
+     .dropdown-content a:hover {background-color: var(--dropdown-bg-color-hover);}
+
+     /* Show the dropdown menu on hover */
+     .show {display: block;}
+
+     input[type=checkbox]
+     {
+         -ms-transform: scale(2);
+         -moz-transform: scale(2);
+         -webkit-transform: scale(2);
+         -o-transform: scale(2);
+         transform: scale(2);
+         padding: 10px;
+         margin: 10px 5px;
+     }
+
+     .slider {
+         -webkit-appearance: none;
+         width: 57%;
+         height: 25px;
+         background: #d3d3d3;
+         outline: none;
+         opacity: 0.7;
+         -webkit-transition: .2s;
+         transition: opacity .2s;
+         float: right;
+         margin: 5px 0;
+         padding: 12px 0;
+     }
+
+     .slider:hover {
+         opacity: 1;
+     }
+
+     .slider::-webkit-slider-thumb {
+         -webkit-appearance: none;
+         appearance: none;
+         width: 25px;
+         height: 25px;
+         background: var(--main-bg-color);
+         cursor: pointer;
+     }
+
+     .slider::-moz-range-thumb {
+         width: 25px;
+         height: 25px;
+         background: var(--main-bg-color);
+         cursor: pointer;
+     }
+
+     .dropbtn {
+         margin: 3%;
+         padding: 0px 14px;
+         position: relative;
+         display: inline-block;
+         border: none;
+         cursor: pointer;
+     }
+
+     .dropbtn img {
+         opacity: 1.0;
+         width: 3%;
+         height: 3%;
+         min-width: 40px;
+         padding: 0px 16px;
+         -ms-transform: translateY(-10%);
+         transform: translateY(-10%);
+     }
+
+     .intro {
+         font-size: 24px;
+         color: #999;
+     }
+
+     .matrix {
+         font-size: 24px;
+         color: #ddd;
+     }
+
+     .headerlink {
+         font-size: 30px;
+         color: white;
+     }
+
+     .siteheadermain {
+         font-family: 'Rooters';
+         font-size: 50px;
+         color: white;
+     }
+
+     .siteheader {
+         font-size: 30px;
+         color: white;
+     }
+
+     .subheader {
+         font-size: 16px;
+         color: white;
+     }
+
+     .releaseheader {
+         font-size: 30px;
+	       font-weight: bold;
+         color: yellow;
+     }
+
+     .releaseheader a:link {
+         color: yellow;
+         font-weight: bold;
+     }
+
+     footer {
+         float: right;
+         font-size: 18px;
+     }
+
+     @media screen and (min-width: 400px) {
+         body, html {
+             font-size: 22px;
+         }
+         .container img {
+             float: left;
+             max-width: 400px;
+             width: 5%;
+             padding: 0px 7px;
+             margin-right: 20px;
+             border-radius: 10%;
+         }
+         .container img.emojisearch {
+             float: right;
+             max-width: 400px;
+             width: 8%;
+             padding: 0px 7px;
+             margin-right: 20px;
+             border-radius: 10%;
+         }
+         .containericons img {
+             float: right;
+             max-width: 200px;
+             width: 3%;
+             margin: 0px 1%;
+             border-radius: 0%;
+         }
+         .timeline-avatar img {
+             opacity: 1.0;
+             width: 8%;
+             height: 8%;
+             padding: 0px 0px;
+             -ms-transform: translateY(-10%);
+             transform: translateY(-10%);
+         }
+         .cwButton {
+             border-radius: 4px;
+             background-color: #555;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 20px;
+             padding: 2px;
+             cursor: pointer;
+             margin: 5px;
+         }
+         .button {
+             border-radius: 4px;
+             background-color: #999;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 18px;
+             padding: 10px;
+             width: 10%;
+             max-width: 100px;
+             min-width: 80px;
+             transition: all 0.5s;
+             cursor: pointer;
+             margin: 5px;
+         }
+         .buttonselected {
+             border-radius: 4px;
+             background-color: #666;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 18px;
+             padding: 10px;
+             width: 10%;
+             max-width: 100px;
+             min-width: 80px;
+             transition: all 0.5s;
+             cursor: pointer;
+             margin: 5px;
+         }
+         .pageicon {
+             width: 4%;
+         }
+         .time-right {
+             float: right;
+             color: #aaa;
+             margin: 4px 20px;
+         }
+         input[type=text], select, textarea {
+             width: 100%;
+             padding: 12px;
+             border: 1px solid #ccc;
+             border-radius: 4px;
+             box-sizing: border-box;
+             margin-top: 6px;
+             margin-bottom: 16px;
+             resize: vertical;
+             font-size: 24px;
+             background-color: var(--main-bg-color-reply);
+             color: var(--main-fg-color);
+         }
+         input[type=button], input[type=submit] {
+             background-color: #555;
+             color: white;
+             float: right;
+             padding: 10px;
+             margin: 15px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: var(--font-size);
+             width: 20%;
+         }
+         input.vote[type=submit] {
+             background-color: #555;
+             color: white;
+             float: left;
+             padding: 10px;
+             margin: 15px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: var(--font-size);
+             width: 20%;
+         }
+         input[type=file] {
+             background-color: #555;
+             color: white;
+             padding: 20px;
+             margin: 0px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: var(--font-size);
+             width: 96%;
+         }
+         .cancelbtn {
+             background-color: #555;
+             color: white;
+             float: right;
+             padding: 10px;
+             margin: 15px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: var(--font-size);
+             width: 20%;
+         }
+         .scope-desc {
+             font-size: 32px;
+         }
+         .buttonunfollow {
+             border-radius: 4px;
+             background-color: #999;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 18px;
+             padding: 10px;
+             width: 20%;
+             max-width: 200px;
+             min-width: 100px;
+             transition: all 0.5s;
+             cursor: pointer;
+             margin: 5px;
+             float: right;
+         }
+         .intro {
+             font-size: 24px;
+             color: #999;
+         }
+
+         .headerlink {
+             font-size: 30px;
+             color: white;
+         }
+
+         .siteheader {
+             font-size: 30px;
+             color: white;
+         }
+
+         footer {
+             float: right;
+             font-size: 18px;
+         }
+     }
+
+     @media screen and (max-width: 1000px) {
+         body, html {
+             font-size: 35px;
+         }
+         .container img {
+             float: left;
+             max-width: 400px;
+             width: 15%;
+             padding: 0px 7px;
+             margin-right: 20px;
+             border-radius: 10%;
+         }
+         .container img.emojisearch {
+             float: right;
+             max-width: 400px;
+             width: 12%;
+             padding: 0px 7px;
+             margin-right: 20px;
+             border-radius: 10%;
+         }
+         .containericons img {
+             float: right;
+             max-width: 200px;
+             width: 7%;
+             margin: 1% 3%;
+             border-radius: 0%;
+         }
+         .timeline-avatar img {
+             opacity: 1.0;
+             width: 15%;
+             height: 15%;
+             padding: 0px 0px;
+             -ms-transform: translateY(-10%);
+             transform: translateY(-10%);
+         }
+         .cwButton {
+             border-radius: 4px;
+             background-color: #555;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 32px;
+             padding: 2px;
+             cursor: pointer;
+             margin: 5px;
+         }
+         .button {
+             border-radius: 4px;
+             background-color: #999;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 32px;
+             padding: 10px;
+             width: 20%;
+             max-width: 400px;
+             min-width: 80px;
+             transition: all 0.5s;
+             cursor: pointer;
+             margin: 15px;
+         }
+         .buttonselected {
+             border-radius: 4px;
+             background-color: #666;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 32px;
+             padding: 10px;
+             width: 20%;
+             max-width: 400px;
+             min-width: 80px;
+             transition: all 0.5s;
+             cursor: pointer;
+             margin: 15px;
+         }
+         .pageicon {
+             width: 8%;
+         }
+         .time-right {
+             float: right;
+             color: #aaa;
+             margin: 25px 20px;
+         }
+         input[type=text], select, textarea {
+             width: 100%;
+             padding: 12px;
+             border: 1px solid #ccc;
+             border-radius: 4px;
+             box-sizing: border-box;
+             margin-top: 6px;
+             margin-bottom: 16px;
+             resize: vertical;
+             font-size: 30px;
+             background-color: var(--main-bg-color-reply);
+             color: var(--main-fg-color);
+         }
+         input[type=button], input[type=submit] {
+             background-color: #555;
+             color: white;
+             float: right;
+             padding: 10px;
+             margin: 15px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: 30px;
+             width: 20%;
+         }
+         input.vote[type=submit] {
+             background-color: #555;
+             color: white;
+             float: left;
+             padding: 10px;
+             margin: 15px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: 30px;
+             width: 20%;
+         }
+         input[type=file] {
+             background-color: #555;
+             color: white;
+             padding: 20px;
+             margin: 0px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: 30px;
+             width: 95.4%;
+         }
+         .cancelbtn {
+             background-color: #555;
+             color: white;
+             float: right;
+             padding: 10px;
+             margin: 15px;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: 30px;
+             width: 20%;
+         }
+         .scope-desc {
+             font-size: 30px;
+         }
+         .buttonunfollow {
+             border-radius: 4px;
+             background-color: #999;
+             border: none;
+             color: #FFFFFF;
+             text-align: center;
+             font-size: 30px;
+             padding: 10px;
+             width: 20%;
+             max-width: 200px;
+             min-width: 100px;
+             transition: all 0.5s;
+             cursor: pointer;
+             margin: 5px;
+             float: right;
+         }
+         .intro {
+             font-size: 32px;
+             color: #999;
+         }
+
+         .headerlink {
+             font-size: 40px;
+             color: white;
+         }
+
+         .siteheader {
+             font-size: 40px;
+             color: white;
+         }
+
+         footer {
+             float: right;
+             font-size: 24px;
+         }
+     }
+
+     .imageright {
+         float: right;
+     }
+
+     .shell {
+         margin: 30px 30px;
+         width: 100%;
+         float: left;
+         font-family: Courier;
+         background-color: black;
+     }
+
+    </style>
+    <head>
+        <title>Epicyon ActivityPub server release version 1.4.0</title>
+    </head>
+    <body>
+        <center>
+            <br>
+            <p class="siteheadermain">Epicyon release version 1.4.0</p>
+            <p class="siteheader">"Standard Schnauzer"</p>
+            <p class="subheader">22nd Jan 2023</p>
+        </center>
+        <p class="intro">The last year in the fediverse has been quite eventful, with many new arrivals. But so far as <a href="https://libreserver.org/epicyon">Epicyon</a> has been concerned things have been chugging along smoothly. There have been no major features added over the last year, but as always there have been many small improvements and bug fixes. These include:</p>
+        <div class="flex-container">
+	          <ul>
+	              <li>Theme and theme designer improvements</li>
+	              <li>A <i>buy button</i> for when you want to link to something that you're selling</li>
+	              <li>General security improvements</li>
+	              <li>Conversation view, avoiding direct links to the Mastodon user interface</li>
+	              <li>Progressive Web App improvements</li>
+	              <li>Quote Toot suppression</li>
+	              <li>Copyright notices added to individual posts</li>
+	              <li>Improved display of remote hashtags</li>
+	              <li>Support for auto-linking scientific paper references</li>
+	              <li>Edit button</li>
+	              <li>Improved calendar events</li>
+                <li>Added a <a href="https://gitlab.com/bashrc2/epicyon/-/blob/main/manual/manual.md">user manual</a></li>
+                <li>Hashtag maps for crowdsourced geolocations</li>
+	              <li>Option to expire old posts</li>
+	              <li>Better emoji support</li>
+                <li>More stable navigation between timeline pages</li>
+	              <li>Included an updated version of the <a href="https://gitlab.com/bashrc2/epicyon/-/blob/main/specification/activitypub.md">ActivityPub specification</a></li>
+	              <li>Unicode fonts no longer bypass filters</li>
+	              <li>vCard support</li>
+	              <li>Improved podcast support</li>
+	              <li>Additional language support: Korean, Turkish, Bengali, Dutch, Ukranian, Swahili, Persian and Greek</li>
+	              <li><b>Bo</b>ld <b>Read</b>ing <b>accessi</b>bility <b>feat</b>ure</li>
+	              <li>Improved compatibility with shell browsers</li>
+	              <li>Additional format fupport: <a href="https://en.wikipedia.org/wiki/Opus_(audio_format)">opus</a></li>
+	              <li>Improved account level control over display of images</li>
+	              <li>Can set the language when creating a new post, for multilingual users</li>
+	              <li>Improved support for Questions/Votes</li>
+	          </ul>
+            <center>
+                <img src="v1_4_0.webp" alt="Epicyon logo of a running dog with paw prints in the background" />
+            </center>
+        </div>
+        <p class="intro">The present time is an interesting juncture in the history of the web. The prospects for the <a href="https://www.w3.org/TR/social-web-protocols">social web</a> appear brighter than ever with increasing developer interest and support for the fediverse. If you are new to all of this then now is the time to get onboard. There are still many future challenges, but it seems that systems backed by open protocols are now beginning to seriously challenge the hegemony of the moribund commercial silos.</p>
+        <blockquote>‟many e-citizens woke up their consciousnesses, becoming aware of what a centralized system used for the most popular applications (generally social network platforms) entails...Probably, those e-citizens moved to the fediverse, becoming fedizens.” -- <a href="https://www.assodpo.it/2022/07/21/The-Fediverse-what-is-it-and-how-does-it-work">L’Associazione data Protection Officer</a></blockquote>
+        <p class="intro">So it's really down to us to keep things small and decentralized. To become the networked islands of organization in a chaotic world. Abide by the <a href="https://gitlab.com/bashrc2/epicyon/-/blob/main/principles_of_small_creation.md">Principles of Small Creation</a></p>
+        <center><img src="img/screenshot-timeline.webp" alt="Screenshot of the main timeline showing posts and left and right columns" /></center>
+        <p class="intro">Epicyon can be downloaded as <a href="epicyon.tar.gz">a gzipped file</a>, or you can get the latest version from the <a href="https://gitlab.com/bashrc2/epicyon">git repo</a>. For installation instructions see <a href="index.html">the main page</a>. To upgrade an existing instance, make sure that you have the python3-cryptography package installed then do a git pull, chown and restart the daemon.</p>
+    </body>
+    <footer>
+        <p>By: Bob Mottram <a href="mailto:bob@libreserver.org">bob@libreserver.org</a></p>
+    </footer>
+</html>

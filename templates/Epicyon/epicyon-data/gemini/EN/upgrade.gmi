@@ -1,0 +1,8 @@
+# Upgrading Epicyon
+
+After installation to subsequently upgrade:
+
+    cd /opt/epicyon
+    git pull
+    chown -R epicyon:epicyon *
+    systemctl restart epicyon

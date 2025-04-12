@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep ' unknown users path' > .unknown_users_paths.txt
+if [ ! -f .unknown_users_paths.txt ]; then
+    echo 'No unknown users paths'
+else
+    cat .unknown_users_paths.txt
+fi

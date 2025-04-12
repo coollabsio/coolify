@@ -1,0 +1,2 @@
+#!/bin/bash
+bandit *.py -x tests.py

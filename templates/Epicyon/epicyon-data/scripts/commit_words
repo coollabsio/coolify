@@ -1,0 +1,2 @@
+#!/bin/bash
+git log --pretty=format:'%s' | tr ' ' '\n' | sed 's/.*/\L&/' | sort | uniq -c | sort -rg | head -n 100

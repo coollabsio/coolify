@@ -1,0 +1,5127 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl">
+    <Prefix name="" IRI="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#"/>
+    <Prefix name="cc" IRI="http://creativecommons.org/ns#"/>
+    <Prefix name="dc" IRI="http://purl.org/dc/terms/"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="xsp" IRI="http://www.owl-ontologies.com/2005/08/07/xsp.owl#"/>
+    <Prefix name="foaf" IRI="http://xmlns.com/foaf/0.1/"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="swrl" IRI="http://www.w3.org/2003/11/swrl#"/>
+    <Prefix name="vann" IRI="http://purl.org/vocab/vann/"/>
+    <Prefix name="swrlb" IRI="http://www.w3.org/2003/11/swrlb#"/>
+    <Prefix name="protege" IRI="http://protege.stanford.edu/plugins/owl/protege#"/>
+    <Import>http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl</Import>
+    <Import>http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl</Import>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="cc:license"/>
+        <IRI>https://www.gnu.org/licenses/agpl-3.0.en.html</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:contributor"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#rachelA</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:contributor"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#simonL</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:creator"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#bernardC</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:description"/>
+        <Literal xml:lang="en">A common vocabulary for digital food platforms (Business Part)</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:issued"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2018-05-28</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:modified"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2019-10-21</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:publisher"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:title"/>
+        <Literal xml:lang="en">Data Food Consortium Business</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespacePrefix"/>
+        <Literal>dfc-b</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <Literal xml:lang="en">A common vocabulary for digital food platforms (Business Part)</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="owl:versionInfo"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#decimal">4.0</Literal>
+    </Annotation>
+    <Declaration>
+        <Class IRI="#Address"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Agent"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsPlannedConsumptionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsPlannedLocalConsumptionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsPlannedLocalProductionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsPlannedProductionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsPlannedTransformation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsRealizedConsumptionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsRealizedProductionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#AsRealizedTransformation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#CatalogItem"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ConsumptionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Coordination"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#CustomerCategory"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_How_Subject"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_What_Subject"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_Where_Subject"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DFC_Who_Subject"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DefinedProduct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#DeliveryOption"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Enterprise"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#FunctionalProduct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#LocalizedProduct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Offer"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Order"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#OrderLine"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#PaymentMethod"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Person"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#PhysicalPlace"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#PhysicalProduct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#PickupOption"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Place"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ProductBatch"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ProductionFlow"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#RealStock"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Repository"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#SaleSession"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#ShippingOption"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Stock"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#SuppliedProduct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#TechnicalProduct"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#TheoriticalStock"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Transaction"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Transformation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#VirtualPlace"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#DFC_Interface_Property"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#addressOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#affiliatedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#affiliates"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#belongsTo"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#certificateOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#concernedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#concerns"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#constituedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#constitutes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#consumedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#consumes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#coordinatedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#coordinates"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#definedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#defines"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#facetOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#from"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#geographicalOriginOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasAddress"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasCertification"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasFacet"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasGeographicalOrigin"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasIncome"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasMainContact"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasNatureOrigin"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasObject"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasOption"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasOutcome"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasPart"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasPartOrigin"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasProcess"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasReference"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasType"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasUnit"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hostedAt"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hosts"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#identifiedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#identifies"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#incomeOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#industrializedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#industrializes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#listedIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#lists"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#localizedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#localizes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#mainContactOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#maintainedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#maintains"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#managedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#manages"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#natureOriginOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#objectOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#offeredThrough"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#offers"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#offersTo"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#optionOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#orderedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#orders"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#outcomeOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#ownedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#owns"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#partOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#partOriginOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#processOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#producedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#produces"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#proposedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#proposes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#referenceOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#referencedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#references"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#refersTo"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#representedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#represents"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#requestedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#requests"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#satisfiedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#satisfies"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#selects"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#storedIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#stores"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#suppliedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#supplies"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#to"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#tracedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#traces"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#transformedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#transforms"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#typeOf"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#uses"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#Image"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#InstagramPage"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#LinkedinPage"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#TwitterPage"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#URL"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#VATnumber"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#VATstatus"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#batchNumber"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#brand"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#city"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#claim"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#cost"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#country"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#date"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#description"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#email"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#endDate"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#enterpriseID"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#expiryDate"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#facebookPage"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#familyName"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#fee"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#firstName"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#invoiceNumber"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#latitude"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#lifetime"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#logo"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#longitude"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#marginPercent"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#orderNumber"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#paymentMethodProvider"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#paymentMethodType"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#phoneNumber"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#physicalCharacteristics"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#postcode"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#price"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#productionDate"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#quantity"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#sku"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#startDate"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#stockLimitation"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#street"/>
+    </Declaration>
+    <Declaration>
+        <DataProperty IRI="#totalTheoriticalStock"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="#Repository_1"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="#Repository_2"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="#Repository_3"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="#Repository_4"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="#Repository_5"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="#Repository_6"/>
+    </Declaration>
+    <Declaration>
+        <Datatype abbreviatedIRI="xsd:date"/>
+    </Declaration>
+    <SubClassOf>
+        <Class IRI="#Address"/>
+        <Class IRI="#DFC_Where_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Address"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#addressOf"/>
+            <Class IRI="#Person"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Address"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#addressOf"/>
+            <Class IRI="#PhysicalPlace"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Agent"/>
+        <Class IRI="#DFC_Who_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Agent"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#belongsTo"/>
+            <Class IRI="#CustomerCategory"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Agent"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasAddress"/>
+            <Class IRI="#Address"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Agent"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#orders"/>
+            <Class IRI="#Order"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Agent"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#owns"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Agent"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#requests"/>
+            <Class IRI="#FunctionalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedConsumptionFlow"/>
+        <Class IRI="#ConsumptionFlow"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedConsumptionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#consumes"/>
+            <Class IRI="#DefinedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedConsumptionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#incomeOf"/>
+            <Class IRI="#AsPlannedTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalConsumptionFlow"/>
+        <Class IRI="#ConsumptionFlow"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalConsumptionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#consumes"/>
+            <Class IRI="#LocalizedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalConsumptionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#incomeOf"/>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalProductionFlow"/>
+        <Class IRI="#ProductionFlow"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalProductionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#outcomeOf"/>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalProductionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#produces"/>
+            <Class IRI="#LocalizedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+        <Class IRI="#Transformation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasIncome"/>
+            <Class IRI="#AsPlannedLocalConsumptionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasOutcome"/>
+            <Class IRI="#AsPlannedLocalProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#transformedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#transformedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedProductionFlow"/>
+        <Class IRI="#ProductionFlow"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedProductionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#outcomeOf"/>
+            <Class IRI="#AsPlannedTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedProductionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#produces"/>
+            <Class IRI="#SuppliedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedTransformation"/>
+        <Class IRI="#Transformation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasIncome"/>
+            <Class IRI="#AsPlannedConsumptionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsPlannedTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasOutcome"/>
+            <Class IRI="#AsPlannedProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedConsumptionFlow"/>
+        <Class IRI="#ConsumptionFlow"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedConsumptionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#consumes"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedConsumptionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#incomeOf"/>
+            <Class IRI="#AsRealizedTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedProductionFlow"/>
+        <Class IRI="#ProductionFlow"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedProductionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#outcomeOf"/>
+            <Class IRI="#AsRealizedTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedProductionFlow"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#produces"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedTransformation"/>
+        <Class IRI="#Transformation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasIncome"/>
+            <Class IRI="#AsRealizedConsumptionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#AsRealizedTransformation"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasOutcome"/>
+            <Class IRI="#AsRealizedProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#listedIn"/>
+            <Class IRI="#Repository"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#managedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#offeredThrough"/>
+            <Class IRI="#Offer"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#references"/>
+            <Class IRI="#DefinedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#listedIn"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#managedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#references"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CatalogItem"/>
+        <DataExactCardinality cardinality="1">
+            <DataProperty IRI="#stockLimitation"/>
+        </DataExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ConsumptionFlow"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ConsumptionFlow"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#consumes"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ConsumptionFlow"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#incomeOf"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Coordination"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Coordination"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#coordinatedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Coordination"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasObject"/>
+            <Class IRI="#SaleSession"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Coordination"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#coordinatedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Coordination"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasObject"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CustomerCategory"/>
+        <Class IRI="#DFC_Who_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CustomerCategory"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#definedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#CustomerCategory"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#definedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+        <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+        <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_How_Subject"/>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_What_Subject"/>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_Where_Subject"/>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DFC_Who_Subject"/>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <Class IRI="#DFC_What_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#concernedBy"/>
+            <Class IRI="#OrderLine"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#consumedBy"/>
+            <Class IRI="#AsPlannedConsumptionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasNatureOrigin"/>
+            <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#NatureOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasPartOrigin"/>
+            <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#PartOrigin"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasProcess"/>
+            <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Process"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#referencedBy"/>
+            <Class IRI="#CatalogItem"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasGeographicalOrigin"/>
+            <ObjectUnionOf>
+                <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#GlobalGenericOrigin"/>
+                <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#TerritorialOrigin"/>
+            </ObjectUnionOf>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasType"/>
+            <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#ProductType"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasUnit"/>
+            <Class IRI="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Unit"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DefinedProduct"/>
+        <DataExactCardinality cardinality="1">
+            <DataProperty IRI="#lifetime"/>
+        </DataExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DeliveryOption"/>
+        <Class IRI="#ShippingOption"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DeliveryOption"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#refersTo"/>
+            <Class IRI="#Address"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DeliveryOption"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#uses"/>
+            <Class IRI="#Address"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#DeliveryOption"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#refersTo"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <Class IRI="#Agent"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#affiliatedBy"/>
+            <Class IRI="#Person"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#coordinates"/>
+            <Class IRI="#Coordination"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#defines"/>
+            <Class IRI="#CustomerCategory"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasMainContact"/>
+            <Class IRI="#Person"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#maintains"/>
+            <Class IRI="#Repository"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#manages"/>
+            <Class IRI="#CatalogItem"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#proposes"/>
+            <Class IRI="#TechnicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#supplies"/>
+            <Class IRI="#SuppliedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#transforms"/>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Enterprise"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasMainContact"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#FunctionalProduct"/>
+        <Class IRI="#DefinedProduct"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#FunctionalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#requestedBy"/>
+            <Class IRI="#Agent"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#FunctionalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#satisfiedBy"/>
+            <Class IRI="#TechnicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#FunctionalProduct"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#requestedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LocalizedProduct"/>
+        <Class IRI="#DFC_What_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LocalizedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#constituedBy"/>
+            <Class IRI="#TheoriticalStock"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LocalizedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#consumedBy"/>
+            <Class IRI="#AsPlannedLocalConsumptionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LocalizedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasReference"/>
+            <Class IRI="#SuppliedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LocalizedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#producedBy"/>
+            <Class IRI="#AsPlannedLocalProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#LocalizedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#representedBy"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#listedIn"/>
+            <Class IRI="#SaleSession"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#offers"/>
+            <Class IRI="#CatalogItem"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#offersTo"/>
+            <Class IRI="#CustomerCategory"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#offers"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#offersTo"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Offer"/>
+        <DataExactCardinality cardinality="1">
+            <DataProperty IRI="#stockLimitation"/>
+        </DataExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#belongsTo"/>
+            <Class IRI="#SaleSession"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasPart"/>
+            <Class IRI="#OrderLine"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#orderedBy"/>
+            <Class IRI="#Agent"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#selects"/>
+            <Class IRI="#ShippingOption"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#uses"/>
+            <Class IRI="#PaymentMethod"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#belongsTo"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#orderedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#selects"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Order"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#uses"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#OrderLine"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#OrderLine"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#concerns"/>
+            <Class IRI="#DefinedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#OrderLine"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#partOf"/>
+            <Class IRI="#Order"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#OrderLine"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#concerns"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#OrderLine"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#partOf"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PaymentMethod"/>
+        <Class IRI="#DFC_How_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Person"/>
+        <Class IRI="#Agent"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Person"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#affiliates"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Person"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#mainContactOf"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalPlace"/>
+        <Class IRI="#Place"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalPlace"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasAddress"/>
+            <Class IRI="#Address"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalPlace"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#localizes"/>
+            <Class IRI="#TheoriticalStock"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalPlace"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#stores"/>
+            <Class IRI="#RealStock"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalPlace"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasAddress"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <Class IRI="#DFC_What_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#concernedBy"/>
+            <Class IRI="#Transaction"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#constituedBy"/>
+            <Class IRI="#RealStock"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#consumedBy"/>
+            <Class IRI="#AsRealizedProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#ownedBy"/>
+            <Class IRI="#Agent"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#producedBy"/>
+            <Class IRI="#AsRealizedProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#represents"/>
+            <Class IRI="#LocalizedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PhysicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#tracedBy"/>
+            <Class IRI="#ProductBatch"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PickupOption"/>
+        <Class IRI="#ShippingOption"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PickupOption"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#uses"/>
+            <Class IRI="#PhysicalPlace"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#PickupOption"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#uses"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Place"/>
+        <Class IRI="#DFC_Where_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Place"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hosts"/>
+            <Class IRI="#SaleSession"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductBatch"/>
+        <Class IRI="#DFC_What_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductBatch"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#identifies"/>
+            <Class IRI="#RealStock"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductBatch"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#traces"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductionFlow"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductionFlow"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#outcomeOf"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ProductionFlow"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#produces"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <Class IRI="#Stock"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#constitutes"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#identifiedBy"/>
+            <Class IRI="#ProductBatch"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#storedIn"/>
+            <Class IRI="#PhysicalPlace"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#constitutes"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#identifiedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RealStock"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#storedIn"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Repository"/>
+        <Class IRI="#DFC_Where_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Repository"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#lists"/>
+            <Class IRI="#CatalogItem"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Repository"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#maintainedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Repository"/>
+        <ObjectMinCardinality cardinality="1">
+            <ObjectProperty IRI="#maintainedBy"/>
+        </ObjectMinCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Repository"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#maintainedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SaleSession"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SaleSession"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasOption"/>
+            <Class IRI="#ShippingOption"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SaleSession"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hostedAt"/>
+            <Class IRI="#Place"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SaleSession"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#lists"/>
+            <Class IRI="#Offer"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SaleSession"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#objectOf"/>
+            <Class IRI="#Coordination"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ShippingOption"/>
+        <Class IRI="#DFC_How_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#ShippingOption"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#optionOf"/>
+            <Class IRI="#SaleSession"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Stock"/>
+        <Class IRI="#DFC_BusinessOntology_Relation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <Class IRI="#DefinedProduct"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#industrializes"/>
+            <Class IRI="#TechnicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#producedBy"/>
+            <Class IRI="#AsPlannedProductionFlow"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#referenceOf"/>
+            <Class IRI="#LocalizedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#suppliedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#suppliedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#SuppliedProduct"/>
+        <DataExactCardinality cardinality="1">
+            <DataProperty IRI="#totalTheoriticalStock"/>
+        </DataExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TechnicalProduct"/>
+        <Class IRI="#DefinedProduct"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TechnicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#industrializedBy"/>
+            <Class IRI="#SuppliedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TechnicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#proposedBy"/>
+            <Class IRI="#Enterprise"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TechnicalProduct"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#satisfies"/>
+            <Class IRI="#FunctionalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TechnicalProduct"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#proposedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TheoriticalStock"/>
+        <Class IRI="#Stock"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TheoriticalStock"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#constitutes"/>
+            <Class IRI="#LocalizedProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TheoriticalStock"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#localizedBy"/>
+            <Class IRI="#PhysicalPlace"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TheoriticalStock"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#constitutes"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#TheoriticalStock"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#localizedBy"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transaction"/>
+        <Class IRI="#DFC_How_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transaction"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#concerns"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transaction"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#from"/>
+            <Class IRI="#Agent"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transaction"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#to"/>
+            <Class IRI="#Agent"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transaction"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#from"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transaction"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#to"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Transformation"/>
+        <Class IRI="#DFC_How_Subject"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#VirtualPlace"/>
+        <Class IRI="#Place"/>
+    </SubClassOf>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#bernardC"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Organization"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#rachelA"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#simonL"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="#Repository"/>
+        <NamedIndividual IRI="#Repository_1"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="#Repository"/>
+        <NamedIndividual IRI="#Repository_2"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="#Repository"/>
+        <NamedIndividual IRI="#Repository_3"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="#Repository"/>
+        <NamedIndividual IRI="#Repository_4"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="#Repository"/>
+        <NamedIndividual IRI="#Repository_5"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="#Repository"/>
+        <NamedIndividual IRI="#Repository_6"/>
+    </ClassAssertion>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#addressOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#affiliatedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#affiliates"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#belongsTo"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#certificateOf"/>
+        <ObjectProperty IRI="#facetOf"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#concernedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#concerns"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#constituedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#constitutes"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#consumedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#consumes"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#coordinatedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#coordinates"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#definedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#defines"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#facetOf"/>
+        <ObjectProperty IRI="#DFC_Interface_Property"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#from"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#geographicalOriginOf"/>
+        <ObjectProperty IRI="#facetOf"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasAddress"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasCertification"/>
+        <ObjectProperty IRI="#hasFacet"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasFacet"/>
+        <ObjectProperty IRI="#DFC_Interface_Property"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasGeographicalOrigin"/>
+        <ObjectProperty IRI="#hasFacet"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasIncome"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasMainContact"/>
+        <ObjectProperty IRI="#affiliates"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasNatureOrigin"/>
+        <ObjectProperty IRI="#hasFacet"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasObject"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasOption"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasOutcome"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasPart"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasPartOrigin"/>
+        <ObjectProperty IRI="#hasFacet"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasProcess"/>
+        <ObjectProperty IRI="#hasFacet"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasReference"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasType"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasType"/>
+        <ObjectProperty IRI="#DFC_Interface_Property"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasUnit"/>
+        <ObjectProperty IRI="#DFC_Interface_Property"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hostedAt"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hosts"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#identifiedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#identifies"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#incomeOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#industrializedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#industrializes"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#listedIn"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#lists"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#localizedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#localizes"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#mainContactOf"/>
+        <ObjectProperty IRI="#affiliatedBy"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#maintainedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#maintains"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#managedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#manages"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#natureOriginOf"/>
+        <ObjectProperty IRI="#facetOf"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#objectOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#offeredThrough"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#offers"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#offersTo"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#optionOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#orderedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#orders"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#outcomeOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#ownedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#owns"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#partOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#partOriginOf"/>
+        <ObjectProperty IRI="#facetOf"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#processOf"/>
+        <ObjectProperty IRI="#facetOf"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#producedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#produces"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#proposedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#proposes"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#referenceOf"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#referencedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#references"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#refersTo"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#representedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#represents"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#requestedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#requests"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#satisfiedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#satisfies"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#selects"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#storedIn"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#stores"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#suppliedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#supplies"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#to"/>
+        <ObjectProperty IRI="#supplies"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#tracedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#traces"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#transformedBy"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#transforms"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#typeOf"/>
+        <ObjectProperty IRI="#DFC_Interface_Property"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#uses"/>
+        <ObjectProperty IRI="#DFC_BusinessOntology_ObjectProperty"/>
+    </SubObjectPropertyOf>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#addressOf"/>
+        <ObjectProperty IRI="#hasAddress"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#affiliatedBy"/>
+        <ObjectProperty IRI="#affiliates"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#certificateOf"/>
+        <ObjectProperty IRI="#hasCertification"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#concernedBy"/>
+        <ObjectProperty IRI="#concerns"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#constituedBy"/>
+        <ObjectProperty IRI="#constitutes"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#consumedBy"/>
+        <ObjectProperty IRI="#consumes"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#coordinatedBy"/>
+        <ObjectProperty IRI="#coordinates"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#definedBy"/>
+        <ObjectProperty IRI="#defines"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#facetOf"/>
+        <ObjectProperty IRI="#hasFacet"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#geographicalOriginOf"/>
+        <ObjectProperty IRI="#hasGeographicalOrigin"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasIncome"/>
+        <ObjectProperty IRI="#incomeOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasMainContact"/>
+        <ObjectProperty IRI="#mainContactOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasNatureOrigin"/>
+        <ObjectProperty IRI="#natureOriginOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasObject"/>
+        <ObjectProperty IRI="#objectOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasOption"/>
+        <ObjectProperty IRI="#optionOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasOutcome"/>
+        <ObjectProperty IRI="#outcomeOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasPart"/>
+        <ObjectProperty IRI="#partOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasPartOrigin"/>
+        <ObjectProperty IRI="#partOriginOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasProcess"/>
+        <ObjectProperty IRI="#processOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasReference"/>
+        <ObjectProperty IRI="#referenceOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hasType"/>
+        <ObjectProperty IRI="#typeOf"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#hostedAt"/>
+        <ObjectProperty IRI="#hosts"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#identifiedBy"/>
+        <ObjectProperty IRI="#identifies"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#industrializedBy"/>
+        <ObjectProperty IRI="#industrializes"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#listedIn"/>
+        <ObjectProperty IRI="#lists"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#localizedBy"/>
+        <ObjectProperty IRI="#localizes"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#maintainedBy"/>
+        <ObjectProperty IRI="#maintains"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#managedBy"/>
+        <ObjectProperty IRI="#manages"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#offeredThrough"/>
+        <ObjectProperty IRI="#offers"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#orderedBy"/>
+        <ObjectProperty IRI="#orders"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#ownedBy"/>
+        <ObjectProperty IRI="#owns"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#producedBy"/>
+        <ObjectProperty IRI="#produces"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#proposedBy"/>
+        <ObjectProperty IRI="#proposes"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#referencedBy"/>
+        <ObjectProperty IRI="#referencedBy"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#representedBy"/>
+        <ObjectProperty IRI="#represents"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#requestedBy"/>
+        <ObjectProperty IRI="#requests"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#satisfiedBy"/>
+        <ObjectProperty IRI="#satisfies"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#storedIn"/>
+        <ObjectProperty IRI="#stores"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#suppliedBy"/>
+        <ObjectProperty IRI="#supplies"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#tracedBy"/>
+        <ObjectProperty IRI="#traces"/>
+    </InverseObjectProperties>
+    <InverseObjectProperties>
+        <ObjectProperty IRI="#transformedBy"/>
+        <ObjectProperty IRI="#transforms"/>
+    </InverseObjectProperties>
+    <FunctionalObjectProperty>
+        <ObjectProperty IRI="#hasCertification"/>
+    </FunctionalObjectProperty>
+    <FunctionalObjectProperty>
+        <ObjectProperty IRI="#hasFacet"/>
+    </FunctionalObjectProperty>
+    <FunctionalObjectProperty>
+        <ObjectProperty IRI="#hasGeographicalOrigin"/>
+    </FunctionalObjectProperty>
+    <FunctionalObjectProperty>
+        <ObjectProperty IRI="#hasProcess"/>
+    </FunctionalObjectProperty>
+    <InverseFunctionalObjectProperty>
+        <ObjectProperty IRI="#certificateOf"/>
+    </InverseFunctionalObjectProperty>
+    <InverseFunctionalObjectProperty>
+        <ObjectProperty IRI="#facetOf"/>
+    </InverseFunctionalObjectProperty>
+    <InverseFunctionalObjectProperty>
+        <ObjectProperty IRI="#geographicalOriginOf"/>
+    </InverseFunctionalObjectProperty>
+    <InverseFunctionalObjectProperty>
+        <ObjectProperty IRI="#processOf"/>
+    </InverseFunctionalObjectProperty>
+    <SymmetricObjectProperty>
+        <ObjectProperty IRI="#referencedBy"/>
+    </SymmetricObjectProperty>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#addressOf"/>
+        <Class IRI="#Address"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#affiliatedBy"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#affiliates"/>
+        <Class IRI="#Person"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#belongsTo"/>
+        <ObjectUnionOf>
+            <Class IRI="#Agent"/>
+            <Class IRI="#Order"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#certificateOf"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#concernedBy"/>
+        <ObjectUnionOf>
+            <Class IRI="#DefinedProduct"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#concerns"/>
+        <ObjectUnionOf>
+            <Class IRI="#OrderLine"/>
+            <Class IRI="#Transaction"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#constituedBy"/>
+        <ObjectUnionOf>
+            <Class IRI="#LocalizedProduct"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#constitutes"/>
+        <ObjectUnionOf>
+            <Class IRI="#RealStock"/>
+            <Class IRI="#TheoriticalStock"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#consumedBy"/>
+        <ObjectUnionOf>
+            <Class IRI="#DefinedProduct"/>
+            <Class IRI="#LocalizedProduct"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#consumes"/>
+        <Class IRI="#ConsumptionFlow"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#coordinatedBy"/>
+        <Class IRI="#Coordination"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#coordinates"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#definedBy"/>
+        <Class IRI="#CustomerCategory"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#defines"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#from"/>
+        <Class IRI="#Transaction"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasAddress"/>
+        <ObjectUnionOf>
+            <Class IRI="#Agent"/>
+            <Class IRI="#PhysicalPlace"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasCertification"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasGeographicalOrigin"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasIncome"/>
+        <ObjectUnionOf>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+            <Class IRI="#AsPlannedTransformation"/>
+            <Class IRI="#AsRealizedTransformation"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasMainContact"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasNatureOrigin"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasObject"/>
+        <Class IRI="#Coordination"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasOption"/>
+        <Class IRI="#SaleSession"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasOutcome"/>
+        <ObjectUnionOf>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+            <Class IRI="#AsPlannedTransformation"/>
+            <Class IRI="#AsRealizedTransformation"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasPart"/>
+        <Class IRI="#Order"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasPartOrigin"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasProcess"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasReference"/>
+        <Class IRI="#LocalizedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasType"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hasUnit"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hostedAt"/>
+        <Class IRI="#SaleSession"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#hosts"/>
+        <Class IRI="#Place"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#identifiedBy"/>
+        <Class IRI="#RealStock"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#identifies"/>
+        <Class IRI="#ProductBatch"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#incomeOf"/>
+        <Class IRI="#ConsumptionFlow"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#industrializedBy"/>
+        <Class IRI="#TechnicalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#industrializes"/>
+        <Class IRI="#SuppliedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#listedIn"/>
+        <ObjectUnionOf>
+            <Class IRI="#CatalogItem"/>
+            <Class IRI="#Offer"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#lists"/>
+        <ObjectUnionOf>
+            <Class IRI="#Repository"/>
+            <Class IRI="#SaleSession"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#localizedBy"/>
+        <Class IRI="#TheoriticalStock"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#localizes"/>
+        <Class IRI="#PhysicalPlace"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#mainContactOf"/>
+        <Class IRI="#Person"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#maintainedBy"/>
+        <Class IRI="#Repository"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#maintains"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#managedBy"/>
+        <Class IRI="#CatalogItem"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#manages"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#objectOf"/>
+        <Class IRI="#SaleSession"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#offeredThrough"/>
+        <Class IRI="#CatalogItem"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#offers"/>
+        <Class IRI="#Offer"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#offersTo"/>
+        <Class IRI="#Offer"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#optionOf"/>
+        <Class IRI="#ShippingOption"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#orderedBy"/>
+        <Class IRI="#Order"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#orders"/>
+        <Class IRI="#Agent"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#outcomeOf"/>
+        <Class IRI="#ProductionFlow"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#ownedBy"/>
+        <Class IRI="#PhysicalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#owns"/>
+        <Class IRI="#Agent"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#partOf"/>
+        <Class IRI="#OrderLine"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#processOf"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#producedBy"/>
+        <ObjectUnionOf>
+            <Class IRI="#LocalizedProduct"/>
+            <Class IRI="#PhysicalProduct"/>
+            <Class IRI="#SuppliedProduct"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#produces"/>
+        <Class IRI="#ProductionFlow"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#proposedBy"/>
+        <Class IRI="#TechnicalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#proposes"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#referenceOf"/>
+        <Class IRI="#SuppliedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#referencedBy"/>
+        <Class IRI="#DefinedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#references"/>
+        <Class IRI="#CatalogItem"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#refersTo"/>
+        <Class IRI="#DeliveryOption"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#representedBy"/>
+        <Class IRI="#LocalizedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#represents"/>
+        <Class IRI="#PhysicalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#requestedBy"/>
+        <Class IRI="#FunctionalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#requests"/>
+        <Class IRI="#Agent"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#satisfiedBy"/>
+        <Class IRI="#FunctionalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#satisfies"/>
+        <Class IRI="#TechnicalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#selects"/>
+        <Class IRI="#Order"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#storedIn"/>
+        <Class IRI="#RealStock"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#stores"/>
+        <Class IRI="#PhysicalPlace"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#suppliedBy"/>
+        <Class IRI="#SuppliedProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#supplies"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#to"/>
+        <Class IRI="#Transaction"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#tracedBy"/>
+        <Class IRI="#PhysicalProduct"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#traces"/>
+        <Class IRI="#ProductBatch"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#transformedBy"/>
+        <Class IRI="#AsPlannedLocalTransformation"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#transforms"/>
+        <Class IRI="#Enterprise"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="#uses"/>
+        <ObjectUnionOf>
+            <Class IRI="#DeliveryOption"/>
+            <Class IRI="#Order"/>
+            <Class IRI="#PickupOption"/>
+        </ObjectUnionOf>
+    </ObjectPropertyDomain>
+    <SubDataPropertyOf>
+        <DataProperty IRI="#endDate"/>
+        <DataProperty IRI="#date"/>
+    </SubDataPropertyOf>
+    <SubDataPropertyOf>
+        <DataProperty IRI="#startDate"/>
+        <DataProperty IRI="#date"/>
+    </SubDataPropertyOf>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#URL"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#VATnumber"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#VATstatus"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#batchNumber"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#city"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#claim"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#cost"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#country"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#date"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#description"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#email"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#enterpriseID"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#expiryDate"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#familyName"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#fee"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#firstName"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#invoiceNumber"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#latitude"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#logo"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#longitude"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#marginPercent"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#orderNumber"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#paymentMethodProvider"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#paymentMethodType"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#postcode"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#price"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#productionDate"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#quantity"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#sku"/>
+    </FunctionalDataProperty>
+    <FunctionalDataProperty>
+        <DataProperty IRI="#street"/>
+    </FunctionalDataProperty>
+    <DataPropertyDomain>
+        <DataProperty IRI="#Image"/>
+        <ObjectUnionOf>
+            <Class IRI="#DefinedProduct"/>
+            <Class IRI="#LocalizedProduct"/>
+            <Class IRI="#PhysicalProduct"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#InstagramPage"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#LinkedinPage"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#TwitterPage"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#URL"/>
+        <Class IRI="#VirtualPlace"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#VATnumber"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#VATstatus"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#batchNumber"/>
+        <Class IRI="#ProductBatch"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#brand"/>
+        <Class IRI="#DefinedProduct"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#city"/>
+        <Class IRI="#Address"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#claim"/>
+        <Class IRI="#DefinedProduct"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#cost"/>
+        <ObjectUnionOf>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+            <Class IRI="#AsRealizedTransformation"/>
+            <Class IRI="#LocalizedProduct"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#country"/>
+        <Class IRI="#Address"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#date"/>
+        <Class IRI="#Stock"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#description"/>
+        <Class IRI="#DFC_BusinessOntology_Subject"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#email"/>
+        <Class IRI="#Agent"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#endDate"/>
+        <ObjectUnionOf>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+            <Class IRI="#AsRealizedTransformation"/>
+            <Class IRI="#SaleSession"/>
+            <Class IRI="#ShippingOption"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#enterpriseID"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#expiryDate"/>
+        <Class IRI="#ProductBatch"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#facebookPage"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#familyName"/>
+        <Class IRI="#Person"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#fee"/>
+        <Class IRI="#ShippingOption"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#firstName"/>
+        <Class IRI="#Person"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#invoiceNumber"/>
+        <Class IRI="#Transaction"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#latitude"/>
+        <Class IRI="#Address"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#lifetime"/>
+        <Class IRI="#DefinedProduct"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#logo"/>
+        <Class IRI="#Enterprise"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#longitude"/>
+        <Class IRI="#Address"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#marginPercent"/>
+        <Class IRI="#Coordination"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#orderNumber"/>
+        <Class IRI="#Order"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#paymentMethodProvider"/>
+        <Class IRI="#PaymentMethod"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#paymentMethodType"/>
+        <Class IRI="#PaymentMethod"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#phoneNumber"/>
+        <Class IRI="#Agent"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#physicalCharacteristics"/>
+        <Class IRI="#DefinedProduct"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#postcode"/>
+        <Class IRI="#Address"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#price"/>
+        <ObjectUnionOf>
+            <Class IRI="#Offer"/>
+            <Class IRI="#PaymentMethod"/>
+            <Class IRI="#Transaction"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#productionDate"/>
+        <Class IRI="#ProductBatch"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#quantity"/>
+        <ObjectUnionOf>
+            <Class IRI="#ConsumptionFlow"/>
+            <Class IRI="#DefinedProduct"/>
+            <Class IRI="#LocalizedProduct"/>
+            <Class IRI="#OrderLine"/>
+            <Class IRI="#PhysicalProduct"/>
+            <Class IRI="#ProductionFlow"/>
+            <Class IRI="#SaleSession"/>
+            <Class IRI="#ShippingOption"/>
+            <Class IRI="#Stock"/>
+            <Class IRI="#Transaction"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#sku"/>
+        <Class IRI="#CatalogItem"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#startDate"/>
+        <ObjectUnionOf>
+            <Class IRI="#AsPlannedLocalTransformation"/>
+            <Class IRI="#AsRealizedTransformation"/>
+            <Class IRI="#SaleSession"/>
+            <Class IRI="#ShippingOption"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#stockLimitation"/>
+        <ObjectUnionOf>
+            <Class IRI="#CatalogItem"/>
+            <Class IRI="#Offer"/>
+        </ObjectUnionOf>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#street"/>
+        <Class IRI="#Address"/>
+    </DataPropertyDomain>
+    <DataPropertyDomain>
+        <DataProperty IRI="#totalTheoriticalStock"/>
+        <Class IRI="#SuppliedProduct"/>
+    </DataPropertyDomain>
+    <DataPropertyRange>
+        <DataProperty IRI="#Image"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#InstagramPage"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#LinkedinPage"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#TwitterPage"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#URL"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#VATnumber"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#VATstatus"/>
+        <Datatype abbreviatedIRI="xsd:boolean"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#batchNumber"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#brand"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#city"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#claim"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#cost"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#country"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#date"/>
+        <Datatype abbreviatedIRI="xsd:date"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#description"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#email"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#endDate"/>
+        <Datatype abbreviatedIRI="xsd:dateTime"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#enterpriseID"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#expiryDate"/>
+        <Datatype abbreviatedIRI="xsd:date"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#facebookPage"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#familyName"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#fee"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#firstName"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#invoiceNumber"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#latitude"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#lifetime"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#logo"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#longitude"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#marginPercent"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#orderNumber"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#paymentMethodProvider"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#paymentMethodType"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#phoneNumber"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#physicalCharacteristics"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#postcode"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#price"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#productionDate"/>
+        <Datatype abbreviatedIRI="xsd:date"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#quantity"/>
+        <Datatype abbreviatedIRI="xsd:float"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#sku"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#startDate"/>
+        <Datatype abbreviatedIRI="xsd:dateTime"/>
+    </DataPropertyRange>
+    <DataPropertyRange>
+        <DataProperty IRI="#street"/>
+        <Datatype abbreviatedIRI="xsd:string"/>
+    </DataPropertyRange>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Address</IRI>
+        <Literal xml:lang="en">Address</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Address</IRI>
+        <Literal xml:lang="fr">Adresse</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Agent</IRI>
+        <Literal xml:lang="en">Agent</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Agent</IRI>
+        <Literal xml:lang="fr">Agent</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedConsumptionFlow</IRI>
+        <Literal xml:lang="en">As planned consumption flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedConsumptionFlow</IRI>
+        <Literal xml:lang="fr">Flux de consommation planifié (théorique)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedLocalConsumptionFlow</IRI>
+        <Literal xml:lang="en">As planned local consumption flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedLocalConsumptionFlow</IRI>
+        <Literal xml:lang="fr">Flux de consommation planifié (localisé)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedLocalProductionFlow</IRI>
+        <Literal xml:lang="en">As planned local production flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedLocalProductionFlow</IRI>
+        <Literal xml:lang="fr">Flux de production planifié (localisé)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedLocalTransformation</IRI>
+        <Literal xml:lang="en">As planned local transformation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedLocalTransformation</IRI>
+        <Literal xml:lang="fr">Transformation planifiée (localisée)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedProductionFlow</IRI>
+        <Literal xml:lang="en">As planned production flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedProductionFlow</IRI>
+        <Literal xml:lang="fr">Flux de production planifié (théorique)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedTransformation</IRI>
+        <Literal xml:lang="en">As planned transformation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsPlannedTransformation</IRI>
+        <Literal xml:lang="fr">Transformation planifiée (théorique)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsRealizedConsumptionFlow</IRI>
+        <Literal xml:lang="en">As realized consumption flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsRealizedConsumptionFlow</IRI>
+        <Literal xml:lang="fr">Flux de consommation réalisé</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsRealizedProductionFlow</IRI>
+        <Literal xml:lang="en">As realized production flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsRealizedProductionFlow</IRI>
+        <Literal xml:lang="fr">Flux de production réalisé</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsRealizedTransformation</IRI>
+        <Literal xml:lang="en">As realized transformation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#AsRealizedTransformation</IRI>
+        <Literal xml:lang="fr">Transformation réalisée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#CatalogItem</IRI>
+        <Literal xml:lang="en">Catalog item</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#CatalogItem</IRI>
+        <Literal xml:lang="fr">Référence catalogue</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ConsumptionFlow</IRI>
+        <Literal xml:lang="en">Consumption flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ConsumptionFlow</IRI>
+        <Literal xml:lang="fr">Flux de consommation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Coordination</IRI>
+        <Literal xml:lang="en">Coordination</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Coordination</IRI>
+        <Literal xml:lang="fr">Coordination</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#CustomerCategory</IRI>
+        <Literal xml:lang="fr">Catégorie client</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#CustomerCategory</IRI>
+        <Literal xml:lang="en">Customer category</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_BusinessOntology_Relation</IRI>
+        <Literal xml:lang="fr">Relation de l&apos;ontologie Data Food Consortium</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_BusinessOntology_Relation</IRI>
+        <Literal xml:lang="en">Relation of Data Food Consortium ontology</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_BusinessOntology_Subject</IRI>
+        <Literal xml:lang="en">Subject of Data Food Consortium ontology</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_BusinessOntology_Subject</IRI>
+        <Literal xml:lang="fr">Sujet de l&apos;ontologie Data Food Consortium</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_How_Subject</IRI>
+        <Literal xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;How?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_How_Subject</IRI>
+        <Literal xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Comment?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_What_Subject</IRI>
+        <Literal xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;What?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_What_Subject</IRI>
+        <Literal xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Quoi?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_Where_Subject</IRI>
+        <Literal xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;Where?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_Where_Subject</IRI>
+        <Literal xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Où?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_Who_Subject</IRI>
+        <Literal xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;Who?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_Who_Subject</IRI>
+        <Literal xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Qui ?&quot;</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DefinedProduct</IRI>
+        <Literal xml:lang="en">Defined product</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DefinedProduct</IRI>
+        <Literal xml:lang="fr">Produit défini</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DeliveryOption</IRI>
+        <Literal xml:lang="en">Delivery option</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DeliveryOption</IRI>
+        <Literal xml:lang="fr">Option de livraison</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Enterprise</IRI>
+        <Literal xml:lang="en">Enterprise</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Enterprise</IRI>
+        <Literal xml:lang="fr">Entreprise</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#FunctionalProduct</IRI>
+        <Literal xml:lang="en">Functional product</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#FunctionalProduct</IRI>
+        <Literal xml:lang="fr">Produit fonctionnel</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Image</IRI>
+        <Literal xml:lang="en">image</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Image</IRI>
+        <Literal xml:lang="fr">image</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#InstagramPage</IRI>
+        <Literal xml:lang="en">Instagram page</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#InstagramPage</IRI>
+        <Literal xml:lang="fr">page Instagram</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#LinkedinPage</IRI>
+        <Literal xml:lang="en">LinkedIn page</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#LinkedinPage</IRI>
+        <Literal xml:lang="fr">page LinkedIn</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#LocalizedProduct</IRI>
+        <Literal xml:lang="en">Localized product</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#LocalizedProduct</IRI>
+        <Literal xml:lang="fr">Produit localisé</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Offer</IRI>
+        <Literal xml:lang="en">Offer</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Offer</IRI>
+        <Literal xml:lang="fr">Offre</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Order</IRI>
+        <Literal xml:lang="fr">Commande</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Order</IRI>
+        <Literal xml:lang="en">Order</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#OrderLine</IRI>
+        <Literal xml:lang="fr">Ligne de commande</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#OrderLine</IRI>
+        <Literal xml:lang="en">Order line</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PaymentMethod</IRI>
+        <Literal xml:lang="fr">Méthode de payment</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PaymentMethod</IRI>
+        <Literal xml:lang="en">Payment method</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Person</IRI>
+        <Literal xml:lang="en">Person</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Person</IRI>
+        <Literal xml:lang="fr">Personne</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PhysicalPlace</IRI>
+        <Literal xml:lang="fr">Lieu physique</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PhysicalPlace</IRI>
+        <Literal xml:lang="en">Physical place</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PhysicalProduct</IRI>
+        <Literal xml:lang="en">Physical product</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PhysicalProduct</IRI>
+        <Literal xml:lang="fr">Produit physique</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PickupOption</IRI>
+        <Literal xml:lang="fr">Option de retrait</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#PickupOption</IRI>
+        <Literal xml:lang="en">Pickup option</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Place</IRI>
+        <Literal xml:lang="fr">Lieu</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Place</IRI>
+        <Literal xml:lang="en">Place</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ProductBatch</IRI>
+        <Literal xml:lang="fr">Lot du produit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ProductBatch</IRI>
+        <Literal xml:lang="en">Product batch</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ProductionFlow</IRI>
+        <Literal xml:lang="fr">Fux de production</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ProductionFlow</IRI>
+        <Literal xml:lang="en">Production flow</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#RealStock</IRI>
+        <Literal xml:lang="en">Real stock</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#RealStock</IRI>
+        <Literal xml:lang="fr">Stock réel</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository</IRI>
+        <Literal xml:lang="en">Repository</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository</IRI>
+        <Literal xml:lang="fr">Référentiel</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository_1</IRI>
+        <Literal>La Ruche Qui Dit Oui</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository_2</IRI>
+        <Literal>Panier Local</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository_3</IRI>
+        <Literal>Cagette</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository_4</IRI>
+        <Literal>Open Food France</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository_5</IRI>
+        <Literal>Open Food Facts</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Repository_6</IRI>
+        <Literal>Elzeard</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#SaleSession</IRI>
+        <Literal xml:lang="en">Sales session</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#SaleSession</IRI>
+        <Literal xml:lang="fr">Session de vente</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ShippingOption</IRI>
+        <Literal xml:lang="fr">Option d&apos;expédition</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ShippingOption</IRI>
+        <Literal xml:lang="en">Shipping option</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Stock</IRI>
+        <Literal xml:lang="en">Stock</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Stock</IRI>
+        <Literal xml:lang="fr">Stock</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#SuppliedProduct</IRI>
+        <Literal xml:lang="fr">Produit fourni</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#SuppliedProduct</IRI>
+        <Literal xml:lang="en">Supplied product</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TechnicalProduct</IRI>
+        <Literal xml:lang="fr">Produit technique</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TechnicalProduct</IRI>
+        <Literal xml:lang="en">Technical product</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TheoriticalStock</IRI>
+        <Literal xml:lang="fr">Stock théorique</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TheoriticalStock</IRI>
+        <Literal xml:lang="en">Theoretical stock</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Transaction</IRI>
+        <Literal xml:lang="en">Transaction</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Transaction</IRI>
+        <Literal xml:lang="fr">Transaction</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Transformation</IRI>
+        <Literal xml:lang="en">Transformation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Transformation</IRI>
+        <Literal xml:lang="fr">Transformation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TwitterPage</IRI>
+        <Literal xml:lang="fr">Compte Twitter</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#TwitterPage</IRI>
+        <Literal xml:lang="en">Twitter page</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#URL</IRI>
+        <Literal xml:lang="en">URL</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#URL</IRI>
+        <Literal xml:lang="fr">URL</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#VATnumber</IRI>
+        <Literal xml:lang="en">VAT number</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#VATnumber</IRI>
+        <Literal xml:lang="fr">n° de TVA intracommunautaire</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#VATstatus</IRI>
+        <Literal xml:lang="en">Charges VAT?</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#VATstatus</IRI>
+        <Literal xml:lang="fr">Soumis à la TVA?</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#VirtualPlace</IRI>
+        <Literal xml:lang="fr">Lieu virtuel</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#VirtualPlace</IRI>
+        <Literal xml:lang="en">Virtual place</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#addressOf</IRI>
+        <Literal xml:lang="en">address of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#addressOf</IRI>
+        <Literal xml:lang="fr">adresse de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#affiliatedBy</IRI>
+        <Literal xml:lang="fr">géré par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#affiliatedBy</IRI>
+        <Literal xml:lang="en">managed by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#affiliates</IRI>
+        <Literal xml:lang="fr">gère</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#affiliates</IRI>
+        <Literal xml:lang="en">manages</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#batchNumber</IRI>
+        <Literal xml:lang="en">batch number</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#batchNumber</IRI>
+        <Literal xml:lang="fr">numéro de lot</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#belongsTo</IRI>
+        <Literal xml:lang="fr">appartient à</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#belongsTo</IRI>
+        <Literal xml:lang="en">belongs to</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#brand</IRI>
+        <Literal xml:lang="en">brand</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#brand</IRI>
+        <Literal xml:lang="fr">marque</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#certificateOf</IRI>
+        <Literal xml:lang="fr">certificat/label de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#certificateOf</IRI>
+        <Literal xml:lang="en">certificate of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#city</IRI>
+        <Literal xml:lang="en">city</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#city</IRI>
+        <Literal xml:lang="fr">ville</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#claim</IRI>
+        <Literal xml:lang="fr">affirmation produit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#claim</IRI>
+        <Literal xml:lang="en">product claim</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#concernedBy</IRI>
+        <Literal xml:lang="en">concerned by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#concernedBy</IRI>
+        <Literal xml:lang="fr">concerné par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#concerns</IRI>
+        <Literal xml:lang="fr">concerne</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#concerns</IRI>
+        <Literal xml:lang="en">concerns</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#constituedBy</IRI>
+        <Literal xml:lang="en">constituted by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#constituedBy</IRI>
+        <Literal xml:lang="fr">constitué par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#constitutes</IRI>
+        <Literal xml:lang="fr">constitue</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#constitutes</IRI>
+        <Literal xml:lang="en">constitutes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#consumedBy</IRI>
+        <Literal xml:lang="fr">consommé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#consumedBy</IRI>
+        <Literal xml:lang="en">consumed by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#consumes</IRI>
+        <Literal xml:lang="fr">consomme</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#consumes</IRI>
+        <Literal xml:lang="en">consumes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#coordinatedBy</IRI>
+        <Literal xml:lang="en">coordinated by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#coordinatedBy</IRI>
+        <Literal xml:lang="fr">coordonné par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#coordinates</IRI>
+        <Literal xml:lang="en">coordinates</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#coordinates</IRI>
+        <Literal xml:lang="fr">coordonne</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#cost</IRI>
+        <Literal xml:lang="en">cost</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#cost</IRI>
+        <Literal xml:lang="fr">coût</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#country</IRI>
+        <Literal xml:lang="en">country</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#country</IRI>
+        <Literal xml:lang="fr">pays</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#date</IRI>
+        <Literal xml:lang="en">date</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#date</IRI>
+        <Literal xml:lang="fr">date</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#definedBy</IRI>
+        <Literal xml:lang="en">defined by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#definedBy</IRI>
+        <Literal xml:lang="fr">defini par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#defines</IRI>
+        <Literal xml:lang="en">defines</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#defines</IRI>
+        <Literal xml:lang="fr">définit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#description</IRI>
+        <Literal xml:lang="en">Description</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#description</IRI>
+        <Literal xml:lang="fr">Description</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#email</IRI>
+        <Literal xml:lang="en">email</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#email</IRI>
+        <Literal xml:lang="fr">email</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#endDate</IRI>
+        <Literal xml:lang="fr">Date de fin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#endDate</IRI>
+        <Literal xml:lang="en">End date</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#enterpriseID</IRI>
+        <Literal xml:lang="en">enterprise unique ID number</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#enterpriseID</IRI>
+        <Literal xml:lang="fr">n° SIRET</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#expiryDate</IRI>
+        <Literal xml:lang="fr">date de péremption</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#expiryDate</IRI>
+        <Literal xml:lang="en">expiry date</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#facebookPage</IRI>
+        <Literal xml:lang="en">Facebook page</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#facebookPage</IRI>
+        <Literal xml:lang="fr">Page Facebook</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#facetOf</IRI>
+        <Literal xml:lang="en">facet of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#facetOf</IRI>
+        <Literal xml:lang="fr">facette de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#familyName</IRI>
+        <Literal xml:lang="en">family name</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#familyName</IRI>
+        <Literal xml:lang="fr">nom de famille</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#fee</IRI>
+        <Literal xml:lang="en">Fee</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#fee</IRI>
+        <Literal xml:lang="fr">Frais</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#firstName</IRI>
+        <Literal xml:lang="en">first name</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#firstName</IRI>
+        <Literal xml:lang="fr">prénom</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#from</IRI>
+        <Literal xml:lang="en">from</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#from</IRI>
+        <Literal xml:lang="fr">vient de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#geographicalOriginOf</IRI>
+        <Literal xml:lang="en">geographical origin of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#geographicalOriginOf</IRI>
+        <Literal xml:lang="fr">origine géographique de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasAddress</IRI>
+        <Literal xml:lang="fr">a pour adresse</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasAddress</IRI>
+        <Literal xml:lang="en">has address</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasCertification</IRI>
+        <Literal xml:lang="fr">a pour certification/label</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasCertification</IRI>
+        <Literal xml:lang="en">has certification</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasFacet</IRI>
+        <Literal xml:lang="fr">a pour facette descriptive</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasFacet</IRI>
+        <Literal xml:lang="en">has facet</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#hasGeographicalOrigin</IRI>
+        <Literal></Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasGeographicalOrigin</IRI>
+        <Literal xml:lang="fr">a pour origine géographique</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasGeographicalOrigin</IRI>
+        <Literal xml:lang="en">has geographical origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasIncome</IRI>
+        <Literal xml:lang="fr">a en entrée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasIncome</IRI>
+        <Literal xml:lang="en">has input</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasMainContact</IRI>
+        <Literal xml:lang="fr">a pour contact principal</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasMainContact</IRI>
+        <Literal xml:lang="en">has for main contact</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasNatureOrigin</IRI>
+        <Literal xml:lang="fr">a pour source / origine naturelle ou vivante</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasNatureOrigin</IRI>
+        <Literal xml:lang="en">has for nature origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasObject</IRI>
+        <Literal xml:lang="fr">a pour objet</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasObject</IRI>
+        <Literal xml:lang="en">has object</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasOption</IRI>
+        <Literal xml:lang="fr">a pour option</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasOption</IRI>
+        <Literal xml:lang="en">has option</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasOutcome</IRI>
+        <Literal xml:lang="fr">a en sortie</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasOutcome</IRI>
+        <Literal xml:lang="en">has output</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasPart</IRI>
+        <Literal xml:lang="fr">a pour partie</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasPart</IRI>
+        <Literal xml:lang="en">has part</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasPartOrigin</IRI>
+        <Literal xml:lang="fr">a pour partie d&apos;origine au sein de la source</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasPartOrigin</IRI>
+        <Literal xml:lang="en">has for part origin</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasProcess</IRI>
+        <Literal xml:lang="fr">a subi comme procédé</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasProcess</IRI>
+        <Literal xml:lang="en">has process</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasReference</IRI>
+        <Literal xml:lang="fr">a pour référence</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasReference</IRI>
+        <Literal xml:lang="en">has reference</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasType</IRI>
+        <Literal xml:lang="fr">a pour type</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasType</IRI>
+        <Literal xml:lang="en">has type</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasUnit</IRI>
+        <Literal xml:lang="fr">a pour unité</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hasUnit</IRI>
+        <Literal xml:lang="en">has unit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hostedAt</IRI>
+        <Literal xml:lang="fr">a lieu à</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hostedAt</IRI>
+        <Literal xml:lang="en">hosted at</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hosts</IRI>
+        <Literal xml:lang="en">hosts</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hosts</IRI>
+        <Literal xml:lang="fr">héberge</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#identifiedBy</IRI>
+        <Literal xml:lang="en">identified by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#identifiedBy</IRI>
+        <Literal xml:lang="fr">identifié par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#identifies</IRI>
+        <Literal xml:lang="fr">identifie</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#identifies</IRI>
+        <Literal xml:lang="en">identifies</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#incomeOf</IRI>
+        <Literal xml:lang="en">Input of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#incomeOf</IRI>
+        <Literal xml:lang="fr">Source de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#industrializedBy</IRI>
+        <Literal xml:lang="en">Industrialized by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#industrializedBy</IRI>
+        <Literal xml:lang="fr">Indutrialisé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#industrializes</IRI>
+        <Literal xml:lang="en">Industrializes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#industrializes</IRI>
+        <Literal xml:lang="fr">Indutrialise</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#invoiceNumber</IRI>
+        <Literal xml:lang="en">invoice number</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#invoiceNumber</IRI>
+        <Literal xml:lang="fr">numéro de facture</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#latitude</IRI>
+        <Literal xml:lang="en">latitude</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#latitude</IRI>
+        <Literal xml:lang="fr">latitude</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#lifetime</IRI>
+        <Literal xml:lang="fr">durée de vie  (en nombre de jours)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#lifetime</IRI>
+        <Literal xml:lang="en">lifetime (in number of days)</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#listedIn</IRI>
+        <Literal xml:lang="en">listed in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#listedIn</IRI>
+        <Literal xml:lang="fr">listé dans</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#lists</IRI>
+        <Literal xml:lang="fr">iste</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#lists</IRI>
+        <Literal xml:lang="en">lists</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#localizedBy</IRI>
+        <Literal xml:lang="fr">localisé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#localizedBy</IRI>
+        <Literal xml:lang="en">localized by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#localizes</IRI>
+        <Literal xml:lang="fr">localise</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#localizes</IRI>
+        <Literal xml:lang="en">localizes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#logo</IRI>
+        <Literal xml:lang="en">logo</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#logo</IRI>
+        <Literal xml:lang="fr">logo</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#longitude</IRI>
+        <Literal xml:lang="en">longitude</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#longitude</IRI>
+        <Literal xml:lang="fr">longitude</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#mainContactOf</IRI>
+        <Literal xml:lang="fr">contact principal pour</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#mainContactOf</IRI>
+        <Literal xml:lang="en">main contact of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#maintainedBy</IRI>
+        <Literal xml:lang="en">maintained by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#maintainedBy</IRI>
+        <Literal xml:lang="fr">maintenu par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#maintains</IRI>
+        <Literal xml:lang="en">maintains</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#maintains</IRI>
+        <Literal xml:lang="fr">maintient</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#managedBy</IRI>
+        <Literal xml:lang="fr">géré par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#managedBy</IRI>
+        <Literal xml:lang="en">managed by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#manages</IRI>
+        <Literal xml:lang="fr">gère</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#manages</IRI>
+        <Literal xml:lang="en">manages</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#marginPercent</IRI>
+        <Literal xml:lang="fr">Marge</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#marginPercent</IRI>
+        <Literal xml:lang="en">Markup</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#natureOriginOf</IRI>
+        <Literal xml:lang="en">nature origin of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#natureOriginOf</IRI>
+        <Literal xml:lang="fr">origine naturelle (source) de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#objectOf</IRI>
+        <Literal xml:lang="en">object of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#objectOf</IRI>
+        <Literal xml:lang="fr">objet de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#offeredThrough</IRI>
+        <Literal xml:lang="en">offered through</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#offeredThrough</IRI>
+        <Literal xml:lang="fr">offert via</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#offers</IRI>
+        <Literal xml:lang="en">offers</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#offers</IRI>
+        <Literal xml:lang="fr">offre</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#offersTo</IRI>
+        <Literal xml:lang="en">offers to</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#offersTo</IRI>
+        <Literal xml:lang="fr">offert à</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#optionOf</IRI>
+        <Literal xml:lang="fr">option de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#optionOf</IRI>
+        <Literal xml:lang="en">option of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#orderNumber</IRI>
+        <Literal xml:lang="fr">numéro de commande</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#orderNumber</IRI>
+        <Literal xml:lang="en">order number</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#orderedBy</IRI>
+        <Literal xml:lang="fr">commandé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#orderedBy</IRI>
+        <Literal xml:lang="en">ordered by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#orders</IRI>
+        <Literal xml:lang="fr">commande</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#orders</IRI>
+        <Literal xml:lang="en">orders</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#outcomeOf</IRI>
+        <Literal xml:lang="fr">Résultat de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#outcomeOf</IRI>
+        <Literal xml:lang="en">output of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ownedBy</IRI>
+        <Literal xml:lang="en">owned by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#ownedBy</IRI>
+        <Literal xml:lang="fr">possédé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#owns</IRI>
+        <Literal xml:lang="en">owns</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#owns</IRI>
+        <Literal xml:lang="fr">possède</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#partOf</IRI>
+        <Literal xml:lang="en">part of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#partOf</IRI>
+        <Literal xml:lang="fr">partie de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#partOriginOf</IRI>
+        <Literal xml:lang="en">part of origin (source) utilisée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#partOriginOf</IRI>
+        <Literal xml:lang="fr">partie de la source utilisée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#paymentMethodProvider</IRI>
+        <Literal xml:lang="fr">fournisseur de la méthode de paiement</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#paymentMethodProvider</IRI>
+        <Literal xml:lang="en">payment method provider</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#paymentMethodType</IRI>
+        <Literal xml:lang="en">payment method type</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#paymentMethodType</IRI>
+        <Literal xml:lang="fr">type de méthode de paiement</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#phoneNumber</IRI>
+        <Literal xml:lang="fr">numéro de téléphone</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#phoneNumber</IRI>
+        <Literal xml:lang="en">phone number</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#physicalCharacteristics</IRI>
+        <Literal xml:lang="fr">charactéristique physique</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#physicalCharacteristics</IRI>
+        <Literal xml:lang="en">physical characteristics</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#postcode</IRI>
+        <Literal xml:lang="fr">code postal</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#postcode</IRI>
+        <Literal xml:lang="en">post code</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#price</IRI>
+        <Literal xml:lang="en">price</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#price</IRI>
+        <Literal xml:lang="fr">prix</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#processOf</IRI>
+        <Literal xml:lang="en">process of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#processOf</IRI>
+        <Literal xml:lang="fr">procédé utilisé pour</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#producedBy</IRI>
+        <Literal xml:lang="en">produced by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#producedBy</IRI>
+        <Literal xml:lang="fr">produit par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#produces</IRI>
+        <Literal xml:lang="en">produces</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#produces</IRI>
+        <Literal xml:lang="fr">produit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#productionDate</IRI>
+        <Literal xml:lang="fr">date de production</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#productionDate</IRI>
+        <Literal xml:lang="en">production date</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#proposedBy</IRI>
+        <Literal xml:lang="en">proposed by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#proposedBy</IRI>
+        <Literal xml:lang="fr">proposé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#proposes</IRI>
+        <Literal xml:lang="fr">propose</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#proposes</IRI>
+        <Literal xml:lang="en">proposes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#quantity</IRI>
+        <Literal xml:lang="en">quantity</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#quantity</IRI>
+        <Literal xml:lang="fr">quantité</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#referenceOf</IRI>
+        <Literal xml:lang="en">reference of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#referenceOf</IRI>
+        <Literal xml:lang="fr">référence de</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#referencedBy</IRI>
+        <Literal xml:lang="en">referenced by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#referencedBy</IRI>
+        <Literal xml:lang="fr">référencé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#references</IRI>
+        <Literal xml:lang="en">references</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#references</IRI>
+        <Literal xml:lang="fr">référence</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#refersTo</IRI>
+        <Literal xml:lang="fr">fait référence à</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#refersTo</IRI>
+        <Literal xml:lang="en">refers to</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#representedBy</IRI>
+        <Literal xml:lang="en">represented by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#representedBy</IRI>
+        <Literal xml:lang="fr">représenté par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#represents</IRI>
+        <Literal xml:lang="en">represents</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#represents</IRI>
+        <Literal xml:lang="fr">représente</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#requestedBy</IRI>
+        <Literal xml:lang="fr">demandé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#requestedBy</IRI>
+        <Literal xml:lang="en">requested by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#requests</IRI>
+        <Literal xml:lang="fr">demande</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#requests</IRI>
+        <Literal xml:lang="en">requests</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#satisfiedBy</IRI>
+        <Literal xml:lang="fr">satisfait par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#satisfiedBy</IRI>
+        <Literal xml:lang="en">satisfied by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#satisfies</IRI>
+        <Literal xml:lang="fr">satisfait</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#satisfies</IRI>
+        <Literal xml:lang="en">satisfies</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#selects</IRI>
+        <Literal xml:lang="en">selects</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#selects</IRI>
+        <Literal xml:lang="fr">sélectionne</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#sku</IRI>
+        <Literal xml:lang="en">Only a general &quot;SKU&quot; id is proposed for now. Agents using GTIN could use GTIN as SKU but other IDs than GTIN can be used.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#sku</IRI>
+        <Literal xml:lang="fr">Référence produit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#sku</IRI>
+        <Literal xml:lang="en">SKU</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#startDate</IRI>
+        <Literal xml:lang="fr">Date de début</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#startDate</IRI>
+        <Literal xml:lang="en">Start date</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#stockLimitation</IRI>
+        <Literal xml:lang="fr">limitation de stock</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#stockLimitation</IRI>
+        <Literal xml:lang="en">stock limitation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#storedIn</IRI>
+        <Literal xml:lang="fr">stocké dans</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#storedIn</IRI>
+        <Literal xml:lang="en">stored in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#stores</IRI>
+        <Literal xml:lang="fr">stocke</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#stores</IRI>
+        <Literal xml:lang="en">stores</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#street</IRI>
+        <Literal xml:lang="fr">n°, rue</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#street</IRI>
+        <Literal xml:lang="en">street, n°</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#suppliedBy</IRI>
+        <Literal xml:lang="fr">fourni par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#suppliedBy</IRI>
+        <Literal xml:lang="en">supplied by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#supplies</IRI>
+        <Literal xml:lang="fr">fournit</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#supplies</IRI>
+        <Literal xml:lang="en">supplies</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#to</IRI>
+        <Literal xml:lang="en">to</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#to</IRI>
+        <Literal xml:lang="fr">à</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#totalTheoriticalStock</IRI>
+        <Literal xml:lang="fr">stock theorique total</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#totalTheoriticalStock</IRI>
+        <Literal xml:lang="en">total theoretical stock</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#tracedBy</IRI>
+        <Literal xml:lang="en">contained in</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#tracedBy</IRI>
+        <Literal xml:lang="fr">contenu dans</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#traces</IRI>
+        <Literal xml:lang="en">contains</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#traces</IRI>
+        <Literal xml:lang="fr">contient</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#transformedBy</IRI>
+        <Literal xml:lang="en">transformed by</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#transformedBy</IRI>
+        <Literal xml:lang="fr">transformé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#transforms</IRI>
+        <Literal xml:lang="fr">transforme</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#transforms</IRI>
+        <Literal xml:lang="en">transforms</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#typeOf</IRI>
+        <Literal xml:lang="en">type of</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#typeOf</IRI>
+        <Literal xml:lang="fr">type pour</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#uses</IRI>
+        <Literal xml:lang="en">uses</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#uses</IRI>
+        <Literal xml:lang="fr">utilise</Literal>
+    </AnnotationAssertion>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi -->

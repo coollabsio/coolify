@@ -1,0 +1,73 @@
+{
+    "@context": {
+        "doap": "http://usefulinc.com/ns/doap#",
+        "foaf": "http://xmlns.com/foaf/0.1/",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "doap:description": {
+            "@id": "doap:description",
+            "@container": "@language"
+        },
+        "doap:shortdesc": {
+            "@id": "doap:shortdesc",
+            "@container": "@language"
+        }
+    },
+    "@type": "doap:Project",
+    "doap:name": "Epicyon",
+    "doap:homepage": "https://libreserver.org/epicyon",
+    "doap:description": {
+        "en": "ActivityPub server with no javascript and suitable for self-hosting, designed for simplicity and accessibility. Includes calendar, news and sharing economy features to empower your federated community."
+    },
+    "doap:shortdesc": {
+        "en": "ActivityPub server, designed for simplicity and accessibility. Includes calendar, news and sharing economy features to empower your federated community."
+    },
+    "doap:created": "2019-06-28",
+    "doap:logo": "https://gitlab.com/bashrc2/epicyon/-/raw/main/img/logo.png",
+    "doap:screenshots": [
+        "https://user-content.gitlab-static.net/2fc2b7285d5d12e39341ac274b5f3ff9fef5d5ae/68747470733a2f2f6c696272657365727665722e6f72672f65706963796f6e2f696d672f73637265656e73686f742d74696d656c696e652e77656270",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-calendar.png",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-lynx-inbox.png",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-media.jpg",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-new-post.png",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-new-share.png",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-profile.jpg",
+        "https://gitlab.com/bashrc2/epicyon/-/raw/main/manual/manual-search.jpg"
+    ],
+    "doap:category": [
+    ],
+    "doap:repository": {
+        "@type": "doap:GitRepository",
+        "doap:browse": "https://gitlab.com/bashrc2/epicyon",
+        "doap:location": "https://gitlab.com/bashrc2/epicyon.git"
+    },
+    "doap:release": {
+        "@type": "doap:Version",
+        "doap:created": "2024-01-22",
+        "doap:name": "v1.5.0",
+        "doap:revision": "1.5.0"
+    },
+    "doap:maintainer": [
+        {
+            "@type": "foaf:Person",
+            "foaf:name": "Bob Mottram",
+            "foaf:homepage": "https://gitlab.com/bashrc2"
+        }
+    ],
+    "doap:implements": [
+        "https://gitlab.com/bashrc2/epicyon/-/blob/main/specification/activitypub.md"
+    ],
+    "doap:supportedFEPs": [
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/c648/fep-c648.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/521a/fep-521a.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/8fcf/fep-8fcf.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/4ccd/fep-4ccd.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/c118/fep-c118.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/fffd/fep-fffd.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/1970/fep-1970.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/0837/fep-0837.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/7628/fep-7628.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/2677/fep-2677.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/5e53/fep-5e53.md",
+        "https://codeberg.org/fediverse/fep/src/branch/main/fep/eb48/fep-eb48.md"
+    ]
+}

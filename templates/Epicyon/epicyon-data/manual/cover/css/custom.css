@@ -1,0 +1,195 @@
+/* fredericka-the-great-regular - latin */
+@font-face {
+  font-family: 'Fredericka the Great';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/fredericka-the-great-v10-latin-regular.eot'); /* IE9 Compat Modes */
+  src: local(''),
+       url('../fonts/fredericka-the-great-v10-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+       url('../fonts/fredericka-the-great-v10-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
+       url('../fonts/fredericka-the-great-v10-latin-regular.woff') format('woff'), /* Modern Browsers */
+       url('../fonts/fredericka-the-great-v10-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
+       url('../fonts/fredericka-the-great-v10-latin-regular.svg#FrederickatheGreat') format('svg'); /* Legacy iOS */
+}
+
+/* montserrat-regular - latin */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/montserrat-v18-latin-regular.eot'); /* IE9 Compat Modes */
+  src: local(''),
+       url('../fonts/montserrat-v18-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+       url('../fonts/montserrat-v18-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
+       url('../fonts/montserrat-v18-latin-regular.woff') format('woff'), /* Modern Browsers */
+       url('../fonts/montserrat-v18-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
+       url('../fonts/montserrat-v18-latin-regular.svg#Montserrat') format('svg'); /* Legacy iOS */
+}
+
+
+body {
+	margin: 0;
+	background-color: rgb(92,92,91);
+	display: flex;
+	flex-wrap: wrap;
+}
+
+section {
+	width: 100%;
+}
+
+img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.display {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex-wrap: wrap;
+	padding: 5% 10%;
+	background-color: darkgrey;
+}
+
+.front {
+	position: relative;
+	width: 500px;
+}
+
+.front::before {
+	position: absolute;
+	content: "";
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(169.2deg,rgba(0,0,0,.5) 75%,rgba(255,255,255,.5) 91%),linear-gradient(169.2deg,rgba(0,0,0,.5) 15%,rgba(255,255,255,.5) 64%);
+}
+
+.front .thumbnail {
+	height: 700px;
+	background-image: url(../img/front.jpg);
+	background-repeat: no-repeat;
+	background-size: cover;
+	box-shadow: 15px 10px 15px lightgrey;
+}
+
+.sidebar {
+	background-color: #1bd;
+	width: 4%;
+	height: 700px;
+	font-family: 'Gruppo',cursive;
+	display: flex;
+	justify-content: space-evenly;
+	flex-direction: column;
+}
+
+.sidebar span {
+	display: block;
+	color: #000;
+	text-transform: uppercase;
+	font-weight: 900;
+	text-align: center;
+	margin: 10px 0;
+	text-shadow: 0 6px 8px #000;
+	font-size: 20px;
+}
+
+.down {
+	margin-top: 10px;
+}
+
+.content {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	font-family: 'Montserrat',sans-serif;
+	text-align: center;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-direction: column;
+}
+
+.front .content .title {
+	color: white;
+	text-transform: capitalize;
+	text-shadow: 0 5px 15px #000;
+	font-family: 'Fredericka the Great',cursive;
+	font-size: 40px;
+	margin-top: 30px;
+}
+
+.front .content .subtitle {
+	font-family: 'Montserrat',sans-serif;
+	color: #fff;
+	text-transform: uppercase;
+	font-size: 10px;
+	letter-spacing: 1.5px;
+}
+
+.front .content .author {
+	font-family: 'Montserrat',sans-serif;
+	color: black;
+	letter-spacing: 5px;
+	font-weight: 900;
+	text-transform: uppercase;
+	font-size: 10px;
+}
+
+.front .footer {
+	text-transform: uppercase;
+	color: black;
+	font-size: 8px;
+	margin: 30px;
+	font-weight: 900;
+}
+
+.header {
+	margin-top: 25px;
+	padding: 20px;
+}
+.header img.logoImage {
+	  width: 90%;
+	  object-fit: scale-down;
+}
+
+.logo {
+	width: 25px;
+	height: 25px;
+}
+
+.bar {
+	width: 80px;
+	height: 80px;
+}
+
+.color {
+	color: #000;
+}
+
+
+
+@media screen and (max-width:1367px) {
+	section {
+		width: 100%;
+	}
+
+	.display {
+		padding: 20% 2%;
+	}
+
+	.sidebar {
+		display: none;
+	}
+
+	.front .thumbnail {
+		background-position: center;
+	}
+
+	.sixthcover .front .title {
+		font-size: 42px;
+	}
+}

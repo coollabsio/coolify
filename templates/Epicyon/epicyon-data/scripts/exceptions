@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep 'EX: ' > .exceptions.txt
+if [ ! -f .exceptions.txt ]; then
+    echo 'No exceptions'
+else
+    cat .exceptions.txt
+fi

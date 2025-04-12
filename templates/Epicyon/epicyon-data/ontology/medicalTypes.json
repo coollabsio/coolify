@@ -1,0 +1,2114 @@
+{
+  "@context": {
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "dfc-b": "http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#",
+    "dfc-p": "http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#",
+    "dfc-t": "http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#",
+    "dfc-u": "http://static.datafoodconsortium.org/data/units.json#",
+    "dfc-p:specialize": {
+      "@type": "@id"
+    }
+  },
+  "@graph": [
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#gas-mask",
+      "rdfs:label": [
+        {
+          "@value": "Gas Mask",
+          "@language": "en"
+        },
+        {
+          "@value": "Gas Mask",
+          "@language": "ar"
+        },
+        {
+          "@value": "Gas Mask",
+          "@language": "ku"
+        },
+        {
+          "@value": "Mascara de gas",
+          "@language": "es"
+        },
+        {
+          "@value": "Maschera di gas",
+          "@language": "it"
+        },
+        {
+          "@value": "Gasmaske",
+          "@language": "de"
+        },
+        {
+          "@value": "Gas Mask",
+          "@language": "sw"
+        },
+        {
+          "@value": "Máscara de gás",
+          "@language": "pt"
+        },
+        {
+          "@value": "Gas Mask",
+          "@language": "oc"
+        },
+        {
+          "@value": "Газовая маска",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gas Mask",
+          "@language": "cy"
+        },
+        {
+          "@value": "ガスマスク",
+          "@language": "ja"
+        },
+        {
+          "@value": "Gáis Masc",
+          "@language": "ga"
+        },
+        {
+          "@value": "गैस मास्क",
+          "@language": "hi"
+        },
+        {
+          "@value": "Gs Mask",
+          "@language": "zh"
+        },
+        {
+          "@value": "Masque de gaz",
+          "@language": "fr"
+        },
+        {
+          "@value": "Gas Mask",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#body-protection",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#gas-mask-filter",
+      "rdfs:label": [
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "en"
+        },
+        {
+          "@value": "مقصورة ماسك",
+          "@language": "ar"
+        },
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "ku"
+        },
+        {
+          "@value": "Filtro de máscara de gas",
+          "@language": "es"
+        },
+        {
+          "@value": "Filtro della maschera di gas",
+          "@language": "it"
+        },
+        {
+          "@value": "Gasmaske Filter",
+          "@language": "de"
+        },
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "sw"
+        },
+        {
+          "@value": "Filtro de máscara de gás",
+          "@language": "pt"
+        },
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "oc"
+        },
+        {
+          "@value": "Газовая Маска Фильтр",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "cy"
+        },
+        {
+          "@value": "ガス マスク フィルター",
+          "@language": "ja"
+        },
+        {
+          "@value": "Gáis Scagaire Masc",
+          "@language": "ga"
+        },
+        {
+          "@value": "गैस मास्क फ़िल्टर",
+          "@language": "hi"
+        },
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "zh"
+        },
+        {
+          "@value": "Filtre à masque de gaz",
+          "@language": "fr"
+        },
+        {
+          "@value": "Gas Mask Filter",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#body-protection",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "rdfs:label": [
+        {
+          "@value": "Bandages",
+          "@language": "en"
+        },
+        {
+          "@value": "الفرق",
+          "@language": "ar"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "ku"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "es"
+        },
+        {
+          "@value": "Bandiere",
+          "@language": "it"
+        },
+        {
+          "@value": "Bandagen",
+          "@language": "de"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "sw"
+        },
+        {
+          "@value": "Bandas",
+          "@language": "pt"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "oc"
+        },
+        {
+          "@value": "Бандажи",
+          "@language": "ru"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "cy"
+        },
+        {
+          "@value": "バンド",
+          "@language": "ja"
+        },
+        {
+          "@value": "Bannaí",
+          "@language": "ga"
+        },
+        {
+          "@value": "बंद",
+          "@language": "hi"
+        },
+        {
+          "@value": "优点",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "fr"
+        },
+        {
+          "@value": "Bandages",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#gauze-wrap",
+      "rdfs:label": [
+        {
+          "@value": "Gauze Wrap",
+          "@language": "en"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "ar"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "ku"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "es"
+        },
+        {
+          "@value": "Avvolto di Gauze",
+          "@language": "it"
+        },
+        {
+          "@value": "Würmer",
+          "@language": "de"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "sw"
+        },
+        {
+          "@value": "Envoltório de Gauze",
+          "@language": "pt"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "oc"
+        },
+        {
+          "@value": "Gauze Обертка",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "cy"
+        },
+        {
+          "@value": "ガーゼラップ",
+          "@language": "ja"
+        },
+        {
+          "@value": "cliceáil grianghraf a mhéadú",
+          "@language": "ga"
+        },
+        {
+          "@value": "Gauze लपेटें",
+          "@language": "hi"
+        },
+        {
+          "@value": "Guze Wrap",
+          "@language": "zh"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "fr"
+        },
+        {
+          "@value": "Gauze Wrap",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#gauze-pad",
+      "rdfs:label": [
+        {
+          "@value": "Gauze Pad",
+          "@language": "en"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "ar"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "ku"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "es"
+        },
+        {
+          "@value": "Pad di Gauze",
+          "@language": "it"
+        },
+        {
+          "@value": "STRUKTUR-Pad",
+          "@language": "de"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "sw"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "pt"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "oc"
+        },
+        {
+          "@value": "Gauze Пад",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "cy"
+        },
+        {
+          "@value": "ガーゼパッド",
+          "@language": "ja"
+        },
+        {
+          "@value": "Monaróir a tháirgtear: Uimh",
+          "@language": "ga"
+        },
+        {
+          "@value": "गौज पैड",
+          "@language": "hi"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "zh"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "fr"
+        },
+        {
+          "@value": "Gauze Pad",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#nonstick-pad",
+      "rdfs:label": [
+        {
+          "@value": "Nonstick Pad",
+          "@language": "en"
+        },
+        {
+          "@value": "بدل غير ثابت",
+          "@language": "ar"
+        },
+        {
+          "@value": "Nonstick Pad",
+          "@language": "ku"
+        },
+        {
+          "@value": "Pasillo de pie",
+          "@language": "es"
+        },
+        {
+          "@value": "Pad antiaderente",
+          "@language": "it"
+        },
+        {
+          "@value": "Antihaft-Pad",
+          "@language": "de"
+        },
+        {
+          "@value": "Nonstick Pad",
+          "@language": "sw"
+        },
+        {
+          "@value": "Almofada de Nonstick",
+          "@language": "pt"
+        },
+        {
+          "@value": "Nonstick Pad",
+          "@language": "oc"
+        },
+        {
+          "@value": "Nonstick Pad",
+          "@language": "ru"
+        },
+        {
+          "@value": "Nonstick Pad",
+          "@language": "cy"
+        },
+        {
+          "@value": "ノンスティックパッド",
+          "@language": "ja"
+        },
+        {
+          "@value": "Pad Neamh-Glasáil",
+          "@language": "ga"
+        },
+        {
+          "@value": "नॉनस्टिक पैड",
+          "@language": "hi"
+        },
+        {
+          "@value": "非物质帕德",
+          "@language": "zh"
+        },
+        {
+          "@value": "Cadeau antiadhésif",
+          "@language": "fr"
+        },
+        {
+          "@value": "Nonstick Pad",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#triangle-bandage",
+      "rdfs:label": [
+        {
+          "@value": "Triangle Bandage",
+          "@language": "en"
+        },
+        {
+          "@value": "المثلث",
+          "@language": "ar"
+        },
+        {
+          "@value": "Triangle Bandage",
+          "@language": "ku"
+        },
+        {
+          "@value": "Bandage de triángulo",
+          "@language": "es"
+        },
+        {
+          "@value": "Bandatura del triangolo",
+          "@language": "it"
+        },
+        {
+          "@value": "Triangle Bandage",
+          "@language": "de"
+        },
+        {
+          "@value": "Triangle Bandage",
+          "@language": "sw"
+        },
+        {
+          "@value": "Bandagem de triângulo",
+          "@language": "pt"
+        },
+        {
+          "@value": "Triangle Bandage",
+          "@language": "oc"
+        },
+        {
+          "@value": "Треугольный бандаж",
+          "@language": "ru"
+        },
+        {
+          "@value": "Triangle Bandage",
+          "@language": "cy"
+        },
+        {
+          "@value": "三角形の包帯",
+          "@language": "ja"
+        },
+        {
+          "@value": "Banna Triantán",
+          "@language": "ga"
+        },
+        {
+          "@value": "त्रिभुज पट्टी",
+          "@language": "hi"
+        },
+        {
+          "@value": "特里格勒·巴迪",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bande de triangles",
+          "@language": "fr"
+        },
+        {
+          "@value": "Triangle Bandage",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#wound-closure-strip",
+      "rdfs:label": [
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "en"
+        },
+        {
+          "@value": "قطاع الإغلاق",
+          "@language": "ar"
+        },
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "ku"
+        },
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "es"
+        },
+        {
+          "@value": "Striscia di chiusura in tessuto",
+          "@language": "it"
+        },
+        {
+          "@value": "Wound Closing Streifen",
+          "@language": "de"
+        },
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "sw"
+        },
+        {
+          "@value": "Faixa de fechamento de ferida",
+          "@language": "pt"
+        },
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шум закрытие Strip",
+          "@language": "ru"
+        },
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "cy"
+        },
+        {
+          "@value": "傷の閉鎖のストリップ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Clúdaigh Wound Stiall",
+          "@language": "ga"
+        },
+        {
+          "@value": "घाव बंद करने वाली पट्टी",
+          "@language": "hi"
+        },
+        {
+          "@value": "妇女的关闭",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bande de fermeture laine",
+          "@language": "fr"
+        },
+        {
+          "@value": "Wound Closure Strip",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#paper-tape",
+      "rdfs:label": [
+        {
+          "@value": "Paper Tape",
+          "@language": "en"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "ar"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "ku"
+        },
+        {
+          "@value": "Tapa de papel",
+          "@language": "es"
+        },
+        {
+          "@value": "Nastro di carta",
+          "@language": "it"
+        },
+        {
+          "@value": "Papierband",
+          "@language": "de"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "sw"
+        },
+        {
+          "@value": "Fita de papel",
+          "@language": "pt"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "oc"
+        },
+        {
+          "@value": "Бумажная лента",
+          "@language": "ru"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "cy"
+        },
+        {
+          "@value": "ペーパー テープ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Páipéar Téip",
+          "@language": "ga"
+        },
+        {
+          "@value": "पेपर टेप",
+          "@language": "hi"
+        },
+        {
+          "@value": "论文",
+          "@language": "zh"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "fr"
+        },
+        {
+          "@value": "Paper Tape",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#tape",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#plastic-tape",
+      "rdfs:label": [
+        {
+          "@value": "Plastic Tape",
+          "@language": "en"
+        },
+        {
+          "@value": "بلاستيك تاب",
+          "@language": "ar"
+        },
+        {
+          "@value": "Plastic Tape",
+          "@language": "ku"
+        },
+        {
+          "@value": "Tapa de plástico",
+          "@language": "es"
+        },
+        {
+          "@value": "Nastro di plastica",
+          "@language": "it"
+        },
+        {
+          "@value": "Kunststoffband",
+          "@language": "de"
+        },
+        {
+          "@value": "Plastic Tape",
+          "@language": "sw"
+        },
+        {
+          "@value": "Fita de plástico",
+          "@language": "pt"
+        },
+        {
+          "@value": "Plastic Tape",
+          "@language": "oc"
+        },
+        {
+          "@value": "Пластиковые ленты",
+          "@language": "ru"
+        },
+        {
+          "@value": "Plastic Tape",
+          "@language": "cy"
+        },
+        {
+          "@value": "プラスチック テープ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Plaisteach Téip",
+          "@language": "ga"
+        },
+        {
+          "@value": "प्लास्टिक टेप",
+          "@language": "hi"
+        },
+        {
+          "@value": "Pl弹 Tape",
+          "@language": "zh"
+        },
+        {
+          "@value": "Tape en plastique",
+          "@language": "fr"
+        },
+        {
+          "@value": "Plastic Tape",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#tape",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#examination-gloves",
+      "rdfs:label": [
+        {
+          "@value": "Examination Gloves",
+          "@language": "en"
+        },
+        {
+          "@value": "امتحانات",
+          "@language": "ar"
+        },
+        {
+          "@value": "Examination Gloves",
+          "@language": "ku"
+        },
+        {
+          "@value": "Globos de examen",
+          "@language": "es"
+        },
+        {
+          "@value": "Guanti di esame",
+          "@language": "it"
+        },
+        {
+          "@value": "Prüfungshandschuhe",
+          "@language": "de"
+        },
+        {
+          "@value": "Examination Gloves",
+          "@language": "sw"
+        },
+        {
+          "@value": "Luvas de Exame",
+          "@language": "pt"
+        },
+        {
+          "@value": "Examination Gloves",
+          "@language": "oc"
+        },
+        {
+          "@value": "Обследование Перчатки",
+          "@language": "ru"
+        },
+        {
+          "@value": "Examination Gloves",
+          "@language": "cy"
+        },
+        {
+          "@value": "検査手袋",
+          "@language": "ja"
+        },
+        {
+          "@value": "Lámhleabhair na Scrúduithe",
+          "@language": "ga"
+        },
+        {
+          "@value": "परीक्षा दस्ताने",
+          "@language": "hi"
+        },
+        {
+          "@value": "考试",
+          "@language": "zh"
+        },
+        {
+          "@value": "Gloves d &apos; examen",
+          "@language": "fr"
+        },
+        {
+          "@value": "Examination Gloves",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#gloves",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#stick-on-bandage",
+      "rdfs:label": [
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "en"
+        },
+        {
+          "@value": "ستيك على باندج",
+          "@language": "ar"
+        },
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "ku"
+        },
+        {
+          "@value": "Bandage de palo",
+          "@language": "es"
+        },
+        {
+          "@value": "Bandage",
+          "@language": "it"
+        },
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "de"
+        },
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "sw"
+        },
+        {
+          "@value": "Bandagem de Stick-on",
+          "@language": "pt"
+        },
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "oc"
+        },
+        {
+          "@value": "Стик-на Bandage",
+          "@language": "ru"
+        },
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "cy"
+        },
+        {
+          "@value": "スティックオン包帯",
+          "@language": "ja"
+        },
+        {
+          "@value": "Bandage bata ar",
+          "@language": "ga"
+        },
+        {
+          "@value": "स्टिक-ऑन बैंडेज",
+          "@language": "hi"
+        },
+        {
+          "@value": "圣克-昂",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bande adhésive",
+          "@language": "fr"
+        },
+        {
+          "@value": "Stick-on Bandage",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#saline-solution",
+      "rdfs:label": [
+        {
+          "@value": "Saline Solution",
+          "@language": "en"
+        },
+        {
+          "@value": "الحلبة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "ku"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "es"
+        },
+        {
+          "@value": "Soluzione Saline",
+          "@language": "it"
+        },
+        {
+          "@value": "Saline Lösung",
+          "@language": "de"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "sw"
+        },
+        {
+          "@value": "Solução Saline",
+          "@language": "pt"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "oc"
+        },
+        {
+          "@value": "Saline решение",
+          "@language": "ru"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "cy"
+        },
+        {
+          "@value": "サラインソリューション",
+          "@language": "ja"
+        },
+        {
+          "@value": "Saline Réiteach",
+          "@language": "ga"
+        },
+        {
+          "@value": "सैलिन समाधान",
+          "@language": "hi"
+        },
+        {
+          "@value": "电话:",
+          "@language": "zh"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "fr"
+        },
+        {
+          "@value": "Saline Solution",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#fluid",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#antibiotic-ointment",
+      "rdfs:label": [
+        {
+          "@value": "Antibiotic Ointment",
+          "@language": "en"
+        },
+        {
+          "@value": "مضادات حيوية",
+          "@language": "ar"
+        },
+        {
+          "@value": "Antibiotic Ointment",
+          "@language": "ku"
+        },
+        {
+          "@value": "Ungüento antibiótico",
+          "@language": "es"
+        },
+        {
+          "@value": "Unguento antibiotico",
+          "@language": "it"
+        },
+        {
+          "@value": "Antibiotische Salbe",
+          "@language": "de"
+        },
+        {
+          "@value": "Antibiotic Ointment",
+          "@language": "sw"
+        },
+        {
+          "@value": "Pomada antibiótica",
+          "@language": "pt"
+        },
+        {
+          "@value": "Antibiotic Ointment",
+          "@language": "oc"
+        },
+        {
+          "@value": "Антибиотический мазь",
+          "@language": "ru"
+        },
+        {
+          "@value": "Antibiotic Ointment",
+          "@language": "cy"
+        },
+        {
+          "@value": "抗生物質軟膏",
+          "@language": "ja"
+        },
+        {
+          "@value": "An bhfuil a fhios agat na buntáistí a bhaineann...",
+          "@language": "ga"
+        },
+        {
+          "@value": "एंटीबायोटिक Ointment",
+          "@language": "hi"
+        },
+        {
+          "@value": "反生物组织",
+          "@language": "zh"
+        },
+        {
+          "@value": "Ointment antibiotique",
+          "@language": "fr"
+        },
+        {
+          "@value": "Antibiotic Ointment",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#medicine",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#anti-hemorrhagic-agent",
+      "rdfs:label": [
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "en"
+        },
+        {
+          "@value": "Anti-hemorrhagic العميل",
+          "@language": "ar"
+        },
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "ku"
+        },
+        {
+          "@value": "Anti-hemorrágico Agente",
+          "@language": "es"
+        },
+        {
+          "@value": "Anti-emorragico Agente",
+          "@language": "it"
+        },
+        {
+          "@value": "Antihemorrhagic Agent",
+          "@language": "de"
+        },
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "sw"
+        },
+        {
+          "@value": "Anti-hemorrágica Agente",
+          "@language": "pt"
+        },
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "oc"
+        },
+        {
+          "@value": "Анти-хеморрхагическая Агент",
+          "@language": "ru"
+        },
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "cy"
+        },
+        {
+          "@value": "反hemorrhagic エージェント",
+          "@language": "ja"
+        },
+        {
+          "@value": "Frith-sceimhlitheoireacht Gníomhaire",
+          "@language": "ga"
+        },
+        {
+          "@value": "विरोधी hemorrhagic एजेंट",
+          "@language": "hi"
+        },
+        {
+          "@value": "防治腹泻 智 利",
+          "@language": "zh"
+        },
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "fr"
+        },
+        {
+          "@value": "Anti-hemorrhagic Agent",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#fluids",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#sunblock",
+      "rdfs:label": [
+        {
+          "@value": "Sunblock",
+          "@language": "en"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "ar"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "ku"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "es"
+        },
+        {
+          "@value": "Blocco solare",
+          "@language": "it"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "de"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "sw"
+        },
+        {
+          "@value": "Bloqueio solar",
+          "@language": "pt"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "oc"
+        },
+        {
+          "@value": "Солнцеблок",
+          "@language": "ru"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "cy"
+        },
+        {
+          "@value": "サンブロック",
+          "@language": "ja"
+        },
+        {
+          "@value": "ghrian nochtadh: leath-scáth",
+          "@language": "ga"
+        },
+        {
+          "@value": "सनब्लॉक",
+          "@language": "hi"
+        },
+        {
+          "@value": "日 锁",
+          "@language": "zh"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "fr"
+        },
+        {
+          "@value": "Sunblock",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#body-protection",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandage-shears",
+      "rdfs:label": [
+        {
+          "@value": "Bandage Shears",
+          "@language": "en"
+        },
+        {
+          "@value": "مفارز الزينة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "ku"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "es"
+        },
+        {
+          "@value": "Cesoie di fasciatura",
+          "@language": "it"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "de"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "sw"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "pt"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "oc"
+        },
+        {
+          "@value": "Бандаж Шэрс",
+          "@language": "ru"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "cy"
+        },
+        {
+          "@value": "包帯のせん断",
+          "@language": "ja"
+        },
+        {
+          "@value": "Seirbhís do Chustaiméirí",
+          "@language": "ga"
+        },
+        {
+          "@value": "बैंडेज शीयर",
+          "@language": "hi"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "fr"
+        },
+        {
+          "@value": "Bandage Shears",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandages",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#tweezers",
+      "rdfs:label": [
+        {
+          "@value": "Tweezers",
+          "@language": "en"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "ar"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "ku"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "es"
+        },
+        {
+          "@value": "Pinzette",
+          "@language": "it"
+        },
+        {
+          "@value": "Pinzette",
+          "@language": "de"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "sw"
+        },
+        {
+          "@value": "Apertos",
+          "@language": "pt"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "oc"
+        },
+        {
+          "@value": "Твеезерс",
+          "@language": "ru"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "cy"
+        },
+        {
+          "@value": "ピンセット",
+          "@language": "ja"
+        },
+        {
+          "@value": "Seirbhís do Chustaiméirí",
+          "@language": "ga"
+        },
+        {
+          "@value": "चिमटी",
+          "@language": "hi"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "zh"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "fr"
+        },
+        {
+          "@value": "Tweezers",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#medical-tools",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#protein-bar",
+      "rdfs:label": [
+        {
+          "@value": "Protein Bar",
+          "@language": "en"
+        },
+        {
+          "@value": "Bar Protein",
+          "@language": "ar"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "ku"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "es"
+        },
+        {
+          "@value": "Bar della proteina",
+          "@language": "it"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "de"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "sw"
+        },
+        {
+          "@value": "Barra de Proteína",
+          "@language": "pt"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "oc"
+        },
+        {
+          "@value": "Protein Бар",
+          "@language": "ru"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "cy"
+        },
+        {
+          "@value": "プロテインバー",
+          "@language": "ja"
+        },
+        {
+          "@value": "Táirgí do bhfianaise faoi stiúir glan",
+          "@language": "ga"
+        },
+        {
+          "@value": "प्रोटीन बार",
+          "@language": "hi"
+        },
+        {
+          "@value": "B. Protein Bar",
+          "@language": "zh"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "fr"
+        },
+        {
+          "@value": "Protein Bar",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#energy",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#bandanna",
+      "rdfs:label": [
+        {
+          "@value": "Bandanna",
+          "@language": "en"
+        },
+        {
+          "@value": "باندانا",
+          "@language": "ar"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "ku"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "es"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "it"
+        },
+        {
+          "@value": "Das ist eine gute Idee.",
+          "@language": "de"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "sw"
+        },
+        {
+          "@value": "Ligação",
+          "@language": "pt"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "oc"
+        },
+        {
+          "@value": "Банданна",
+          "@language": "ru"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "cy"
+        },
+        {
+          "@value": "バンドナ",
+          "@language": "ja"
+        },
+        {
+          "@value": "An tSraith Shinsearach",
+          "@language": "ga"
+        },
+        {
+          "@value": "बांदाना",
+          "@language": "hi"
+        },
+        {
+          "@value": "班达纳",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "fr"
+        },
+        {
+          "@value": "Bandanna",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#body-protection",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#water-bottle",
+      "rdfs:label": [
+        {
+          "@value": "Water Bottle",
+          "@language": "en"
+        },
+        {
+          "@value": "بؤرة المياه",
+          "@language": "ar"
+        },
+        {
+          "@value": "Water Bottle",
+          "@language": "ku"
+        },
+        {
+          "@value": "Botella de agua",
+          "@language": "es"
+        },
+        {
+          "@value": "Bottiglia di acqua",
+          "@language": "it"
+        },
+        {
+          "@value": "Wasserflasche",
+          "@language": "de"
+        },
+        {
+          "@value": "Water Bottle",
+          "@language": "sw"
+        },
+        {
+          "@value": "Garrafa de água",
+          "@language": "pt"
+        },
+        {
+          "@value": "Water Bottle",
+          "@language": "oc"
+        },
+        {
+          "@value": "Бутылка воды",
+          "@language": "ru"
+        },
+        {
+          "@value": "Water Bottle",
+          "@language": "cy"
+        },
+        {
+          "@value": "ウォーターボトル",
+          "@language": "ja"
+        },
+        {
+          "@value": "Buidéal Uisce",
+          "@language": "ga"
+        },
+        {
+          "@value": "पानी की बोतल",
+          "@language": "hi"
+        },
+        {
+          "@value": "水土",
+          "@language": "zh"
+        },
+        {
+          "@value": "Bouteille d &apos; eau",
+          "@language": "fr"
+        },
+        {
+          "@value": "Water Bottle",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#fluids",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#ice-pack",
+      "rdfs:label": [
+        {
+          "@value": "Ice Pack",
+          "@language": "en"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "ar"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "ku"
+        },
+        {
+          "@value": "Paquete de hielo",
+          "@language": "es"
+        },
+        {
+          "@value": "Pacchetto ghiaccio",
+          "@language": "it"
+        },
+        {
+          "@value": "Eispaket",
+          "@language": "de"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "sw"
+        },
+        {
+          "@value": "Pacote de gelo",
+          "@language": "pt"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "oc"
+        },
+        {
+          "@value": "Ледовый пакет",
+          "@language": "ru"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "cy"
+        },
+        {
+          "@value": "アイスパック",
+          "@language": "ja"
+        },
+        {
+          "@value": "Pacáiste Oighear",
+          "@language": "ga"
+        },
+        {
+          "@value": "आइस पैक",
+          "@language": "hi"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "zh"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "fr"
+        },
+        {
+          "@value": "Ice Pack",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#anti-inflamatory",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#messenger-bag",
+      "rdfs:label": [
+        {
+          "@value": "Messenger Bag",
+          "@language": "en"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "ar"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "ku"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "es"
+        },
+        {
+          "@value": "Borsa Messenger",
+          "@language": "it"
+        },
+        {
+          "@value": "Tasche für die Reise",
+          "@language": "de"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "sw"
+        },
+        {
+          "@value": "Bolsa de mensageiro",
+          "@language": "pt"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "oc"
+        },
+        {
+          "@value": "Сумка Messenger",
+          "@language": "ru"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "cy"
+        },
+        {
+          "@value": "メッセンジャーバッグ",
+          "@language": "ja"
+        },
+        {
+          "@value": "mála láimhe",
+          "@language": "ga"
+        },
+        {
+          "@value": "मेसेंजर बैग",
+          "@language": "hi"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "zh"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "fr"
+        },
+        {
+          "@value": "Messenger Bag",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#bag",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#glucose-tablets",
+      "rdfs:label": [
+        {
+          "@value": "Glucose tablets",
+          "@language": "en"
+        },
+        {
+          "@value": "أقراص غلوكوز",
+          "@language": "ar"
+        },
+        {
+          "@value": "Glucose tablets",
+          "@language": "ku"
+        },
+        {
+          "@value": "tabletas de glucosa",
+          "@language": "es"
+        },
+        {
+          "@value": "Compresse di glucosio",
+          "@language": "it"
+        },
+        {
+          "@value": "Glucose-Tabletten",
+          "@language": "de"
+        },
+        {
+          "@value": "Glucose tablets",
+          "@language": "sw"
+        },
+        {
+          "@value": "Comprimidos de glicose",
+          "@language": "pt"
+        },
+        {
+          "@value": "Glucose tablets",
+          "@language": "oc"
+        },
+        {
+          "@value": "Глюкозы таблетки",
+          "@language": "ru"
+        },
+        {
+          "@value": "Glucose tablets",
+          "@language": "cy"
+        },
+        {
+          "@value": "グルコース錠",
+          "@language": "ja"
+        },
+        {
+          "@value": "táibléad glúcóis",
+          "@language": "ga"
+        },
+        {
+          "@value": "ग्लूकोज़ टैबलेट",
+          "@language": "hi"
+        },
+        {
+          "@value": "Glucose 表",
+          "@language": "zh"
+        },
+        {
+          "@value": "comprimés de Glucose",
+          "@language": "fr"
+        },
+        {
+          "@value": "Glucose tablets",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#energy",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#liquid-antacid-water-mixture",
+      "rdfs:label": [
+        {
+          "@value": "Liquid Antacid Water Mixture",
+          "@language": "en"
+        },
+        {
+          "@value": "تركيبة المياه السائلة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Liquid Antacid Water Mixture",
+          "@language": "ku"
+        },
+        {
+          "@value": "Mezcla de agua de antácidos líquidos",
+          "@language": "es"
+        },
+        {
+          "@value": "Miscela ad acqua liquido",
+          "@language": "it"
+        },
+        {
+          "@value": "Flüssige Antacid Wassermischung",
+          "@language": "de"
+        },
+        {
+          "@value": "Liquid Antacid Water Mixture",
+          "@language": "sw"
+        },
+        {
+          "@value": "Misturador de água antagonida líquido",
+          "@language": "pt"
+        },
+        {
+          "@value": "Liquid Antacid Water Mixture",
+          "@language": "oc"
+        },
+        {
+          "@value": "Жидкость Antacid Water Mixture",
+          "@language": "ru"
+        },
+        {
+          "@value": "Liquid Antacid Water Mixture",
+          "@language": "cy"
+        },
+        {
+          "@value": "液体のAntacid水混合物",
+          "@language": "ja"
+        },
+        {
+          "@value": "Meascthóir Uisce Antacid leachtach",
+          "@language": "ga"
+        },
+        {
+          "@value": "तरल Antacid जल मिश्रण",
+          "@language": "hi"
+        },
+        {
+          "@value": "液体Atacid Water Mixture",
+          "@language": "zh"
+        },
+        {
+          "@value": "Mélange d &apos; eau antacidique liquide",
+          "@language": "fr"
+        },
+        {
+          "@value": "Liquid Antacid Water Mixture",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#fluids",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#re-hydration-mixture",
+      "rdfs:label": [
+        {
+          "@value": "Re-hydration Mixture",
+          "@language": "en"
+        },
+        {
+          "@value": "إعادة التهوية الاختلاط",
+          "@language": "ar"
+        },
+        {
+          "@value": "Re-hydration Mixture",
+          "@language": "ku"
+        },
+        {
+          "@value": "Rehidratación Mezcla",
+          "@language": "es"
+        },
+        {
+          "@value": "Reidratazione Miscela",
+          "@language": "it"
+        },
+        {
+          "@value": "Rehydrierung Mischung",
+          "@language": "de"
+        },
+        {
+          "@value": "Re-hydration Mixture",
+          "@language": "sw"
+        },
+        {
+          "@value": "Re-hidratação Mistura",
+          "@language": "pt"
+        },
+        {
+          "@value": "Re-hydration Mixture",
+          "@language": "oc"
+        },
+        {
+          "@value": "Ре-гидация Смесь",
+          "@language": "ru"
+        },
+        {
+          "@value": "Re-hydration Mixture",
+          "@language": "cy"
+        },
+        {
+          "@value": "再水分補給 ミックスチャー",
+          "@language": "ja"
+        },
+        {
+          "@value": "Ath-hiodráitiú Meascthóir",
+          "@language": "ga"
+        },
+        {
+          "@value": "पुनर्जलीकरण मिश्रण",
+          "@language": "hi"
+        },
+        {
+          "@value": "重新计算 固定",
+          "@language": "zh"
+        },
+        {
+          "@value": "Réhydratation Mixture",
+          "@language": "fr"
+        },
+        {
+          "@value": "Re-hydration Mixture",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#fluids",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#ear-plugs",
+      "rdfs:label": [
+        {
+          "@value": "Ear Plugs",
+          "@language": "en"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "ar"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "ku"
+        },
+        {
+          "@value": "Plugs de oído",
+          "@language": "es"
+        },
+        {
+          "@value": "Spine per orecchie",
+          "@language": "it"
+        },
+        {
+          "@value": "Ohrstecker",
+          "@language": "de"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "sw"
+        },
+        {
+          "@value": "Plugs de ouvido",
+          "@language": "pt"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "oc"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "ru"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "cy"
+        },
+        {
+          "@value": "イヤープラグ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Seirbhís do Chustaiméirí",
+          "@language": "ga"
+        },
+        {
+          "@value": "कान प्लग",
+          "@language": "hi"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "zh"
+        },
+        {
+          "@value": "Plugs d'oreille",
+          "@language": "fr"
+        },
+        {
+          "@value": "Ear Plugs",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#body-protection",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/medicalTypes.json#cpr-mask",
+      "rdfs:label": [
+        {
+          "@value": "CPR Mask",
+          "@language": "en"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "ar"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "ku"
+        },
+        {
+          "@value": "CPR Máscara",
+          "@language": "es"
+        },
+        {
+          "@value": "RCP Maschera",
+          "@language": "it"
+        },
+        {
+          "@value": "CPR Maske",
+          "@language": "de"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "sw"
+        },
+        {
+          "@value": "RCP Máscara",
+          "@language": "pt"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "oc"
+        },
+        {
+          "@value": "КПР Маска",
+          "@language": "ru"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "cy"
+        },
+        {
+          "@value": "CPRの特長 マスク",
+          "@language": "ja"
+        },
+        {
+          "@value": "CPR An chuid is mó",
+          "@language": "ga"
+        },
+        {
+          "@value": "सीपीआर मास्क",
+          "@language": "hi"
+        },
+        {
+          "@value": "评 注 Mask",
+          "@language": "zh"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "fr"
+        },
+        {
+          "@value": "CPR Mask",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/medicalTypes.json#mask",
+      "@type": "dfc-p:ProductType"
+    }
+  ]
+}

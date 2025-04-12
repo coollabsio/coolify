@@ -1,0 +1,331 @@
+#!/bin/bash
+
+install_destination=/opt/epicyon-onion
+username='epicyon-onion'
+
+if [[ "$1" == 'remove' ]]; then
+    echo 'Removing Epicyon onion instance'
+    systemctl stop tor
+    rm /etc/torrc.d/epicyon
+    rm -rf /var/lib/tor/hidden_service_epicyon
+    systemctl restart tor
+
+    systemctl stop "${username}.service"
+    systemctl disable "${username}.service"
+    rm "/etc/nginx/sites-enabled/${username}"
+    rm "/etc/nginx/sites-availale/${username}"
+    rm -rf ${install_destination}
+    userdel -r ${username}
+    echo 'Epicyon onion instance removed'
+    exit 0
+fi
+
+clear
+echo 'Installing Epicyon on an onion domain'
+
+NGINX_PORT=9553
+EPICYON_PORT=7157
+
+echo 'Adding Epicyon dependencies'
+if [ -f /usr/bin/pacman ]; then
+    pacman -Syy
+    pacman -S --noconfirm tor python-pip python-pysocks python-cryptography \
+           imagemagick python-pillow python-requests \
+           perl-image-exiftool python-numpy python-dateutil \
+           certbot flake8 git qrencode bandit
+    pip3 install pyqrcode pypng
+else
+    apt-get update
+    apt-get -y install imagemagick python3-cryptography \
+            python3-dateutil python3-idna python3-requests \
+            python3-numpy python3-pil.imagetk python3-pip \
+            python3-setuptools python3-socks python3-idna \
+            libimage-exiftool-perl python3-flake8 \
+            python3-django-timezone-field tor nginx git qrencode \
+            python3-pyqrcode python3-png python3-bandit
+fi
+
+if [[ "$(uname -a)" == *'Debian'* ]]; then
+    echo 'Fixing the tor daemon'
+    { echo '[Unit]';
+      echo 'Description=Anonymizing overlay network for TCP (multi-instance-master)';
+      echo '';
+      echo '[Service]';
+      echo 'Type=simple';
+      echo 'User=root';
+      echo 'Group=debian-tor';
+      echo 'ExecStart=/usr/bin/tor --defaults-torrc /usr/share/tor/tor-service-defaults-torrc -f /etc/tor/torrc --RunAsDaemon 0';
+      echo '';
+      echo '[Install]';
+      echo 'WantedBy=multi-user.target'; } > /lib/systemd/system/tor.service
+    cp /lib/systemd/system/tor.service /root/tor.service
+    systemctl daemon-reload
+    systemctl restart tor
+fi
+
+echo 'Cloning the epicyon repo'
+if [ ! -d ${install_destination} ]; then
+    git clone --depth 1 https://gitlab.com/bashrc2/epicyon ${install_destination}
+
+    if [ ! -d ${install_destination} ]; then
+        echo 'Epicyon repo failed to clone'
+        exit 3
+    fi
+fi
+
+echo 'Adding an epicyon system user account'
+if [ -f /usr/bin/pacman ]; then
+    groupadd ${username}
+    useradd --system -g ${username} --home-dir=${install_destination} $username
+    groupadd www-data
+    useradd --system -g www-data --home-dir=/srv/http www-data
+else
+    adduser --system --home=${install_destination} --group $username
+fi
+
+chown -R ${username}:${username} ${install_destination}
+
+echo 'Creating onion site configuration'
+if [ ! -d /etc/torrc.d ]; then
+    mkdir /etc/torrc.d
+fi
+if ! grep -q '%include /etc/torrc.d' /etc/tor/torrc; then
+    echo '%include /etc/torrc.d' >> /etc/tor/torrc
+    systemctl restart tor
+fi
+
+if [ ! -f /etc/torrc.d/epicyon ]; then
+    { echo 'HiddenServiceDir /var/lib/tor/hidden_service_epicyon/';
+      echo 'HiddenServiceVersion 3';
+      echo '#HiddenServicePoWDefensesEnabled 0';
+      echo "HiddenServicePort 80 127.0.0.1:${NGINX_PORT}"; } > /etc/torrc.d/epicyon
+fi
+
+systemctl restart tor
+
+echo 'Waiting for tor daemon to restart'
+
+sleep 5
+
+if [ ! -f /var/lib/tor/hidden_service_epicyon/hostname ]; then
+    echo 'Waiting for tor daemon to restart...'
+    sleep 5
+fi
+
+if [ ! -f /var/lib/tor/hidden_service_epicyon/hostname ]; then
+    echo 'Could not create onion address for epicyon'
+fi
+ONION_DOMAIN=$(cat /var/lib/tor/hidden_service_epicyon/hostname)
+if [ ! "$ONION_DOMAIN" ]; then
+    echo 'No onion domain at /var/lib/tor/hidden_service_epicyon/hostname'
+    exit 1
+fi
+echo "Onion domain created: $ONION_DOMAIN"
+
+echo 'Creating Epicyon daemon'
+{ echo '[Unit]';
+  echo "Description=$username";
+  echo 'After=syslog.target';
+  echo 'After=network.target';
+  echo '';
+  echo '[Service]';
+  echo 'Type=simple';
+  echo "User=$username";
+  echo "Group=$username";
+  echo "WorkingDirectory=${install_destination}";
+  echo "ExecStart=/usr/bin/python3 ${install_destination}/epicyon.py --http --bind 0.0.0.0 --port 80 --proxy ${EPICYON_PORT} --domain ${ONION_DOMAIN} --registration open";
+  echo "Environment=USER=$username";
+  echo 'Environment=PYTHONUNBUFFERED=true';
+  echo 'Environment=PYTHONIOENCODING=utf-8';
+  echo 'Restart=always';
+  echo 'StandardError=syslog';
+  echo 'CPUQuota=80%';
+  echo 'ProtectHome=true';
+  echo 'ProtectKernelTunables=true';
+  echo 'ProtectKernelModules=true';
+  echo 'ProtectControlGroups=true';
+  echo 'ProtectKernelLogs=true';
+  echo 'ProtectHostname=true';
+  echo 'ProtectClock=true';
+  echo 'ProtectProc=invisible';
+  echo 'ProcSubset=pid';
+  echo 'PrivateTmp=true';
+  echo 'PrivateUsers=true';
+  echo 'PrivateDevices=true';
+  echo 'PrivateIPC=true';
+  echo 'MemoryDenyWriteExecute=true';
+  echo 'NoNewPrivileges=true';
+  echo 'LockPersonality=true';
+  echo 'RestrictRealtime=true';
+  echo 'RestrictSUIDSGID=true';
+  echo 'RestrictNamespaces=true';
+  echo 'SystemCallArchitectures=native';
+  echo '';
+  echo '[Install]';
+  echo 'WantedBy=multi-user.target'; } > "/etc/systemd/system/${username}.service"
+
+systemctl daemon-reload
+systemctl enable "${username}.service"
+systemctl restart "${username}.service"
+
+echo 'Creating nginx configuration'
+if [ ! -f /etc/nginx/nginx.conf ]; then
+    { echo 'user www-data;';
+      echo 'pid /run/nginx.pid;';
+      echo '';
+      echo 'events {';
+      echo '        worker_connections 50;';
+      echo '        # multi_accept on;';
+      echo '}';
+      echo '';
+      echo 'http {';
+      echo '        # limit the number of connections per single IP';
+      echo "        limit_conn_zone \$binary_remote_addr zone=conn_limit_per_ip:10m;";
+      echo '';
+      echo '        # limit the number of requests for a given session';
+      echo "        limit_req_zone \$binary_remote_addr zone=req_limit_per_ip:10m rate=140r/s;";
+      echo '';
+      echo '        # if the request body size is more than the buffer size, then the entire (or partial) request body is written into a temporary file';
+      echo '        client_body_buffer_size  128k;';
+      echo '';
+      echo '        # headerbuffer size for the request header from client, its set for testing purpose';
+      echo '        client_header_buffer_size 3m;';
+      echo '';
+      echo '        # maximum number and size of buffers for large headers to read from client request';
+      echo '        large_client_header_buffers 4 256k;';
+      echo '';
+      echo '        # read timeout for the request body from client, its set for testing purpose';
+      echo '        client_body_timeout   3m;';
+      echo '';
+      echo '        # how long to wait for the client to send a request header, its set for testing purpose';
+      echo '        client_header_timeout 3m;';
+      echo '';
+      echo '        sendfile on;';
+      echo '        tcp_nopush on;';
+      echo '        tcp_nodelay on;';
+      echo '        keepalive_timeout 65;';
+      echo '        types_hash_max_size 2048;';
+      echo '        server_tokens off;';
+      echo '';
+      echo '        include /etc/nginx/mime.types;';
+      echo '        default_type application/octet-stream;';
+      echo '';
+      echo '        access_log /dev/null;';
+      echo '        error_log /dev/null;';
+      echo '';
+      echo '        gzip on;';
+      echo '        gzip_disable "msie6";';
+      echo '';
+      echo '        include /etc/nginx/conf.d/*.conf;';
+      echo '        include /etc/nginx/sites-enabled/*;';
+      echo '}'; } > /etc/nginx/nginx.conf
+else
+    if ! grep -q 'include /etc/nginx/sites-enabled' /etc/nginx/nginx.conf; then
+        echo 'include /etc/nginx/sites-enabled/*.conf;' >> /etc/nginx/nginx.conf
+    fi
+fi
+if [ ! -d /etc/nginx/conf.d ]; then
+    mkdir /etc/nginx/conf.d
+fi
+if [ ! -d /etc/nginx/sites-available ]; then
+    mkdir /etc/nginx/sites-available
+fi
+if [ ! -d /etc/nginx/sites-enabled ]; then
+    mkdir /etc/nginx/sites-enabled
+fi
+
+if [ -f /usr/bin/pacman ]; then
+    if [ ! -f /lib/systemd/system/nginx.service ]; then
+        echo 'Creating nginx daemon'
+        { echo '[Unit]';
+          echo 'Description=A high performance web server and a reverse proxy server';
+          echo 'Documentation=man:nginx(8)';
+          echo 'After=network.target nss-lookup.target';
+          echo ''
+          echo '[Service]';
+          echo 'Type=forking';
+          echo 'PIDFile=/run/nginx.pid';
+          echo "ExecStartPre=$(which nginx) -t -q -g 'daemon on; master_process on;'";
+          echo "ExecStart=$(which nginx) -g 'daemon on; master_process on;'";
+          echo "ExecReload=$(which nginx) -g 'daemon on; master_process on;' -s reload";
+          echo 'ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /run/nginx.pid';
+          echo 'TimeoutStopSec=5';
+          echo 'KillMode=mixed';
+          echo '';
+          echo '[Install]';
+          echo 'WantedBy=multi-user.target'; } > /etc/systemd/system/nginx.service
+        systemctl enable nginx
+    fi
+fi
+
+web_dir=/var/www
+if [ -f /usr/bin/pacman ]; then
+    web_dir=/srv/http
+fi
+if [ ! -d /var/www/${ONION_DOMAIN}/htdocs ]; then
+    mkdir -p /var/www/${ONION_DOMAIN}/htdocs
+fi
+
+echo "Creating nginx virtual host for ${ONION_DOMAIN}"
+{ echo 'server {';
+  echo "    listen 127.0.0.1:${NGINX_PORT} default_server;";
+  echo "    server_name ${ONION_DOMAIN};"
+  echo '';
+  echo '    gzip            on;';
+  echo '    gzip_min_length 1000;';
+  echo '    gzip_proxied    expired no-cache no-store private auth;';
+  echo '    gzip_types      gzip_types text/plain text/css text/vcard text/vcard+xml application/json application/ld+json application/javascript text/xml application/xml application/rdf+xml application/xml+rss text/javascript;';
+  echo '';
+  echo "    add_header Content-Security-Policy \"script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline'\";";
+  echo '    add_header X-Content-Type-Options nosniff;';
+  echo '    add_header X-XSS-Protection "1; mode=block";';
+  echo '    add_header X-Download-Options noopen;';
+  echo '    add_header X-Permitted-Cross-Domain-Policies none;';
+  echo '';
+  echo '    access_log /dev/null;';
+  echo '    error_log /dev/null;';
+  echo '';
+  echo '    index index.html;';
+  echo '';
+  echo '    location /newsmirror {';
+  echo "      root /var/www/${ONION_DOMAIN}/htdocs;";
+  echo '      try_files $uri =404;';
+  echo '    }';
+  echo '';
+  echo '    location / {';
+  echo '      proxy_http_version 1.1;';
+  echo '      client_max_body_size 31M;';
+  echo "      proxy_set_header Host \$http_host;";
+  echo "      proxy_set_header X-Real-IP \$remote_addr;";
+  echo "      proxy_set_header X-Forward-For \$proxy_add_x_forwarded_for;";
+  echo '      proxy_set_header X-Forward-Proto http;';
+  echo '      proxy_set_header X-Nginx-Proxy true;';
+  echo '      proxy_temp_file_write_size 64k;';
+  echo '      proxy_connect_timeout 10080s;';
+  echo '      proxy_send_timeout 10080;';
+  echo '      proxy_read_timeout 10080;';
+  echo '      proxy_buffer_size 64k;';
+  echo '      proxy_buffers 16 32k;';
+  echo '      proxy_busy_buffers_size 64k;';
+  echo '      proxy_redirect off;';
+  echo '      proxy_request_buffering off;';
+  echo '      proxy_buffering off;';
+  echo "      proxy_pass http://localhost:${EPICYON_PORT};";
+  echo '      tcp_nodelay on;';
+  echo '    }';
+  echo '}'; } > "/etc/nginx/sites-available/${username}"
+
+chown -R www-data:www-data /var/www/${ONION_DOMAIN}/htdocs
+if [ ! -d ${install_destination}/accounts/newsmirror ]; then
+    mkdir -p ${install_destination}/accounts/newsmirror
+    chown -R ${username}:${username} ${install_destination}
+fi
+ln -s ${install_destination}/newsmirror /var/www/${ONION_DOMAIN}/htdocs/newsmirror
+
+ln -s "/etc/nginx/sites-available/${username}" /etc/nginx/sites-enabled/
+systemctl restart nginx
+
+echo -n "$ONION_DOMAIN" | qrencode -t ANSI
+echo "Your onion Epicyon instance is now installed."
+echo "In a Tor browser navigate to $ONION_DOMAIN and register an account"
+exit 0

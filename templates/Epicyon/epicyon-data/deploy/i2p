@@ -1,0 +1,445 @@
+#!/bin/bash
+
+install_destination=/opt/epicyon-i2p
+username='epicyon-i2p'
+
+if [[ "$1" == 'remove' ]]; then
+    echo 'Removing Epicyon i2p instance'
+    systemctl stop i2pd
+    if [ -f /var/lib/i2pd/tunnels.d/epicyon ]; then
+        rm /var/lib/i2pd/tunnels.d/epicyon
+    fi
+    if [ -f /etc/i2pd/tunnels.conf.d/epicyon ]; then
+        rm /etc/i2pd/tunnels.conf.d/epicyon
+    fi
+    rm /var/lib/i2pd/epicyon.dat
+    systemctl restart i2pd
+
+    systemctl stop "${username}.service"
+    systemctl disable "${username}.service"
+    rm "/etc/nginx/sites-enabled/${username}"
+    rm "/etc/nginx/sites-availale/${username}"
+    rm -rf ${install_destination}
+    userdel -r ${username}
+    echo 'Epicyon i2p instance removed'
+    exit 0
+fi
+
+if [[ "$1" == 'removei2p' ]]; then
+    if [ -f /usr/bin/pacman ]; then
+        pacman -R --noconfirm i2pd
+    else
+        apt-get -y remove --purge i2pd
+    fi
+    rm -rf /etc/i2pd
+    rm -rf /var/lib/i2pd
+    if [ -f /var/log/i2pd/i2pd.log ]; then
+        rm /var/log/i2pd/i2pd.log
+    fi
+fi
+
+clear
+echo 'Installing Epicyon on an i2p domain'
+
+NGINX_PORT=9554
+EPICYON_PORT=7158
+tunnels_dir=/var/lib/i2pd/tunnels.d
+
+# if proxychains already exists then make a copy of the
+# older config
+if [ -f /etc/proxychains.conf ]; then
+    mv /etc/proxychains.conf /etc/proxychains.conf.old
+fi
+
+echo 'Adding Epicyon dependencies'
+if [ -f /usr/bin/pacman ]; then
+    pacman -Syy
+    pacman -S --noconfirm python-pip python-pysocks python-cryptography \
+           imagemagick python-pillow python-requests \
+           perl-image-exiftool python-numpy python-dateutil \
+           certbot flake8 git i2pd wget qrencode \
+           proxychains midori bandit
+    pip3 install pyqrcode pypng
+else
+    apt-get update
+    apt-get -y install imagemagick python3-cryptography \
+            python3-dateutil python3-idna python3-requests \
+            python3-numpy python3-pil.imagetk python3-pip \
+            python3-setuptools python3-socks python3-idna \
+            libimage-exiftool-perl python3-flake8 \
+            python3-django-timezone-field nginx git i2pd wget \
+            python3-pyqrcode qrencode python3-png \
+            proxychains midori python3-bandit
+fi
+
+if [ ! -d /etc/i2pd ]; then
+    echo 'i2pd was not installed'
+    exit 5
+fi
+
+echo 'Cloning the epicyon repo'
+if [ ! -d ${install_destination} ]; then
+    git clone --depth 1 https://gitlab.com/bashrc2/epicyon ${install_destination}
+
+    if [ ! -d ${install_destination} ]; then
+        echo 'Epicyon repo failed to clone'
+        exit 3
+    fi
+fi
+
+echo 'Adding an epicyon system user account'
+if [ -f /usr/bin/pacman ]; then
+    groupadd ${username}
+    useradd --system -g ${username} --home-dir=${install_destination} $username
+    groupadd www-data
+    useradd --system -g www-data --home-dir=/srv/http www-data
+else
+    adduser --system --home=${install_destination} --group $username
+fi
+
+chown -R ${username}:${username} ${install_destination}
+
+echo 'Creating a command script to obtain i2p domain names from dat files'
+{ echo '#!/bin/bash';
+  echo "tunnelname=\"\$1\"";
+  echo 'domainfile=/tmp/i2pdomain.txt';
+  echo "if [ -f \${domainfile} ]; then";
+  echo "    rm \${domainfile}";
+  echo 'fi';
+  echo "wget http://127.0.0.1:7070/?page=i2p_tunnels -O \${domainfile} 2> /dev/null";
+  echo "if [ ! -f \${domainfile} ]; then";
+  echo '    exit 9';
+  echo 'fi';
+  echo "awk -F \">\${tunnelname}<\" '{print \$2}' < \${domainfile} | awk -F ';' '{print \$2}' | awk -F ':' '{print \$1}' | tr -d '[:space:]'";
+  echo "rm \${domainfile}"; } > /usr/bin/i2pdomain
+chmod +x /usr/bin/i2pdomain
+
+echo 'Creating Epicyon i2p tunnel file'
+if [ ! -d "$tunnels_dir" ]; then
+    ln -s /etc/i2pd/tunnels.conf.d /var/lib/i2pd/tunnels.d
+fi
+
+if ! grep -q 'epicyon.dat' /var/lib/i2pd/tunnels.conf; then
+    { echo '';
+      echo '[epicyon]';
+      echo 'type = http';
+      echo 'host = 127.0.0.1';
+      echo 'inport = 80';
+      echo "port = ${NGINX_PORT}";
+      echo 'inbound.length = 1';
+      echo 'inbound.quantity = 5';
+      echo 'outbound.length = 1';
+      echo 'outbound.quantity = 5';
+      echo "keys = epicyon.dat"; } >> /var/lib/i2pd/tunnels.conf
+fi
+rm "$tunnels_dir"/*~
+
+echo 'Setting i2p tunnels directory'
+sed -i 's|#tunnelsdir =|tunnelsdir =|g' /etc/i2pd/i2pd.conf
+sed -i 's|# tunnelsdir =|tunnelsdir =|g' /etc/i2pd/i2pd.conf
+sed -i "s|tunnelsdir =.*|tunnelsdir = $tunnels_dir|g" /etc/i2pd/i2pd.conf
+
+echo 'Enabling ipv6'
+if [ -f /etc/sysctl.conf ]; then
+    if grep -q 'net.ipv6.conf.all.disable_ipv6' /etc/sysctl.conf; then
+        sed -i 's|net.ipv6.conf.all.disable_ipv6.*|net.ipv6.conf.all.disable_ipv6 = 0|g' /etc/sysctl.conf
+        /sbin/sysctl -p -q
+    fi
+fi
+sed -i 's|#ipv6 =|ipv6 =|g' /etc/i2pd/i2pd.conf
+sed -i 's|# ipv6 =|ipv6 =|g' /etc/i2pd/i2pd.conf
+sed -i 's|ipv6 =.*|ipv6 = true|g' /etc/i2pd/i2pd.conf
+
+echo 'Disabling i2p logging'
+sed -i 's|#logfile =|logfile =|g' /etc/i2pd/i2pd.conf
+sed -i 's|# logfile =|logfile =|g' /etc/i2pd/i2pd.conf
+sed -i 's|logfile =.*|logfile = /dev/null|g' /etc/i2pd/i2pd.conf
+
+echo 'Enabling i2p NAT traversal'
+sed -i 's|#nat =|nat =|g' /etc/i2pd/i2pd.conf
+sed -i 's|# nat =|nat =|g' /etc/i2pd/i2pd.conf
+sed -i 's|nat =.*|nat = true|g' /etc/i2pd/i2pd.conf
+
+if [ ! -d /run/i2pd ]; then
+    mkdir /run/i2pd
+fi
+chown -R i2pd:i2pd /run/i2pd
+
+#if [ -f /usr/bin/pacman ]; then
+#    sed -i 's|ExecStart=.*|ExecStart=/usr/sbin/i2pd --conf=/etc/i2pd/i2pd.conf --tunconf=/etc/i2pd/tunnels.conf --tunnelsdir=/etc/i2pd/tunnels.conf.d --service|g' /lib/systemd/system/i2pd.service
+#    sed -i 's|Type=.*|Type=simple|g' /lib/systemd/system/i2pd.service
+#fi
+
+echo 'Setting file permissions'
+chown -R i2pd:i2pd "$tunnels_dir"
+chmod 644 "$tunnels_dir"/*
+chmod 755 "$tunnels_dir"
+# chown -R i2pd:i2pd /etc/i2pd
+systemctl daemon-reload
+systemctl enable i2pd
+systemctl restart i2pd
+
+echo 'Waiting for i2p daemon restart'
+sleep 5
+if [ ! -f /var/lib/i2pd/epicyon.dat ]; then
+    echo 'Waiting for i2p daemon restart...'
+    sleep 5
+fi
+
+if [ ! -f /var/lib/i2pd/epicyon.dat ]; then
+    echo '/var/lib/i2pd/epicyon.dat not created'
+    exit 6
+fi
+
+echo '/var/lib/i2pd/epicyon.dat file was created'
+
+I2P_DOMAIN=$(i2pdomain epicyon)
+if [[ "$I2P_DOMAIN" != *'.i2p' ]]; then
+    echo 'Epicyon i2p domain not created'
+    echo "$I2P_DOMAIN"
+    exit 1
+fi
+
+echo "i2p domain: http://${I2P_DOMAIN}"
+
+echo 'Creating Epicyon daemon'
+{ echo '[Unit]';
+  echo "Description=$username";
+  echo 'After=syslog.target';
+  echo 'After=network.target';
+  echo '';
+  echo '[Service]';
+  echo 'Type=simple';
+  echo "User=$username";
+  echo "Group=$username";
+  echo "WorkingDirectory=${install_destination}";
+  echo "ExecStart=/usr/bin/python3 ${install_destination}/epicyon.py --http --i2p --bind 0.0.0.0 --port 80 --proxy ${EPICYON_PORT} --domain ${I2P_DOMAIN} --registration open";
+  echo "Environment=USER=$username";
+  echo 'Environment=PYTHONUNBUFFERED=true';
+  echo 'Environment=PYTHONIOENCODING=utf-8';
+  echo 'Restart=always';
+  echo 'StandardError=syslog';
+  echo 'CPUQuota=80%';
+  echo 'ProtectHome=true';
+  echo 'ProtectKernelTunables=true';
+  echo 'ProtectKernelModules=true';
+  echo 'ProtectControlGroups=true';
+  echo 'ProtectKernelLogs=true';
+  echo 'ProtectHostname=true';
+  echo 'ProtectClock=true';
+  echo 'ProtectProc=invisible';
+  echo 'ProcSubset=pid';
+  echo 'PrivateTmp=true';
+  echo 'PrivateUsers=true';
+  echo 'PrivateDevices=true';
+  echo 'PrivateIPC=true';
+  echo 'MemoryDenyWriteExecute=true';
+  echo 'NoNewPrivileges=true';
+  echo 'LockPersonality=true';
+  echo 'RestrictRealtime=true';
+  echo 'RestrictSUIDSGID=true';
+  echo 'RestrictNamespaces=true';
+  echo 'SystemCallArchitectures=native';
+  echo '';
+  echo '[Install]';
+  echo 'WantedBy=multi-user.target'; } > "/etc/systemd/system/${username}.service"
+
+systemctl daemon-reload
+systemctl enable "${username}.service"
+systemctl restart "${username}.service"
+
+echo 'Creating nginx configuration'
+if [ ! -f /etc/nginx/nginx.conf ]; then
+    { echo 'user www-data;';
+      echo 'pid /run/nginx.pid;';
+      echo '';
+      echo 'events {';
+      echo '        worker_connections 50;';
+      echo '        # multi_accept on;';
+      echo '}';
+      echo '';
+      echo 'http {';
+      echo '        # limit the number of connections per single IP';
+      echo "        limit_conn_zone \$binary_remote_addr zone=conn_limit_per_ip:10m;";
+      echo '';
+      echo '        # limit the number of requests for a given session';
+      echo "        limit_req_zone \$binary_remote_addr zone=req_limit_per_ip:10m rate=140r/s;";
+      echo '';
+      echo '        # if the request body size is more than the buffer size, then the entire (or partial) request body is written into a temporary file';
+      echo '        client_body_buffer_size  128k;';
+      echo '';
+      echo '        # headerbuffer size for the request header from client, its set for testing purpose';
+      echo '        client_header_buffer_size 3m;';
+      echo '';
+      echo '        # maximum number and size of buffers for large headers to read from client request';
+      echo '        large_client_header_buffers 4 256k;';
+      echo '';
+      echo '        # read timeout for the request body from client, its set for testing purpose';
+      echo '        client_body_timeout   3m;';
+      echo '';
+      echo '        # how long to wait for the client to send a request header, its set for testing purpose';
+      echo '        client_header_timeout 3m;';
+      echo '';
+      echo '        sendfile on;';
+      echo '        tcp_nopush on;';
+      echo '        tcp_nodelay on;';
+      echo '        keepalive_timeout 65;';
+      echo '        types_hash_max_size 2048;';
+      echo '        server_tokens off;';
+      echo '';
+      echo '        include /etc/nginx/mime.types;';
+      echo '        default_type application/octet-stream;';
+      echo '';
+      echo '        access_log /dev/null;';
+      echo '        error_log /dev/null;';
+      echo '';
+      echo '        gzip on;';
+      echo '        gzip_disable "msie6";';
+      echo '';
+      echo '        include /etc/nginx/conf.d/*.conf;';
+      echo '        include /etc/nginx/sites-enabled/*;';
+      echo '}'; } > /etc/nginx/nginx.conf
+else
+    if ! grep -q 'include /etc/nginx/sites-enabled' /etc/nginx/nginx.conf; then
+        echo 'include /etc/nginx/sites-enabled/*.conf;' >> /etc/nginx/nginx.conf
+    fi
+fi
+if [ ! -d /etc/nginx/conf.d ]; then
+    mkdir /etc/nginx/conf.d
+fi
+if [ ! -d /etc/nginx/sites-available ]; then
+    mkdir /etc/nginx/sites-available
+fi
+if [ ! -d /etc/nginx/sites-enabled ]; then
+    mkdir /etc/nginx/sites-enabled
+fi
+
+if [ -f /usr/bin/pacman ]; then
+    if [ ! -f /lib/systemd/system/nginx.service ]; then
+        echo 'Creating nginx daemon'
+        { echo '[Unit]';
+          echo 'Description=A high performance web server and a reverse proxy server';
+          echo 'Documentation=man:nginx(8)';
+          echo 'After=network.target nss-lookup.target';
+          echo ''
+          echo '[Service]';
+          echo 'Type=forking';
+          echo 'PIDFile=/run/nginx.pid';
+          echo "ExecStartPre=$(which nginx) -t -q -g 'daemon on; master_process on;'";
+          echo "ExecStart=$(which nginx) -g 'daemon on; master_process on;'";
+          echo "ExecReload=$(which nginx) -g 'daemon on; master_process on;' -s reload";
+          echo 'ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /run/nginx.pid';
+          echo 'TimeoutStopSec=5';
+          echo 'KillMode=mixed';
+          echo '';
+          echo '[Install]';
+          echo 'WantedBy=multi-user.target'; } > /etc/systemd/system/nginx.service
+        systemctl enable nginx
+    fi
+fi
+
+web_dir=/var/www
+if [ -f /usr/bin/pacman ]; then
+    web_dir=/srv/http
+fi
+
+echo "Creating nginx virtual host for http://${I2P_DOMAIN}"
+{ echo 'server {';
+  echo "    listen 127.0.0.1:${NGINX_PORT} default_server;";
+  echo "    server_name ${I2P_DOMAIN};"
+  echo '';
+  echo '    gzip            on;';
+  echo '    gzip_min_length 1000;';
+  echo '    gzip_proxied    expired no-cache no-store private auth;';
+  echo '    gzip_types      gzip_types text/plain text/css text/vcard text/vcard+xml application/json application/ld+json application/javascript text/xml application/xml application/rdf+xml application/xml+rss text/javascript;';
+  echo '';
+  echo "    add_header Content-Security-Policy \"script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline'\";";
+  echo '    add_header X-Content-Type-Options nosniff;';
+  echo '    add_header X-XSS-Protection "1; mode=block";';
+  echo '    add_header X-Download-Options noopen;';
+  echo '    add_header X-Permitted-Cross-Domain-Policies none;';
+  echo '';
+  echo '    access_log /dev/null;';
+  echo '    error_log /dev/null;';
+  echo '';
+  echo '    index index.html;';
+  echo '';
+  echo '    location /newsmirror {';
+  echo "      root /var/www/${I2P_DOMAIN}/htdocs;";
+  echo '      try_files $uri =404;';
+  echo '    }';
+  echo '';
+  echo '    location / {';
+  echo '      proxy_http_version 1.1;';
+  echo '      client_max_body_size 31M;';
+  echo "      proxy_set_header Host \$http_host;";
+  echo "      proxy_set_header X-Real-IP \$remote_addr;";
+  echo "      proxy_set_header X-Forward-For \$proxy_add_x_forwarded_for;";
+  echo '      proxy_set_header X-Forward-Proto http;';
+  echo '      proxy_set_header X-Nginx-Proxy true;';
+  echo '      proxy_temp_file_write_size 64k;';
+  echo '      proxy_connect_timeout 10080s;';
+  echo '      proxy_send_timeout 10080;';
+  echo '      proxy_read_timeout 10080;';
+  echo '      proxy_buffer_size 64k;';
+  echo '      proxy_buffers 16 32k;';
+  echo '      proxy_busy_buffers_size 64k;';
+  echo '      proxy_redirect off;';
+  echo '      proxy_request_buffering off;';
+  echo '      proxy_buffering off;';
+  echo "      proxy_pass http://localhost:${EPICYON_PORT};";
+  echo '      tcp_nodelay on;';
+  echo '    }';
+  echo '}'; } > /etc/nginx/sites-available/epicyon-i2p
+
+ln -s /etc/nginx/sites-available/epicyon-i2p /etc/nginx/sites-enabled/
+systemctl restart nginx
+
+# set up socks5 proxy for browser
+{ echo 'dynamic_chain';
+  echo 'proxy_dns';
+  echo 'remote_dns_subnet 224';
+  echo 'tcp_read_time_out 15000';
+  echo 'tcp_connect_time_out 8000';
+  echo 'localnet 127.0.0.0/255.0.0.0';
+  echo '[ProxyList]';
+  echo 'http    127.0.0.1 4444';
+  echo 'socks5  127.0.0.1 4447'; } > /etc/proxychains.conf
+
+# set up a desktop icon
+for d in /home/*/ ; do
+    CURRUSER=$(echo "$d" | awk -F '/' '{print $3}')
+    if [ -d "/home/${CURRUSER}/Desktop" ]; then
+        { echo '#!/usr/bin/env xdg-open';
+          echo '[Desktop Entry]';
+          echo 'Name=Epicyon I2P';
+          echo 'GenericName=P2P Social Network';
+          echo 'Comment=P2P Social Network';
+          echo "Exec=proxychains midori http://${I2P_DOMAIN}";
+          echo 'Icon=org.midori_browser.Midori';
+          echo 'Type=Application';
+          echo 'Terminal=false';
+          echo 'Categories=Internet;SocialNetwork;';
+          echo 'StartupWMClass=Epicyon';
+          echo 'Keywords=Epicyon;P2P;I2P;'; } > "/home/${CURRUSER}/Desktop/${username}.desktop"
+        chown "$CURRUSER":"$CURRUSER" "/home/${CURRUSER}/Desktop/${username}.desktop"
+    fi
+done
+
+clear
+echo -n "$I2P_DOMAIN" | qrencode -t ANSI
+echo 'Your Epicyon i2p instance is now installed.'
+echo ''
+echo 'You can view it from the terminal with the command:'
+echo ''
+echo '    proxychains midori'
+echo ''
+echo 'If you prefer Firefox then see preferences/network settings, '
+echo 'manual proxy and uncheck DNS over HTTPS. In about:config and '
+echo 'find the property media.peerConnection.ice.proxy_only and set '
+echo 'it to true. http should be proxied through 127.0.0.1 port 4444 '
+echo 'and socks5 proxied through 127.0.0.1 port 4447.'
+echo ''
+echo "Navigate to http://${I2P_DOMAIN} and register an account."
+
+exit 0

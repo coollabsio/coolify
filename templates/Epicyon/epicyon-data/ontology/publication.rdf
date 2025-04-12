@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:foaf="http://xmlns.com/foaf/0.1/"
+         xmlns:owl="http://www.w3.org/2002/07/owl#">
+
+  <foaf:Person rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#simonL">
+    <foaf:familyName xml:lang="fr">Louvet</foaf:familyName>
+    <foaf:firstName xml:lang="fr">Simon</foaf:firstName>
+    <owl:sameAs rdf:resource="https://orcid.org/0000-0002-3528-6577"/>
+  </foaf:Person>
+  <foaf:Person rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#rachelA">
+    <foaf:familyName xml:lang="fr">Arnould</foaf:familyName>
+    <foaf:firstName xml:lang="fr">Rachel</foaf:firstName>
+  </foaf:Person>
+  <foaf:Person rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#bernardC">
+    <foaf:familyName xml:lang="fr">Chabot</foaf:familyName>
+    <foaf:firstName xml:lang="fr">Bernard</foaf:firstName>
+  </foaf:Person>
+  <foaf:Organization rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium">
+    <foaf:homepage rdf:resource="http://static.datafoodconsortium.org/"/>
+    <foaf:name xml:lang="fr">Data Food Consortium</foaf:name>
+  </foaf:Organization>
+</rdf:RDF>

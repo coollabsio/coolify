@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep -i ' follow accept ' > .accept_events.txt
+if [ ! -f .accept_events.txt ]; then
+    echo 'No follow Accept events'
+else
+    cat .accept_events.txt
+fi

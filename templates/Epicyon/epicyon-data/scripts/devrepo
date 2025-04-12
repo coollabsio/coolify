@@ -1,0 +1,8 @@
+#!/bin/bash
+if [ -d /etc/epicyon ]; then
+    cd /etc/epicyon || exit 0
+else
+    cd /opt/epicyon || exit 0
+fi
+git remote set-url origin https://gitlab.com/bashrc2/epicyon.git
+git checkout main

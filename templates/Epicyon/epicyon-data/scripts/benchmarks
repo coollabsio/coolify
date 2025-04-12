@@ -1,0 +1,18 @@
+#!/bin/bash
+if [ -d /etc/epicyon ]; then
+    cd /etc/epicyon || exit 0
+else
+    cd /opt/epicyon || exit 0
+fi
+
+echo ''
+echo 'Digest calculation times'
+journalctl -u epicyon | grep "DIGEST|" | awk -F '|' '{print $2}' | sort -r | uniq | head -n 20
+
+echo ''
+echo 'Timings for GET'
+journalctl -u epicyon -r | grep "GET TIMING|" | head -n 50
+
+echo ''
+echo 'Timings for POST'
+journalctl -u epicyon -r | grep "POST TIMING|" | head -n 50

@@ -1,0 +1,3262 @@
+{
+  "@context": {
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "dfc-b": "http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#",
+    "dfc-p": "http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#",
+    "dfc-t": "http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#",
+    "dfc-u": "http://static.datafoodconsortium.org/data/units.json#",
+    "dfc-p:specialize": {
+      "@type": "@id"
+    }
+  },
+  "@graph": [
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#shirt",
+      "rdfs:label": [
+        {
+          "@value": "La chemise",
+          "@language": "fr"
+        },
+        {
+          "@value": "Shirt",
+          "@language": "de"
+        },
+        {
+          "@value": "Camisa",
+          "@language": "es"
+        },
+        {
+          "@value": "Shirt",
+          "@language": "en"
+        },
+        {
+          "@value": "শার্ট",
+          "@language": "bn"
+        },
+        {
+          "@value": "셔츠",
+          "@language": "ko"
+        },
+        {
+          "@value": "сорочка",
+          "@language": "uk"
+        },
+        {
+          "@value": "Gömlek",
+          "@language": "tr"
+        },
+        {
+          "@value": "Shirt",
+          "@language": "nl"
+        },
+        {
+          "@value": "Πουκάμισο",
+          "@language": "el"
+        },
+        {
+          "@value": "شيرت",
+          "@language": "ar"
+        },
+        {
+          "@value": "Shirt",
+          "@language": "ku"
+        },
+        {
+          "@value": "Camicia",
+          "@language": "it"
+        },
+        {
+          "@value": "Shirt",
+          "@language": "sw"
+        },
+        {
+          "@value": "Camisa",
+          "@language": "pt"
+        },
+        {
+          "@value": "Shirt",
+          "@language": "oc"
+        },
+        {
+          "@value": "рубашка",
+          "@language": "ru"
+        },
+        {
+          "@value": "Crys",
+          "@language": "cy"
+        },
+        {
+          "@value": "シャツ",
+          "@language": "ja"
+        },
+        {
+          "@value": "An shúchán",
+          "@language": "ga"
+        },
+        {
+          "@value": "शर्ट",
+          "@language": "hi"
+        },
+        {
+          "@value": "施暴",
+          "@language": "zh"
+        },
+        {
+          "@value": "Camisa",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/clothesTypes.json#shirt",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#belt",
+      "rdfs:label": [
+        {
+          "@value": "Ceinture",
+          "@language": "fr"
+        },
+        {
+          "@value": "Gürtel",
+          "@language": "de"
+        },
+        {
+          "@value": "Cinturón",
+          "@language": "es"
+        },
+        {
+          "@value": "Belt",
+          "@language": "en"
+        },
+        {
+          "@value": "বেল্ট",
+          "@language": "bn"
+        },
+        {
+          "@value": "Riem",
+          "@language": "nl"
+        },
+        {
+          "@value": "Ζώνη",
+          "@language": "el"
+        },
+        {
+          "@value": "Пояс",
+          "@language": "uk"
+        },
+        {
+          "@value": "벨트",
+          "@language": "ko"
+        },
+        {
+          "@value": "الحزام",
+          "@language": "ar"
+        },
+        {
+          "@value": "Qayiş",
+          "@language": "ku"
+        },
+        {
+          "@value": "Cintura",
+          "@language": "it"
+        },
+        {
+          "@value": "Mkanda",
+          "@language": "sw"
+        },
+        {
+          "@value": "Cinto de cinto",
+          "@language": "pt"
+        },
+        {
+          "@value": "Belt",
+          "@language": "oc"
+        },
+        {
+          "@value": "Пояс",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gwregys",
+          "@language": "cy"
+        },
+        {
+          "@value": "ベルト",
+          "@language": "ja"
+        },
+        {
+          "@value": "Chreasa",
+          "@language": "ga"
+        },
+        {
+          "@value": "बेल्ट",
+          "@language": "hi"
+        },
+        {
+          "@value": "腰带",
+          "@language": "zh"
+        },
+        {
+          "@value": "Cinturó",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#belt",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#childrens-clothing",
+      "rdfs:label": [
+        {
+          "@value": "Vêtements pour enfants",
+          "@language": "fr"
+        },
+        {
+          "@value": "Kinderkleidung",
+          "@language": "de"
+        },
+        {
+          "@value": "Ropa de ninos",
+          "@language": "es"
+        },
+        {
+          "@value": "Children's Clothing",
+          "@language": "en"
+        },
+        {
+          "@value": "Kinderkleding",
+          "@language": "nl"
+        },
+        {
+          "@value": "아동복",
+          "@language": "ko"
+        },
+        {
+          "@value": "বাচ্চাদের পোশাক",
+          "@language": "bn"
+        },
+        {
+          "@value": "Дитячий одяг",
+          "@language": "uk"
+        },
+        {
+            "@value": "Παιδικά Ρούχα",
+          "@language": "el"
+        },
+        {
+          "@value": "ملابس الأطفال",
+          "@language": "ar"
+        },
+        {
+          "@value": "Cilên Zarokan",
+          "@language": "ku"
+        },
+        {
+          "@value": "Abbigliamento per bambini",
+          "@language": "it"
+        },
+        {
+          "@value": "Mavazi ya Watoto",
+          "@language": "sw"
+        },
+        {
+          "@value": "Vestuário infantil",
+          "@language": "pt"
+        },
+        {
+          "@value": "Children's Clothing",
+          "@language": "oc"
+        },
+        {
+          "@value": "Детская одежда",
+          "@language": "ru"
+        },
+        {
+          "@value": "Dillad Plant",
+          "@language": "cy"
+        },
+        {
+          "@value": "子供の衣類",
+          "@language": "ja"
+        },
+        {
+          "@value": "Éadaí Leanaí",
+          "@language": "ga"
+        },
+        {
+          "@value": "बच्चों के वस्त्र",
+          "@language": "hi"
+        },
+        {
+          "@value": "儿童入学",
+          "@language": "zh"
+        },
+        {
+          "@value": "Roba infantil",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#childrens-clothing",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#coat",
+      "rdfs:label": [
+        {
+          "@value": "Manteau",
+          "@language": "fr"
+        },
+        {
+          "@value": "Mantel",
+          "@language": "de"
+        },
+        {
+          "@value": "Abrigo",
+          "@language": "es"
+        },
+        {
+          "@value": "Coat",
+          "@language": "en"
+        },
+        {
+          "@value": "Пальто",
+          "@language": "uk"
+        },
+        {
+          "@value": "Jas",
+          "@language": "nl"
+        },
+        {
+          "@value": "Ceket",
+          "@language": "tr"
+        },
+        {
+          "@value": "কোট",
+          "@language": "bn"
+        },
+        {
+          "@value": "معطف",
+          "@language": "ar"
+        },
+        {
+          "@value": "Post",
+          "@language": "ku"
+        },
+        {
+          "@value": "Cappotto",
+          "@language": "it"
+        },
+        {
+          "@value": "Kanzu",
+          "@language": "sw"
+        },
+        {
+          "@value": "Casa de banho",
+          "@language": "pt"
+        },
+        {
+          "@value": "Coat",
+          "@language": "oc"
+        },
+        {
+          "@value": "Пальто",
+          "@language": "ru"
+        },
+        {
+          "@value": "Côt",
+          "@language": "cy"
+        },
+        {
+          "@value": "コーティング",
+          "@language": "ja"
+        },
+        {
+          "@value": "Ar Aghaidh Ar Aghaidh",
+          "@language": "ga"
+        },
+        {
+          "@value": "कोट",
+          "@language": "hi"
+        },
+        {
+          "@value": "外套",
+          "@language": "zh"
+        },
+        {
+          "@value": "Abric",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#coat",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#dress",
+      "rdfs:label": [
+        {
+          "@value": "Robe",
+          "@language": "fr"
+        },
+        {
+          "@value": "Kleid",
+          "@language": "de"
+        },
+        {
+          "@value": "Vestir",
+          "@language": "es"
+        },
+        {
+          "@value": "Dress",
+          "@language": "en"
+        },
+        {
+          "@value": "الملابس",
+          "@language": "ar"
+        },
+        {
+          "@value": "Lebas",
+          "@language": "ku"
+        },
+        {
+          "@value": "Abito",
+          "@language": "it"
+        },
+        {
+          "@value": "Nguo",
+          "@language": "sw"
+        },
+        {
+          "@value": "Vestido",
+          "@language": "pt"
+        },
+        {
+          "@value": "Dress",
+          "@language": "oc"
+        },
+        {
+          "@value": "Платье",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gwisg",
+          "@language": "cy"
+        },
+        {
+          "@value": "ドレス",
+          "@language": "ja"
+        },
+        {
+          "@value": "Gúna bainise",
+          "@language": "ga"
+        },
+        {
+          "@value": "पोशाक",
+          "@language": "hi"
+        },
+        {
+          "@value": "博士",
+          "@language": "zh"
+        },
+        {
+          "@value": "Vestit",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#shoes",
+      "rdfs:label": [
+        {
+          "@value": "Des chaussures",
+          "@language": "fr"
+        },
+        {
+          "@value": "Schuhe",
+          "@language": "de"
+        },
+        {
+          "@value": "Zapatos",
+          "@language": "es"
+        },
+        {
+          "@value": "Shoes",
+          "@language": "en"
+        },
+        {
+          "@value": "Παπούτσια",
+          "@language": "el"
+        },
+        {
+          "@value": "신발",
+          "@language": "ko"
+        },
+        {
+          "@value": "জুতা",
+          "@language": "bn"
+        },
+        {
+          "@value": "Schoenen",
+          "@language": "nl"
+        },
+        {
+          "@value": "Взуття",
+          "@language": "uk"
+        },
+        {
+          "@value": "Ayakkabı",
+          "@language": "tr"
+        },
+        {
+          "@value": "الأحذية",
+          "@language": "ar"
+        },
+        {
+          "@value": "Shoes",
+          "@language": "ku"
+        },
+        {
+          "@value": "Scarpe",
+          "@language": "it"
+        },
+        {
+          "@value": "Viatu",
+          "@language": "sw"
+        },
+        {
+          "@value": "Buty",
+          "@language": "pl"
+        },
+        {
+          "@value": "Sapatos",
+          "@language": "pt"
+        },
+        {
+          "@value": "Shoes",
+          "@language": "oc"
+        },
+        {
+          "@value": "Обувь",
+          "@language": "ru"
+        },
+        {
+          "@value": "Esgidiau",
+          "@language": "cy"
+        },
+        {
+          "@value": "シューズ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Bróga",
+          "@language": "ga"
+        },
+        {
+          "@value": "जूते",
+          "@language": "hi"
+        },
+        {
+          "@value": "舒 果",
+          "@language": "zh"
+        },
+        {
+          "@value": "Sabates",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#footwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#boots",
+      "rdfs:label": [
+        {
+          "@value": "Bottes",
+          "@language": "fr"
+        },
+        {
+          "@value": "Stiefel",
+          "@language": "de"
+        },
+        {
+          "@value": "Botas",
+          "@language": "es"
+        },
+        {
+          "@value": "Boots",
+          "@language": "en"
+        },
+        {
+          "@value": "bot ayakkabı",
+          "@language": "tr"
+        },
+        {
+          "@value": "Buty",
+          "@language": "pl"
+        },
+        {
+          "@value": "부츠",
+          "@language": "ko"
+        },
+        {
+          "@value": "Чоботи",
+          "@language": "uk"
+        },
+        {
+          "@value": "بوتس",
+          "@language": "ar"
+        },
+        {
+          "@value": "Boots",
+          "@language": "ku"
+        },
+        {
+          "@value": "Stivali",
+          "@language": "it"
+        },
+        {
+          "@value": "Viatu",
+          "@language": "sw"
+        },
+        {
+          "@value": "Botas",
+          "@language": "pt"
+        },
+        {
+          "@value": "Boots",
+          "@language": "oc"
+        },
+        {
+          "@value": "Сапоги",
+          "@language": "ru"
+        },
+        {
+          "@value": "Boots",
+          "@language": "cy"
+        },
+        {
+          "@value": "ブーツ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Buataisí Buataisí",
+          "@language": "ga"
+        },
+        {
+          "@value": "जूते",
+          "@language": "hi"
+        },
+        {
+          "@value": "波 斯",
+          "@language": "zh"
+        },
+        {
+          "@value": "Botes",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#footwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#gown",
+      "rdfs:label": [
+        {
+          "@value": "Robe",
+          "@language": "fr"
+        },
+        {
+          "@value": "Kleid",
+          "@language": "de"
+        },
+        {
+          "@value": "Vestido",
+          "@language": "es"
+        },
+        {
+          "@value": "Gown",
+          "@language": "en"
+        },
+        {
+          "@value": "Suknia",
+          "@language": "pl"
+        },
+        {
+          "@value": "겉옷",
+          "@language": "ko"
+        },
+        {
+          "@value": "গাউন",
+          "@language": "bn"
+        },
+        {
+          "@value": "Gewaad",
+          "@language": "nl"
+        },
+        {
+          "@value": "Elbise",
+          "@language": "tr"
+        },
+        {
+          "@value": "Сукня",
+          "@language": "uk"
+        },
+        {
+          "@value": "فون",
+          "@language": "ar"
+        },
+        {
+          "@value": "Gown",
+          "@language": "ku"
+        },
+        {
+          "@value": "Abito",
+          "@language": "it"
+        },
+        {
+          "@value": "Gauni",
+          "@language": "sw"
+        },
+        {
+          "@value": "Golpe",
+          "@language": "pt"
+        },
+        {
+          "@value": "Gown",
+          "@language": "oc"
+        },
+        {
+          "@value": "Ура",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gŵn",
+          "@language": "cy"
+        },
+        {
+          "@value": "ガウン",
+          "@language": "ja"
+        },
+        {
+          "@value": "Go raibh maith agat",
+          "@language": "ga"
+        },
+        {
+          "@value": "गाउन",
+          "@language": "hi"
+        },
+        {
+          "@value": "袍",
+          "@language": "zh"
+        },
+        {
+          "@value": "Gown",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#gown",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#hat",
+      "rdfs:label": [
+        {
+          "@value": "Chapeau",
+          "@language": "fr"
+        },
+        {
+          "@value": "Hut",
+          "@language": "de"
+        },
+        {
+          "@value": "Sombrero",
+          "@language": "es"
+        },
+        {
+          "@value": "Hat",
+          "@language": "en"
+        },
+        {
+          "@value": "Hoed",
+          "@language": "nl"
+        },
+        {
+          "@value": "Καπέλο",
+          "@language": "el"
+        },
+        {
+          "@value": "টুপি",
+          "@language": "bn"
+        },
+        {
+          "@value": "Kapelusz",
+          "@language": "pl"
+        },
+        {
+          "@value": "Şapka",
+          "@language": "tr"
+        },
+        {
+          "@value": "모자",
+          "@language": "ko"
+        },
+        {
+          "@value": "Капелюх",
+          "@language": "uk"
+        },
+        {
+          "@value": "قبعة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Kûm",
+          "@language": "ku"
+        },
+        {
+          "@value": "Cappello",
+          "@language": "it"
+        },
+        {
+          "@value": "Kofia",
+          "@language": "sw"
+        },
+        {
+          "@value": "Chapéu de chapéu",
+          "@language": "pt"
+        },
+        {
+          "@value": "Hat",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шляпа",
+          "@language": "ru"
+        },
+        {
+          "@value": "Hat",
+          "@language": "cy"
+        },
+        {
+          "@value": "帽子帽子",
+          "@language": "ja"
+        },
+        {
+          "@value": "cineál gas: in airde",
+          "@language": "ga"
+        },
+        {
+          "@value": "हैट",
+          "@language": "hi"
+        },
+        {
+          "@value": "Hat",
+          "@language": "zh"
+        },
+        {
+          "@value": "Hat",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#hat",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#hosiery‎",
+      "rdfs:label": [
+        {
+          "@value": "Hosiery",
+          "@language": "fr"
+        },
+        {
+          "@value": "‎Strumpfwaren",
+          "@language": "de"
+        },
+        {
+          "@value": "‎Hosi",
+          "@language": "es"
+        },
+        {
+          "@value": "Hosiery‎",
+          "@language": "en"
+        },
+        {
+          "@value": "হোসিয়ারি‎",
+          "@language": "bn"
+        },
+        {
+          "@value": "양말‎‎",
+          "@language": "ko"
+        },
+        {
+          "@value": "Καλτσοποιία‎",
+          "@language": "el"
+        },
+        {
+          "@value": "çorap",
+          "@language": "tr"
+        },
+        {
+          "@value": "Kousen‎",
+          "@language": "nl"
+        },
+        {
+          "@value": "Панчішно-шкарпеткові вироби‎",
+          "@language": "uk"
+        },
+        {
+          "@value": "Hosiery",
+          "@language": "ar"
+        },
+        {
+          "@value": "Hosiery‎",
+          "@language": "ku"
+        },
+        {
+          "@value": "Hosily",
+          "@language": "it"
+        },
+        {
+          "@value": "Hosiery‎",
+          "@language": "sw"
+        },
+        {
+          "@value": "Meias",
+          "@language": "pt"
+        },
+        {
+          "@value": "Hosiery‎",
+          "@language": "oc"
+        },
+        {
+          "@value": "ГОСЕРИЯ",
+          "@language": "ru"
+        },
+        {
+          "@value": "Hosiery‎",
+          "@language": "cy"
+        },
+        {
+          "@value": "ホシーリー",
+          "@language": "ja"
+        },
+        {
+          "@value": "taiseachas aeir: fliuch",
+          "@language": "ga"
+        },
+        {
+          "@value": "होजरी",
+          "@language": "hi"
+        },
+        {
+          "@value": "霍西图",
+          "@language": "zh"
+        },
+        {
+          "@value": "Calceteria",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#hosiery‎",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#jacket",
+      "rdfs:label": [
+        {
+          "@value": "Veste",
+          "@language": "fr"
+        },
+        {
+          "@value": "Jacke",
+          "@language": "de"
+        },
+        {
+          "@value": "Chaqueta",
+          "@language": "es"
+        },
+        {
+          "@value": "Jacket",
+          "@language": "en"
+        },
+        {
+          "@value": "Kurtka",
+          "@language": "pl"
+        },
+        {
+          "@value": "재킷",
+          "@language": "ko"
+        },
+        {
+          "@value": "জ্যাকেট",
+          "@language": "bn"
+        },
+        {
+          "@value": "Ceket",
+          "@language": "tr"
+        },
+        {
+          "@value": "Jasje",
+          "@language": "nl"
+        },
+        {
+          "@value": "Жакет",
+          "@language": "uk"
+        },
+        {
+          "@value": "جاكيت",
+          "@language": "ar"
+        },
+        {
+          "@value": "Sako",
+          "@language": "ku"
+        },
+        {
+          "@value": "Giacca",
+          "@language": "it"
+        },
+        {
+          "@value": "Koti",
+          "@language": "sw"
+        },
+        {
+          "@value": "Casaco",
+          "@language": "pt"
+        },
+        {
+          "@value": "Jacket",
+          "@language": "oc"
+        },
+        {
+          "@value": "Куртка",
+          "@language": "ru"
+        },
+        {
+          "@value": "Siaced",
+          "@language": "cy"
+        },
+        {
+          "@value": "ジャケット",
+          "@language": "ja"
+        },
+        {
+          "@value": "Jacket céirithe",
+          "@language": "ga"
+        },
+        {
+          "@value": "जैकेट",
+          "@language": "hi"
+        },
+        {
+          "@value": "夹克",
+          "@language": "zh"
+        },
+        {
+          "@value": "Jaqueta",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#jacket",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#jeans",
+      "rdfs:label": [
+        {
+          "@value": "Jeans",
+          "@language": "fr"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "de"
+        },
+        {
+          "@value": "Vaqueras",
+          "@language": "es"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "en"
+        },
+        {
+          "@value": "τζιν παντελονι",
+          "@language": "el"
+        },
+        {
+          "@value": "জিন্স",
+          "@language": "bn"
+        },
+        {
+          "@value": "Kot",
+          "@language": "tr"
+        },
+        {
+          "@value": "청바지",
+          "@language": "ko"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "nl"
+        },
+        {
+          "@value": "джинси",
+          "@language": "uk"
+        },
+        {
+          "@value": "جينز",
+          "@language": "ar"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "ku"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "it"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "sw"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "pt"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "oc"
+        },
+        {
+          "@value": "Джинсы",
+          "@language": "ru"
+        },
+        {
+          "@value": "Jeans",
+          "@language": "cy"
+        },
+        {
+          "@value": "ジーンズ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Amharc ar gach eolas",
+          "@language": "ga"
+        },
+        {
+          "@value": "जीन्स",
+          "@language": "hi"
+        },
+        {
+          "@value": "牛仔裤",
+          "@language": "zh"
+        },
+        {
+          "@value": "Texans",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#jeans",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#mask",
+      "rdfs:label": [
+        {
+          "@value": "Masquer",
+          "@language": "fr"
+        },
+        {
+          "@value": "Maske",
+          "@language": "de"
+        },
+        {
+          "@value": "Máscara",
+          "@language": "es"
+        },
+        {
+          "@value": "Mask",
+          "@language": "en"
+        },
+        {
+          "@value": "Mask",
+          "@language": "ar"
+        },
+        {
+          "@value": "Mask",
+          "@language": "ku"
+        },
+        {
+          "@value": "Maschera",
+          "@language": "it"
+        },
+        {
+          "@value": "Mask",
+          "@language": "sw"
+        },
+        {
+          "@value": "Máscara",
+          "@language": "pt"
+        },
+        {
+          "@value": "Mask",
+          "@language": "oc"
+        },
+        {
+          "@value": "Маска",
+          "@language": "ru"
+        },
+        {
+          "@value": "Mask",
+          "@language": "cy"
+        },
+        {
+          "@value": "マスク",
+          "@language": "ja"
+        },
+        {
+          "@value": "An chuid is mó",
+          "@language": "ga"
+        },
+        {
+          "@value": "मास्क",
+          "@language": "hi"
+        },
+        {
+          "@value": "Mask",
+          "@language": "zh"
+        },
+        {
+          "@value": "Mask",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#mask",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#neckwear",
+      "rdfs:label": [
+        {
+          "@value": "Vêtements de cou",
+          "@language": "fr"
+        },
+        {
+          "@value": "Krawatten",
+          "@language": "de"
+        },
+        {
+          "@value": "Corbatas",
+          "@language": "es"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "en"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "ar"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "ku"
+        },
+        {
+          "@value": "Biancheria da letto",
+          "@language": "it"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "sw"
+        },
+        {
+          "@value": "Pescoço",
+          "@language": "pt"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "oc"
+        },
+        {
+          "@value": "Обувь",
+          "@language": "ru"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "cy"
+        },
+        {
+          "@value": "ネックウェア",
+          "@language": "ja"
+        },
+        {
+          "@value": "Seirbhís do Chustaiméirí",
+          "@language": "ga"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "hi"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "zh"
+        },
+        {
+          "@value": "Neckwear",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#neckwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#scarf",
+      "rdfs:label": [
+        {
+          "@value": "Écharpe",
+          "@language": "fr"
+        },
+        {
+          "@value": "Schal",
+          "@language": "de"
+        },
+        {
+          "@value": "Bufanda",
+          "@language": "es"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "en"
+        },
+        {
+          "@value": "سكارف",
+          "@language": "ar"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "ku"
+        },
+        {
+          "@value": "Sciarpa",
+          "@language": "it"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "sw"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "pt"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шарф",
+          "@language": "ru"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "cy"
+        },
+        {
+          "@value": "スカーフ",
+          "@language": "ja"
+        },
+        {
+          "@value": "riachtanais uisce: measartha",
+          "@language": "ga"
+        },
+        {
+          "@value": "दुपट्टा",
+          "@language": "hi"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "zh"
+        },
+        {
+          "@value": "Scarf",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#neckwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#suit",
+      "rdfs:label": [
+        {
+          "@value": "Costume",
+          "@language": "fr"
+        },
+        {
+          "@value": "Anzug",
+          "@language": "de"
+        },
+        {
+          "@value": "Traje",
+          "@language": "es"
+        },
+        {
+          "@value": "Suit",
+          "@language": "en"
+        },
+        {
+          "@value": "بدلة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Suit",
+          "@language": "ku"
+        },
+        {
+          "@value": "Su",
+          "@language": "it"
+        },
+        {
+          "@value": "Suit",
+          "@language": "sw"
+        },
+        {
+          "@value": "Terno",
+          "@language": "pt"
+        },
+        {
+          "@value": "Suit",
+          "@language": "oc"
+        },
+        {
+          "@value": "Подходит",
+          "@language": "ru"
+        },
+        {
+          "@value": "Suit",
+          "@language": "cy"
+        },
+        {
+          "@value": "スーツ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Suímh",
+          "@language": "ga"
+        },
+        {
+          "@value": "सूट",
+          "@language": "hi"
+        },
+        {
+          "@value": "诉讼",
+          "@language": "zh"
+        },
+        {
+          "@value": "Suit",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#suit",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#poncho",
+      "rdfs:label": [
+        {
+          "@value": "Poncho",
+          "@language": "fr"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "de"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "es"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "en"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "ar"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "ku"
+        },
+        {
+          "@value": "Poncho per bambini",
+          "@language": "it"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "sw"
+        },
+        {
+          "@value": "Poncho de chuva",
+          "@language": "pt"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "oc"
+        },
+        {
+          "@value": "Пончо",
+          "@language": "ru"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "cy"
+        },
+        {
+          "@value": "ポンチョ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Roghnaigh gach rud",
+          "@language": "ga"
+        },
+        {
+          "@value": "पोंचो",
+          "@language": "hi"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "zh"
+        },
+        {
+          "@value": "Poncho",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#poncho",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#cloak",
+      "rdfs:label": [
+        {
+          "@value": "Manteau",
+          "@language": "fr"
+        },
+        {
+          "@value": "Mantel",
+          "@language": "de"
+        },
+        {
+          "@value": "Capa",
+          "@language": "es"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "en"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "ar"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "ku"
+        },
+        {
+          "@value": "Chiusura",
+          "@language": "it"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "sw"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "pt"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "oc"
+        },
+        {
+          "@value": "Клоак",
+          "@language": "ru"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "cy"
+        },
+        {
+          "@value": "ログイン",
+          "@language": "ja"
+        },
+        {
+          "@value": "taiseachas aeir: fliuch",
+          "@language": "ga"
+        },
+        {
+          "@value": "क्लोक",
+          "@language": "hi"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "zh"
+        },
+        {
+          "@value": "Cloak",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#cloak",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#sari",
+      "rdfs:label": [
+        {
+          "@value": "Sari",
+          "@language": "fr"
+        },
+        {
+          "@value": "Sari",
+          "@language": "de"
+        },
+        {
+          "@value": "Sari",
+          "@language": "es"
+        },
+        {
+          "@value": "Sari",
+          "@language": "en"
+        },
+        {
+          "@value": "Sari",
+          "@language": "ar"
+        },
+        {
+          "@value": "Sari",
+          "@language": "ku"
+        },
+        {
+          "@value": "Sari",
+          "@language": "it"
+        },
+        {
+          "@value": "Sari",
+          "@language": "sw"
+        },
+        {
+          "@value": "Sari",
+          "@language": "pt"
+        },
+        {
+          "@value": "Sari",
+          "@language": "oc"
+        },
+        {
+          "@value": "Сари",
+          "@language": "ru"
+        },
+        {
+          "@value": "Sari",
+          "@language": "cy"
+        },
+        {
+          "@value": "サリ",
+          "@language": "ja"
+        },
+        {
+          "@value": "An tIarthar",
+          "@language": "ga"
+        },
+        {
+          "@value": "साड़ी",
+          "@language": "hi"
+        },
+        {
+          "@value": "Sari",
+          "@language": "zh"
+        },
+        {
+          "@value": "Sari",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#sash",
+      "rdfs:label": [
+        {
+          "@value": "Ceinture",
+          "@language": "fr"
+        },
+        {
+          "@value": "Schärpe",
+          "@language": "de"
+        },
+        {
+          "@value": "Faja",
+          "@language": "es"
+        },
+        {
+          "@value": "Sash",
+          "@language": "en"
+        },
+        {
+          "@value": "Sash",
+          "@language": "ar"
+        },
+        {
+          "@value": "Sash",
+          "@language": "ku"
+        },
+        {
+          "@value": "Sash.",
+          "@language": "it"
+        },
+        {
+          "@value": "Sash",
+          "@language": "sw"
+        },
+        {
+          "@value": "Sash",
+          "@language": "pt"
+        },
+        {
+          "@value": "Sash",
+          "@language": "oc"
+        },
+        {
+          "@value": "Саш",
+          "@language": "ru"
+        },
+        {
+          "@value": "Sash",
+          "@language": "cy"
+        },
+        {
+          "@value": "サッシュ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Saoil",
+          "@language": "ga"
+        },
+        {
+          "@value": "साश",
+          "@language": "hi"
+        },
+        {
+          "@value": "Sash",
+          "@language": "zh"
+        },
+        {
+          "@value": "Sash",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#sash",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#shawl",
+      "rdfs:label": [
+        {
+          "@value": "Châle",
+          "@language": "fr"
+        },
+        {
+          "@value": "Schal",
+          "@language": "de"
+        },
+        {
+          "@value": "Chal",
+          "@language": "es"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "en"
+        },
+        {
+          "@value": "شول",
+          "@language": "ar"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "ku"
+        },
+        {
+          "@value": "Shaw",
+          "@language": "it"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "sw"
+        },
+        {
+          "@value": "Shawl.",
+          "@language": "pt"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шаль",
+          "@language": "ru"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "cy"
+        },
+        {
+          "@value": "ショール",
+          "@language": "ja"
+        },
+        {
+          "@value": "cineál gas: in airde",
+          "@language": "ga"
+        },
+        {
+          "@value": "शॉल",
+          "@language": "hi"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "zh"
+        },
+        {
+          "@value": "Shawl",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#skirt",
+      "rdfs:label": [
+        {
+          "@value": "Jupe",
+          "@language": "fr"
+        },
+        {
+          "@value": "Rock",
+          "@language": "de"
+        },
+        {
+          "@value": "Falda",
+          "@language": "es"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "en"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "ar"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "ku"
+        },
+        {
+          "@value": "Gomma",
+          "@language": "it"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "sw"
+        },
+        {
+          "@value": "Saia!",
+          "@language": "pt"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "oc"
+        },
+        {
+          "@value": "Юбка",
+          "@language": "ru"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "cy"
+        },
+        {
+          "@value": "スカート",
+          "@language": "ja"
+        },
+        {
+          "@value": "Scátála",
+          "@language": "ga"
+        },
+        {
+          "@value": "स्कर्ट",
+          "@language": "hi"
+        },
+        {
+          "@value": "施 士",
+          "@language": "zh"
+        },
+        {
+          "@value": "Skirt",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#trousers",
+      "rdfs:label": [
+        {
+          "@value": "Pantalon",
+          "@language": "fr"
+        },
+        {
+          "@value": "Hose",
+          "@language": "de"
+        },
+        {
+          "@value": "Pantalones",
+          "@language": "es"
+        },
+        {
+          "@value": "Trousers",
+          "@language": "en"
+        },
+        {
+          "@value": "البنادق",
+          "@language": "ar"
+        },
+        {
+          "@value": "Trousers",
+          "@language": "ku"
+        },
+        {
+          "@value": "Pantaloni",
+          "@language": "it"
+        },
+        {
+          "@value": "Trousers",
+          "@language": "sw"
+        },
+        {
+          "@value": "Calças",
+          "@language": "pt"
+        },
+        {
+          "@value": "Trousers",
+          "@language": "oc"
+        },
+        {
+          "@value": "Брюки",
+          "@language": "ru"
+        },
+        {
+          "@value": "Trousers",
+          "@language": "cy"
+        },
+        {
+          "@value": "Trousersの使い方",
+          "@language": "ja"
+        },
+        {
+          "@value": "riachtanais uisce: measartha",
+          "@language": "ga"
+        },
+        {
+          "@value": "पतलून",
+          "@language": "hi"
+        },
+        {
+          "@value": "导 言",
+          "@language": "zh"
+        },
+        {
+          "@value": "Trousers",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#trousers",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#shorts",
+      "rdfs:label": [
+        {
+          "@value": "Shorts",
+          "@language": "fr"
+        },
+        {
+          "@value": "Kurze Hose",
+          "@language": "de"
+        },
+        {
+          "@value": "Bermudas",
+          "@language": "es"
+        },
+        {
+          "@value": "Shorts",
+          "@language": "en"
+        },
+        {
+          "@value": "قصيرة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Shorts",
+          "@language": "ku"
+        },
+        {
+          "@value": "Pantaloni",
+          "@language": "it"
+        },
+        {
+          "@value": "Shorts",
+          "@language": "sw"
+        },
+        {
+          "@value": "Calções",
+          "@language": "pt"
+        },
+        {
+          "@value": "Shorts",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шорты",
+          "@language": "ru"
+        },
+        {
+          "@value": "Shorts",
+          "@language": "cy"
+        },
+        {
+          "@value": "ショートパンツ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Deontais do Mhic Léinn",
+          "@language": "ga"
+        },
+        {
+          "@value": "शॉर्ट",
+          "@language": "hi"
+        },
+        {
+          "@value": "短期",
+          "@language": "zh"
+        },
+        {
+          "@value": "Shorts",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#shorts",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#underwear",
+      "rdfs:label": [
+        {
+          "@value": "Sous-vêtement",
+          "@language": "fr"
+        },
+        {
+          "@value": "Unterwäsche",
+          "@language": "de"
+        },
+        {
+          "@value": "Ropa interior",
+          "@language": "es"
+        },
+        {
+          "@value": "Underwear",
+          "@language": "en"
+        },
+        {
+          "@value": "الملابس الداخلية",
+          "@language": "ar"
+        },
+        {
+          "@value": "Underwear",
+          "@language": "ku"
+        },
+        {
+          "@value": "Biancheria intima",
+          "@language": "it"
+        },
+        {
+          "@value": "Underwear",
+          "@language": "sw"
+        },
+        {
+          "@value": "Roupa interior",
+          "@language": "pt"
+        },
+        {
+          "@value": "Underwear",
+          "@language": "oc"
+        },
+        {
+          "@value": "Нижнее белье",
+          "@language": "ru"
+        },
+        {
+          "@value": "Underwear",
+          "@language": "cy"
+        },
+        {
+          "@value": "アンダーウェア",
+          "@language": "ja"
+        },
+        {
+          "@value": "Fo-éadaí",
+          "@language": "ga"
+        },
+        {
+          "@value": "अंडरवियर",
+          "@language": "hi"
+        },
+        {
+          "@value": "在韦尔",
+          "@language": "zh"
+        },
+        {
+          "@value": "Underwear",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#underwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#socks",
+      "rdfs:label": [
+        {
+          "@value": "Des chaussettes",
+          "@language": "fr"
+        },
+        {
+          "@value": "Socken",
+          "@language": "de"
+        },
+        {
+          "@value": "Medias",
+          "@language": "es"
+        },
+        {
+          "@value": "Socks",
+          "@language": "en"
+        },
+        {
+          "@value": "جوارب",
+          "@language": "ar"
+        },
+        {
+          "@value": "Socks",
+          "@language": "ku"
+        },
+        {
+          "@value": "Calzini",
+          "@language": "it"
+        },
+        {
+          "@value": "Socks",
+          "@language": "sw"
+        },
+        {
+          "@value": "Meias",
+          "@language": "pt"
+        },
+        {
+          "@value": "Socks",
+          "@language": "oc"
+        },
+        {
+          "@value": "Носки",
+          "@language": "ru"
+        },
+        {
+          "@value": "Socks",
+          "@language": "cy"
+        },
+        {
+          "@value": "靴下",
+          "@language": "ja"
+        },
+        {
+          "@value": "Síológa",
+          "@language": "ga"
+        },
+        {
+          "@value": "मोज़े",
+          "@language": "hi"
+        },
+        {
+          "@value": "袭击",
+          "@language": "zh"
+        },
+        {
+          "@value": "Socks",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#footwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#helmet",
+      "rdfs:label": [
+        {
+          "@value": "Casque",
+          "@language": "fr"
+        },
+        {
+          "@value": "Helm",
+          "@language": "de"
+        },
+        {
+          "@value": "Casco",
+          "@language": "es"
+        },
+        {
+          "@value": "Helmet",
+          "@language": "en"
+        },
+        {
+          "@value": "الخوذة",
+          "@language": "ar"
+        },
+        {
+          "@value": "Helmet",
+          "@language": "ku"
+        },
+        {
+          "@value": "Casco",
+          "@language": "it"
+        },
+        {
+          "@value": "Helmet",
+          "@language": "sw"
+        },
+        {
+          "@value": "Capacete",
+          "@language": "pt"
+        },
+        {
+          "@value": "Helmet",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шлем",
+          "@language": "ru"
+        },
+        {
+          "@value": "Helmet",
+          "@language": "cy"
+        },
+        {
+          "@value": "ヘルメット",
+          "@language": "ja"
+        },
+        {
+          "@value": "taiseachas aeir: fliuch",
+          "@language": "ga"
+        },
+        {
+          "@value": "हेलमेट",
+          "@language": "hi"
+        },
+        {
+          "@value": "赫尔特·赫曼特",
+          "@language": "zh"
+        },
+        {
+          "@value": "Helmet",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#helmet",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#gloves",
+      "rdfs:label": [
+        {
+          "@value": "Gants",
+          "@language": "fr"
+        },
+        {
+          "@value": "Handschuhe",
+          "@language": "de"
+        },
+        {
+          "@value": "Guantes",
+          "@language": "es"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "en"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "ar"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "ku"
+        },
+        {
+          "@value": "Guanti",
+          "@language": "it"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "sw"
+        },
+        {
+          "@value": "Luvas",
+          "@language": "pt"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "oc"
+        },
+        {
+          "@value": "Перчатки",
+          "@language": "ru"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "cy"
+        },
+        {
+          "@value": "グローブ",
+          "@language": "ja"
+        },
+        {
+          "@value": "riachtanais uisce: measartha",
+          "@language": "ga"
+        },
+        {
+          "@value": "दस्ताने",
+          "@language": "hi"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "zh"
+        },
+        {
+          "@value": "Gloves",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#gloves",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#kurta",
+      "rdfs:label": [
+        {
+          "@value": "Kurta",
+          "@language": "fr"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "de"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "es"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "en"
+        },
+        {
+          "@value": "كورتا",
+          "@language": "ar"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "ku"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "it"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "sw"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "pt"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "oc"
+        },
+        {
+          "@value": "Курта",
+          "@language": "ru"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "cy"
+        },
+        {
+          "@value": "カルタ",
+          "@language": "ja"
+        },
+        {
+          "@value": "An Chóiré Theas",
+          "@language": "ga"
+        },
+        {
+          "@value": "कुर्त",
+          "@language": "hi"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "zh"
+        },
+        {
+          "@value": "Kurta",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#kurta",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#sherwani",
+      "rdfs:label": [
+        {
+          "@value": "Sherwani",
+          "@language": "fr"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "de"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "es"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "en"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "ar"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "ku"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "it"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "sw"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "pt"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шервани",
+          "@language": "ru"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "cy"
+        },
+        {
+          "@value": "シャーワニ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Seirbhís do Chustaiméirí",
+          "@language": "ga"
+        },
+        {
+          "@value": "शेरवानी",
+          "@language": "hi"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "zh"
+        },
+        {
+          "@value": "Sherwani",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#mens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#shalwar-kameez",
+      "rdfs:label": [
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "fr"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "de"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "es"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "en"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "ar"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "ku"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "it"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "sw"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "pt"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "oc"
+        },
+        {
+          "@value": "Шальвар Камеез",
+          "@language": "ru"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "cy"
+        },
+        {
+          "@value": "シャーラー・カメエズ",
+          "@language": "ja"
+        },
+        {
+          "@value": "cliceáil grianghraf a mhéadú",
+          "@language": "ga"
+        },
+        {
+          "@value": "शालवार कमीज",
+          "@language": "hi"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "zh"
+        },
+        {
+          "@value": "Shalwar Kameez",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#cheongsam",
+      "rdfs:label": [
+        {
+          "@value": "Cheongsam",
+          "@language": "fr"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "de"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "es"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "en"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "ar"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "ku"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "it"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "sw"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "pt"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "oc"
+        },
+        {
+          "@value": "Чеонгсам",
+          "@language": "ru"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "cy"
+        },
+        {
+          "@value": "チェオンサム",
+          "@language": "ja"
+        },
+        {
+          "@value": "An bhfuil a fhios agat?",
+          "@language": "ga"
+        },
+        {
+          "@value": "चेंग्साम",
+          "@language": "hi"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "zh"
+        },
+        {
+          "@value": "Cheongsam",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#áo-bà-ba",
+      "rdfs:label": [
+        {
+          "@value": "Áo bà ba",
+          "@language": "fr"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "de"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "es"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "en"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "ar"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "ku"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "it"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "sw"
+        },
+        {
+          "@value": "Áu bà ba",
+          "@language": "pt"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "oc"
+        },
+        {
+          "@value": "Áo bà бa",
+          "@language": "ru"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "cy"
+        },
+        {
+          "@value": "アオバババ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Bhí an t-eolas mícheart nó as dáta",
+          "@language": "ga"
+        },
+        {
+          "@value": "ao bà ba",
+          "@language": "hi"
+        },
+        {
+          "@value": "阿尔巴",
+          "@language": "zh"
+        },
+        {
+          "@value": "Áo bà ba",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#áo-bà-ba",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#áo-dài",
+      "rdfs:label": [
+        {
+          "@value": "Áo dài",
+          "@language": "fr"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "de"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "es"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "en"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "ar"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "ku"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "it"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "sw"
+        },
+        {
+          "@value": "ÁFRICA",
+          "@language": "pt"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "oc"
+        },
+        {
+          "@value": "Ао dài",
+          "@language": "ru"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "cy"
+        },
+        {
+          "@value": "アオ・ダイ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Déan teagmháil linn",
+          "@language": "ga"
+        },
+        {
+          "@value": "ao dài",
+          "@language": "hi"
+        },
+        {
+          "@value": "阿尔托·阿比",
+          "@language": "zh"
+        },
+        {
+          "@value": "Áo dài",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#áo-dài",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#halter-top",
+      "rdfs:label": [
+        {
+          "@value": "Halter haut",
+          "@language": "fr"
+        },
+        {
+          "@value": "Bikini-Oberteil",
+          "@language": "de"
+        },
+        {
+          "@value": "Camiseta sin mangas",
+          "@language": "es"
+        },
+        {
+          "@value": "Halter top",
+          "@language": "en"
+        },
+        {
+          "@value": "قمة الهضاب",
+          "@language": "ar"
+        },
+        {
+          "@value": "Halter top",
+          "@language": "ku"
+        },
+        {
+          "@value": "Top Halter",
+          "@language": "it"
+        },
+        {
+          "@value": "Halter top",
+          "@language": "sw"
+        },
+        {
+          "@value": "Top de Halter",
+          "@language": "pt"
+        },
+        {
+          "@value": "Halter top",
+          "@language": "oc"
+        },
+        {
+          "@value": "Halter топ",
+          "@language": "ru"
+        },
+        {
+          "@value": "Halter top",
+          "@language": "cy"
+        },
+        {
+          "@value": "ハルタートップ",
+          "@language": "ja"
+        },
+        {
+          "@value": "barr Halter",
+          "@language": "ga"
+        },
+        {
+          "@value": "Halter शीर्ष",
+          "@language": "hi"
+        },
+        {
+          "@value": "哈龙",
+          "@language": "zh"
+        },
+        {
+          "@value": "Halter top",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#womens",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#sandals",
+      "rdfs:label": [
+        {
+          "@value": "Des sandales",
+          "@language": "fr"
+        },
+        {
+          "@value": "Sandalen",
+          "@language": "de"
+        },
+        {
+          "@value": "Sandalias",
+          "@language": "es"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "en"
+        },
+        {
+          "@value": "الرمال",
+          "@language": "ar"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "ku"
+        },
+        {
+          "@value": "Sandali Sandali",
+          "@language": "it"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "sw"
+        },
+        {
+          "@value": "Sandálias de sandálias",
+          "@language": "pt"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "oc"
+        },
+        {
+          "@value": "Сандалии",
+          "@language": "ru"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "cy"
+        },
+        {
+          "@value": "サンダル",
+          "@language": "ja"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "ga"
+        },
+        {
+          "@value": "सैंडल",
+          "@language": "hi"
+        },
+        {
+          "@value": "圣城",
+          "@language": "zh"
+        },
+        {
+          "@value": "Sandals",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#footwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#slippers",
+      "rdfs:label": [
+        {
+          "@value": "Chaussons",
+          "@language": "fr"
+        },
+        {
+          "@value": "Hausschuhe",
+          "@language": "de"
+        },
+        {
+          "@value": "Zapatillas",
+          "@language": "es"
+        },
+        {
+          "@value": "Slippers",
+          "@language": "en"
+        },
+        {
+          "@value": "مشبك",
+          "@language": "ar"
+        },
+        {
+          "@value": "Slippers",
+          "@language": "ku"
+        },
+        {
+          "@value": "pantofole pantofole",
+          "@language": "it"
+        },
+        {
+          "@value": "Slippers",
+          "@language": "sw"
+        },
+        {
+          "@value": "Chinelos",
+          "@language": "pt"
+        },
+        {
+          "@value": "Slippers",
+          "@language": "oc"
+        },
+        {
+          "@value": "Тапочки",
+          "@language": "ru"
+        },
+        {
+          "@value": "Slippers",
+          "@language": "cy"
+        },
+        {
+          "@value": "スリッパ",
+          "@language": "ja"
+        },
+        {
+          "@value": "Seirbhís do Chustaiméirí",
+          "@language": "ga"
+        },
+        {
+          "@value": "चप्पल",
+          "@language": "hi"
+        },
+        {
+          "@value": "速 度",
+          "@language": "zh"
+        },
+        {
+          "@value": "Slippers",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#footwear",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#kilt",
+      "rdfs:label": [
+        {
+          "@value": "Kilt",
+          "@language": "en"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "ar"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "ku"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "es"
+        },
+        {
+          "@value": "Chilometraggio",
+          "@language": "it"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "de"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "sw"
+        },
+        {
+          "@value": "Fornos industriais",
+          "@language": "pt"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "oc"
+        },
+        {
+          "@value": "Килт",
+          "@language": "ru"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "cy"
+        },
+        {
+          "@value": "キルト",
+          "@language": "ja"
+        },
+        {
+          "@value": "Inis dúinn, le do thoil...",
+          "@language": "ga"
+        },
+        {
+          "@value": "किल",
+          "@language": "hi"
+        },
+        {
+          "@value": "杀害",
+          "@language": "zh"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "fr"
+        },
+        {
+          "@value": "Kilt",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#kilt",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#apron",
+      "rdfs:label": [
+        {
+          "@value": "Apron",
+          "@language": "en"
+        },
+        {
+          "@value": "Apron",
+          "@language": "ar"
+        },
+        {
+          "@value": "Apron",
+          "@language": "ku"
+        },
+        {
+          "@value": "Apron",
+          "@language": "es"
+        },
+        {
+          "@value": "Grembiule",
+          "@language": "it"
+        },
+        {
+          "@value": "Apres",
+          "@language": "de"
+        },
+        {
+          "@value": "Apron",
+          "@language": "sw"
+        },
+        {
+          "@value": "Avental",
+          "@language": "pt"
+        },
+        {
+          "@value": "Apron",
+          "@language": "oc"
+        },
+        {
+          "@value": "Абон",
+          "@language": "ru"
+        },
+        {
+          "@value": "Apron",
+          "@language": "cy"
+        },
+        {
+          "@value": "エプロン",
+          "@language": "ja"
+        },
+        {
+          "@value": "An tAthrú",
+          "@language": "ga"
+        },
+        {
+          "@value": "एप्रन",
+          "@language": "hi"
+        },
+        {
+          "@value": "环境",
+          "@language": "zh"
+        },
+        {
+          "@value": "Apron",
+          "@language": "fr"
+        },
+        {
+          "@value": "Apron",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#apron",
+      "@type": "dfc-p:ProductType"
+    },
+    {
+      "@id": "http://static.datafoodconsortium.org/data/clothesTypes.json#corset",
+      "rdfs:label": [
+        {
+          "@value": "Corset",
+          "@language": "en"
+        },
+        {
+          "@value": "Corset",
+          "@language": "ar"
+        },
+        {
+          "@value": "Corset",
+          "@language": "ku"
+        },
+        {
+          "@value": "Corset",
+          "@language": "es"
+        },
+        {
+          "@value": "Corse",
+          "@language": "it"
+        },
+        {
+          "@value": "Korsett",
+          "@language": "de"
+        },
+        {
+          "@value": "Corset",
+          "@language": "sw"
+        },
+        {
+          "@value": "Espartilho",
+          "@language": "pt"
+        },
+        {
+          "@value": "Corset",
+          "@language": "oc"
+        },
+        {
+          "@value": "Корсет",
+          "@language": "ru"
+        },
+        {
+          "@value": "Corset",
+          "@language": "cy"
+        },
+        {
+          "@value": "コルセット",
+          "@language": "ja"
+        },
+        {
+          "@value": "Sraith",
+          "@language": "ga"
+        },
+        {
+          "@value": "कोर्सेट",
+          "@language": "hi"
+        },
+        {
+          "@value": "Cset",
+          "@language": "zh"
+        },
+        {
+          "@value": "Corset",
+          "@language": "fr"
+        },
+        {
+          "@value": "Corset",
+          "@language": "ca"
+        }
+      ],
+      "dfc-p:specialize": "http://static.datafoodconsortium.org/data/toolTypes.rdf#corset",
+      "@type": "dfc-p:ProductType"
+    }
+  ]
+}

@@ -1,0 +1,3270 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#"
+     xml:base="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl"
+     xmlns:cc="http://creativecommons.org/ns#"
+     xmlns:dc="http://purl.org/dc/terms/"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:xsp="http://www.owl-ontologies.com/2005/08/07/xsp.owl#"
+     xmlns:foaf="http://xmlns.com/foaf/0.1/"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:swrl="http://www.w3.org/2003/11/swrl#"
+     xmlns:vann="http://purl.org/vocab/vann/"
+     xmlns:swrlb="http://www.w3.org/2003/11/swrlb#"
+     xmlns:protege="http://protege.stanford.edu/plugins/owl/protege#">
+    <owl:Ontology rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl">
+        <rdf:type rdf:resource="http://purl.org/vocommons/voaf#Vocabulary"/>
+        <vann:preferredNamespacePrefix>dfc-b</vann:preferredNamespacePrefix>
+        <vann:preferredNamespaceUri>http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#</vann:preferredNamespaceUri>
+        <owl:imports rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl"/>
+        <owl:imports rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl"/>
+        <cc:license rdf:resource="https://www.gnu.org/licenses/agpl-3.0.en.html"/>
+        <dc:contributor rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#rachelA"/>
+        <dc:contributor rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#simonL"/>
+        <dc:creator rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#bernardC"/>
+        <dc:description xml:lang="en">A common vocabulary for digital food platforms (Business Part)</dc:description>
+        <dc:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2018-05-28</dc:issued>
+        <dc:modified rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2019-10-21</dc:modified>
+        <dc:publisher rdf:resource="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium"/>
+        <dc:title xml:lang="en">Data Food Consortium Business</dc:title>
+        <rdfs:comment xml:lang="en">A common vocabulary for digital food platforms (Business Part)</rdfs:comment>
+        <owl:versionInfo rdf:datatype="http://www.w3.org/2001/XMLSchema#decimal">4.0</owl:versionInfo>
+    </owl:Ontology>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Datatypes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://www.w3.org/2001/XMLSchema#date -->
+
+    <rdfs:Datatype rdf:about="http://www.w3.org/2001/XMLSchema#date"/>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property"/>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#addressOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#addressOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasAddress"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:label xml:lang="en">address of</rdfs:label>
+        <rdfs:label xml:lang="fr">adresse de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliatedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliatedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliates"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="fr">géré par</rdfs:label>
+        <rdfs:label xml:lang="en">managed by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliates -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliates">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+        <rdfs:label xml:lang="fr">gère</rdfs:label>
+        <rdfs:label xml:lang="en">manages</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#belongsTo -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#belongsTo">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">appartient à</rdfs:label>
+        <rdfs:label xml:lang="en">belongs to</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#certificateOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#certificateOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasCertification"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#InverseFunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">certificat/label de</rdfs:label>
+        <rdfs:label xml:lang="en">certificate of</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concernedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concernedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concerns"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="en">concerned by</rdfs:label>
+        <rdfs:label xml:lang="fr">concerné par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concerns -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concerns">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">concerne</rdfs:label>
+        <rdfs:label xml:lang="en">concerns</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constituedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constituedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="en">constituted by</rdfs:label>
+        <rdfs:label xml:lang="fr">constitué par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TheoriticalStock"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">constitue</rdfs:label>
+        <rdfs:label xml:lang="en">constitutes</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">consommé par</rdfs:label>
+        <rdfs:label xml:lang="en">consumed by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow"/>
+        <rdfs:label xml:lang="fr">consomme</rdfs:label>
+        <rdfs:label xml:lang="en">consumes</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinatedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinatedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinates"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination"/>
+        <rdfs:label xml:lang="en">coordinated by</rdfs:label>
+        <rdfs:label xml:lang="fr">coordonné par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinates -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinates">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="en">coordinates</rdfs:label>
+        <rdfs:label xml:lang="fr">coordonne</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#definedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#definedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#defines"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CustomerCategory"/>
+        <rdfs:label xml:lang="en">defined by</rdfs:label>
+        <rdfs:label xml:lang="fr">defini par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#defines -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#defines">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="en">defines</rdfs:label>
+        <rdfs:label xml:lang="fr">définit</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#InverseFunctionalProperty"/>
+        <rdfs:label xml:lang="en">facet of</rdfs:label>
+        <rdfs:label xml:lang="fr">facette de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#from -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#from">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+        <rdfs:label xml:lang="en">from</rdfs:label>
+        <rdfs:label xml:lang="fr">vient de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#geographicalOriginOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#geographicalOriginOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasGeographicalOrigin"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#InverseFunctionalProperty"/>
+        <rdfs:label xml:lang="en">geographical origin of</rdfs:label>
+        <rdfs:label xml:lang="fr">origine géographique de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasAddress -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasAddress">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">a pour adresse</rdfs:label>
+        <rdfs:label xml:lang="en">has address</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasCertification -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasCertification">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">a pour certification/label</rdfs:label>
+        <rdfs:label xml:lang="en">has certification</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:label xml:lang="fr">a pour facette descriptive</rdfs:label>
+        <rdfs:label xml:lang="en">has facet</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasGeographicalOrigin -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasGeographicalOrigin">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:comment rdf:datatype="http://www.w3.org/2001/XMLSchema#string"></rdfs:comment>
+        <rdfs:label xml:lang="fr">a pour origine géographique</rdfs:label>
+        <rdfs:label xml:lang="en">has geographical origin</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasIncome -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasIncome">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">a en entrée</rdfs:label>
+        <rdfs:label xml:lang="en">has input</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasMainContact -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasMainContact">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliates"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#mainContactOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="fr">a pour contact principal</rdfs:label>
+        <rdfs:label xml:lang="en">has for main contact</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasNatureOrigin -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasNatureOrigin">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#natureOriginOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">a pour source / origine naturelle ou vivante</rdfs:label>
+        <rdfs:label xml:lang="en">has for nature origin</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasObject -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasObject">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#objectOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination"/>
+        <rdfs:label xml:lang="fr">a pour objet</rdfs:label>
+        <rdfs:label xml:lang="en">has object</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOption -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOption">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#optionOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+        <rdfs:label xml:lang="fr">a pour option</rdfs:label>
+        <rdfs:label xml:lang="en">has option</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOutcome -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOutcome">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">a en sortie</rdfs:label>
+        <rdfs:label xml:lang="en">has output</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasPart -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasPart">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+        <rdfs:label xml:lang="fr">a pour partie</rdfs:label>
+        <rdfs:label xml:lang="en">has part</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasPartOrigin -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasPartOrigin">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOriginOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">a pour partie d&apos;origine au sein de la source</rdfs:label>
+        <rdfs:label xml:lang="en">has for part origin</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasProcess -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasProcess">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasFacet"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#processOf"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">a subi comme procédé</rdfs:label>
+        <rdfs:label xml:lang="en">has process</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasReference -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasReference">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referenceOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+        <rdfs:label xml:lang="fr">a pour référence</rdfs:label>
+        <rdfs:label xml:lang="en">has reference</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasType -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasType">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#typeOf"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">a pour type</rdfs:label>
+        <rdfs:label xml:lang="en">has type</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasUnit -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasUnit">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="fr">a pour unité</rdfs:label>
+        <rdfs:label xml:lang="en">has unit</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hostedAt -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hostedAt">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hosts"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+        <rdfs:label xml:lang="fr">a lieu à</rdfs:label>
+        <rdfs:label xml:lang="en">hosted at</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hosts -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hosts">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Place"/>
+        <rdfs:label xml:lang="en">hosts</rdfs:label>
+        <rdfs:label xml:lang="fr">héberge</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifiedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifiedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifies"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock"/>
+        <rdfs:label xml:lang="en">identified by</rdfs:label>
+        <rdfs:label xml:lang="fr">identifié par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifies -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifies">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+        <rdfs:label xml:lang="fr">identifie</rdfs:label>
+        <rdfs:label xml:lang="en">identifies</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow"/>
+        <rdfs:label xml:lang="en">Input of</rdfs:label>
+        <rdfs:label xml:lang="fr">Source de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializes"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct"/>
+        <rdfs:label xml:lang="en">Industrialized by</rdfs:label>
+        <rdfs:label xml:lang="fr">Indutrialisé par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+        <rdfs:label xml:lang="en">Industrializes</rdfs:label>
+        <rdfs:label xml:lang="fr">Indutrialise</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#listedIn -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#listedIn">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lists"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="en">listed in</rdfs:label>
+        <rdfs:label xml:lang="fr">listé dans</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lists -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lists">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">iste</rdfs:label>
+        <rdfs:label xml:lang="en">lists</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizes"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TheoriticalStock"/>
+        <rdfs:label xml:lang="fr">localisé par</rdfs:label>
+        <rdfs:label xml:lang="en">localized by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+        <rdfs:label xml:lang="fr">localise</rdfs:label>
+        <rdfs:label xml:lang="en">localizes</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#mainContactOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#mainContactOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliatedBy"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+        <rdfs:label xml:lang="fr">contact principal pour</rdfs:label>
+        <rdfs:label xml:lang="en">main contact of</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintainedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintainedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintains"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label xml:lang="en">maintained by</rdfs:label>
+        <rdfs:label xml:lang="fr">maintenu par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintains -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintains">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="en">maintains</rdfs:label>
+        <rdfs:label xml:lang="fr">maintient</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#managedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#managedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#manages"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+        <rdfs:label xml:lang="fr">géré par</rdfs:label>
+        <rdfs:label xml:lang="en">managed by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#manages -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#manages">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="fr">gère</rdfs:label>
+        <rdfs:label xml:lang="en">manages</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#natureOriginOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#natureOriginOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf"/>
+        <rdfs:label xml:lang="en">nature origin of</rdfs:label>
+        <rdfs:label xml:lang="fr">origine naturelle (source) de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#objectOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#objectOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+        <rdfs:label xml:lang="en">object of</rdfs:label>
+        <rdfs:label xml:lang="fr">objet de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offeredThrough -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offeredThrough">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offers"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+        <rdfs:label xml:lang="en">offered through</rdfs:label>
+        <rdfs:label xml:lang="fr">offert via</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offers -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offers">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+        <rdfs:label xml:lang="en">offers</rdfs:label>
+        <rdfs:label xml:lang="fr">offre</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offersTo -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offersTo">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+        <rdfs:label xml:lang="en">offers to</rdfs:label>
+        <rdfs:label xml:lang="fr">offert à</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#optionOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#optionOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+        <rdfs:label xml:lang="fr">option de</rdfs:label>
+        <rdfs:label xml:lang="en">option of</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orderedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orderedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orders"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+        <rdfs:label xml:lang="fr">commandé par</rdfs:label>
+        <rdfs:label xml:lang="en">ordered by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orders -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orders">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:label xml:lang="fr">commande</rdfs:label>
+        <rdfs:label xml:lang="en">orders</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow"/>
+        <rdfs:label xml:lang="fr">Résultat de</rdfs:label>
+        <rdfs:label xml:lang="en">output of</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ownedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ownedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#owns"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+        <rdfs:label xml:lang="en">owned by</rdfs:label>
+        <rdfs:label xml:lang="fr">possédé par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#owns -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#owns">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:label xml:lang="en">owns</rdfs:label>
+        <rdfs:label xml:lang="fr">possède</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine"/>
+        <rdfs:label xml:lang="en">part of</rdfs:label>
+        <rdfs:label xml:lang="fr">partie de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOriginOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOriginOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf"/>
+        <rdfs:label xml:lang="en">part of origin (source) utilisée</rdfs:label>
+        <rdfs:label xml:lang="fr">partie de la source utilisée</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#processOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#processOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facetOf"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#InverseFunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="en">process of</rdfs:label>
+        <rdfs:label xml:lang="fr">procédé utilisé pour</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#producedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#producedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="en">produced by</rdfs:label>
+        <rdfs:label xml:lang="fr">produit par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow"/>
+        <rdfs:label xml:lang="en">produces</rdfs:label>
+        <rdfs:label xml:lang="fr">produit</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposes"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct"/>
+        <rdfs:label xml:lang="en">proposed by</rdfs:label>
+        <rdfs:label xml:lang="fr">proposé par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposes -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposes">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="fr">propose</rdfs:label>
+        <rdfs:label xml:lang="en">proposes</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referenceOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referenceOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+        <rdfs:label xml:lang="en">reference of</rdfs:label>
+        <rdfs:label xml:lang="fr">référence de</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referencedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referencedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referencedBy"/>
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#SymmetricProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:label xml:lang="en">referenced by</rdfs:label>
+        <rdfs:label xml:lang="fr">référencé par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#references -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#references">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+        <rdfs:label xml:lang="en">references</rdfs:label>
+        <rdfs:label xml:lang="fr">référence</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#refersTo -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#refersTo">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DeliveryOption"/>
+        <rdfs:label xml:lang="fr">fait référence à</rdfs:label>
+        <rdfs:label xml:lang="en">refers to</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#representedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#representedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#represents"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+        <rdfs:label xml:lang="en">represented by</rdfs:label>
+        <rdfs:label xml:lang="fr">représenté par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#represents -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#represents">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+        <rdfs:label xml:lang="en">represents</rdfs:label>
+        <rdfs:label xml:lang="fr">représente</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requestedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requestedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requests"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#FunctionalProduct"/>
+        <rdfs:label xml:lang="fr">demandé par</rdfs:label>
+        <rdfs:label xml:lang="en">requested by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requests -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requests">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:label xml:lang="fr">demande</rdfs:label>
+        <rdfs:label xml:lang="en">requests</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfiedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfiedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfies"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#FunctionalProduct"/>
+        <rdfs:label xml:lang="fr">satisfait par</rdfs:label>
+        <rdfs:label xml:lang="en">satisfied by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfies -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfies">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct"/>
+        <rdfs:label xml:lang="fr">satisfait</rdfs:label>
+        <rdfs:label xml:lang="en">satisfies</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#selects -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#selects">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+        <rdfs:label xml:lang="en">selects</rdfs:label>
+        <rdfs:label xml:lang="fr">sélectionne</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#storedIn -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#storedIn">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stores"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock"/>
+        <rdfs:label xml:lang="fr">stocké dans</rdfs:label>
+        <rdfs:label xml:lang="en">stored in</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stores -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stores">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+        <rdfs:label xml:lang="fr">stocke</rdfs:label>
+        <rdfs:label xml:lang="en">stores</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#suppliedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#suppliedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#supplies"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+        <rdfs:label xml:lang="fr">fourni par</rdfs:label>
+        <rdfs:label xml:lang="en">supplied by</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#supplies -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#supplies">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="fr">fournit</rdfs:label>
+        <rdfs:label xml:lang="en">supplies</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#to -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#to">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#supplies"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+        <rdfs:label xml:lang="en">to</rdfs:label>
+        <rdfs:label xml:lang="fr">à</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#tracedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#tracedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#traces"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+        <rdfs:label xml:lang="en">contained in</rdfs:label>
+        <rdfs:label xml:lang="fr">contenu dans</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#traces -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#traces">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+        <rdfs:label xml:lang="en">contains</rdfs:label>
+        <rdfs:label xml:lang="fr">contient</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transformedBy -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transformedBy">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <owl:inverseOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transforms"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+        <rdfs:label xml:lang="en">transformed by</rdfs:label>
+        <rdfs:label xml:lang="fr">transformé par</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transforms -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transforms">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:label xml:lang="fr">transforme</rdfs:label>
+        <rdfs:label xml:lang="en">transforms</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#typeOf -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#typeOf">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Interface_Property"/>
+        <rdfs:label xml:lang="en">type of</rdfs:label>
+        <rdfs:label xml:lang="fr">type pour</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses -->
+
+    <owl:ObjectProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_ObjectProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DeliveryOption"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PickupOption"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="en">uses</rdfs:label>
+        <rdfs:label xml:lang="fr">utilise</rdfs:label>
+    </owl:ObjectProperty>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Data properties
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Image -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Image">
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">image</rdfs:label>
+        <rdfs:label xml:lang="fr">image</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#InstagramPage -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#InstagramPage">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">Instagram page</rdfs:label>
+        <rdfs:label xml:lang="fr">page Instagram</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LinkedinPage -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LinkedinPage">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">LinkedIn page</rdfs:label>
+        <rdfs:label xml:lang="fr">page LinkedIn</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TwitterPage -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TwitterPage">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">Compte Twitter</rdfs:label>
+        <rdfs:label xml:lang="en">Twitter page</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#URL -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#URL">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VirtualPlace"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">URL</rdfs:label>
+        <rdfs:label xml:lang="fr">URL</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VATnumber -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VATnumber">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">VAT number</rdfs:label>
+        <rdfs:label xml:lang="fr">n° de TVA intracommunautaire</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VATstatus -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VATstatus">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#boolean"/>
+        <rdfs:label xml:lang="en">Charges VAT?</rdfs:label>
+        <rdfs:label xml:lang="fr">Soumis à la TVA?</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#batchNumber -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#batchNumber">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">batch number</rdfs:label>
+        <rdfs:label xml:lang="fr">numéro de lot</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#brand -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#brand">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">brand</rdfs:label>
+        <rdfs:label xml:lang="fr">marque</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#city -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#city">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">city</rdfs:label>
+        <rdfs:label xml:lang="fr">ville</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#claim -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#claim">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">affirmation produit</rdfs:label>
+        <rdfs:label xml:lang="en">product claim</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#cost -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#cost">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="en">cost</rdfs:label>
+        <rdfs:label xml:lang="fr">coût</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#country -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#country">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">country</rdfs:label>
+        <rdfs:label xml:lang="fr">pays</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#date -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#date">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Stock"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#date"/>
+        <rdfs:label xml:lang="en">date</rdfs:label>
+        <rdfs:label xml:lang="fr">date</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#description -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#description">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">Description</rdfs:label>
+        <rdfs:label xml:lang="fr">Description</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#email -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#email">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">email</rdfs:label>
+        <rdfs:label xml:lang="fr">email</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#endDate -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#endDate">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#date"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+        <rdfs:label xml:lang="fr">Date de fin</rdfs:label>
+        <rdfs:label xml:lang="en">End date</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#enterpriseID -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#enterpriseID">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">enterprise unique ID number</rdfs:label>
+        <rdfs:label xml:lang="fr">n° SIRET</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#expiryDate -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#expiryDate">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#date"/>
+        <rdfs:label xml:lang="fr">date de péremption</rdfs:label>
+        <rdfs:label xml:lang="en">expiry date</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facebookPage -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#facebookPage">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">Facebook page</rdfs:label>
+        <rdfs:label xml:lang="fr">Page Facebook</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#familyName -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#familyName">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">family name</rdfs:label>
+        <rdfs:label xml:lang="fr">nom de famille</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#fee -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#fee">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="en">Fee</rdfs:label>
+        <rdfs:label xml:lang="fr">Frais</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#firstName -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#firstName">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">first name</rdfs:label>
+        <rdfs:label xml:lang="fr">prénom</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#invoiceNumber -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#invoiceNumber">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">invoice number</rdfs:label>
+        <rdfs:label xml:lang="fr">numéro de facture</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#latitude -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#latitude">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="en">latitude</rdfs:label>
+        <rdfs:label xml:lang="fr">latitude</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lifetime -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lifetime">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="fr">durée de vie  (en nombre de jours)</rdfs:label>
+        <rdfs:label xml:lang="en">lifetime (in number of days)</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#logo -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#logo">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">logo</rdfs:label>
+        <rdfs:label xml:lang="fr">logo</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#longitude -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#longitude">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="en">longitude</rdfs:label>
+        <rdfs:label xml:lang="fr">longitude</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#marginPercent -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#marginPercent">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="fr">Marge</rdfs:label>
+        <rdfs:label xml:lang="en">Markup</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orderNumber -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orderNumber">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">numéro de commande</rdfs:label>
+        <rdfs:label xml:lang="en">order number</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#paymentMethodProvider -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#paymentMethodProvider">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PaymentMethod"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">fournisseur de la méthode de paiement</rdfs:label>
+        <rdfs:label xml:lang="en">payment method provider</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#paymentMethodType -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#paymentMethodType">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PaymentMethod"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="en">payment method type</rdfs:label>
+        <rdfs:label xml:lang="fr">type de méthode de paiement</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#phoneNumber -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#phoneNumber">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">numéro de téléphone</rdfs:label>
+        <rdfs:label xml:lang="en">phone number</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#physicalCharacteristics -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#physicalCharacteristics">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">charactéristique physique</rdfs:label>
+        <rdfs:label xml:lang="en">physical characteristics</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#postcode -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#postcode">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">code postal</rdfs:label>
+        <rdfs:label xml:lang="en">post code</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#price -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#price">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PaymentMethod"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="en">price</rdfs:label>
+        <rdfs:label xml:lang="fr">prix</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#productionDate -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#productionDate">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#date"/>
+        <rdfs:label xml:lang="fr">date de production</rdfs:label>
+        <rdfs:label xml:lang="en">production date</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#quantity -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#quantity">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Stock"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#float"/>
+        <rdfs:label xml:lang="en">quantity</rdfs:label>
+        <rdfs:label xml:lang="fr">quantité</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#sku -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#sku">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:comment xml:lang="en">Only a general &quot;SKU&quot; id is proposed for now. Agents using GTIN could use GTIN as SKU but other IDs than GTIN can be used.</rdfs:comment>
+        <rdfs:label xml:lang="fr">Référence produit</rdfs:label>
+        <rdfs:label xml:lang="en">SKU</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#startDate -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#startDate">
+        <rdfs:subPropertyOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#date"/>
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#dateTime"/>
+        <rdfs:label xml:lang="fr">Date de début</rdfs:label>
+        <rdfs:label xml:lang="en">Start date</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stockLimitation -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stockLimitation">
+        <rdfs:domain>
+            <owl:Class>
+                <owl:unionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+                    <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+                </owl:unionOf>
+            </owl:Class>
+        </rdfs:domain>
+        <rdfs:label xml:lang="fr">limitation de stock</rdfs:label>
+        <rdfs:label xml:lang="en">stock limitation</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#street -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#street">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label xml:lang="fr">n°, rue</rdfs:label>
+        <rdfs:label xml:lang="en">street, n°</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#totalTheoriticalStock -->
+
+    <owl:DatatypeProperty rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#totalTheoriticalStock">
+        <rdfs:domain rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+        <rdfs:label xml:lang="fr">stock theorique total</rdfs:label>
+        <rdfs:label xml:lang="en">total theoretical stock</rdfs:label>
+    </owl:DatatypeProperty>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Where_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#addressOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#addressOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Address</rdfs:label>
+        <rdfs:label xml:lang="fr">Adresse</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Who_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#belongsTo"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CustomerCategory"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasAddress"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orders"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#owns"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requests"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#FunctionalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Agent</rdfs:label>
+        <rdfs:label xml:lang="fr">Agent</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedConsumptionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedConsumptionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As planned consumption flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de consommation planifié (théorique)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalConsumptionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalConsumptionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As planned local consumption flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de consommation planifié (localisé)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalProductionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalProductionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As planned local production flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de production planifié (localisé)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transformation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasIncome"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalConsumptionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOutcome"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transformedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transformedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As planned local transformation</rdfs:label>
+        <rdfs:label xml:lang="fr">Transformation planifiée (localisée)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedProductionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedProductionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As planned production flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de production planifié (théorique)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedTransformation -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedTransformation">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transformation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasIncome"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedConsumptionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOutcome"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As planned transformation</rdfs:label>
+        <rdfs:label xml:lang="fr">Transformation planifiée (théorique)</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedConsumptionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedConsumptionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As realized consumption flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de consommation réalisé</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedProductionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedProductionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As realized production flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de production réalisé</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedTransformation">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transformation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasIncome"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedConsumptionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOutcome"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">As realized transformation</rdfs:label>
+        <rdfs:label xml:lang="fr">Transformation réalisée</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#listedIn"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#managedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offeredThrough"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#references"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#listedIn"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#managedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#references"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stockLimitation"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Catalog item</rdfs:label>
+        <rdfs:label xml:lang="fr">Référence catalogue</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ConsumptionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumes"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#incomeOf"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Consumption flow</rdfs:label>
+        <rdfs:label xml:lang="fr">Flux de consommation</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinatedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasObject"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinatedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasObject"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Coordination</rdfs:label>
+        <rdfs:label xml:lang="fr">Coordination</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CustomerCategory -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CustomerCategory">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Who_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#definedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#definedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Catégorie client</rdfs:label>
+        <rdfs:label xml:lang="en">Customer category</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+        <rdfs:label xml:lang="fr">Relation de l&apos;ontologie Data Food Consortium</rdfs:label>
+        <rdfs:label xml:lang="en">Relation of Data Food Consortium ontology</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl#RepresentedThing"/>
+        <rdfs:label xml:lang="en">Subject of Data Food Consortium ontology</rdfs:label>
+        <rdfs:label xml:lang="fr">Sujet de l&apos;ontologie Data Food Consortium</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_How_Subject -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_How_Subject">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject"/>
+        <rdfs:label xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;How?&quot;</rdfs:label>
+        <rdfs:label xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Comment?&quot;</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_What_Subject -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_What_Subject">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject"/>
+        <rdfs:label xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;What?&quot;</rdfs:label>
+        <rdfs:label xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Quoi?&quot;</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Where_Subject -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Where_Subject">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject"/>
+        <rdfs:label xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;Where?&quot;</rdfs:label>
+        <rdfs:label xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Où?&quot;</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Who_Subject -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Who_Subject">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Subject"/>
+        <rdfs:label xml:lang="en">Subject of Data Food Consortium ontology answering question &quot;Who?&quot;</rdfs:label>
+        <rdfs:label xml:lang="fr">Sujet de l&apos;ontologie DFC répondant à la question &quot;Qui ?&quot;</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_What_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concernedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedConsumptionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasNatureOrigin"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#NatureOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasPartOrigin"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#PartOrigin"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasProcess"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Process"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referencedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasGeographicalOrigin"/>
+                <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:qualifiedCardinality>
+                <owl:onClass>
+                    <owl:Class>
+                        <owl:unionOf rdf:parseType="Collection">
+                            <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#GlobalGenericOrigin"/>
+                            <rdf:Description rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#TerritorialOrigin"/>
+                        </owl:unionOf>
+                    </owl:Class>
+                </owl:onClass>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasType"/>
+                <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:qualifiedCardinality>
+                <owl:onClass rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#ProductType"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasUnit"/>
+                <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:qualifiedCardinality>
+                <owl:onClass rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#Unit"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lifetime"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Defined product</rdfs:label>
+        <rdfs:label xml:lang="fr">Produit défini</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DeliveryOption -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DeliveryOption">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#refersTo"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#refersTo"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Delivery option</rdfs:label>
+        <rdfs:label xml:lang="fr">Option de livraison</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliatedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#coordinates"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#defines"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CustomerCategory"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasMainContact"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintains"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#manages"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#supplies"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#transforms"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalTransformation"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasMainContact"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Enterprise</rdfs:label>
+        <rdfs:label xml:lang="fr">Entreprise</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#FunctionalProduct -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#FunctionalProduct">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requestedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfiedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#requestedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Functional product</rdfs:label>
+        <rdfs:label xml:lang="fr">Produit fonctionnel</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_What_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constituedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TheoriticalStock"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalConsumptionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasReference"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#producedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedLocalProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#representedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Localized product</rdfs:label>
+        <rdfs:label xml:lang="fr">Produit localisé</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#listedIn"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offers"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offersTo"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CustomerCategory"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offers"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#offersTo"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stockLimitation"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Offer</rdfs:label>
+        <rdfs:label xml:lang="fr">Offre</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#belongsTo"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasPart"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orderedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#selects"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PaymentMethod"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#belongsTo"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#orderedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#selects"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Commande</rdfs:label>
+        <rdfs:label xml:lang="en">Order</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#OrderLine">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concerns"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Order"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concerns"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#partOf"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Ligne de commande</rdfs:label>
+        <rdfs:label xml:lang="en">Order line</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PaymentMethod -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PaymentMethod">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_How_Subject"/>
+        <rdfs:label xml:lang="fr">Méthode de payment</rdfs:label>
+        <rdfs:label xml:lang="en">Payment method</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Person">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#affiliates"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#mainContactOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Person</rdfs:label>
+        <rdfs:label xml:lang="fr">Personne</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Place"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasAddress"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Address"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TheoriticalStock"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#stores"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasAddress"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Lieu physique</rdfs:label>
+        <rdfs:label xml:lang="en">Physical place</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_What_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concernedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constituedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#consumedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ownedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#producedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsRealizedProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#represents"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#tracedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Physical product</rdfs:label>
+        <rdfs:label xml:lang="fr">Produit physique</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PickupOption -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PickupOption">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#uses"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Option de retrait</rdfs:label>
+        <rdfs:label xml:lang="en">Pickup option</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Place -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Place">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Where_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hosts"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Lieu</rdfs:label>
+        <rdfs:label xml:lang="en">Place</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_What_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifies"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#traces"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Lot du produit</rdfs:label>
+        <rdfs:label xml:lang="en">Product batch</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductionFlow">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#outcomeOf"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#produces"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Fux de production</rdfs:label>
+        <rdfs:label xml:lang="en">Production flow</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#RealStock">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Stock"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifiedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ProductBatch"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#storedIn"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#identifiedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#storedIn"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Real stock</rdfs:label>
+        <rdfs:label xml:lang="fr">Stock réel</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_Where_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lists"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#CatalogItem"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintainedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintainedBy"/>
+                <owl:minCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:minCardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#maintainedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Repository</rdfs:label>
+        <rdfs:label xml:lang="fr">Référentiel</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hasOption"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#hostedAt"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Place"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#lists"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Offer"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#objectOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Coordination"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Sales session</rdfs:label>
+        <rdfs:label xml:lang="fr">Session de vente</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#ShippingOption">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_How_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#optionOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SaleSession"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Option d&apos;expédition</rdfs:label>
+        <rdfs:label xml:lang="en">Shipping option</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Stock -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Stock">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_BusinessOntology_Relation"/>
+        <rdfs:label xml:lang="en">Stock</rdfs:label>
+        <rdfs:label xml:lang="fr">Stock</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#producedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#AsPlannedProductionFlow"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#referenceOf"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#suppliedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#suppliedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#totalTheoriticalStock"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Produit fourni</rdfs:label>
+        <rdfs:label xml:lang="en">Supplied product</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TechnicalProduct">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DefinedProduct"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#industrializedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#SuppliedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Enterprise"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#satisfies"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#FunctionalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#proposedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Produit technique</rdfs:label>
+        <rdfs:label xml:lang="en">Technical product</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TheoriticalStock -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#TheoriticalStock">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Stock"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#LocalizedProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizedBy"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalPlace"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#constitutes"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#localizedBy"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="fr">Stock théorique</rdfs:label>
+        <rdfs:label xml:lang="en">Theoretical stock</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transaction">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_How_Subject"/>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#concerns"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#PhysicalProduct"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#from"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#to"/>
+                <owl:allValuesFrom rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Agent"/>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#from"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:subClassOf>
+            <owl:Restriction>
+                <owl:onProperty rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#to"/>
+                <owl:cardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:cardinality>
+            </owl:Restriction>
+        </rdfs:subClassOf>
+        <rdfs:label xml:lang="en">Transaction</rdfs:label>
+        <rdfs:label xml:lang="fr">Transaction</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transformation -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Transformation">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_How_Subject"/>
+        <rdfs:label xml:lang="en">Transformation</rdfs:label>
+        <rdfs:label xml:lang="fr">Transformation</rdfs:label>
+    </owl:Class>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VirtualPlace -->
+
+    <owl:Class rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#VirtualPlace">
+        <rdfs:subClassOf rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Place"/>
+        <rdfs:label xml:lang="fr">Lieu virtuel</rdfs:label>
+        <rdfs:label xml:lang="en">Virtual place</rdfs:label>
+    </owl:Class>
+
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Individuals
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#bernardC -->
+
+    <rdf:Description rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#bernardC">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    </rdf:Description>
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium -->
+
+    <rdf:Description rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Organization"/>
+    </rdf:Description>
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#rachelA -->
+
+    <rdf:Description rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#rachelA">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    </rdf:Description>
+
+
+
+    <!-- http://static.datafoodconsortium.org/data/publication.rdf#simonL -->
+
+    <rdf:Description rdf:about="http://static.datafoodconsortium.org/data/publication.rdf#simonL">
+        <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    </rdf:Description>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_1 -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_1">
+        <rdf:type rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">La Ruche Qui Dit Oui</rdfs:label>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_2 -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_2">
+        <rdf:type rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Panier Local</rdfs:label>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_3 -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_3">
+        <rdf:type rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Cagette</rdfs:label>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_4 -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_4">
+        <rdf:type rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Open Food France</rdfs:label>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_5 -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_5">
+        <rdf:type rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Open Food Facts</rdfs:label>
+    </owl:NamedIndividual>
+
+
+
+    <!-- http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_6 -->
+
+    <owl:NamedIndividual rdf:about="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository_6">
+        <rdf:type rdf:resource="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#Repository"/>
+        <rdfs:label rdf:datatype="http://www.w3.org/2001/XMLSchema#string">Elzeard</rdfs:label>
+    </owl:NamedIndividual>
+</rdf:RDF>
+
+
+
+<!-- Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi -->

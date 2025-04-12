@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ ! -d architecture ]; then
+    mkdir architecture
+fi
+
+FILES="*.dot"
+for f in $FILES
+do
+    img_filename=$(echo ${f} | awk -F '.' '{print $1}').png
+    dot "$f" -Tpng -o architecture/${img_filename}
+done

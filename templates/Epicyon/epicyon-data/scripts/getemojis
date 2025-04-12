@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# See https://emojos.in
+
+instance="$1"
+if [ ! "${instance}" ]; then
+    echo "Please specify an instance domain"
+    exit 1
+fi
+
+filename=".emoji.html"
+if [ "$2" ]; then
+    filename="$1"
+fi
+
+if [ -f "${filename}" ]; then
+    rm "${filename}"
+fi
+
+echo "wget \"https://emojos.in/${instance}?show_all=true&show_animated=true\" -O \"${filename}\""
+wget "https://emojos.in/${instance}?show_all=true&show_animated=true" -O "${filename}"
+if [ ! -f "${filename}" ]; then
+    echo "Unable to download from ${instance}"
+    exit 2
+fi
+
+cat "${filename}"
+
+imported_filename='.emoji_import.txt'
+result=$(cat "$filename" | grep '"' | awk -F '"' '{print $2 ", " $4}')
+if [ ! "${result}" ]; then
+    echo "No emojis found"
+    exit 3
+fi
+echo "${result}" > "${imported_filename}"
+cat "${imported_filename}"
+python3 epicyon.py --import_emoji "${imported_filename}"
+rm "${imported_filename}"

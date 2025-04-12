@@ -1,0 +1,2 @@
+#!/bin/bash
+journalctl -u epicyon | grep "INBOX:"

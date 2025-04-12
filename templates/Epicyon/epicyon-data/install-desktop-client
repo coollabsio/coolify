@@ -1,0 +1,149 @@
+#!/bin/bash
+
+currUser="$USER"
+
+if [ ! -d "${HOME}/.config/systemd/user" ]; then
+    mkdir -p "${HOME}/.config/systemd/user"
+fi
+
+if [ ! -f /usr/bin/zenity ]; then
+    if [ -f /usr/bin/apt ]; then
+        sudo apt -y install zenity
+    fi
+    if [ -f /usr/bin/pacman ]; then
+        sudo pacman -S --noconfirm zenity
+    fi
+fi
+
+HANDLE=$(zenity --entry --width=400 --title "Epicyon Desktop Client" --text "Fediverse handle (name@domain): ")
+if [ ! "$HANDLE" ]; then
+    zenity --warning --width=400 --text "No fediverse handle was given"
+    exit 1
+fi
+if [[ "$HANDLE" != *'@'* ]]; then
+    zenity --warning --width=400 --text "Fediverse handle must be in the form username@domain"
+    exit 2
+fi
+# PASSWORD=$(zenity --width=400 --password --title "Epicyon Desktop Client")
+# if [ ! "$PASSWORD" ]; then
+#     zenity --warning --width=400 --text "No password was given"
+#     exit 3
+# fi
+
+if [ ! -f /usr/bin/git ]; then
+    if [ -f /usr/bin/apt ]; then
+        sudo apt -y install git
+    fi
+    if [ -f /usr/bin/pacman ]; then
+        sudo pacman -S --noconfirm git
+    fi
+fi
+
+if [ ! -f /usr/bin/gpg ]; then
+    if [ -f /usr/bin/apt ]; then
+        sudo apt -y install gnupg
+    fi
+    if [ -f /usr/bin/pacman ]; then
+        sudo pacman -S --noconfirm gnupg
+    fi
+fi
+
+if [ ! -f /usr/bin/python3 ]; then
+    if [ -f /usr/bin/apt ]; then
+        sudo apt -y install python3
+    fi
+    if [ -f /usr/bin/pacman ]; then
+        sudo pacman -S --noconfirm python
+    fi
+fi
+
+if [ ! -d ${HOME}/.epicyon ]; then
+    git clone --depth 1 https://gitlab.com/bashrc2/epicyon ${HOME}/.epicyon
+else
+    cd ${HOME}/.epicyon || exit 1
+    git pull
+fi
+if [ ! -d ${HOME}/.epicyon ]; then
+    zenity --warning --width=400 --text "Unable to clone Epicyon repo"
+    exit 4
+fi
+chown -R "${currUser}":"${currUser}" ${HOME}/.epicyon
+
+notificationType=
+if [ -f /usr/bin/notify-send ]; then
+    notificationType='notify-send'
+else
+    if [ -f /usr/bin/zenity ]; then
+        notificationType='zenity'
+    fi
+fi
+if [[ ! "$notificationType" ]]; then
+    zenity --warning --width=400 --text "No desktop notification command was found."
+    exit 5
+fi
+
+if [ ! -d ${HOME}/.gnupg ]; then
+    echo 'Generating GPG key'
+    gpg --quick-generate-key "${HANDLE}" ed25519 cert
+fi
+
+#{ echo '[Unit]';
+#  echo 'Description=Epicyon Desktop Notifications';
+#  echo '';
+#  echo '[Service]';
+#  echo "WorkingDirectory=${HOME}/.epicyon";
+#  echo "ExecStart=/usr/bin/python3 epicyon.py --noKeyPress --notifyType $notificationType --notify $HANDLE --password \"$PASSWORD\"";
+#  echo 'Type=oneshot';
+#  echo 'RemainAfterExit=yes';
+#  echo '';
+#  echo '[Install]';
+#  echo 'WantedBy=default.target'; } > "${HOME}/.config/systemd/user/epicyon-notifications.service"
+#systemctl --user daemon-reload
+#systemctl --user stop epicyon-notifications.service &
+#systemctl --user disable epicyon-notifications.service
+
+{ echo '#!/bin/bash';
+  echo 'cd ~/.epicyon';
+  echo "if [ \"\$1\" ]; then";
+  echo "    PASSWORD=\"\$1\"";
+  echo 'else';
+  echo "    PASSWORD=\$(zenity --width=400 --password --title \"Epicyon Desktop Client\")";
+  echo "    if [ ! \"\$PASSWORD\" ]; then";
+  echo "        zenity --warning --width=400 --text \"No password was given\"";
+  echo '        exit 3';
+  echo '    fi';  
+  echo 'fi';
+  echo "python3 epicyon.py --desktop ${HANDLE} --password \"\$PASSWORD\""; } > ~/epicyon-client
+chmod +x ~/epicyon-client
+
+# TTS version
+cp ~/epicyon-client ~/epicyon-client-tts
+chmod +x ~/epicyon-client-tts
+sed -i 's|epicyon.py|epicyon.py --screenreader espeak|g' ~/epicyon-client-tts
+
+# TTS version with picospeaker
+cp ~/epicyon-client ~/epicyon-client-pico
+chmod +x ~/epicyon-client-pico
+sed -i 's|epicyon.py|epicyon.py --screenreader picospeaker|g' ~/epicyon-client-pico
+
+# TTS version with mimic3
+cp ~/epicyon-client ~/epicyon-client-mimic3
+chmod +x ~/epicyon-client-mimic3
+sed -i 's|epicyon.py|epicyon.py --screenreader mimic3|g' ~/epicyon-client-mimic3
+
+# TTS stream
+cp ~/epicyon-client ~/epicyon-client-stream
+chmod +x ~/epicyon-client-stream
+sed -i 's|epicyon.py|epicyon.py --notifyShowNewPosts --screenreader espeak|g' ~/epicyon-client-stream
+
+# TTS stream
+cp ~/epicyon-client ~/epicyon-stream-pico
+chmod +x ~/epicyon-stream-pico
+sed -i 's|epicyon.py|epicyon.py --notifyShowNewPosts --screenreader picospeaker|g' ~/epicyon-stream-pico
+
+# TTS stream
+cp ~/epicyon-client ~/epicyon-stream-mimic3
+chmod +x ~/epicyon-stream-mimic3
+sed -i 's|epicyon.py|epicyon.py --notifyShowNewPosts --screenreader mimic3|g' ~/epicyon-stream-mimic3
+
+zenity --info --width=400 --text "Epicyon desktop client is now installed. You can run it with ~/epicyon-client"

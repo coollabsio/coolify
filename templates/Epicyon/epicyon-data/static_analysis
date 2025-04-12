@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ -f /usr/bin/flake8 ]; then
+    cmd="/usr/bin/flake8"
+else
+    cmd="python3 -m flake8"
+fi
+
+echo "Starting static analysis"
+
+for sourceFile in *.py
+do
+    if [[ "$sourceFile" == *"flycheck"* ]]; then
+	continue
+    fi
+    result=$($cmd "$sourceFile")
+    if [ "$result" ]; then
+	echo ''
+	echo "$result"
+	exit 1
+    fi
+    echo -n '.'
+done
+
+echo ''
+echo "Static analysis complete"
+
+exit 0

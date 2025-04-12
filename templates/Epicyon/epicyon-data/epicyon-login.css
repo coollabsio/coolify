@@ -1,0 +1,287 @@
+@charset "UTF-8";
+
+:root {
+    --login-bg-color: #010026;
+    --link-bg-color: #e6ebf0;
+    --login-fg-color: white;
+    --main-link-color: darkblue;
+    --main-visited-color: #232c37;
+    --border-color: #c0cdd9;
+    --border-width: 1px;
+    --font-size-header: 18px;
+    --font-color-header: black;
+    --login-font-size: 22px;
+    --login-font-size-mobile: 40px;
+    --login-font-size-tiny: 20px;
+    --text-entry-foreground: #111;
+    --text-entry-background: white;
+    --time-color: #aaa;
+    --button-text: #FFFFFF;
+    --button-background: #999;
+    --button-selected: #666;
+    --form-border-radius: 30px;
+    --focus-color: grey;
+    --line-spacing: 130%;
+    --login-logo-width: 20%;
+    --main-link-color-hover: blue;
+    --rendering: normal;
+}
+
+@font-face {
+  font-family: 'NimbusSanL';
+  font-style: italic;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/NimbusSanL-italic.otf') format('opentype');
+}
+@font-face {
+  font-family: 'NimbusSanL';
+  font-style: normal;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/NimbusSanL.otf') format('opentype');
+}
+
+body, html {
+    background-color: var(--login-bg-color);
+    color: var(--login-fg-color);
+
+    background-image: url("/login-background.jpg");
+    background-size: cover;
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    height: 100%;
+    font-family: 'NimbusSanL';
+    max-width: 60%;
+    min-width: 600px;
+    margin: 0 auto;
+    font-size: var(--login-font-size);
+    line-height: var(--line-spacing);
+    image-rendering: var(--rendering);
+}
+
+a, u {
+    color: var(--login-fg-color);
+}
+
+a:visited{
+    color: var(--main-visited-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link {
+    color: var(--main-link-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:visited:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:focus {
+    border: 2px solid var(--focus-color);
+}
+
+form {
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--form-border-radius);
+}
+
+.transparent {
+    color: transparent;
+    background: transparent;
+    font-size: 0px;
+    line-height: 0px;
+    height: 0px;
+}
+
+input[type=text], input[type=password] {
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    font-size: var(--login-font-size);
+    font-family: 'NimbusSanL';
+}
+
+button {
+    background-color: var(--button-background);
+    color: var(--button-text);
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    font-size: var(--login-font-size);
+    font-family: 'NimbusSanL';
+}
+
+.login-text {
+    font-size: var(--login-font-size);
+    font-family: 'NimbusSanL';
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+.imgcontainer {
+    text-align: center;
+    margin: 24px 0 12px 0;
+}
+
+.imgcontainer img {
+    width: var(--login-logo-width);
+}
+
+img.avatar {
+    width: 40%;
+    border-radius: 50%;
+}
+
+.container {
+    padding: 16px;
+}
+
+span.psw {
+    float: right;
+    padding-top: 16px;
+}
+
+.license {
+    float: right;
+    margin: 0% 0%;
+    width: 20%;
+}
+
+@media screen and (min-width: 400px) {
+    body, html {
+        background-color: var(--login-bg-color);
+        color: var(--login-fg-color);
+        height: 100%;
+        font-family: 'NimbusSanL';
+        max-width: 60%;
+        min-width: 600px;
+        margin: 0 auto;
+        font-size: var(--login-font-size);
+        font-family: 'NimbusSanL';
+        position: relative;
+    }
+    .login-text {
+        font-size: var(--login-font-size);
+        font-family: 'NimbusSanL';
+    }
+    input[type=text], input[type=password] {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: var(--login-font-size);
+        font-family: 'NimbusSanL';
+    }
+    button {
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+        font-size: var(--login-font-size);
+        font-family: 'NimbusSanL';
+    }
+}
+
+@media screen and (max-width: 1000px) {
+    body, html {
+        background-color: var(--login-bg-color);
+        color: var(--login-fg-color);
+        height: 100%;
+        font-family: 'NimbusSanL';
+        max-width: 95%;
+        min-width: 600px;
+        margin: 0 auto;
+        font-size: var(--login-font-size-mobile);
+        font-family: 'NimbusSanL';
+        position: relative;
+    }
+    .login-text {
+        font-size: var(--login-font-size-mobile);
+        font-family: 'NimbusSanL';
+    }
+    input[type=text], input[type=password] {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: var(--login-font-size-mobile);
+        font-family: 'NimbusSanL';
+    }
+    button {
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+        font-size: var(--login-font-size-mobile);
+        font-family: 'NimbusSanL';
+    }
+}
+
+@media screen and (max-width: 480px) {
+    body, html {
+        background-color: var(--login-bg-color);
+        color: var(--login-fg-color);
+        height: 100%;
+        font-family: 'NimbusSanL';
+        max-width: 95%;
+        min-width: 400px;
+        margin: 0 auto;
+        font-size: var(--login-font-size-tiny);
+        font-family: 'NimbusSanL';
+        position: relative;
+    }
+    .login-text {
+        font-size: var(--login-font-size-tiny);
+        font-family: 'NimbusSanL';
+    }
+    input[type=text], input[type=password] {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: var(--login-font-size-tiny);
+        font-family: 'NimbusSanL';
+    }
+    button {
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+        font-size: var(--login-font-size-mobile);
+        font-family: 'NimbusSanL';
+    }
+}

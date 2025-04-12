@@ -1,0 +1,24 @@
+{
+    "name": "Link Trackers",
+    "warning": "Link Trackers",
+    "description": "Links in this post may be tracking your browser",
+    "words": [],
+    "domains": [
+        "bit.ly",
+        "bitly.com",
+        "rebrand.ly",
+        "rebrandly.com",
+        "tinyurl.com",
+        "bl.ink",
+        "short.io",
+        "snapt.io",
+        "clickmagick.com",
+        "voluum.com",
+        "improvely.com",
+        "improve.ly",
+        "linktrackr.com",
+        "redtrack.io",
+        "clixtrac.com",
+        "t2mio.com"
+    ]
+}

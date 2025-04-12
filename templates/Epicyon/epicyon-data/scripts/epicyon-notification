@@ -1,0 +1,445 @@
+#!/bin/bash
+#
+# This can be called from a crontab entry to send notifications
+# when Epicyon events occur. You will need to have
+# sendxmpp+prosody or Synapse (matrix) installed.
+#
+# Something like:
+#
+# */1 * * * * root /usr/local/bin/epicyon-notification
+#
+# License
+# =======
+#
+# Copyright (C) 2020-2021 Bob Mottram <bob@libreserver.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+PROJECT_NAME=epicyon
+epicyonInstallDir=/opt/${PROJECT_NAME}
+
+MY_EMAIL_ADDRESS="username@domain"
+
+local_domain=$HOSTNAME
+if [ -f /var/lib/tor/hidden_service_epicyon/hostname ]; then
+    local_domain=$(cat /var/lib/tor/hidden_service_epicyon/hostname)
+fi
+
+
+function notification_translate_text {
+    text="$1"
+    if ! grep -q '"language":' "${epicyonInstallDir}/config.json"; then
+        echo "$text"
+        return
+    fi
+    language=$(cat "${epicyonInstallDir}/config.json" | awk -F '"language":' '{print $2}' | awk -F '"' '{print $2}')
+    translationsFilename="${epicyonInstallDir}/translations/${language}.json"
+    if [ ! -f "$translationsFilename" ]; then
+        echo "$text"
+        return
+    fi
+    if ! grep -q "\"$text\":" "$translationsFilename"; then
+        echo "$text"
+        return
+    fi
+    grep "\"$text\":" "$translationsFilename" | awk -F '"' '{print $4}'
+}
+
+function kill_sendxmpp_process {
+    # Sometimes the process can get stuck, so ensure that
+    # it gets killed if necessary
+    # shellcheck disable=SC2009
+    sendxmpp_pid=$(ps ax | grep /usr/bin/sendxmpp | grep -v grep | awk -F ' ' '{print $1}')
+    if [ "$sendxmpp_pid" ]; then
+        kill -9 "$sendxmpp_pid"
+    fi
+}
+
+function matrix_synapse_server_message {
+    admin_username="$1"
+    notifications_username="$2"
+    message="$3"
+
+    MATRIX_DATA_DIR='/var/lib/matrix'
+    homeserver_config="${MATRIX_DATA_DIR}/homeserver.yaml"
+
+    # shellcheck disable=SC2002
+    MATRIX_DOMAIN_NAME=$(cat "$homeserver_config" | grep "server_name:" | head -n 1 | awk -F '"' '{print $2}')
+    if [ ! "$MATRIX_DOMAIN_NAME" ]; then
+        return
+    fi
+
+    # get the curl command and domain to send to
+    curl_command='curl'
+    homebase="https://$MATRIX_DOMAIN_NAME"
+    if [ -f /var/lib/tor/hidden_service_matrix/hostname ]; then
+        curl_command='torsocks curl'
+        homebase="http://$(cat /var/lib/tor/hidden_service_matrix/hostname)"
+    fi
+
+    # get the token for the matrix admin user
+    MATRIXADMIN="@${admin_username}:$MATRIX_DOMAIN_NAME"
+    MATRIXUSER="@${notifications_username}:$MATRIX_DOMAIN_NAME"
+    cd "$MATRIX_DATA_DIR" || return
+    TOKEN=$(sqlite3 homeserver.db "select token from access_tokens where user_id like '$MATRIXADMIN' order by id desc limit 1;")
+    if [ ! "$TOKEN" ]; then
+        admin_username="${notifications_username}"
+        TOKEN=$(sqlite3 homeserver.db "select token from access_tokens where user_id like '$MATRIXUSER' order by id desc limit 1;")
+        if [ ! "$TOKEN" ]; then
+            echo "No matrix access token for $MATRIXADMIN"
+            return
+        fi
+    fi
+    # send server notice
+    MATRIXPOST="${homebase}/_synapse/admin/v1/send_server_notice?access_token=${TOKEN}"
+    MATRIXMESSAGE="{\"user_id\": \"${MATRIXUSER}\",\"content\": { \"msgtype\": \"m.text\",\"body\": \"${message}\" }}"
+    # shellcheck disable=SC2086
+    ${curl_command} --request POST --silent --header "Content-Type: application/json" --data "${MATRIXMESSAGE}" ${MATRIXPOST} > /dev/null
+}
+
+function matrix_conduit_server_message {
+    admin_username="$1"
+    notifications_username="$2"
+    message="$3"
+
+    MATRIX_DATA_DIR='/var/lib/matrix-conduit'
+    homeserver_config="/etc/matrix-conduit/conduit.toml"
+
+    # shellcheck disable=SC2002
+    MATRIX_DOMAIN_NAME=$(cat "$homeserver_config" | grep "server_name =" | head -n 1 | awk -F '"' '{print $2}')
+    if [ ! "$MATRIX_DOMAIN_NAME" ]; then
+        return
+    fi
+
+    # get the curl command and domain to send to
+    curl_command='curl'
+    homebase="https://$MATRIX_DOMAIN_NAME"
+    if [ -f /var/lib/tor/hidden_service_conduit/hostname ]; then
+        curl_command='torsocks curl'
+        homebase="http://$(cat /var/lib/tor/hidden_service_matrix/hostname)"
+    fi
+
+    # get the access token for the matrix admin user
+    MATRIXADMIN="@${admin_username}:$MATRIX_DOMAIN_NAME"
+    MATRIXUSER="@${notifications_username}:$MATRIX_DOMAIN_NAME"
+    cd "$MATRIX_DATA_DIR" || return
+    # TODO
+    echo "No matrix access token for $MATRIXADMIN"
+    return
+    # send server notice
+    # NOTE: this might not be implemented within Conduit yet.
+    # See https://gitlab.com/famedly/conduit/-/blob/next/src/api/client_server/message.rs
+    MATRIXPOST="${homebase}/_matrix/admin/r0/send_server_notice?access_token=${TOKEN}"
+    MATRIXMESSAGE="{\"user_id\": \"${MATRIXUSER}\",\"content\": { \"msgtype\": \"m.text\",\"body\": \"${message}\" }}"
+    # shellcheck disable=SC2086
+    ${curl_command} --request POST --silent --header "Content-Type: application/json" --data "${MATRIXMESSAGE}" ${MATRIXPOST} > /dev/null
+}
+
+function sendNotification {
+    USERNAME="$1"
+    SUBJECT="$2"
+    MESSAGE="$3"
+
+    hasSent=
+
+    # see https://ntfy.sh
+    # You will need to create these two files containing the ntfy
+    # service url and topic
+    ntfy_url_file=/home/${USERNAME}/.ntfy_url
+    ntfy_topic_file=/home/${USERNAME}/.ntfy_topic
+
+    # get ntfy settings from the account directory
+    epicyon_config_file=${epicyonInstallDir}/config.json
+    if [ -f "${epicyon_config_file}" ]; then
+        epicyon_domain=$(cat "$epicyon_config_file" | awk -F '"domain": "' '{print $2}' | awk -F '"' '{print $1}')
+        if [ "${epicyon_domain}" ]; then
+            epicyon_account_dir="${epicyonInstallDir}/accounts/${USERNAME}@${epicyon_domain}"
+            if [ -d "${epicyon_account_dir}" ]; then
+                ntfy_url_file=${epicyon_account_dir}/.ntfy_url
+                ntfy_topic_file=${epicyon_account_dir}/.ntfy_topic
+            fi
+        fi
+    fi
+
+    if [ "$MESSAGE" ]; then
+        if [ -f "$ntfy_topic_file" ]; then
+            ntfy_topic=$(cat "$ntfy_topic_file")
+            if [ "$ntfy_topic" ]; then
+                if [ -f "$ntfy_url_file" ]; then
+                    ntfy_url=$(cat "$ntfy_url_file")
+                else
+                    # use the default service url
+                    ntfy_url="ntfy.sh"
+                fi
+
+                curl_command='curl'
+                if [ -f /var/lib/tor/hidden_service_matrix/hostname ]; then
+                    curl_command='torsocks curl'
+                fi
+
+                if [ ! "$SUBJECT" ]; then
+                    SUBJECT="$PROJECT_NAME"
+                fi
+                ${curl_command} -H "Title: ${SUBJECT}" -H "Priority: default" -H "Tags: loudspeaker" -d "${MESSAGE}" "${ntfy_url}/${ntfy_topic}"
+                hasSent=1
+            fi
+        fi
+    fi
+
+    if [ -d /etc/prosody ]; then
+        if [ -f /usr/bin/sendxmpp ]; then
+            # generate a random password for a temporary user account
+            notification_user_password=$(openssl rand -base64 32 | tr -dc A-Za-z0-9 | head -c 30 ; echo -n '')
+            # register a temporary xmpp user account to send the message
+            if prosodyctl register "notification" "$local_domain" "$notification_user_password"; then
+                if [[ "$SUBJECT" == *' Tor '* ]]; then
+                    MESSAGE="$SUBJECT"
+                fi
+
+                if [ -f /usr/bin/sendxmpp ]; then
+                    # kill any existing message which hasn't sent
+                    kill_sendxmpp_process
+                    # send the xmpp notification using the temporary account
+                    echo "${MESSAGE}" | /usr/bin/sendxmpp -u notification -p "${notification_user_password}" -j localhost -o ${local_domain} --message-type=headline -n -t -s ${PROJECT_NAME} ${USERNAME}@${local_domain}
+                    hasSent=1
+                fi
+            fi
+            # remove the temporary xmpp account
+            prosodyctl deluser "notification@$local_domain"
+        fi
+    fi
+
+    if [ -d /etc/matrix ]; then
+        matrix_synapse_server_message "${USERNAME}" "${USERNAME}" "$MESSAGE"
+        hasSent=1
+    fi
+
+    if [ -d /etc/matrix-conduit ]l then
+       matrix_conduit_server_message "${USERNAME}" "${USERNAME}" "$MESSAGE"
+       # hasSent=1
+    fi
+
+    if [ ! "$hasSent" ]; then
+        if [[ "$MY_EMAIL_ADDRESS" != "username@domain" ]]; then
+            # send to a fixed email address for a single user instance
+            echo "$MESSAGE" | /usr/bin/mail -s "$SUBJECT" "$MY_EMAIL_ADDRESS"
+        fi
+    fi
+}
+
+function notifications {
+    # checks if DMs or replies have arrived and sends notifications to users
+    if [ ! -f "$epicyonInstallDir/config.json" ]; then
+        return
+    fi
+
+    if [ ! -f "${epicyonInstallDir}/config.json" ]; then
+        return
+    fi
+
+    # shellcheck disable=SC2002
+    EPICYON_DOMAIN_NAME=$(cat "${epicyonInstallDir}/config.json" | awk -F '"domain":' '{print $2}' | awk -F '"' '{print $2}')
+    for d in ${epicyonInstallDir}/accounts/*/ ; do
+        if [[ "$d" != *'@'* ]]; then
+            continue
+        fi
+        epicyonDir="${d::-1}"
+        USERNAME=$(echo "$epicyonDir" | awk -F '/' '{print $5}' | awk -F '@' '{print $1}')
+
+        # send notifications for calendar events to XMPP/email users
+        epicyonCalendarfile="$epicyonDir/.newCalendar"
+        if [ -f "$epicyonCalendarfile" ]; then
+            if ! grep -q "##sent##" "$epicyonCalendarfile"; then
+                epicyonCalendarmessage=$(notification_translate_text 'Calendar')
+                epicyonCalendarfileContent=$(echo "$epicyonCalendarmessage")" "$(cat "$epicyonCalendarfile")
+                if [[ "$epicyonCalendarfileContent" == '/calendar'* ]]; then
+                    epicyonCalendarmessage="Epicyon: ${EPICYON_DOMAIN_NAME}/users/${USERNAME}${epicyonCalendarfileContent}"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonCalendarmessage"
+                echo "##sent##" >> "$epicyonCalendarfile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonCalendarfile"
+            fi
+        fi
+
+        # send notifications for DMs to XMPP/email users
+        epicyonDMfile="$epicyonDir/.newDM"
+        if [ -f "$epicyonDMfile" ]; then
+            if ! grep -q "##sent##" "$epicyonDMfile"; then
+                epicyonDMmessage=$(notification_translate_text 'DM')
+                epicyonDMfileContent=$(echo "$epicyonDMmessage")" "$(cat "$epicyonDMfile")
+                if [[ "$epicyonDMfileContent" == *':'* ]]; then
+                    epicyonDMmessage="Epicyon: $epicyonDMfileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonDMmessage"
+                echo "##sent##" > "$epicyonDMfile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonDMfile"
+            fi
+        fi
+
+        # send notifications for likes to XMPP/email users
+        epicyonLikeFile="$epicyonDir/.newLike"
+        if [ -f "$epicyonLikeFile" ]; then
+            if ! grep -q "##sent##" "$epicyonLikeFile"; then
+                epicyonLikeMessage=$(notification_translate_text 'Liked by')
+                epicyonLikeFileContent=$(cat "$epicyonLikeFile" | awk -F ' ' '{print $1}')" "$(echo "$epicyonLikeMessage")" "$(cat "$epicyonLikeFile" | awk -F ' ' '{print $2}')
+                if [[ "$epicyonLikeFileContent" == *':'* ]]; then
+                    epicyonLikeMessage="Epicyon: $epicyonLikeFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonLikeMessage"
+                echo "##sent##" > "$epicyonLikeFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonLikeFile"
+            fi
+        fi
+
+        # send notifications for moved accounts to XMPP/email users
+        epicyonMovedFile="${epicyonDir}/.newMoved"
+        if [ -f "${epicyonMovedFile}" ]; then
+            if ! grep -q "##sent##" "$epicyonMovedFile"; then
+                epicyonMovedMessage=$(notification_translate_text 'has moved to')
+                epicyonMovedFrom=$(cat "$epicyonMovedFile" | awk -F ' ' '{print $1}')
+                epicyonMovedTo=$(cat "$epicyonMovedFile" | awk -F ' ' '{print $2}')
+                epicyonMovedUrl=$(cat "$epicyonMovedFile" | awk -F ' ' '{print $3}')
+                epicyonMovedLink="<a href=\"${epicyonMovedUrl}\">${epicyonMovedTo}</a>"
+                epicyonMovedFileContent=$($(echo "$epicyonMovedFrom")" "$(echo "$epicyonMovedMessage")" "$(echo "$epicyonMovedLink"))
+                if [[ "$epicyonMovedFileContent" == *':'* ]]; then
+                    epicyonMovedFileContent="Epicyon: $epicyonMovedFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonMovedFileContent"
+                echo "##sent##" > "$epicyonMovedFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonMovedFile"
+            fi
+        fi
+
+        # send notifications for emoji reactions to XMPP/email users
+        epicyonReactionFile="$epicyonDir/.newReaction"
+        if [ -f "$epicyonReactionFile" ]; then
+            if ! grep -q "##sent##" "$epicyonReactionFile"; then
+                epicyonReactionMessage=$(notification_translate_text 'Reaction by')
+                epicyonReactionFileContent=$(cat "$epicyonReactionFile" | awk -F ' ' '{print $1}')" "$(echo "$epicyonReactionMessage")" "$(cat "$epicyonReactionFile" | awk -F ' ' '{print $2}')
+                if [[ "$epicyonReactionFileContent" == *':'* ]]; then
+                    epicyonReactionMessage="Epicyon: $epicyonReactionFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonReactionMessage"
+                echo "##sent##" > "$epicyonReactionFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonReactionFile"
+            fi
+        fi
+
+        # send notifications for posts arriving from a particular person
+        epicyonNotifyFile="$epicyonDir/.newNotifiedPost"
+        if [ -f "$epicyonNotifyFile" ]; then
+            if ! grep -q "##sent##" "$epicyonNotifyFile"; then
+                epicyonNotifyMessage=$(notification_translate_text 'New post')
+                epicyonNotifyFileContent=$(echo "$epicyonNotifyMessage")" "$(cat "$epicyonNotifyFile")
+                if [[ "$epicyonNotifyFileContent" == *':'* ]]; then
+                    epicyonNotifyMessage="Epicyon: $epicyonNotifyFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonNotifyMessage"
+                echo "##sent##" > "$epicyonNotifyFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonNotifyFile"
+            fi
+        fi
+
+        # send notifications for replies to XMPP/email users
+        epicyonReplyFile="$epicyonDir/.newReply"
+        if [ -f "$epicyonReplyFile" ]; then
+            if ! grep -q "##sent##" "$epicyonReplyFile"; then
+                epicyonReplyMessage=$(notification_translate_text 'Replies')
+                epicyonReplyFileContent=$(echo "$epicyonReplyMessage")" "$(cat "$epicyonReplyFile")
+                if [[ "$epicyonReplyFileContent" == *':'* ]]; then
+                    epicyonReplyMessage="Epicyon: $epicyonReplyFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonReplyMessage"
+                echo "##sent##" > "$epicyonReplyFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonReplyFile"
+            fi
+        fi
+
+        # send notifications for git patches to XMPP/email users
+        epicyonPatchFile="$epicyonDir/.newPatch"
+        if [ -f "$epicyonPatchFile" ]; then
+            if [ -f "${epicyonPatchFile}Content" ]; then
+                if ! grep -q "##sent##" "$epicyonPatchFile"; then
+                    epicyonPatchMessage=$(cat "$epicyonPatchFile")
+                    if [ "$epicyonPatchMessage" ]; then
+                        # notify the member
+                        sendNotification "$USERNAME" "Epicyon" "$epicyonPatchMessage"
+                        echo "##sent##" > "$epicyonPatchFile"
+                        chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonPatchFile"
+                        # send the patch to them by email
+                        cat "${epicyonPatchFile}Content" | mail -s "[Epicyon] $epicyonPatchMessage" "${USERNAME}@${HOSTNAME}"
+                        rm "${epicyonPatchFile}Content"
+                    fi
+                fi
+            fi
+        fi
+
+        # send notifications for new shared items to XMPP/email users
+        epicyonShareFile="$epicyonDir/.newShare"
+        if [ -f "$epicyonShareFile" ]; then
+            if ! grep -q "##sent##" "$epicyonShareFile"; then
+                epicyonShareMessage=$(notification_translate_text 'Shares')
+                epicyonShareFileContent=$(echo "$epicyonShareMessage")" "$(cat "$epicyonShareFile")
+                if [[ "$epicyonShareFileContent" == *':'* ]]; then
+                    epicyonShareMessage="Epicyon: $epicyonShareFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonShareMessage"
+                echo "##sent##" > "$epicyonShareFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonShareFile"
+            fi
+        fi
+
+        # send notifications for new wanted items to XMPP/email users
+        epicyonWantedFile="$epicyonDir/.newWanted"
+        if [ -f "$epicyonWantedFile" ]; then
+            if ! grep -q "##sent##" "$epicyonWantedFile"; then
+                epicyonWantedMessage=$(notification_translate_text 'Wanted')
+                epicyonWantedFileContent=$(echo "$epicyonWantedMessage")" "$(cat "$epicyonWantedFile")
+                if [[ "$epicyonWantedFileContent" == *':'* ]]; then
+                    epicyonWantedMessage="Epicyon: $epicyonWantedFileContent"
+                fi
+                sendNotification "$USERNAME" "Epicyon" "$epicyonWantedMessage"
+                echo "##sent##" > "$epicyonWantedFile"
+                chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonWantedFile"
+            fi
+        fi
+
+        # send notifications for follow requests to XMPP/email users
+        epicyonFollowFile="$epicyonDir/followrequests.txt"
+        epicyonFollowNotificationsFile="$epicyonDir/follownotifications.txt"
+        if [ -f "$epicyonFollowFile" ]; then
+            if [ -s "$epicyonFollowFile" ]; then
+                epicyonNotify=
+                if [ -f "$epicyonFollowNotificationsFile" ]; then
+                    hash1=$(sha256sum "$epicyonFollowFile" | awk -F ' ' '{print $1}')
+                    hash2=$(sha256sum "$epicyonFollowNotificationsFile" | awk -F ' ' '{print $1}')
+                    if [[ "$hash1" != "$hash2" ]]; then
+                        epicyonNotify=1
+                    fi
+                else
+                    epicyonNotify=1
+                fi
+                if [ $epicyonNotify ]; then
+                    cp "$epicyonFollowFile" "$epicyonFollowNotificationsFile"
+                    chown ${PROJECT_NAME}:${PROJECT_NAME} "$epicyonFollowNotificationsFile"
+
+                    epicyonFollowMessage=$(notification_translate_text 'Approve follower requests')" ${EPICYON_DOMAIN_NAME}/users/${USERNAME}/followers"
+                    sendNotification "$USERNAME" "Epicyon" "$epicyonFollowMessage"
+                fi
+            fi
+        fi
+    done
+}
+
+notifications

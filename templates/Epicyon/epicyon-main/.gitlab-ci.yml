@@ -1,0 +1,8 @@
+image: debian:testing
+
+test:
+  script:
+    - apt-get update
+    - apt-get install -y python3-cryptography python3-dateutil python3-idna python3-numpy python3-pil.imagetk python3-requests python3-socks python3-setuptools python3-pyqrcode imagemagick gnupg
+    - python3 epicyon.py --tests
+    - python3 epicyon.py --testsnetwork

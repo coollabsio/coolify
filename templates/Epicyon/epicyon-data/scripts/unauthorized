@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep 'unauthorized ' > .unauthorized.txt
+if [ ! -f .unauthorized.txt ]; then
+    echo 'No unauthorized events'
+else
+    cat .unauthorized.txt
+fi

@@ -1,0 +1,7 @@
+#!/bin/bash
+journalctl -u epicyon | grep 'MITM:' > .mitm_events.txt
+if [ ! -f .mitm_events.txt ]; then
+    echo 'No MITM events'
+else
+    cat .mitm_events.txt
+fi

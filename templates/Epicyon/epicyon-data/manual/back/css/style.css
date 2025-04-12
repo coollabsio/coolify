@@ -1,0 +1,203 @@
+/* ubuntu-condensed-regular - latin */
+@font-face {
+  font-family: 'Ubuntu Condensed';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/ubuntu-condensed-v11-latin-regular.eot'); /* IE9 Compat Modes */
+  src: local(''),
+       url('../fonts/ubuntu-condensed-v11-latin-regular.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+       url('../fonts/ubuntu-condensed-v11-latin-regular.woff2') format('woff2'), /* Super Modern Browsers */
+       url('../fonts/ubuntu-condensed-v11-latin-regular.woff') format('woff'), /* Modern Browsers */
+       url('../fonts/ubuntu-condensed-v11-latin-regular.ttf') format('truetype'), /* Safari, Android, iOS */
+       url('../fonts/ubuntu-condensed-v11-latin-regular.svg#UbuntuCondensed') format('svg'); /* Legacy iOS */
+}
+
+*{
+	box-sizing: border-box;
+}
+
+body{
+	margin: 0;
+}
+
+#container{
+	width: 800px;
+	margin: 0 auto;
+	padding: 40px 0;
+	background: linear-gradient(90deg, #FFFFFF 80%, #a1a2b6 80%);
+}
+
+main{
+	width: 60%;
+	float: left;
+}
+
+#main-header h3{
+	margin-top: 0;
+	font-size: 0.9em;
+	font-weight: 100;
+	font-family: "Trebuchet MS", Helvetica, sans-serif;
+}
+
+#article-header{
+	font-family: 'Ubuntu Condensed', sans-serif;
+	text-align: center;
+}
+
+	#article-header h1{
+		margin: 0;
+		font-size: 2.5em;
+		color: #8b2928;
+	}
+
+	#article-header h6{
+		margin: 2px 0 0 0;
+		font-weight: 600;
+		font-size: 1em;
+	}
+
+#intro p{
+	font-size: 1.1em;
+	line-height: 1.2em;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+	#intro p:first-child:first-letter{
+		font-family: 'Ubuntu Condensed', sans-serif;
+		font-size: 4.5em;
+		float: left;
+		line-height: 0.8em;
+		margin-right: 8px;
+		color: #908C6F;
+	}
+
+	#intro #title{
+		font-family: 'Ubuntu Condensed', sans-serif;
+		color: #908C6F;
+		font-weight: bold;
+	}
+
+#inside #section-header h3{
+	font-family: 'Ubuntu Condensed', sans-serif;
+	color: #908C6F;
+	font-size: 1.3em;
+	font-weight: bold;
+	margin-bottom: 0;
+}
+
+#inside ul{
+	margin-top: 5px;
+	padding-left: 18px;
+	list-style: none;	
+}
+
+#inside ul li{
+	font-size: 1.1em;
+	line-height: 1.4em;
+	text-indent: -1em;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+#inside ul li:before{
+	position: relative;
+	top: 2px;
+	font-size: 1.1em;
+	content: "• ";
+   color: #8b2928;
+}
+
+#inside p{
+	font-size: 1.1em;
+	line-height: 1.4em;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+#author{
+	font-size: 1.1em;
+	line-height: 1.4em;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+	margin-bottom: 0;
+}
+
+	#author #author-name{
+		font-family: 'Ubuntu Condensed', sans-serif;
+		color: #908C6F;
+		font-weight: bold;
+	}
+
+aside{
+	width: 40%;
+	float: left;
+	padding: 0 35px 0 20px;
+}
+
+aside #quotes{
+	background: #bbc3cc;
+	background: -moz-linear-gradient(top, #bbc3cc 0%, #bbc3cc 11%, #cedae7 49%, #e0ebf7 76%, #ffffff 100%);
+	background: -webkit-gradient(left top, left bottom, color-stop(0%, #bbc3cc), color-stop(11%, #bbc3cc), color-stop(49%, #cedae7), color-stop(76%, #e0ebf7), color-stop(100%, #ffffff));
+	background: -webkit-linear-gradient(top, #bbc3cc 0%, #bbc3cc 11%, #cedae7 49%, #e0ebf7 76%, #ffffff 100%);
+	background: -o-linear-gradient(top, #bbc3cc 0%, #bbc3cc 11%, #cedae7 49%, #e0ebf7 76%, #ffffff 100%);
+	background: -ms-linear-gradient(top, #bbc3cc 0%, #bbc3cc 11%, #cedae7 49%, #e0ebf7 76%, #ffffff 100%);
+	background: linear-gradient(to bottom, #bbc3cc 0%, #bbc3cc 11%, #cedae7 49%, #e0ebf7 76%, #ffffff 100%);
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#c9bd71', endColorstr='#ffffff', GradientType=0 );
+	padding: 10px 10px 5px 10px;
+}
+
+aside p{
+	text-align: center;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+aside .quote{
+	font-size: 1.2em;
+	margin-bottom: 0;
+}
+
+aside .quote:before, aside .quote:after{
+	content: '"';
+	color: #8b2928;
+	font-weight: bold;
+	font-size: 1.2em;
+}
+
+aside .author{
+	font-size: 0.9em;
+	margin-top: 5px;
+}
+
+#free-ebook img{
+	display: block;
+	width: 200px;
+	margin: 0 auto;
+}
+
+#bar-code img{
+	display: block;
+	width: 200px;
+	margin: 0 auto;
+	margin-top: 50px;
+}
+
+#page-footer{
+	clear: both;
+	background: url("../img/barcode.gif") no-repeat 530px bottom;
+}
+
+#page-footer #instructions{
+	width: 60%;
+	padding-top: 15px;
+	font-size: 0.8em;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+#page-footer #price{
+	display: inline;
+	margin-left: 55px;
+	font-size: 0.8em;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+#page-footer img{
+	padding-top: 50px;
+	width: 150px;
+}

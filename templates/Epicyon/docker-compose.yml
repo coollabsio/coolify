@@ -1,0 +1,44 @@
+version: '3.3'
+
+services:
+  app:
+    build:
+      context: ./epicyon-main
+      dockerfile: Dockerfile
+    container_name: epicyondoc
+    ports:
+      - "7156:7156"
+    env_file:
+      - .env
+    command: >
+      /usr/bin/python3 /app/epicyon.py
+      --bind 0.0.0.0
+      --port 80
+      --proxy 7156
+      --registration open
+      --domain ${DOMAIN}
+      --path /app
+    volumes:
+      - ./epicyon-data:/app
+    restart: unless-stopped
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:latest
+    container_name: nginxnew
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - app
+    networks:
+      - internal
+
+networks:
+  internal:
+

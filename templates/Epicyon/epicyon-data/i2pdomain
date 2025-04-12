@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+
+__filename__ = "i2pdomain"
+__author__ = "Bob Mottram"
+__license__ = "AGPL3+"
+__version__ = "1.1.0"
+__maintainer__ = "Bob Mottram"
+__email__ = "bob@libreserver.org"
+__status__ = "Production"
+
+import base64, hashlib, sys
+
+with open(sys.argv[1], 'rb') as f:
+    isRead=False
+    try:
+        print(base64.b32encode(hashlib.sha256(base64.b64decode(f.read(), '-~')).digest()).decode().strip('=').lower()+".b32.i2p")
+        isRead=True
+    except:
+        pass
+    if not isRead:
+        print(base64.b32encode(hashlib.sha256(base64.b64decode(f.read(516), '-~')).digest()).decode().strip('=').lower()+".b32.i2p")

@@ -1,0 +1,18 @@
+{
+    "name": "Ableism",
+    "warning": "Ableism",
+    "description": "Discrimination and social prejudice against people with disabilities.",
+    "words": [
+        "crazy", "cripple", "turn a blind", "turn a deaf", "diffability",
+        "differently abled", "different abilit",
+        " dumb.", " dumb ", " dumb!", " dumb?", "handicap",
+        "idiot", "imbecil", "insanity", "insane", " lame", "lunatic",
+        "maniac", "moron", "retard", "spaz", "spastic", "specially-abled",
+        "special needs", "stupid", "blind to", "bonkers",
+        "wheelchair bound", "confined to a wheelchair", "deaf to",
+        "deranged", "derranged", "harelip", "wacko", "whacko",
+        "cretin", "feeble-minded", "mental defective", "mentally defective",
+        "mongoloid", "blinded by", "double-blind"
+    ],
+    "domains": []
+}

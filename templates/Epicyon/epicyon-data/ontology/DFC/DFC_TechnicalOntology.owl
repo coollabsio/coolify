@@ -1,0 +1,269 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     ontologyIRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl">
+    <Prefix name="" IRI="http://static.datafoodconsortium.org/ontologies/DFC_TechnicalOntology.owl"/>
+    <Prefix name="cc" IRI="http://creativecommons.org/ns#"/>
+    <Prefix name="dc" IRI="http://purl.org/dc/terms/"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="xsp" IRI="http://www.owl-ontologies.com/2005/08/07/xsp.owl#"/>
+    <Prefix name="foaf" IRI="http://xmlns.com/foaf/0.1/"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="swrl" IRI="http://www.w3.org/2003/11/swrl#"/>
+    <Prefix name="vann" IRI="http://purl.org/vocab/vann/"/>
+    <Prefix name="swrlb" IRI="http://www.w3.org/2003/11/swrlb#"/>
+    <Prefix name="protege" IRI="http://protege.stanford.edu/plugins/owl/protege#"/>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="cc:license"/>
+        <IRI>https://www.gnu.org/licenses/agpl-3.0.en.html</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:creator"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#simonL</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:description"/>
+        <Literal xml:lang="en">A common vocabulary for digital food platforms (Technical Part)</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:issued"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2018-05-28</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:modified"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#date">2019-10-21</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:publisher"/>
+        <IRI>http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium</IRI>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="dc:title"/>
+        <Literal xml:lang="en">Data Food Consortium Technical</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespacePrefix"/>
+        <Literal>dfc-t</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <Literal xml:lang="en">A common vocabulary for digital food platforms (Technical Part)</Literal>
+    </Annotation>
+    <Annotation>
+        <AnnotationProperty abbreviatedIRI="owl:versionInfo"/>
+        <Literal datatypeIRI="http://www.w3.org/2001/XMLSchema#decimal">4.0</Literal>
+    </Annotation>
+    <Declaration>
+        <Class IRI="#DFC_DitributedRepresentation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#Platform"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#RepresentationPivot"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="#RepresentedThing"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="foaf:Organization"/>
+    </Declaration>
+    <Declaration>
+        <Class abbreviatedIRI="foaf:Person"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://static.datafoodconsortium.org/ontologies/DFC_BusinessOntology.owl#DFC_TechnicalOntology_ObjectProperty"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hasPivot"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#hostedBy"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="#represent"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#simonL"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="cc:license"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:creator"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:description"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:issued"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:modified"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:publisher"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="dc:title"/>
+    </Declaration>
+    <Declaration>
+        <AnnotationProperty abbreviatedIRI="vann:preferredNamespacePrefix"/>
+    </Declaration>
+    <SubClassOf>
+        <Class IRI="#Platform"/>
+        <Class IRI="#DFC_DitributedRepresentation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#Platform"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hostedBy"/>
+            <Class abbreviatedIRI="owl:Thing"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentationPivot"/>
+        <Class IRI="#DFC_DitributedRepresentation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentationPivot"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#represent"/>
+            <Class IRI="#RepresentedThing"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentationPivot"/>
+        <ObjectMinCardinality cardinality="1">
+            <ObjectProperty IRI="#represent"/>
+            <Class IRI="#RepresentedThing"/>
+        </ObjectMinCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentedThing"/>
+        <Class IRI="#DFC_DitributedRepresentation"/>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentedThing"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hasPivot"/>
+            <Class IRI="#RepresentationPivot"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentedThing"/>
+        <ObjectAllValuesFrom>
+            <ObjectProperty IRI="#hostedBy"/>
+            <Class IRI="#Platform"/>
+        </ObjectAllValuesFrom>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentedThing"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hasPivot"/>
+            <Class IRI="#RepresentationPivot"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <SubClassOf>
+        <Class IRI="#RepresentedThing"/>
+        <ObjectExactCardinality cardinality="1">
+            <ObjectProperty IRI="#hostedBy"/>
+            <Class IRI="#Platform"/>
+        </ObjectExactCardinality>
+    </SubClassOf>
+    <DisjointClasses>
+        <Class IRI="#Platform"/>
+        <Class IRI="#RepresentationPivot"/>
+        <Class IRI="#RepresentedThing"/>
+    </DisjointClasses>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Organization"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#dataFoodConsortium"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class abbreviatedIRI="foaf:Person"/>
+        <NamedIndividual IRI="http://static.datafoodconsortium.org/data/publication.rdf#simonL"/>
+    </ClassAssertion>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hasPivot"/>
+        <ObjectProperty abbreviatedIRI="owl:topObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#hostedBy"/>
+        <ObjectProperty abbreviatedIRI="owl:topObjectProperty"/>
+    </SubObjectPropertyOf>
+    <SubObjectPropertyOf>
+        <ObjectProperty IRI="#represent"/>
+        <ObjectProperty abbreviatedIRI="owl:topObjectProperty"/>
+    </SubObjectPropertyOf>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_DitributedRepresentation</IRI>
+        <Literal xml:lang="fr">Concepts de réconciliation de représentation distribuée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#DFC_DitributedRepresentation</IRI>
+        <Literal xml:lang="en">ditributed représentation reconcialition concepts</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#Platform</IRI>
+        <Literal xml:lang="fr">Organisation qui heberge la donnée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#Platform</IRI>
+        <Literal xml:lang="fr">Plateforme</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#RepresentationPivot</IRI>
+        <Literal xml:lang="fr">Permet de designer tous les RepresentatedThing qui sont équivalents et d&apos;etre désigné par un RepresentedThing pour connaitre ses équivalence par transitivité</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#RepresentationPivot</IRI>
+        <Literal xml:lang="fr">Pivot de représentation</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#RepresentedThing</IRI>
+        <Literal xml:lang="fr">Chose représentée sur une platefome posadant des equivalences sur d&apos;autres plateformes</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#RepresentedThing</IRI>
+        <Literal xml:lang="fr">Chose représentée</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>#hasPivot</IRI>
+        <Literal xml:lang="fr">possède un point pivot</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#hostedBy</IRI>
+        <Literal xml:lang="fr">hébergé par</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>#represent</IRI>
+        <Literal xml:lang="fr">représente</Literal>
+    </AnnotationAssertion>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi -->
+

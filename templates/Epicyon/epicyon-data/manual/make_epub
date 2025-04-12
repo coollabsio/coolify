@@ -1,0 +1,29 @@
+#!/bin/bash
+
+EPUB_TITLE='Epicyon User Manual'
+EPUB_AUTHORS='Bob Mottram'
+EPUB_LANGUAGE='English'
+EPUB_TAGS='fediverse, activitypub, server, linux, python, smallweb'
+EPUB_COMMENTS='ActivityPub server, designed for simplicity and accessibility. Includes calendar, news and sharing economy features to empower your federated community.'
+EPUB_PUBLISHER='Fuzzy Books'
+
+if [ ! -f /usr/bin/pandoc ]; then
+    echo 'pandoc command not found'
+    exit 1
+fi
+pandoc -t html -f markdown -o manual.html manual.md
+git add manual.html
+if [ -f /usr/bin/ebook-convert ]; then
+    ebook-convert manual.html manual.epub --cover manual-cover.png --authors "${EPUB_AUTHORS}" --language "${EPUB_LANGUAGE}" --tags "${EPUB_TAGS}" --comments "${EPUB_COMMENTS}" --title "${EPUB_TITLE}" --pretty-print  --publisher "${EPUB_PUBLISHER}"
+else
+    echo 'ebook-convert command not found'
+    if [ -f /usr/bin/flatpak ]; then
+        if ! flatpak --command="sh" run com.calibre_ebook.calibre \
+             -c "ebook-convert manual.html manual.epub --cover manual-cover.png --authors \"${EPUB_AUTHORS}\" --language \"${EPUB_LANGUAGE}\" --tags \"${EPUB_TAGS}\" --comments \"${EPUB_COMMENTS}\" --title \"${EPUB_TITLE}\" --pretty-print --publisher \"${EPUB_PUBLISHER}\""; then
+            exit 2
+        fi
+    fi
+fi
+if [ -f manual.epub ]; then
+    git add manual.epub
+fi

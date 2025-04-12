@@ -1,0 +1,28 @@
+{
+  "@context":{
+    "dfc-p": "http://static.datafoodconsortium.org/ontologies/DFC_ProductGlossary.owl#",
+    "dfc-u":"http://static.datafoodconsortium.org/data/units.rdf#"
+  },
+  "@graph":[
+    {
+      "@id":"dfc-u:kg",
+      "@type":"dfc-p:Unit",
+      "rdfs:label":"kilogramme"
+    },
+    {
+      "@id":"dfc-u:u",
+      "@type":"dfc-p:Unit",
+      "rdfs:label":"unité"
+    },
+    {
+      "@id":"dfc-u:g",
+      "@type":"dfc-p:Unit",
+      "rdfs:label":"gramme"
+    },
+    {
+      "@id":"dfc-u:l",
+      "@type":"dfc-p:Unit",
+      "rdfs:label":"litre"
+    }
+  ]
+}

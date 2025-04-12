@@ -1,0 +1,99 @@
+@charset "UTF-8";
+
+:root {
+    --main-bg-color: #282c37;
+    --link-bg-color: #282c37;
+    --main-bg-color-darker: #232c37;
+    --main-bg-color-report: #221c27;
+    --main-header-color-roles: #282237;
+    --main-fg-color: #dddddd;
+    --main-link-color: #999;
+    --main-visited-color: #888;
+    --border-color: #505050;
+    --font-size-header: 18px;
+    --font-color-header: #ccc;
+    --font-size: 30px;
+    --text-entry-foreground: #ccc;
+    --text-entry-background: #111;
+    --time-color: #aaa;
+    --button-text: #FFFFFF;
+    --button-background: #999;
+    --button-selected: #666;
+    --focus-color: white;
+    --main-link-color-hover: #bbb;
+    --rendering: normal;
+}
+
+@font-face {
+  font-family: 'Bedstead';
+  font-style: italic;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/bedstead.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Bedstead';
+  font-style: normal;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/bedstead.otf') format('opentype');
+}
+
+body, html {
+    background-color: var(--main-bg-color);
+    color: var(--main-fg-color);
+
+    height: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    max-width: 80%;
+    min-width: 600px;
+    margin: 0 auto;
+    font-size: var(--font-size);
+    image-rendering: var(--rendering);
+}
+
+a, u {
+    color: var(--main-fg-color);
+}
+
+a:visited{
+    color: var(--main-visited-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link {
+    color: var(--main-link-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:visited:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:focus {
+    border: 2px solid var(--focus-color);
+}
+
+.screentitle {
+    font-size: 30px;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+div {
+    height: 300px;
+    width: 400px;
+    background: var(--main-bg-color);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-top: -100px;
+    margin-left: -200px;
+}

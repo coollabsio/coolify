@@ -1,0 +1,43 @@
+# Font Licenses
+
+Absortile is under GPL. See https://www.ffonts.net/Absortile.font
+Atkinson-Hyperlegible-Next is under Atkinson Hyperlegible Font License, based on OFL version 1.1 http://brailleinstitute.org/freefont
+Barlow-Regular is under SIL Open Font License. See https://tribby.com/fonts/barlow
+Bedstead is under CC0. See below and https://fontlibrary.org/en/font/bedstead
+bgrove is under GPL. See http://www.free-fonts-download.com/basic/bloominggrove-font
+CheGuevaraTextSans-Regular is under CC0. See https://fonts2u.com/cheguevara-text-sans-regular.font
+CommitMono is under OFL. See https://commitmono.com
+Domestic_Manners by Dustin Norlander is under GPLv2. See https://www.1001fonts.com/domestic-manners-font.html
+Edition is public domain. See https://www.fontspace.com/edition-font-f35311
+ElectrumADFExp-Regular is by Arkandis Digital Foundry under GPLv2. See https://www.1001fonts.com/electrum-adf-exp-font.html
+GeneralFailureRegular is public domain. See https://www.fontspace.com/general-failure-font-f32565
+HubotSansRegular is under OFL. See https://github.com/github/hubot-sans/blob/main/LICENSE
+JetBrains is Apache 2.0. See https://www.jetbrains.com/lp/mono/
+Judges is under GPL. See https://webfonts.ffonts.net/Judges.font
+LinBiolinum is under GPLv2. See https://www.1001fonts.com/linux-biolinum-font.html
+LcdSolid is public domain. See https://www.fontspace.com/lcd-solid-font-f11346
+MarginaliaRegular is public domain. See https://www.fontspace.com/marginalia-font-f32466
+Minitel is GPL. See https://www.dafont.com/minitel.font
+MonaSans is under OFL v1.1. See https://github.com/github/mona-sans
+Montserrat is under OFL and came from CCC Rc3 style guide https://styleguide.rc3.world
+Nimbus Sans L is GPL. See https://www.fontsquirrel.com/fonts/nimbus-sans-l
+Octavius is created by Jack Oatley and described as "100% free to use, though credit is appreciated" https://www.dafont.com/octavius.font
+OpenDyslexic is under OFL. See https://github.com/antijingoist/opendyslexic
+Orbitron is under OFL and came from CCC Rc3 style guide https://styleguide.rc3.world
+RailModel is GPL. See https://www.fontspace.com/rail-model-font-f10741
+Rainyhearts in public domain. By Camellina tr.camellina@gmail.com
+Solidaric by Bob Mottram is under AGPL
+StonehengeRegular is by unknown author, but freely licensed. See https://www.fontmirror.com/stonehenge
+SubZER0 is under GPL. See http://www.free-fonts-download.com/Techno/subzer0-font
+SundownerRegular is public domain. See https://www.fontspace.com/sundowner-font-f40837
+Warenhaus-Standard is public domain. See https://fontlibrary.org/en/font/warenhaus-typenhebel
+
+# Note
+
+There are varying opinions out there on the internets about the compatibility of Open Font License with GPL projects. However, gnu.org does list it as compatible - or at least not incompatible - when bundled with other software, which in practice is the case here. It writes:
+
+SIL Open Font License 1.1
+
+The Open Font License (including its original release, version 1.0) is a free copyleft license for fonts. Its only unusual requirement is that when selling the font, you must redistribute it bundled with some software, rather than alone. Since a simple Hello World program will satisfy the requirement, it is harmless. Neither we nor SIL recommend the use of this license for anything other than fonts.
+
+https://www.gnu.org/licenses/license-list.html#Fonts

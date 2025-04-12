@@ -1,0 +1,14 @@
+pipeline:
+  test:
+    image: debian:testing
+    commands:
+      - apt-get update
+<<<<<<< HEAD
+      - apt-get install -y python3-socks imagemagick python3-setuptools python3-cryptography python3-dateutil python3-idna python3-requests python3-django-timezone-field libimage-exiftool-perl python3-flake8 python3-pyqrcode python3-png python3-bandit imagemagick gnupg
+      - python3 epicyon.py --tests
+      - python3 epicyon.py --testsnetwork
+=======
+      - apt-get install -y python3-cryptography python3-dateutil python3-idna python3-numpy python3-pil.imagetk python3-requests python3-socks python3-setuptools python3-pyqrcode imagemagick gnupg
+      - python3 epicyon.py --tests
+      - python3 epicyon.py --testsnetwork
+>>>>>>> 5d3b105c5c46fe9dc541089e253d6d16dff859af

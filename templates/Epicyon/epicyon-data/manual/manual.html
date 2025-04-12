@@ -1,0 +1,1911 @@
+<h1 id="table-of-contents">Table of Contents</h1>
+<ol type="1">
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#installation">Installation</a></li>
+<li><a href="#upgrading">Upgrading</a></li>
+<li><a href="#housekeeping">Housekeeping</a></li>
+<li><a href="#registering-accounts">Registering accounts</a></li>
+<li><a href="#the-importance-of-good-defaults">The importance of good
+defaults</a></li>
+<li><a href="#logging-in">Logging in</a></li>
+<li><a href="#account-profiles">Account Profiles</a></li>
+<li><a href="#following">Following</a></li>
+<li><a href="#creating-posts">Creating posts</a></li>
+<li><a href="#the-timeline">The Timeline</a></li>
+<li><a href="#calendar">Calendar</a></li>
+<li><a href="#side-columns">Side columns</a></li>
+<li><a href="#media-timeline">Media timeline</a></li>
+<li><a href="#moderation">Moderation</a></li>
+<li><a href="#themes">Themes</a></li>
+<li><a href="#buying-and-selling">Buying and selling</a></li>
+<li><a href="#sharing-economy">Sharing economy</a></li>
+<li><a href="#search">Search</a></li>
+<li><a href="#browsing-in-a-command-shell">Browsing in a command
+shell</a></li>
+<li><a href="#building-fediverse-communities">Building fediverse
+communities</a></li>
+<li><a href="#a-brief-history-of-the-fediverse">A Brief History of the
+Fediverse</a></li>
+</ol>
+<h1 id="introduction">Introduction</h1>
+<p><em>“Every new beginning comes from some other beginning’s
+end.”</em></p>
+<p>– Seneca</p>
+<p><em>The fediverse</em> is a set of federated servers, typically using
+a communication protocol called <a
+href="https://www.w3.org/TR/activitypub">ActivityPub</a> which was
+devised by the <a href="https://www.w3.org/wiki/Socialwg">social working
+group</a> within the World Wide Web Consortium (W3C). At present it is
+mostly used for <a
+href="https://en.wikipedia.org/wiki/Microblogging">microblogging</a>,
+although ActivityPub is sufficiently general that it can also be used
+for a variety of other purposes.</p>
+<p>The word <em>fediverse</em> (federated universe) appears to have
+originated around 2012 as the first <a
+href="https://en.wikipedia.org/wiki/Identi.ca">identi.ca</a> website was
+ending and the <a
+href="https://en.wikipedia.org/wiki/Pump.io">pump.io</a> project was
+beginning. The ActivityPub protocol was initially called
+<em>ActivityPump</em>, due to the influence which pump.io had upon its
+creation. Fediverse servers are typically referred to as “instances”,
+but they are really just websites which can speak with each other using
+the vocabulary of ActivityPub. Choosing an instance is the same as
+choosing a website that you trust to handle your data. This is <em>the
+social web</em>.</p>
+<p>Servers such as <a
+href="https://github.com/mastodon/mastodon">Mastodon</a> are well known,
+but these are aimed at large scale deployments on powerful hardware
+running within data centers, making use of content distribution networks
+(CDN) and due to their large number of dependencies requiring someone
+with a high level of systems administration skill to maintain. Epicyon
+is designed for the opposite situation where it is only intended to have
+a single user or a small number of users (less than ten) running from
+your home location or on a modest VPS and where maintenance is extremely
+trivial such that it’s possible to keep an instance running for long
+durations with minimal intervention.</p>
+<p>Epicyon is part of the <a
+href="https://neustadt.fr/essays/the-small-web">small web</a> category
+of internet software, in that it is intended to scale via federation
+rather than to scale vertically via resource intensive and expensive
+hardware. Think many small communicating nodes rather than a small
+number of large servers. Also, in spite of the prevailing great
+obsession with scale, not everything needs to. You can federate with a
+small number of servers for a particular purpose - such as running a
+club or hackspace - and that’s ok. It supports both the server-to-server
+(S2S) and client-to-server (C2S) versions of the ActivityPub protocol,
+with <a
+href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication">basic
+auth</a> for C2S authentication.</p>
+<p><a
+href="https://uxdesign.cc/mastodon-is-antiviral-design-42f090ab8d51?gi=9baf6195c60b">Anti-virality</a>
+is a common design approach in the fediverse, and Epicyon also follows
+this convention by having chronological timelines and avoiding lists of
+trending things or ranking profiles by numbers of followers. Recent
+hashtags are presented <em>in alphabetical order</em> to avoid any
+frequency bias. Typically if a post gets more than ten likes then its
+count will only show as <em>“10+”</em>, to try to avoid getting fixated
+upon making numbers go up at the expense of more considered forms of
+interaction.</p>
+<p>It is hardly possible to visit many sites on the web without your
+browser loading and running a large amount of javascript. Epicyon takes
+a minimalist approach where its web interface only uses <a
+href="https://html.spec.whatwg.org/multipage">HTML</a> and <a
+href="https://www.w3.org/Style/CSS/Overview.en.html">CSS</a>. You can
+disable javascript, or use a browser which doesn’t have javascript
+capability, and the user experience is unchanged. Lack of javascript
+also rules out a large area of potential attack surface.</p>
+<p>Another common concern is being able to keep instances running.
+Instance abandonment creates a lot of disruption, and it’s often related
+to the amount of effort that it takes to keep things going. To avoid the
+maintenance burden becoming prohibitive, Epicyon is implemented in a
+simple manner with very few dependencies and no database. All data is
+just files in a directory, and upgrades are also straightforward. This
+degree of simplicity runs counter to the current trend within the
+software industry towards complex frameworks and large scale databases
+with elaborate and rapidly evolving dependencies.</p>
+<p>Epicyon also includes some lightweight organizing features, such as
+calendar, events and sharing economy features.</p>
+<p>It’s time to make the web a social space once more, to reject
+centralized systems and prioritize people rather than business
+models.</p>
+<h1 id="installation">Installation</h1>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>You will need python version 3.7 or later.</p>
+<p>On a Debian based system:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt install <span class="at">-y</span> tor python3-socks imagemagick python3-setuptools python3-cryptography python3-dateutil python3-idna python3-requests python3-flake8 python3-django-timezone-field python3-pyqrcode python3-png python3-bandit libimage-exiftool-perl certbot nginx wget</span></code></pre></div>
+<h2 id="source-code">Source code</h2>
+<p>The following instructions install Epicyon to the
+<strong>/opt</strong> directory. It’s not essential that it be installed
+there, and it could be in any other preferred directory.</p>
+<p>Clone the repo, or if you downloaded the tarball then extract it into
+the <strong>/opt</strong> directory.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /opt</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="at">--depth</span> 1 https://gitlab.com/bashrc2/epicyon</span></code></pre></div>
+<h2 id="set-permissions">Set permissions</h2>
+<p>Create a user for the server to run as:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> su</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">adduser</span> <span class="at">--system</span> <span class="at">--home</span><span class="op">=</span>/opt/epicyon <span class="at">--group</span> epicyon</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">chown</span> <span class="at">-R</span> epicyon:epicyon /opt/epicyon</span></code></pre></div>
+<h2 id="news-mirrors">News mirrors</h2>
+<p>The content for RSS feed links can be downloaded and mirrored, so
+that even if the original sources go offline the content remains
+readable. Link the RSS/newswire mirrors with.</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> /var/www/YOUR_DOMAIN</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> /opt/epicyon/accounts/newsmirror</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ln</span> <span class="at">-s</span> /opt/epicyon/accounts/newsmirror /var/www/YOUR_DOMAIN/newsmirror</span></code></pre></div>
+<h2 id="create-daemon">Create daemon</h2>
+<p>Typically the server will run from a <em>systemd</em> daemon. It can
+be set up as follows:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/systemd/system/epicyon.service</span></code></pre></div>
+<p>Paste the following:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">[Unit]</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="va">Description</span><span class="op">=</span>epicyon</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="va">After</span><span class="op">=</span>syslog.target</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="va">After</span><span class="op">=</span>network.target</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="ex">[Service]</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="va">Type</span><span class="op">=</span>simple</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="va">User</span><span class="op">=</span>epicyon</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="va">Group</span><span class="op">=</span>epicyon</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="va">WorkingDirectory</span><span class="op">=</span>/opt/epicyon</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="va">ExecStart</span><span class="op">=</span>/usr/bin/python3 <span class="ex">/opt/epicyon/epicyon.py</span> <span class="at">--bind</span> 0.0.0.0 <span class="at">--port</span> 443 <span class="at">--proxy</span> 7156 <span class="at">--domain</span> YOUR_DOMAIN <span class="at">--registration</span> open <span class="at">--log_login_failures</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="va">Environment</span><span class="op">=</span>USER=epicyon</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="va">Environment</span><span class="op">=</span>PYTHONUNBUFFERED=true</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="va">Environment</span><span class="op">=</span>PYTHONIOENCODING=utf-8</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="va">Restart</span><span class="op">=</span>always</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="va">StandardError</span><span class="op">=</span>syslog</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="va">CPUQuota</span><span class="op">=</span>80%</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectHome</span><span class="op">=</span>true</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectKernelTunables</span><span class="op">=</span>true</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectKernelModules</span><span class="op">=</span>true</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectControlGroups</span><span class="op">=</span>true</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectKernelLogs</span><span class="op">=</span>true</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectHostname</span><span class="op">=</span>true</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectClock</span><span class="op">=</span>true</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="va">ProtectProc</span><span class="op">=</span>invisible</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="va">ProcSubset</span><span class="op">=</span>pid</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="va">PrivateTmp</span><span class="op">=</span>true</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="va">PrivateUsers</span><span class="op">=</span>true</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="va">PrivateDevices</span><span class="op">=</span>true</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="va">PrivateIPC</span><span class="op">=</span>true</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="va">MemoryDenyWriteExecute</span><span class="op">=</span>true</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="va">NoNewPrivileges</span><span class="op">=</span>true</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="va">LockPersonality</span><span class="op">=</span>true</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="va">RestrictRealtime</span><span class="op">=</span>true</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="va">RestrictSUIDSGID</span><span class="op">=</span>true</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="va">RestrictNamespaces</span><span class="op">=</span>true</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="va">SystemCallArchitectures</span><span class="op">=</span>native</span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="ex">[Install]</span></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="va">WantedBy</span><span class="op">=</span>multi-user.target</span></code></pre></div>
+<p>Activate the daemon:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">systemctl</span> enable epicyon</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">systemctl</span> start epicyon</span></code></pre></div>
+<h2 id="web-server-setup">Web server setup</h2>
+<p>Create a web server configuration.</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/nginx/sites-available/YOUR_DOMAIN</span></code></pre></div>
+<p>And paste the following:</p>
+<pre class="nginx"><code>server {
+  listen 80;
+  listen [::]:80;
+  server_name YOUR_DOMAIN;
+  access_log /dev/null;
+  error_log /dev/null;
+  client_max_body_size 31m;
+  client_body_buffer_size 128k;
+
+  limit_conn conn_limit_per_ip 10;
+  limit_req zone=req_limit_per_ip burst=10 nodelay;
+
+  index index.html;
+  rewrite ^ https://$server_name$request_uri? permanent;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name YOUR_DOMAIN;
+
+  gzip on;
+  gzip_disable &quot;msie6&quot;;
+  gzip_vary on;
+  gzip_proxied any;
+  gzip_min_length 1024;
+  gzip_comp_level 6;
+  gzip_buffers 16 8k;
+  gzip_http_version 1.1;
+  gzip_types text/plain text/css text/vcard text/vcard+xml application/json application/ld+json application/javascript text/xml application/xml application/rdf+xml application/xml+rss text/javascript;
+
+  ssl_stapling off;
+  ssl_stapling_verify off;
+  ssl on;
+  ssl_certificate /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;
+  #ssl_dhparam /etc/ssl/certs/YOUR_DOMAIN.dhparam;
+
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers HIGH:!MEDIUM:!LOW:!aNULL:!NULL:!SHA;
+  ssl_prefer_server_ciphers on;
+  ssl_session_cache shared:SSL:10m;
+  ssl_session_tickets off;
+
+  add_header Content-Security-Policy &quot;default-src https:; script-src https: &#39;unsafe-inline&#39;; style-src https: &#39;unsafe-inline&#39;&quot;;
+  add_header X-Frame-Options DENY;
+  add_header X-Content-Type-Options nosniff;
+  add_header X-XSS-Protection &quot;1; mode=block&quot;;
+  add_header X-Download-Options noopen;
+  add_header X-Permitted-Cross-Domain-Policies none;
+  add_header Strict-Transport-Security &quot;max-age=15768000; includeSubDomains; preload&quot; always;
+
+  access_log /dev/null;
+  error_log /dev/null;
+
+  index index.html;
+
+  location /newsmirror {
+    root /var/www/YOUR_DOMAIN;
+    try_files $uri =404;
+  }
+
+  keepalive_timeout 70;
+  sendfile on;
+
+  location / {
+  proxy_http_version 1.1;
+  client_max_body_size 31M;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forward-Proto http;
+  proxy_set_header X-Nginx-Proxy true;
+  proxy_temp_file_write_size 64k;
+  proxy_connect_timeout 10080s;
+  proxy_send_timeout 10080;
+  proxy_read_timeout 10080;
+  proxy_buffer_size 64k;
+  proxy_buffers 16 32k;
+  proxy_busy_buffers_size 64k;
+  proxy_redirect off;
+  proxy_request_buffering off;
+  proxy_buffering off;
+  proxy_pass http://localhost:7156;
+  tcp_nodelay on;
+  }
+}</code></pre>
+<p>Enable the site:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ln</span> <span class="at">-s</span> /etc/nginx/sites-available/YOUR_DOMAIN /etc/nginx/sites-enabled/</span></code></pre></div>
+<h2 id="on-your-internet-router">On your internet router</h2>
+<p>Forward port 443 from your internet router to your server. If you
+have dynamic DNS make sure its configured.</p>
+<h2 id="obtain-a-tls-certificate">Obtain a TLS certificate</h2>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">systemctl</span> stop nginx</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">certbot</span> certonly <span class="at">-n</span> <span class="at">--server</span> https://acme-v02.api.letsencrypt.org/directory <span class="at">--standalone</span> <span class="at">-d</span> YOUR_DOMAIN <span class="at">--renew-by-default</span> <span class="at">--agree-tos</span> <span class="at">--email</span> YOUR_EMAIL</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">systemctl</span> start nginx</span></code></pre></div>
+<h2 id="restart-the-web-server">Restart the web server</h2>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">systemctl</span> restart nginx</span></code></pre></div>
+<p>If you need to use <a href="https://www.fail2ban.org">fail2ban</a>
+then failed login attempts can be found in
+<strong>accounts/loginfailures.log</strong>.</p>
+<p>If you are using the <a href="https://caddyserver.com">Caddy web
+server</a> then see <a
+href="https://code.libreserver.org/bashrc/epicyon/raw/main/caddy.example.conf">caddy.example.conf</a>.</p>
+<p>Now you can navigate to your domain and register an account. The
+first account becomes the administrator.</p>
+<h2 id="configuring-notifications">Configuring notifications</h2>
+<p>Since Epicyon does not use javascript there are no notifications in
+the browser. However, you can receive notifications via email, XMPP, <a
+href="https://matrix.org">Matrix</a> or <a
+href="https://ntfy.sh">ntfy</a>.</p>
+<p>Copy the notifications script:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> /opt/epicyon/scripts/epicyon-notification /usr/local/bin/epicyon-notification</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> +x /usr/local/bin/epicyon-notification</span></code></pre></div>
+<p>If you are using email for notifications and it is a single user
+instance then you might want to edit <em>MY_EMAIL_ADDRESS</em> within
+<em>/usr/local/bin/epicyon-notification</em>.</p>
+<p>Then add the following to <em>/etc/crontab</em>.</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># */1 * * * * root /usr/local/bin/epicyon-notification</span></span></code></pre></div>
+<h2 id="installing-on-onion-or-i2p-domains">Installing on Onion or i2p
+domains</h2>
+<p>If you don’t have access to the clearnet, or prefer to avoid it, then
+it’s possible to run an Epicyon instance easily from your laptop. There
+are scripts within the <em>deploy</em> directory which can be used to
+install an instance on a Debian or Arch/Parabola operating system. With
+some modification of package names they could be also used with other
+distros.</p>
+<p>Please be aware that such installations will not federate with
+ordinary fediverse instances on the clearnet, unless those instances
+have been specially modified to do so. But onion instances will federate
+with other onion instances and i2p instances with other i2p
+instances.</p>
+<h1 id="upgrading">Upgrading</h1>
+<p>Unlike some other instance types, Epicyon is really easy to upgrade.
+It only requires a git pull to obtain the changes from the upstream
+repo, then set permissions and restart the daemon.</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /opt/epicyon</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> pull</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">chown</span> <span class="at">-R</span> epicyon:epicyon <span class="pp">*</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="ex">systemctl</span> restart epicyon</span></code></pre></div>
+<h1 id="housekeeping">Housekeeping</h1>
+<p>To avoid running out of disk space you will want to clear down old
+inbox posts. Posts from your instance outboxes will be unaffected.</p>
+<p>Create an archive script
+<strong>/usr/bin/epicyon-archive</strong>:</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /opt/epicyon <span class="kw">||</span> <span class="bu">exit</span> 0</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="ex">/usr/bin/python3</span> epicyon.py <span class="at">--archive</span> none <span class="at">--archiveweeks</span> 4 <span class="at">--maxposts</span> 32000</span></code></pre></div>
+<p>You can adjust the maximum number of weeks and the maximum number of
+inbox posts as needed. Then add it as a cron entry.</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;*/60 * * * * root /usr/bin/epicyon-archive&quot;</span> <span class="op">&gt;&gt;</span> /etc/crontab</span></code></pre></div>
+<h1 id="registering-accounts">Registering accounts</h1>
+<p>You will notice that within the systemd daemon the
+<em>registration</em> option is set to <em>open</em>. In a browser if
+you navigate to the URL of your instance then you should see a
+<em>Register</em> button. The first account to register becomes the
+administrator.</p>
+<p>To avoid spam signups, or overloading the system, there is a maximum
+number of accounts for the instance which by default is set to 10.</p>
+<h1 id="the-importance-of-good-defaults">The importance of good
+defaults</h1>
+<p>Many social network systems have bad defaults, and that is for the
+purpose of maximizing the number of users and their level of engagement.
+Bad defaults usually create a combination of <em>addiction patterns</em>
+and <em>involuntary oversharing</em> and hence a viral network effect of
+escalating outrage and dependency. On small fediverse servers we can
+avoid having bad defaults, because there is no profit motive or drive
+for massive notoriety.</p>
+<p>Good defaults tend to be a little more private and avoid the
+addiction to making numbers go up or achieving <em>notoriety at any
+social cost</em>. This puts fediverse instances like Epicyon at a slight
+disadvantage compared to ruthlessly commercial systems, but it’s an
+explicit trade-off in order to minimize the harms which can arise within
+social networks. So you won’t find any high scores tables or trending
+items.</p>
+<h1 id="logging-in">Logging in</h1>
+<p>In a browser if you navigate to the URL of your instance and enter
+the username and password that you previously registered. The first time
+that you log in it will show a series of introduction screens which
+prompt you to add a profile picture, name and bio description.</p>
+<figure>
+<img src="manual-login.png" alt="Login screen" />
+<figcaption aria-hidden="true">Login screen</figcaption>
+</figure>
+<h1 id="account-profiles">Account Profiles</h1>
+<h2 id="initial-setup">Initial setup</h2>
+<p>When you register an account on the instance the first thing that you
+may want to do is to add more profile details and change your
+preferences. From the main timeline screen select the top banner to move
+to your profile and then select the edit button, which usually looks
+like a pen and is adjacent to the logout icon.</p>
+<figure>
+<img src="manual-edit-button.png" alt="Profile edit button" />
+<figcaption aria-hidden="true">Profile edit button</figcaption>
+</figure>
+<h2 id="basic-details">Basic details</h2>
+<figure>
+<img src="manual-basic-details.png" alt="Profile basic details" />
+<figcaption aria-hidden="true">Profile basic details</figcaption>
+</figure>
+<h3 id="describe-yourself">Describe yourself</h3>
+<p>Add an appropriate description of youself, which doesn’t resemble the
+type of thing which would appear on a spam account. When other fediverse
+users are judging a follow request from you they will want to know that
+you are a real person and not a spammer or troll.</p>
+<h3 id="premium-account">Premium Account</h3>
+<p>There is an option to set your account as “premium”. This is intended
+for an <a
+href="https://en.wikipedia.org/wiki/OnlyFans">OnlyFans</a>-like
+situation in which followers need to subscribe with some payment before
+making a follow request to receive your posts. If this option is
+selected then recent posts on your profile won’t be shown to
+unauthorized viewers and the terminology of donations is switched to
+subscriptions. You will need to set a link where followers can register,
+and ask fans to specify their fediverse handle so that you can approve
+it.</p>
+<p>A difference with corporate content subscription services is that the
+federated nature of instances means that once a post has been sent out
+to fans/followers then you won’t have any control over what they
+subsequently do with your content. So they could boost/announce posts to
+non-subscribers, for example.</p>
+<h3 id="other-fediverse-accounts">Other fediverse accounts</h3>
+<p>If you have any other fediverse accounts on different instances then
+you might want to add URLs for those. You can set the languages which
+you can read, as <a href="https://en.wikipedia.org/wiki/ISO_639-1">two
+letter abbreviations</a>. This helps to avoid having posts from other
+people within your timeline which you can’t read.</p>
+<h3 id="expiring-posts">Expiring posts</h3>
+<p>You can set your posts to expire after a number of days. If this
+value is zero then the instance will keep your posts indefinitely.</p>
+<h3 id="quitting-the-website-formerly-known-as-twitter">Quitting the
+website formerly known as Twitter</h3>
+<p>If you are coming to the fediverse as an exile from the website
+formerly known as Twitter then you may want to select the option to
+remove any Twitter posts from your timeline. Sometimes people want to
+make a clean break from Twitter and have no further involvement with
+it.</p>
+<p>As Twitter turns into an information black hole populated by
+generative AI grifters it’s expected that posts on that site may become
+no longer visible on the open web, and even when they are visible they
+may be unreliable or fake content generated in whole or in part by
+algorithms.</p>
+<h3 id="alternative-contact-details">Alternative contact details</h3>
+<p>You can set additional contact details, such as email, XMPP and
+Matrix addresses. So if people want to contact you for private <a
+href="https://en.wikipedia.org/wiki/End-to-end_encryption">end-to-end
+secure</a> chat then they can do so. The fediverse was never designed
+for end-to-end security - it is primarily for public communications -
+and so it’s better to leave secure private chat to the apps which are
+specialized for that purpose.</p>
+<h3 id="filtering-and-blocking">Filtering and blocking</h3>
+<p>If you want to block particular fediverse accounts or instances then
+you can enter those in the <em>blocked account</em> section. There
+should be one account per line.</p>
+<h3 id="geolocation-spoofing">Geolocation spoofing</h3>
+<p>Within the <em>filtering and blocking</em> section you can also set a
+city which will be used for geolocation spoofing. When you post a photo,
+instead of removing all metadata spoofed metadata will be added in order
+to consistently fool the machine learning systems behind web crawlers or
+scrapers, and create a <a
+href="https://en.wikipedia.org/wiki/Confirmation_bias">confirmation
+bias</a> effect where the surveillance systems become increasingly
+confident in an erroneous conclusion. Setting a city somewhere near to
+your <a href="https://en.wikipedia.org/wiki/Time_zone">time zone</a> is
+preferable, so that it matches your typical pattern of daily posting
+activity without giving away your real location.</p>
+<h3 id="verifying-your-website-or-blog">Verifying your website or
+blog</h3>
+<p>It is possible to indicate that a website or blog belongs to you by
+linking it to your profile screen. Within the <em>head</em> html section
+of your website or blog index page include a line similar to:</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode html"><code class="sourceCode html"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="dt">&lt;</span><span class="kw">link</span> <span class="er">rel</span><span class="ot">=</span><span class="st">&quot;me&quot;</span> <span class="er">href</span><span class="ot">=</span><span class="st">&quot;https://YourEpicyonDomain/@YourNickname&quot;</span> <span class="dt">/&gt;</span></span></code></pre></div>
+<p>If you edit and then publish your profile, with the <em>website</em>
+and/or <em>blog</em> fields completed then if the above link is found
+your sites will be indicated to be verified on your profile screen. When
+verified they will appear in green with a tick.</p>
+<figure>
+<img src="manual-verified-website.jpg"
+alt="Profile screen showing verified website" />
+<figcaption aria-hidden="true">Profile screen showing verified
+website</figcaption>
+</figure>
+<h2 id="roles">Roles</h2>
+<p>If you are the administrator then within your profile settings you
+can also specify roles for other accounts on the instance. A small
+instance is like a ship with the roles being crew positions, and all
+members of the crew need to work together to keep the ship afloat. The
+current roles are:</p>
+<h3 id="moderator">Moderator</h3>
+<p>Is allowed to remove posts and deal with moderation reports.</p>
+<h3 id="editor">Editor</h3>
+<p>Editors can change the links in the left column and the RSS feeds
+within the right newswire column.</p>
+<h3 id="artist">Artist</h3>
+<p>Artists can change the colors and style of the web interface, using
+the <em>theme designer</em>.</p>
+<h3 id="counselor">Counselor</h3>
+<p>A <em>counselor</em> is someone tasked with resolving disputes
+between users of the instance. They are permitted to send DMs to any
+user account on the instance. Obviously, this type of power can be
+abused and so the administrator should choose counselors with care.</p>
+<h3 id="devop">Devop</h3>
+<p>Devops are permitted to perform some routine administration
+functions, such as monitoring instance performance graphs.</p>
+<h1 id="following">Following</h1>
+<p><em>“I am not a beginning. I am not an end. I am a link in a
+chain.”</em></p>
+<p>– Keith Haring</p>
+<p>On the main timeline screen at the top right of the centre column
+there is a search icon which looks like a magnifying glass. By
+convention within the fediverse the search function is also the way to
+look up and follow other people. Enter the handle (<span
+class="citation" data-cites="name">@name</span><span class="citation"
+data-cites="domain">@domain</span>) or URL of the profile page for the
+person that you want to follow and select <em>search</em>. If the
+account is found then its details will appear and you can choose to
+follow or not.</p>
+<p><img src="manual-search-following.jpg"
+alt="Following people via search" /> <img src="manual-following.jpg"
+alt="Following search result" /></p>
+<p>Once you are following someone then selecting their profile picture
+and then the <em>unfollow</em> button will remove the follow.</p>
+<h1 id="creating-posts">Creating posts</h1>
+<p>To make a new post from the main timeline screen select the <em>new
+post</em> icon at the top right of the centre column.</p>
+<figure>
+<img src="manual-new-post.png" alt="New post screen" />
+<figcaption aria-hidden="true">New post screen</figcaption>
+</figure>
+<p>The format of the post should be plain text, without any html markup.
+Any URLs will be automatically linked, and you can use hashtags and
+emoji. Emojis can be added via their name with colon characters before
+and after.</p>
+<h2 id="post-scopes">Post scopes</h2>
+<p>Posts can have different scopes which provide some amount of privacy,
+or particular functions. To change the scope select the current one and
+a dropdown list will appear.</p>
+<h3 id="public">Public</h3>
+<p>Is visible to anyone in the fediverse. May also be visible outside of
+the fediverse to anyone with an appropriate link.</p>
+<h3 id="blog">Blog</h3>
+<p>Used to create a blog post. Blog posts are typically longer than
+other types of post, and are also publicly visible to anyone on the
+web.</p>
+<p>At the top of the <em>links</em> column on the main timeline screen
+there is an icon to show an RSS feed for your blog entries.</p>
+<h3 id="unlisted">Unlisted</h3>
+<p>Similar to a public post, but will not appear as a recent post within
+your profile. Unlisted posts can add a little more privacy to a
+conversation in that it will not be immediately obvious to casual
+observers. Often in practice this is all that’s needed to avoid trolls
+or unwanted attention.</p>
+<h3 id="followers">Followers</h3>
+<p>A <em>followers only</em> post will only be visible to people who are
+following you. They will not be visible to people who are not your
+followers, or to other observers on the web.</p>
+<p>A subtlety of this type of post is that people have different
+followers, so if you send to your followers and they send a reply to
+their followers then your post or references to it may end up with
+people who are not your followers.</p>
+<h3 id="dm">DM</h3>
+<p>Direct messages are only send to specific people, designated by their
+fediverse handles (<span class="citation"
+data-cites="name">@name</span><span class="citation"
+data-cites="domain">@domain</span>).</p>
+<h3 id="reminder">Reminder</h3>
+<p>A reminder is a direct message to yourself at some time in the
+future. It will appear on your calendar.</p>
+<h3 id="report">Report</h3>
+<p>A report is a type of post which is sent to moderators on your
+instance, to alert them about some problem. It is not sent to any other
+instance.</p>
+<h3 id="shares">Shares</h3>
+<p>A <em>shared item</em> post describes a physical object or service
+which may be shared by people on your instance. Shared items may also be
+visible to people on specific named instances if that has been set up by
+the administrator.</p>
+<h3 id="wanted">Wanted</h3>
+<p>A <em>wanted item</em> is a physical object or service which you
+want. These posts will be visible to other people on your instance and
+also to people on specific named instances if that has been set up by
+the administrator.</p>
+<h2 id="subject-or-content-warning">Subject or Content Warning</h2>
+<p>Content warnings are not “censorship” or “hiding important things”.
+It’s like the subject line of an email: the reader knows what’s coming
+so they may choose when to see it. In a timeline which is strictly
+chronological, content warnings can also help you to skip over posts
+which obviously are not going to be of interest to you, rather than
+depending on a fallible or gameable algorithm to select what is
+relevant.</p>
+<h2 id="attachments">Attachments</h2>
+<p>Attachments can use a variety of formats.</p>
+<ul>
+<li>Images: <em>jpg, jpeg, gif, webp, avif, svg, ico, jxl, png</em></li>
+<li>Audio: <em>mp3, ogg, flac, opus, speex, wav</em></li>
+<li>Video: <em>mp4, webm, ogv</em></li>
+</ul>
+<figure>
+<img src="manual-attachments.png" alt="New post attachments" />
+<figcaption aria-hidden="true">New post attachments</figcaption>
+</figure>
+<p>Attachments should be as small as possible in terms of file size.
+Videos should be no more than 20 seconds in length. Epicyon is not
+suitable for hosting lengthy or high resolution videos, although
+podcasts might be feasible.</p>
+<figure>
+<img src="manual-watermark-ai.png" alt="Image watermarking" />
+<figcaption aria-hidden="true">Image watermarking</figcaption>
+</figure>
+<p>When attaching an image it is possible to overlay a watermark image
+in order to mess with generative AI scrapers trying to grift upon your
+photos. Epicyon will do it’s best to bounce AI scraper bots, or pollute
+them by giving random responses to pollute their training sets, but
+since those systems are fundamentally unethical they cannot be relied
+upon to follow user agent conventions. A watermark image can be uploaded
+from the <strong>Edit Profile</strong> screen under the
+<strong>Background Images</strong> section. You may need to experiment
+with the watermark image width, position and opacity, which can be set
+as command options on the daemon. See <a
+href="https://gitlab.com/bashrc2/epicyon/-/blob/main/README_commandline.md">README_commandline.md</a>
+for details.</p>
+<p>Even if the scraper bot tries to remove your watermark from the image
+by filling in from the surrounding pixels, the removal itself may leave
+a detectable trace indicative of improper use.</p>
+<h2 id="events">Events</h2>
+<p>You can specify a date, time and location for the post. If a date is
+set then the post will appear as an event on the calendar of recipients.
+This makes it easy for people to organize events without needing to
+explicitly manage calendars. <img src="manual-date-time.png"
+alt="New post event" /></p>
+<h2 id="maps">Maps</h2>
+<p>The location field on a post can be a description, but it can also be
+a map geolocation. To add a geolocation go to <a
+href="https://www.openstreetmap.org">openstreetmap.org</a>, find your
+location and copy and paste the URL into the location field of your new
+post.</p>
+<p>Selecting the <em>location</em> header will open the last known
+geolocation, so if your current location is near this makes it quicker
+to find.</p>
+<h2 id="scientific-references">Scientific references</h2>
+<p>It is possible to have references to scientific papers linked
+automatically, such that they are readable with one click/press.
+Supported references are <a href="https://arxiv.org">arXiv</a> and <a
+href="https://en.wikipedia.org/wiki/Digital_object_identifier">Digital
+object identifier (DOI)</a>. For example:</p>
+<pre class="text"><code>This is a reference to a paper: arxiv:2203.15752</code></pre>
+<h2 id="pinned-posts">Pinned posts</h2>
+<p>It is possible to pin additional information to your profile page.
+This can be done by making a Public scoped post and selecting <em>Pin
+this post to your profile</em>.</p>
+<p>To clear a pinned post, make a blank Public scoped post and also
+select <em>Pin this post to your profile</em>.</p>
+<h1 id="the-timeline">The Timeline</h1>
+<h2 id="layout">Layout</h2>
+<figure>
+<img src="manual-layout.png" alt="Layout" />
+<figcaption aria-hidden="true">Layout</figcaption>
+</figure>
+<p>On a desktop system the main timeline screen has a multi-column
+layout. The main content containing posts is in the centre. To the left
+is a column containing useful web links. To the right is the newswire
+containing links from RSS feeds.</p>
+<p>At the top right of the centre column there are a few icons known as
+<em>action buttons</em>, for show/hide extra timelines, show/hide
+announces or boosts, calendar, search and creating a new post.</p>
+<p>On mobile screens there is a single column layout, and the
+<em>links</em> and <em>newswire</em> column content is available via
+action buttons.</p>
+<p>Different timelines are listed at the top - inbox, DM, replies,
+outbox, etc - and more can be shown by selecting the <em>show/hide</em>
+icon.</p>
+<h2 id="navigation">Navigation</h2>
+<p>As a general principle of navigation selecting the top banner always
+takes you back to the previous screen, or if you are on the main
+timeline screen then it will alternate with your profile.</p>
+<p>At the bottom of the timeline there will usually be an arrow icon to
+go to the next page, and a list of page numbers. You can also move
+between pages using key shortcuts <strong>ALT+SHIFT+&gt;</strong> and
+<strong>ALT+SHIFT+&lt;</strong>. Key shortcuts exist for most navigation
+events, and you can customise them by selecting the <em>key
+shortcuts</em> link at the bottom of the left column.</p>
+<figure>
+<img src="manual-shortcuts.png" alt="Keyboard shortcuts screen" />
+<figcaption aria-hidden="true">Keyboard shortcuts screen</figcaption>
+</figure>
+<h1 id="calendar">Calendar</h1>
+<p><em>“There is nothing in this world that does not have a decisive
+moment”</em></p>
+<p>– Henri Cartier-Bresson</p>
+<p>The calendar is not yet a standardized feature of the fediverse as a
+whole, but has existed in Friendica and Zot instances for a long time.
+Being able to attach a date and time to a post and then have it appear
+on your calendar and perhaps also the calendars of your followers is
+quite useful for organizing things with minimum effort. Until such time
+as federated calendar functionality becomes more standardized this may
+only work between Epicyon instances.</p>
+<p>Calendar events are really just ordinary posts with a date, time and
+perhaps also a location attached to them. Posts with <em>Public</em>
+scope which have a date and time will appear on the calendars of your
+followers, unless they have opted out of receiving calendar events from
+you.</p>
+<figure>
+<img src="manual-calendar.png" alt="Calendar screen" />
+<figcaption aria-hidden="true">Calendar screen</figcaption>
+</figure>
+<p><em>Reminder</em> is a special type of calendar post, which is really
+just a direct message to yourself in the future.</p>
+<p>To create a calendar post from the main timeline, select the
+<strong>New post</strong> icon, then use the dropdown menu to select the
+scope of your post. Give your event a description and add a date and
+time. If you add a location this can either be a description or a
+geolocation link, such as a link to <a
+href="https://openstreetmap.org">openstreetmap</a>.</p>
+<p>Selecting the calendar icon from the main timeline will display your
+calendar events. It is possible to export them using the
+<strong>iCalendar</strong> icon at the bottom right to the screen.
+Calendar events are also available via <a
+href="https://en.wikipedia.org/wiki/CalDAV">CalDav</a> using the URL
+https://yourdomain/calendars/yournickname</p>
+<h1 id="side-columns">Side columns</h1>
+<p><img src="manual-side-columns.png" alt="Timeline side columns" /> The
+links within the side columns are global to the instance, and only users
+having the <em>editor</em> role can change them. Since the number of
+accounts on the instance is expected to be small these links provide a
+common point of reference.</p>
+<p>This multi-column layout is inspired by the appearance of early blogs
+or the original <em>Indymedia</em>, which in turn was inspired by the
+appearance of monastic texts in which you would see comments in the
+margins in line with the main text. So you can be reading posts from
+friends but also keeping an eye on the news from RSS/Atom feeds at the
+same time.</p>
+<h2 id="links">Links</h2>
+<p>Web links within the left column are intended to be generally useful
+or of interest to the users of the instance. They are similar to a
+blogroll. If you have the <em>editor</em> role there is an edit button
+at the top of the left column which can be used to add or remove links.
+Headers can also be added to group links into logical sections. For
+example:</p>
+<pre class="text"><code>* Search
+
+Code search https://beta.sayhello.so
+Wiby https://wiby.me/
+
+* Links
+
+16colors https://16colo.rs
+Dotshareit http://dotshare.it</code></pre>
+<h2 id="newswire">Newswire</h2>
+<p>The right column is the newswire column. It contains a list of links
+generated from RSS/Atom feeds.</p>
+<p><a href="https://en.wikipedia.org/wiki/RSS">RSS</a> is a much
+maligned protocol. It’s simple, and an excellent way to read news in a
+manner that’s convenient for you. The main reason for its downfall is
+that it’s difficult to implement <a
+href="https://en.wikipedia.org/wiki/Surveillance_capitalism">targeted
+advertising</a> - the dominant business model of the web - within RSS.
+It’s hard to spy on anyone using an RSS feed. So if we want the web to
+improve then supporting RSS ought to be a priority.</p>
+<p>If you have the <em>editor</em> role then an edit icon will appear at
+the top of the right column, and the edit screen then allows you to add
+or remove feeds.</p>
+<h3 id="moderated-feeds">Moderated feeds</h3>
+<p>Feeds can be either <em>moderated</em> or not. Moderated feed items
+must be approved by a moderator before then can appear in the newswire
+column and be visible to other users on the instance. To indicate that a
+feed should be moderated prefix its URL with a star character.</p>
+<h3 id="mirrored-feeds">Mirrored feeds</h3>
+<p>Newswire items can also be mirrored. This means that instead of
+newswire items being links back to the original source article a copy
+will be made of the article locally on your server. Mirroring can be
+useful if the site of the RSS/Atom feed is unreliable or likely to go
+offline (such as solar powered systems only online during daylight
+hours). When deciding whether to mirror a feed you will also want to
+consider the copyright status of the content being mirrored, and whether
+legal problems could arise. To indicate that a feed should be mirrored
+prefix its URL with an exclamation mark ! character.</p>
+<h3 id="filters-and-warnings">Filters and warnings</h3>
+<p>On this screen you can also set filtered words and dogwhistle content
+warnings for the instance. Filtered words should be on separate lines,
+and dogwhistle words can be added in the format:</p>
+<pre class="text"><code>dogwhistleword -&gt; content warning to be added
+dogwhistle phrase -&gt; content warning to be added
+DogwhistleWordPrefix* -&gt; content warning to be added
+*DogwhistleWordEnding -&gt; content warning to be added</code></pre>
+<h3 id="newswire-tagging-rules">Newswire tagging rules</h3>
+<p>As news arrives via RSS or Atom feeds it can be processed to add or
+remove hashtags, in accordance to some rules which you can define.</p>
+<p>On the newswire edit screen, available to accounts having the
+<em>moderator</em> role, you can define the news processing rules. There
+is one rule per line.</p>
+<p><strong>Syntax:</strong> <em>if [conditions] then [action]</em></p>
+<p><strong>Logical Operators:</strong> <em>not, and, or, xor, from,
+contains</em></p>
+<p>A simple example is:</p>
+<pre class="test"><code>if moderated and not #oxfordimc then block</code></pre>
+<p>For moderated feeds this will only allow items through if they have
+the <strong>#oxfordimc</strong> hashtag.</p>
+<p>If you want to add hashtags an example is:</p>
+<pre class="test"><code>if contains &quot;garden&quot; or contains &quot;lawn&quot; then add #gardening</code></pre>
+<p>So if incoming news contains the word “garden” either in its title or
+description then it will automatically be assigned the hashtag
+<strong>#gardening</strong>. You can also add hashtags based upon other
+hashtags.</p>
+<pre class="test"><code>if #garden or #lawn then add #gardening</code></pre>
+<p>You can also remove hashtags.</p>
+<pre class="test"><code>if #garden or #lawn then remove #gardening</code></pre>
+<p>Which will remove <strong>#gardening</strong> if it exists as a
+hashtag within the news post.</p>
+<p>You can add tags based upon the RSS link, such as:</p>
+<pre class="test"><code>if from &quot;mycatsite.com&quot; then add #cats</code></pre>
+<h1 id="media-timeline">Media timeline</h1>
+<p>Selecting the <em>show/hide</em> icon from the main timeline will
+reveal an extra timeline called <strong>Media</strong>. The media
+timeline shows posts which contain a picture, audio or video content. So
+if you are primarily interested in photos then this timeline can be
+useful.</p>
+<figure>
+<img src="manual-media.jpg" alt="Media timeline" />
+<figcaption aria-hidden="true">Media timeline</figcaption>
+</figure>
+<p>If there is an description for the media then this also appears
+within this timeline. Selecting a photo will enlarge it.</p>
+<h1 id="moderation">Moderation</h1>
+<p>The importance of moderation within social networks can’t be
+over-stated. In the early history of the web in which communities tended
+to be organized around forum software and mailing lists the typical
+pattern went as follows:</p>
+<ul>
+<li>Founders initiate the forum</li>
+<li>The forum gains popularity and a community grows around it</li>
+<li>Trolls show up</li>
+<li>The administrator is too nice, believes that all opinions are
+equally valid, and refuses to remove trolls or promptly redact their
+content</li>
+<li>Within somewhere between a couple of days and a few weeks, trolls
+set longstanding forum members against each other</li>
+<li>Community fails and the forum closes abruptly, leaving only a
+404</li>
+</ul>
+<p>The pattern has been repeated many times. Online communities can take
+years to carefully build up and days to destroy. Having good moderation
+in place, with clear terms of service and enforced boundaries, can help
+to avoid failures or burnout. Being “nice” and accepting all content
+tends not to work out well. Such an arrangement is easily hijacked by
+people with bad intent.</p>
+<h2 id="moderator-timeline">Moderator timeline</h2>
+<p>If you have the <em>moderator</em> role then selecting the
+<em>show/hide</em> icon from the main timeline will reveal an extra
+timeline usually called <strong>Mod</strong>. Selecting this timeline
+will take you to the instance moderator timeline, which contains any
+moderation reports.</p>
+<figure>
+<img src="manual-moderator.png" alt="Moderator timeline" />
+<figcaption aria-hidden="true">Moderator timeline</figcaption>
+</figure>
+<h3 id="filtering">Filtering</h3>
+<p>You can filter out posts containing particular words or phrases by
+entering the offending text and then selecting the
+<strong>Filter</strong> button. You can use the
+<strong>Unfilter</strong> button to reverse the decision.</p>
+<h3 id="removing-an-offending-post">Removing an offending post</h3>
+<p>If a post made on your instance has been reported as violating the
+terms of service you can remove it by entering its URL and then
+selecting the <strong>Remove</strong> button.</p>
+<h3 id="suspending-an-account">Suspending an account</h3>
+<p>You can suspend an account on the instance by entering the nickname
+and then selecting the <strong>Suspend</strong> button. Accounts are
+usually suspended pending investigation into some terms of service
+violation. You can use the <strong>Unsuspend</strong> button to
+re-enable an account.</p>
+<h3 id="instance-level-blocking-of-handles-or-domains">Instance level
+blocking of handles or domains</h3>
+<p>To block a fediverse handle (nickname@domain), hashtag or domain
+enter the thing that you wish to block and then select the
+<strong>Block</strong> button. You can do the same with the
+<strong>Unblock</strong> button to reverse your decision.</p>
+<p>When creating a block you can also add a space followed by any text
+describing the reason for the block. Such as:</p>
+<pre class="text"><code>annoyingdomain.com A spam instance</code></pre>
+<p>If you want to see what is being blocked at the instance level then
+select the <strong>Info</strong> button.</p>
+<h3 id="web-crawlers-and-search-bots">Web crawlers and search bots</h3>
+<p>Most fediverse posts have <em>Public</em> scope, and various web
+crawlers routinely try to index them. These are mostly the usual
+suspects, such as BigTech companies, but also include lesser known
+crawlers such as the British Library. By default all web search bots are
+blocked, but the administrator account can enable particular ones.</p>
+<p>If you are the administrator of the instance then to see the
+currently active web search crawlers edit your profile and select
+<strong>Filtering and blocking</strong>, then <strong>Known Web Search
+Bots</strong>. The most common ones will appear at the top. To enable
+particular ones add their name to <strong>Web Search Bots
+Allowed</strong> (one per line).</p>
+<h3 id="clearing-the-actor-cache">Clearing the Actor Cache</h3>
+<p>If you know that an instance has had a security incident and has
+rotated their signing keys then you can clear the cache for that
+instance so that their public keys will be refreshed. Enter the domain
+name for the instance and then select <strong>Clear Cache</strong>
+button.</p>
+<h2 id="account-level-moderation">Account level moderation</h2>
+<h3 id="filtering-1">Filtering</h3>
+<p>From the main timeline select the top banner to go to your profile,
+then select the <strong>edit</strong> icon. Open the <strong>Filtering
+and blocking</strong> section and then you can specify filtered words or
+phrases. Be sure to select <strong>Publish</strong> to finalize your
+settings.</p>
+<p>You can also filter words within the bio of users making follow
+requests. This allows unwanted followers to be automatically rejected if
+their bio contains particular words.</p>
+<h3 id="blocking-accounts-or-domains">Blocking accounts or domains</h3>
+<p>From the main timeline select the top banner to go to your profile,
+then select the <strong>edit</strong> icon. Open the <strong>Filtering
+and blocking</strong> section and then you can specify <strong>blocked
+accounts</strong> or domains (one per line).</p>
+<p>When creating a block you can also add a space followed by any text
+describing the reason for the block. This can help as a reminder as to
+why you blocked someone. Such as:</p>
+<pre class="text"><code>chud@chuddydomain.com Slobbering. Ferocious. Carnivorous. Underground.
+sealion@endlessreplies.net Another bad faith &quot;debater&quot;</code></pre>
+<p>Be sure to select <strong>Publish</strong> to finalize your
+settings.</p>
+<h3 id="federated-blocklists">Federated blocklists</h3>
+<p>If you have the admin or moderator role then there is a section
+within <strong>Filtering and blocking</strong> called <strong>Blocking
+API endpoints</strong>. This can be used to subscribe to remote
+blocklist URLs, and may be useful in situations where for example you
+have multiple instances set up for an organisation and want them to all
+use the same blocklist.</p>
+<p>Federated blocklists should be a json endpoint accessible via HTTP
+GET, and can either be a simple list of strings, where the strings are
+blocked account handles or domains:</p>
+<pre class="text"><code>[
+  &quot;@asshat@angrychuds.com&quot;,
+  &quot;@replyguy@endlessly.replying.net&quot;,
+  &quot;tedious.domain&quot;
+]</code></pre>
+<p>Or they can be a list of dictionaries:</p>
+<pre class="text"><code>[
+  {
+    &#39;id&#39;: 123,
+    &#39;username&#39;: &#39;@asshat@angrychuds.com&#39;,
+    &#39;email&#39;: &#39;null&#39;,
+    &#39;status&#39;: &#39;block&#39;,
+    &#39;created_at&#39;: None,
+    &#39;updated_at&#39;: None
+  },
+  {
+    &#39;id&#39;: 124,
+    &#39;username&#39;: &#39;@replyguy@endlessly.replying.net&#39;,
+    &#39;email&#39;: &#39;null&#39;,
+    &#39;status&#39;: &#39;block&#39;,
+    &#39;created_at&#39;: None,
+    &#39;updated_at&#39;: None
+  },
+  {
+    &#39;id&#39;: 125,
+    &#39;username&#39;: &#39;@tedious.domain&#39;,
+    &#39;email&#39;: &#39;null&#39;,
+    &#39;status&#39;: &#39;block&#39;,
+    &#39;created_at&#39;: None,
+    &#39;updated_at&#39;: None
+  }
+]</code></pre>
+<p><strong>Caution:</strong> When subscribing to a federated blocklist
+you need to have a high degree of trust in the people maintaining it. If
+they turn out to be untrustworthy or malevolent then they can
+potentially render your instance useless by blocking all your followed
+domains.</p>
+<h3 id="replacing-words">Replacing words</h3>
+<p>Sometimes you may want to replace words within received posts. This
+can be for added clarity, to dissipate annoyance or just for fun.</p>
+<p>From the main timeline select the top banner to go to your profile,
+then select the <strong>edit</strong> icon. Open the <strong>Filtering
+and blocking</strong> section and then you can specify replacements as
+follows:</p>
+<pre class="text"><code>OldWord -&gt; NewWord
+original phrase -&gt; new phrase</code></pre>
+<p>These replacements are subjective, such that if you
+boost/repeat/announce a post then the original wording will be retained
+for recipients.</p>
+<h3 id="content-warning-lists">Content warning lists</h3>
+<p>Content warning lists are lists of domains and/or keywords which can
+be used to append a warning if they appear in the content of an incoming
+post. For example, you can have a content warning added if a post
+contains links to satire sites, so that you don’t confuse them with real
+news and you don’t need to be familiar with every possible satire site.
+These types of warnings are opt-in, so if they don’t apply to you then
+you don’t have to have any.</p>
+<p>From the main timeline select the top banner to go to your profile,
+then select the <strong>edit</strong> icon. Open the <strong>Filtering
+and blocking</strong> section and look for <strong>“Add content warnings
+for the following sites”</strong>. You can then select the types of
+warnings to be added to your timeline.</p>
+<h2 id="emergencies">Emergencies</h2>
+<p>The fediverse is typically calmer than the centralized social
+networks, but there can be times when disputes break out and tempers
+become heated. In the worst cases this can lead to administrator burnout
+and instances shutting down.</p>
+<p>If you are the administrator and you are in a situation where you or
+the users on your instance are getting a lot of targeted harassement
+then you can put the instance into <em>broch mode</em>, which is a type
+of temporary allowlist which lasts for between one and two weeks. This
+prevents previously unknown instances from sending posts to your
+timelines, so adversaries can’t create a lot of temporary instances for
+the purpose of attacking yours.</p>
+<p>A general observation is that it is difficult to maintain collective
+outrage at a high level for more than a week, so trolling campaigns tend
+to not last much longer than that. Broch mode allows you to ride out the
+storm, while retaining normal communications with friendly
+instances.</p>
+<p>To enable broch mode the administrator should edit their profile, go
+to the instance settings and select the option. Once enabled it will
+turn itself off automatically after 7-14 days. The somewhat uncertain
+deactivation time prevents an adversary from knowing when to begin a new
+flooding attempt, and after a couple of weeks they will be losing the
+motivation to continue.</p>
+<h1 id="themes">Themes</h1>
+<p>Generic-looking user interfaces have become expected for many types
+of software, because they are designed to scale up to very large numbers
+of users and hence need to be as bland and inoffensive as possible. But
+small web systems don’t need appeal to a bland, corporate, imagined
+average user. If you are spending significant time using a social
+network then being able to customise it and really make it your online
+home improves usability.</p>
+<h2 id="standard-themes">Standard themes</h2>
+<p>Epicyon has multiple standard themes and if you are the administrator
+then if you edit your profile and open the <em>Graphic design</em>
+section then you can change the current theme for the instance. Users
+may need to reload the web page with <em>CTRL+F5</em> in order to see
+the changes.</p>
+<h2 id="theme-customization">Theme customization</h2>
+<p>If you have the <em>artist</em> role then from the top of the left
+column of the main timeline you can select the <em>Theme Designer</em>
+icon, which usually resembles a paint roller or paint brush. This allows
+you to change colors and values for user interface components.</p>
+<figure>
+<img src="manual-theme-designer.png" alt="Theme designer screen" />
+<figcaption aria-hidden="true">Theme designer screen</figcaption>
+</figure>
+<h1 id="buying-and-selling">Buying and selling</h1>
+<p>When creating a new post you have the option of specifying a <em>buy
+link</em> This is a link to a web page where you can buy some particular
+item. When someone receives the post if they have a compatible instance
+then a small shopping cart icon will appear at the bottom of the post
+along with the other icons. Clicking or pressing the shopping cart will
+then take you to the buying site. It’s a predictable and machine
+parsable way indicating that something is for sale, separate from the
+post content.</p>
+<p>To avoid spam, it is possible for the shopping icon to only appear if
+it links to one of an allowed list of seller domains. In this way you
+can be confident that you are only navigating to approved sites.</p>
+<h1 id="sharing-economy">Sharing economy</h1>
+<p>This is intended to add <a
+href="https://en.wikipedia.org/wiki/The_Freecycle_Network">Freecycle</a>
+type functionality within a social network context, leveraging your
+social connections on the instance, or between participating instances,
+to facilitate sharing and reduce wasteful consumerism.</p>
+<h2 id="adding-a-shared-item">Adding a shared item</h2>
+<p>When creating a new post one of the scope options is called
+<em>shares</em>. You can describe an item or service that you are
+willing to share.</p>
+<p>Sharing is primarily intended to not require any monetary
+transactions, although prices can optionally be added. There are no
+payment mechanisms implemented and if that is required then it is
+recommended to include details of payment method within the
+description.</p>
+<p>It is optionally possible to display the shared item on your profile,
+which makes it <em>fully public to the whole internet</em>. Only a small
+number of shared items can be shown on your profile though, which is
+decided via the command option <em>–maxSharesOnProfile</em>.</p>
+<figure>
+<img src="manual-new-share.png" alt="Adding a new shared item" />
+<figcaption aria-hidden="true">Adding a new shared item</figcaption>
+</figure>
+<h2 id="adding-a-wanted-item">Adding a wanted item</h2>
+<p>This is the opposite to adding a share in that you are making a post
+which indicates that you are wanting some particular thing or
+service.</p>
+<h2 id="new-shares">New shares</h2>
+<p>When new shared items are added then in the left column of the main
+timeline screen there will be a section showing recent shares.</p>
+<h2 id="shared-and-wanted-items-timelines">Shared and wanted items
+timelines</h2>
+<p>Any items shared or wanted will appear within timelines, which can be
+viewed by selecting the <em>show/hide</em> icon.</p>
+<h2 id="federated-shares">Federated shares</h2>
+<p>If you are the administrator of the instance then you can specify
+other instances with which your local shared items may be federated.
+Edit your profile and select the <em>Shares</em> section, then add the
+domain names of the instances to share with (one per line). If other
+instance administrators also configure their system to share with yours
+then this is the ideal mutualistic situation, increasing the set of
+things being shared.</p>
+<p>The technical implementation of federated shared items currently does
+not use ActivityPub, but instead a pull-based system more comparable to
+RSS/Atom. This is so that the people doing the sharing always remain in
+control of what they are sharing, and can withdraw a share at any time.
+A pull-based implementation also makes things considerably harder for
+spammers.</p>
+<h1 id="search">Search</h1>
+<p>To search, select the magnifying glass icon from the top right of the
+centre column of the main timeline. This will take you to a separate
+screen where you can enter your search query.</p>
+<figure>
+<img src="manual-search.jpg" alt="Search screen" />
+<figcaption aria-hidden="true">Search screen</figcaption>
+</figure>
+<p><strong>Hashtag categories</strong></p>
+<p>If you select <em>SHOW MORE</em> at the bottom of the search screen
+then this will show all recent hashtags, in alphabetical order. If you
+have the <em>editor</em> role then selecting a tag will then allow to to
+assign a category to it. In this way you can build up <em>hashtag
+categories</em> as a way to group tags together under subject headings.
+For example, <em>cake</em> might be under a <em>food</em> category.</p>
+<p>The hashtag categories are published as an RSS feed at
+https://yourdomain/categories.xml, and editors on other instances can
+add those feeds to their newswire. This enables the categorization of
+hashtags to be crowdsourced between instances.</p>
+<p><strong>Searching for a fediverse handle or profile URL</strong></p>
+<p>If you enter a fediverse handle or a URL corresponding to a profile
+then the system will try to find it. If successful then a summary of the
+found profile will be shown, and you will have the option to
+follow/unfollow or view the original upstream profile page. If you are
+already following then a different screen will be shown with more
+options available.</p>
+<p><strong>Searching your posts</strong></p>
+<p>To search your own posts prefix the search text with a single quote
+character.</p>
+<p><strong>Searching hashtags</strong></p>
+<p>To search for a hashtag just enter it, complete with the hash
+prefix.</p>
+<p><strong>Searching shared items</strong></p>
+<p>To search for any shared items just enter the text that you want to
+search for.</p>
+<p><strong>Searching wanted items</strong></p>
+<p>To search for a wanted item then enter the text that you want to
+search for prefixed by a full stop (period) character.</p>
+<p><strong>Searching for skills</strong></p>
+<p>To search for accounts having a particular skill, prefix your search
+text with a star character.</p>
+<p><strong>Searching for emojis</strong></p>
+<p>To search for an emoji use its name prefixed by a colon
+character.</p>
+<h1 id="browsing-in-a-command-shell">Browsing in a command shell</h1>
+<p>Since the web interface of Epicyon only needs HTML5 and CSS, it can
+work with browsers which don’t implement javascript at all.</p>
+<p>Screenshots within the preceding sections all assume that you are
+using a common graphical web browser. However, it is also possible to
+use Epicyon from a shell browser, such as <a
+href="https://lynx.invisible-island.net">Lynx</a>. This may be better
+suited for use with screen readers, or if you want to check your social
+media while logged into a server via <em>ssh</em>.</p>
+<p>If you are using <em>Lynx</em> then you will need to ensure that it
+is configured for the <strong>utf-8</strong> character set, and that you
+have emoji fonts installed (eg. <strong>noto-fonts-emoji</strong>). Edit
+your <em>lynx.cfg</em> file (usually in <em>/etc/lynx.cfg</em>) and
+set:</p>
+<pre class="text"><code>CHARACTER_SET:utf-8</code></pre>
+<p>To avoid annoying questions you may also want to set:</p>
+<pre class="text"><code>ACCEPT_ALL_COOKIES:TRUE</code></pre>
+<p>After logging in you will see a menu, which are shortcuts to
+different screens.</p>
+<figure>
+<img src="manual-lynx-menu.png"
+alt="Menu viewed within a shell browser" />
+<figcaption aria-hidden="true">Menu viewed within a shell
+browser</figcaption>
+</figure>
+<p>Timelines will look something like the following.</p>
+<figure>
+<img src="manual-lynx-inbox.png"
+alt="Inbox viewed within a shell browser" />
+<figcaption aria-hidden="true">Inbox viewed within a shell
+browser</figcaption>
+</figure>
+<p>The typical way of refreshing the timeline is to go to the top,
+select <strong>Inbox</strong> from the menu, then use
+<strong>CTRL-R</strong> to reload.</p>
+<h1 id="content-licenses">Content licenses</h1>
+<p>ActivityPub posts are really just content on a website and so are
+subject to copyright rules. Historically, the copyright status of posts
+was always left as ambiguous but in Epicyon for the avoidance of
+disputes it is made explicit. Setting the scope of a post, such as being
+to followers only, is not sufficient to indicate how that post is
+intended to be used.</p>
+<p>Content licensing is at the instance level, and set by the
+administrator. Log in as the administrator and then go to <em>instance
+settings</em>. From there you can set the content license, which should
+be the URL for the full license text.</p>
+<p>When subsequently creating posts a small copyright icon will appear,
+which then links back to the license.</p>
+<p>The choice of content license is for the instance administrator to
+decide, but it is recommended that <a
+href="https://creativecommons.org/licenses/by-nc/4.0/legalcode">non-commercial
+creative commons licenses</a> may be enough to deter some of the worst
+abuses of <a
+href="https://en.wikipedia.org/wiki/Personal_data">personally
+identifiable information</a> by BigTech companies.</p>
+<h1 id="building-fediverse-communities">Building fediverse
+communities</h1>
+<p>The great thing about running a small instance is that you can do
+things in whatever manner you prefer. What follows is a few guidelines
+which may help.</p>
+<figure>
+<img src="manual-fediverse.png" alt="Fediverse logo" />
+<figcaption aria-hidden="true">Fediverse logo</figcaption>
+</figure>
+<p><strong>Have a working backup system</strong></p>
+<p>Keeping backups is very important, and fortunately with Epicyon this
+is a simple process. The Epicyon installation consists only of files in
+a directory. There is no database. So just backing up the directory
+where it resides - typically <em>/opt/epicyon</em> - is all that you
+need to do. Once you have a backup system in place, test that it
+works.</p>
+<p><strong>The fediverse is not an open source Twitter</strong></p>
+<p>This sounds like a trite comment, but if you have members on your
+instance coming from Twitter and expecting it to be the same sort of
+thing then they will be disappointed. A major difference is that the
+fediverse is more about conversation rather than one-way broadcast.
+Sites like Twitter encourage you to become an “influencer” and adopt a
+style of communication where you are shouting to a large audience
+without much expectation of dialogue.</p>
+<p>On the website formerly known as Twitter there is an algorithm which
+will make follow suggestions and dump all manner of aggravating trash
+into your timeline. On the fediverse if you want to connect with people
+then you will need to be more proactive in going out to <em>find the
+others</em>. There is no algorithm trying to guess what you want without
+your participation. Zuckerberg’s Threads is an exception to this, but
+the less said about that the better.</p>
+<p><strong>Robustly remove bad actors</strong></p>
+<p>If people are creating a problem or bringing trouble and are not
+amenable to changing their ways, whether they are members of your
+instance or not, then be prepared to block or suspend their accounts.
+Remember that <em>trolls will destroy your community if you let
+them</em>. Define your <em>terms of service</em> and apply it
+consistently to anyone interacting with your instance.</p>
+<p><strong>Curate your experience</strong></p>
+<p>Add links to the left column and blog or podcast feeds to the right.
+Choose links which are relevant to your community so that useful
+information is one click away. If you have multiple people on your
+instance then assign roles to them so that they have a stake in
+maintaining a good experience.</p>
+<h1 id="a-brief-history-of-the-fediverse">A Brief History of the
+Fediverse</h1>
+<h2 id="the-problems-with-centralization">The problems with
+Centralization</h2>
+<h3 id="censorship">Censorship</h3>
+<p>When everybody is in a single database the whims of whoever owns that
+database become paramount.</p>
+<p>Maybe this week the owner doesn’t like the posts of cancer survivors.
+Maybe next week they don’t like transgender people. Maybe another week
+they don’t like people resisting fascists on the street. All these
+accounts can be speedily closed, erasing history, and in practice things
+like this have actually happened many times.</p>
+<p>Admittedly in the case of the website formerly known as Twitter it
+probably isn’t a single server or a single database, but via
+virtualization technologies we can consider it to be such. What matters
+mostly is who owns and controls the system, and that the system behaves
+as a single cohesive entity with a unified policy.</p>
+<p>Censorship on sites like Twitter/X and Facebook has been an ongoing
+problem for many years. If there has been a trend it has been one of
+increasing pressure from nation states to comply with local laws, or
+just the wishes of the powerful to suppress inconvenient home truths and
+interfere with people organizing protests. Any event with “social action
+potential” can transform into a challenge to entrenched power
+structures.</p>
+<p>Beginning with the Arab Spring in 2011, internet shutdowns became
+increasingly common, but even in places where the internet is
+operational there can still be domain blocks against the biggest social
+network systems. The obvious examples of this is China’s Great Firewall
+or Iran’s national internet, but there are many other similar cases of
+selective blocking.</p>
+<p>Having the ability to avoid censorship, either by the centralized
+social networks or by governments at the ISP level is useful, and being
+able to run your own social networks is one way of achieving that.</p>
+<p>In a federated system some servers may get blocked by censors, but
+the rest of the system can still continue to be operational. You get to
+decide by what rules the community is governed.</p>
+<h3 id="algorithmic-timelines">Algorithmic Timelines</h3>
+<p>The algorithmic timeline might seem like a good idea at first. After
+all, people have limited time to mess around on social networks so maybe
+they just want to see the highlights.</p>
+<p>Unfortunately it’s never quite that simple. The website formerly
+known as Twitter started using an algorithmic timeline in 2016 and
+Facebook many years before that. Algorithmic timelines give whoever
+controls the system the ability to promote or censor content as they
+wish, and their wishes may bear no relationship to the wishes of the
+user.</p>
+<p><em>“When the linear timeline was removed in favor of their own
+algorithmic sort, they removed our control over the conversation
+entirely. Instead of you and your friends in discourse with each other,
+you’re talking around the sources of content you’re being told to see,
+read, and like. You are in direct competition with a corporate notion of
+your personal history, identity, and relationships.”</em></p>
+<p>In 2012 Facebook used its algorithmic timeline <a
+href="https://www.wired.com/2014/06/everything-you-need-to-know-about-facebooks-manipulative-experiment/">to
+manipulate the emotions of its users</a> in a week long experiment. None
+of the experimental subjects gave consent. By promoting or removing
+happy or sad content the collective mood could be artificially swayed
+one way or another. It’s likely that other similar experiments have
+occurred quietly without any media attention.</p>
+<p>Algorithmic timelines also mean that different users see a different
+version of events. For any given post, maybe you see it now or maybe
+later or perhaps not at all, depending upon what the algorithm decides
+is priority. This reduces the potential for coordinated activities.</p>
+<p>A well known problem with algorithmic timelines is “shadow banning”.
+You are sending out posts, but the algorithms decide that they all have
+zero ranking priority and so your friends never seem them. You think
+you’re communicating, but actually you’re not.</p>
+<h3 id="echo-chambers-and-outrage-culture">Echo chambers and outrage
+culture</h3>
+<p>What happens when you put millions of people from many different
+cultures into an online space where they can’t avoid each other? This is
+the experiment which the centralized social network systems have been
+performing.</p>
+<p>People have conflicting opinions and expected norms, so when they’re
+in a confined space and don’t have much control over what gets into
+their stream they will of course fight with each other.</p>
+<p>This can result in endless bickering, ALLCAPS RANTS, harassment,
+bikeshedding, egobattles and call-outs. It soon gets emotionally
+draining and can have serious psychological and sometimes physical
+consequences. The website formerly known as Twitter today is a more or
+less endless stream of outrage and neonazi talking points.</p>
+<p>The echo chamber is the opposite. You only talk to a small circle of
+friends and never meet anyone outside of your ingroup. There’s a lot of
+complaining about bubble effects, but in practice this rarely happens
+since algorithmic timelines don’t give the user enough control to be
+able to remain strictly within their bubble.</p>
+<p>The ideal is somewhere between being in a bubble and being in an
+overcrowded and antagonistic space suffering from endless linguistic
+combat. Federation provides this kind of model.</p>
+<h3 id="the-silo-feedback-loop">The Silo Feedback Loop</h3>
+<p>The various features of the centralized silo systems create a
+feedback loop which encourages “engagement” and enables paying customers
+to manipulate opinions.</p>
+<ul>
+<li>Organization buys targeted ads</li>
+<li>Algorithmic timeline changes to display them</li>
+<li>User experience changes due to altered timeline</li>
+<li>Analytics of resulting user behaviour</li>
+<li>Devise new ad campaign</li>
+<li>Repeat</li>
+</ul>
+<p>The silo systems can use data mining and machine learning methods to
+maximize the engagement of users with ads. Typically the AI will learn
+that in order to get the biggest results the ads should target people in
+a manner which causes shock and outrage, resulting in furious replies
+and flamewars. “Look at this terrible thing!”, etc.</p>
+<p>When the ads are of a political or psyops nature obviously this can
+have significant adverse effects upon the society if enough targeted
+advertising is deployed. Even if the silo system has a policy which
+forbids this it’s hard for them to automatically detect political
+campaigns which may be quite subtle and manipulative in their messaging.
+They also have a strong incentive to take as much money as they can,
+regardless of its origin or intentions.</p>
+<p>The absence of centrally controlled algorithmic timelines prevents
+this kind of feedback loop from being deliberately created within the
+fediverse.</p>
+<p>If the timeline is purely chronological, or if it’s controlled by the
+user, then it’s not possible to buy influence over opinions in the same
+manner.</p>
+<h3 id="corporate-versus-community-interests">Corporate versus Community
+Interests</h3>
+<p><em>“Centralised systems lead to increasingly monotonous and
+unaccountable power. Over time this encourages exploitation and
+disinterest in user needs.”</em></p>
+<p>– Irina Bolychevsky</p>
+<p>Naive people might believe that Facebook is just a place to hang out
+and chat with friends. But there aren’t many folks that naive in
+existence anymore.</p>
+<p>Facebook doesn’t actually care whether the user experience is good or
+not, so long as its advertising customers can target their users and the
+money keeps rolling in. This is certainly reflected in the horrible user
+interface.</p>
+<p>The interests of major internet companies are not necessarily the
+same as the interests of internet users. Often the interests are badly
+out of alignment.</p>
+<p>The companies - especially the big ones - are only concerned about
+profits and share holders. Things like keeping Mark Zuckerberg in the
+top ten list of oligarchs. They’re not concerned about you or your
+community, because you’re small fry and they are the Tech Geniuses
+living in McMansions and driving expensive CyberTrucks.</p>
+<p>Federation is one way to bring the interests back into alignment and
+cut the oligarchs with their inflated egos and self-entitlement out of
+the picture. If you keep the number of users on an instance small then
+there is not much power differential between the admin and the users,
+and probably their concerns are similar.</p>
+<h2 id="dimensions-of-decentralization">Dimensions of
+Decentralization</h2>
+<p>Decentralized systems can be conceptualized along three axes, forming
+the Governance Cube.</p>
+<h3 id="logical">Logical</h3>
+<p>If you divide the system in half will they continue to function or
+fail catastrophically.</p>
+<p>Can you combine systems which previously ran separately into a larger
+one, without losing any functionality or having clashing
+indexes/hashes.</p>
+<h3 id="political">Political</h3>
+<p>Is the system controlled by a single individual or a single
+organization, or is it controlled by many people or different
+organizations.</p>
+<p>Do you need anyone’s permission to run the system.</p>
+<h3 id="architectural">Architectural</h3>
+<p>How many computers is the system running on, and how geographically
+dispersed are they. Are they all in a single warehouse or in many homes
+and offices.</p>
+<h3 id="examples">Examples</h3>
+<p>Bitcoin: Logically centralized, Architecturally decentralized (apart
+from mining), politically decentralized (mostly)</p>
+<p>Traditional corporations: Logically centralized, Architecturally
+centralized, Politically centralized</p>
+<p>Fediverse: Logically decentralized, Politically decentralized,
+Architecturally decentralized. Fediverse might be considered politically
+centralized, but only at the instance level.</p>
+<p>Signal App: Logically centralized, Politically centralized,
+Architecturally centralized (single server)</p>
+<p>SSB: Logically decentralized, Politically decentralized,
+Architecturally decentralized</p>
+<p>A system which was politically centralized but logically and
+architecturally decentralized would be where everyone could run their
+own solid-like data pods and control permissions to their data, but
+identity would be centrally managed by a single organization.</p>
+<h2 id="problems-with-the-website-formerly-known-as-twitter">Problems
+with the website formerly known as Twitter</h2>
+<p>Particular problems with Twitter, especially from 2016 onwards after
+the introduction of algorithmic timelines were:</p>
+<ul>
+<li>Centralised</li>
+<li>Proprietary, so forking and doing something better wasn’t an
+option</li>
+<li>They forced you to ID yourself with a phone number</li>
+<li>They handed your data to third party companies</li>
+<li>Most governments were using it to ID people saying bad things about
+them</li>
+<li>Ads and corporate campaigns</li>
+<li>Heavy handed censorship, or refusal to remove users who were
+violating TOS merely because of their celebrity status</li>
+<li>Refusal to deal with obvious bot accounts, used for spying or
+creating an economy of fake followers</li>
+</ul>
+<h2 id="peers-and-federalists">Peers and Federalists</h2>
+<p>The ideal state of the web would be peer to peer. There would be
+perfect scalability due to there being no bandwidth choke points. All
+data would be content addressible, replicated and seeded by its users.
+DDoS would be practically impossible. Each peer would make their own
+decisions about which others to connect to and what data to share.</p>
+<p>The web today is the opposite of this, and is increasingly
+centralised. Policies about what type of content is permitted or not
+tend to be global and defined by the terms of service a few
+megacorporations.</p>
+<p>Both of these have disadvantages. The centralised web tries to impose
+a single standard for connectivity and content onto the whole world. The
+peer to peer situation means that each individual is captain of their
+own ship and makes their own decisions about who to connect to and what
+to share, but this may sometimes involve a lot of duplicated curation
+effort.</p>
+<p>Federation offers a third way of doing things, in which decisions
+about what is or isn’t acceptable may be partly collectivized, but not
+to a totalizing extent as in the centralized case. This allows peers to
+offload some of their preferences to their affinity group, which may
+improve the user experience and reduce cognitive workload. For example,
+collective defense against known bad entities.</p>
+<h2 id="pseudonymity">Pseudonymity</h2>
+<p>After the web 2.0 systems appeared in the mid 2000s so too did a
+consensus that “real names” were preferable to pseudonyms.</p>
+<p>The thinking was that if users are anonymous then they’re more likely
+to indulge in antisocial behavior, because there are likely to be no
+real world repercussions.</p>
+<p>In the fediverse, as on earlier internet systems, pseudonyms are used
+predominantly and there have been no “real name” policies so far.</p>
+<p>The evolution of Facebook and to a much lesser extent Google+
+provided good evidence that “real names” do not necessarily produce
+civility. Instead “real names” are much more about producing a
+consistent social graph for use by advertisers. If you know someone’s
+specific identity then its much easier to target them with advertising
+and send traditional junk mail to their home address.</p>
+<p>So the obsession with “real names” was largely about commercial
+motives rather than improving the discourse.</p>
+<p>Full anonymity where there isn’t a consistent username or where many
+users are on the same account is difficult to handle because it makes
+spammers hard to block, but pseudonymity where users have a persistent
+and unique username/address which is not necessarily linked to any
+“legal person” appears to be optimal.</p>
+<h2 id="gnu-socialites">GNU Socialites</h2>
+<p><a href="https://en.wikipedia.org/wiki/GNU_social">GNU Social</a> was
+released in 2013, based upon the earlier StatusNet code, written in
+PHP.</p>
+<p>In contrast to the release announcement, which talked of
+“professional quality code”, the software contained a large amount of
+cruft.</p>
+<p>Initial cruft included a lot of links to Google, including long
+obsolete Google projects such as <a
+href="https://en.wikipedia.org/wiki/Google_Buzz">Buzz</a>. Initial tasks
+were to remove any dependencies upon proprietary systems.</p>
+<h3 id="the-quitter-era">The Quitter Era</h3>
+<p>Between 2013 and 2016 the most popular GNU Social instances ran with
+the Qvitter user interface, which closely resembled the earlier and more
+user friendly appearance of Twitter, before a lot of junk was added. It
+was developed primarily by Hannes Mannerheim from August 2013
+onwards.</p>
+<p>These instances had domains like quitter.se or quitter.no. They had
+explicitly anti-capitalist branding, with “quitter” being a reference to
+“quitting Twitter”.</p>
+<p>Unlike the classic GNU Social user interface, which was unchanged
+from the pre-2012 StatusNet days, Qvitter used javascript. There was
+widespread distrust of javascript at that time, so the more security
+conscious folks tended to use non-Quitter instances.</p>
+<p>During the Quitter Era most users were either Free Software
+developers/supporters, or anarchists seeking to socially organize
+autonomously from the corporate systems. Anarchist slogans intermingled
+with Stallman and GNU memes were common.</p>
+<p>By the end of 2016 the main focus of fediverse activity was shifting
+away from GNU Social and towards the shiny new Mastodon system.</p>
+<h3 id="postactiv">PostActiv</h3>
+<p>Development on GNU Social was slow, and mostly confined to
+international translations.</p>
+<p>As a consequence of slow developent, in 2016 a fork of GNU Social was
+created called postActiv . PostActiv was developed by Maiyannah Bishop,
+with the aim of tidying the code, adding comments and improving the
+message queue buffering.</p>
+<p>The postActiv fork was not an acrimonious one, and it was recommended
+by the main GNU Social developer, Mikael Nordfeldth.</p>
+<h2 id="here-come-the-elephants">Here come the Elephants</h2>
+<p>Mastodon started gaining popularity towards the end of 2016. At that
+time it was based around a single instance called mastodon.social.</p>
+<p>It was initially viewed skeptically by the users of GNU Social
+instances, as being a cult based around the personality of its young
+developer, Eugen Rochko.</p>
+<p>This system was promoted as being like Twitter, but with a zero
+tolerance policy towards far right or alt-right agitators. The “lack of
+nazis” was enough of a motivator to get some users to move over from
+Twitter.</p>
+<p>Mastodon introduced a new concept to the fediverse - the content
+warning. Content warnings could also be considered as ultra brief
+content summaries, allowing the user to rapidly skip over posts which
+were probably not of interest.</p>
+<p>What content warnings (or one line summaries) allowed users to do was
+to follow numbers of other users above the Dunbar limit and without
+necessarily having a high degree of affinity with them, while also
+avoiding the cognitive overload which would otherwise result. In effect,
+content warnings were an alternative to the algorithmic timeline,
+producing the same compressing effect without the down sides of
+censorship and shadowbans.</p>
+<p>People on Twitter had been requesting user interface changes to
+improve usability and getting nowhere for years, but were happily
+surprised that the Mastodon developer was much more responsive to
+suggestions.</p>
+<p>Mastodon initially set its character limit to 500 - much higher than
+Twitter’s 140 at the time, but typically lower than many GNU Social
+instances which defaulted to 2000.</p>
+<h3 id="appearance">Appearance</h3>
+<p>A variety of factors contributed to the early popularity of Mastodon,
+and one of those factors was its similarity to an already familiar
+Twitter user interface, called Tweetdeck.</p>
+<p>From early on Mastodon seems to have attracted many artists, and as a
+consequence it tended to have better quality artwork for its logos than
+other fediverse projects - and Free Software projects in general.</p>
+<h3 id="changing-demographics">Changing demographics</h3>
+<p>With the rise of Mastodon in 2017 the gender composition of the
+fediverse noticeably changed from being mostly masculine (maybe 80% at a
+guess) towards being much more even. Mastodon had broad appeal and
+brought in new demographics which were not confined to people interested
+in technology.</p>
+<h3 id="the-first-million">The First Million</h3>
+<p>At the end of 2017 Mastodon had a million user accounts. However,
+taking into account that many of those would be dormant, or bots, a more
+realistic estimate of active users would between 100 and 200
+thousand.</p>
+<h3 id="new-design-features">New Design Features</h3>
+<p>Mastodon also introduced new design features which were intended to
+reduce the potential for harassment. On Mastodon systems you could
+search on hashtags, but not do arbitrary searches of an instance for
+arbitrary text.</p>
+<p>This was an attempt to mitigate lowbrow adversaries who would
+otherwise search through the system looking for keywords (like maybe
+“feminist”) and then dogpile those users with insulting posts.</p>
+<p>Lowbrow dogpiling attacks of this kind had been common on Twitter for
+a number of years, so anything which frustrated the most dim-witted
+adversaries was still useful.</p>
+<p>Mastodon was the first web application in production to adopt
+ActivityPub for server-to-server communication, and it was available at
+the beginning of 2018.</p>
+<h3 id="activitypub-adoption">ActivityPub Adoption</h3>
+<p>Mastodon adopted the ActivityPub protocol at the beginning of 2018.
+It only used the server-to-server part of the protocol, and not the
+server-to-client. The implementation of ActivityPub within Mastodon then
+became primary reference for other instance software, such as Pleroma.
+The earlier OStatus protocol continued to be supported.</p>
+<h3 id="the-decline-and-fall-of-ostatus">The decline and fall of
+Ostatus</h3>
+<p>In May 2019 the Mastodon project maintainer announced plans to
+deprecate the OStatus protocol, which had been superceded by
+ActivityPub.</p>
+<p><em>“In 3.0, it is time to remove OStatus from Mastodon. Mastodon has
+not been designed as a multi-platform system and supporting a legacy
+platform creates messy and confusing code. Furthermore, the OStatus code
+has not been receiving the same performance and security improvements,
+in many parts because the OStatus protocol is inherently less secure in
+some aspects.”</em></p>
+<h3 id="little-hitlers-and-smalltime-internet-tyrants">Little Hitlers
+and smalltime internet tyrants</h3>
+<p>In July 2019 the white supremacist social network gab dot com
+switched from its formerly proprietary codebase over to using a fork of
+Mastodon. This caused a lot of concern among the existing userbase, who
+up to that point had been mostly left wing or anarchist. The Mastodon
+project blog issued a statement.</p>
+<p><em>“Mastodon is completely opposed to Gab’s project and philosophy,
+which seeks to monetize and platform racist content while hiding behind
+the banner of free speech.”</em></p>
+<p>Upon launch gab dot com claimed to have added another million users
+to the fediverse, but upon closer scrutiny these figures had been
+deliberately inflated via the inclusion of dormant legacy accounts
+carried over from their previous database. The site also removed the
+active users count which would otherwise reveal the diminutive volume of
+their actual userbase.</p>
+<p>The appearance of an openly neo-nazi instance accelerated interest in
+improving the security and moderation capabilities of Mastodon, and the
+discussion of Object Capabilities or “authorized fetch”. Many Mastodon
+instances preemptively blocked gab dot com and its affiliated sites even
+before they had officially launched, such was the revulsion.</p>
+<p>There was also the irony of people espousing extreme hatred of
+minority groups adopting a software system largely created by and for
+those very same groups. Effectively they were admitting that the
+proprietary approach had failed and that software built by people they
+viewed as enemies was technically superior to anything that “the master
+race” could hamfistedly kludge together themselves.</p>
+<h2 id="migrations-and-exoduses">Migrations and Exoduses</h2>
+<p>There have been many waves of incoming users. From time to time,
+typically once or twice per year, the website formerly known as Twitter,
+Facebook or other silo systems will just decide that they don’t like a
+certain type of user and begin closing or suspending their accounts or
+groups.</p>
+<p>In other cases a celebrity will be shadowbanned or suspended, which
+then causes a scandal among their followers and a desire for the fandom
+to relocate.</p>
+<p>These are the biggest exoduses so far:</p>
+<h3 id="identi.ca-in-trouble">2011/12: Identi.ca in trouble</h3>
+<p>Towards the end of 2011 identi.ca started to experience multi-day or
+multi-week outages. Its developer advised that anyone complaining create
+their own instances, and thus the first migration wave began out of the
+original silo system.</p>
+<p>Evan wanted to change the posts size of identi.ca from 140
+characters, like Twitter at the time, to something larger. There was a
+harsh backlash, so some of those who wanted to maintain the traditional
+length created their own federated sites, or used hosted ones which
+could be paid for to support the main development.</p>
+<p>By that time identi.ca was running out of money and its end was
+immanent.</p>
+<h3 id="twitters-algorithmic-timeline">2016: Twitter’s Algorithmic
+Timeline</h3>
+<p>In early 2016 the website formerly known as Twitter introduced an
+algorithmic timeline. Algorithmic timelines mean that the posts which
+other users see depend upon an opaque algorithm created by the company.
+The result is that it’s possible to post to the system but not be seen
+by anyone, or whoever your target audience is. This is known as “shadow
+banning”.</p>
+<p>The combined effects of shadow banning plus overt censorship resulted
+in a large influx into the fediverse. At times my GNU Social stream was
+a crazy firehoze of all kinds of random stuff.</p>
+<p>The established Quitter instances were soon overloaded with users,
+and as a consequence new instances were set up. The most notable of
+these was shitposter.club.</p>
+<h3 id="mastodon-goes-viral">2017: Mastodon goes Viral</h3>
+<p>Around about April 2017 Mastodon went viral. It started getting lots
+of mentions on the website formerly known as Twitter, and some
+mainstream technology journalists were writing about it. Many people
+thought it was new - which was true, but only in a narrow sense - and
+likely to become The Next Big Thing.</p>
+<p>Once again there was a large exodus of users out of Twitter and into
+the fediverse. My stream was going crazy, with hundreds of posts every
+few minutes.</p>
+<p>This exodus was more driven by hype than by Twitter doing anything
+especially bad to its users. By that time most users had accepted and
+internalized the fact that the site had become a perpetual dumpster fire
+of hostility and unwanted content.</p>
+<p>The technology journalism about Mastodon was of a comically poor
+standard. Most journalists fundamentally misunderstood the main concepts
+and so ended up making irrelevant criticisms. They mostly suffered from
+fediverse culture shock.</p>
+<p>Prior to the Mastodon craze, its developer had placed some ads for it
+on the website formerly known as Twitter. Twitter being a bunch of
+clueless corporate drones, they weren’t smart enough to realise that
+they were advertising a competing system. The ads almost certainly
+targeted technology journalists.</p>
+<h4 id="end-of-the-one-true-instance">End of the One True Instance</h4>
+<p>In late 2016 and early 2017, prior to going viral, Mastodon had
+existed as a single instance - mastodon.social. During that time it was
+heavily criticized for its OStatus federation bugs, and there seemed to
+be little interest in federating with anyone. Instead it looked like
+mastodon.social was aiming to be a centralized single server Twitter
+clone. Like Twitter, but with a lot less tolerance for bad behavior and
+a strong stance against hitlerites.</p>
+<p>Once it went viral there was no way that Mastodon could remain a
+single server affair with a monolithic and insular culture, and they had
+to become more serious about making the federation features work for
+real.</p>
+<p>As is the case with each new wave of incoming users, many new
+instances were set up and many of them were subsequently abandoned, or
+failed to keep backups and then had database corruption or a failed hard
+drive. There is always some rate of attrition. But many Mastodon
+instances remained viable, with enthusiastic new communities forming
+around them. The fediverse was going well beyond it’s traditional Free
+Software user base, appealing to entirely new and diverse
+demographics.</p>
+<h4 id="celebrity-bounce">Celebrity Bounce</h4>
+<p>In the April time frame various celebrities from the website formerly
+known as Twitter tried joining the fediverse via Mastodon. At some point
+William Shatner tried and failed to register an account or find a
+journalist named Lance Ulanoff. Both of them failed to understand that
+this system wasn’t identical to Twitter in the way it works. Adafruit
+and a number of others also started accounts, typically on the main
+mastodon.social instance.</p>
+<p>But none of these celebrity accounts lasted for long. A month or two
+at most. They soon realized that they would not be able to cultivate a
+mass audience in the fediverse, nor would the fediverse in any way
+shield them from legitimate criticism or spoof accounts mocking their
+cluelessness.</p>
+<p>It seems that the phemonena of celebrity requires a centralized
+broadcast culture together with a legal system able to enforce personal
+brands, and the fediverse does not fit that model very well at all.</p>
+<h4 id="replacing-the-twitterbots">Replacing the Twitterbots</h4>
+<p>Before 2017 there had been GNU Social based bots set up to import
+posts from the website formerly known as Twitter for certain accounts.
+After Mastodon went viral this was no longer needed so much, because
+people on Twitter either moved over or maintained a fediverse account.
+An example of this was Roy Schestowitz.</p>
+<h3 id="a-perfect-storm">2018: A perfect storm</h3>
+<p>In 2018 the exoduses didn’t let up.</p>
+<p>In April the first instance for sex workers appeared. This was in
+response to the SESTA act in the US, which made the more mainstream
+sites nervous about hosting anything which might be related to sex work
+of any kind, and as a consequence began the large scale purging of
+accounts which might be related to that. The Switter instance rapidly
+grew to host a large number of users displaced from various other sites
+by the new law.</p>
+<p>In August a combination of dreadful decisions made by the CEO of
+Twitter resulted in a kind of perfect storm in which at its peak 17,000
+new users arrived in a single day.</p>
+<p>The factors creating the August Twitter storm were:</p>
+<ul>
+<li>Changes to the Twitter API, resulting in client apps breaking</li>
+<li>A witch hunt against Terms of Service violators, almost certainly
+automated via AI rather than manual vetting. Violations were often silly
+things taken out of context from tweets a year or more old</li>
+<li>It became increasingly obvious that the Twitter CEO’s decisions were
+politically motivated, leading many users to consider themselves unsafe
+on that platform</li>
+<li>Closing the alt accounts of Twitter users in an attempt to
+consolidate a singular identity in the same manner as Facebook. Users
+often had multiple accounts for different purposes.</li>
+</ul>
+<p>In early December there was another exodus, this time from Tumblr
+which had adopted a new policy of banning adult content. Like Facebook,
+Tublr tried to use AI to detect images containing what it called
+“female-presenting nipples”, but the AI was hopelessly bad and caused an
+avalanche of false positives resulting in account suspensions.</p>
+<p>In the same week that Tublr began its purge of adult content Facebook
+also changed its terms of service to follow suit in what appeared to be
+a coordinated takedown. Facebook’s new terms forbade pretty much
+anything even tangentally related to sex, including things such as the
+discussion of sexual orientation or partner preferences.</p>
+<p>Also in 2018 Google announced that its social network service, known
+as Google+, would soon be closed. The fediverse gained some new people
+as a result, although by that time the number of users on Google+ had
+dwindled to a small community.</p>
+<p>By the end of 2018 Facebook’s AI moderation was becoming more of a
+problem for the average user of that system. Even expressing frustration
+in some mild forms, such as “men are trash!”, was enough to result in
+account suspension due to the misidentification of hate speech.</p>
+<h3 id="tyrannical-tendencies">2019: Tyrannical tendencies</h3>
+<p>With its launch in 2016 and first wave of success in early 2017
+Mastodon had badged itself as the system which doesn’t accept nazis.</p>
+<p>Up until 2019 migrations into the fediverse had been fairly benign
+and with a large LGBTQ quotient. But 2019 was the first case of what
+might be described as a hostile migration.</p>
+<p>The neo-nazi site gab dot com moved its operations from its
+previously failed proprietary server over to using a fork of Mastodon.
+This caused a lot of alarm among existing fediverse users and instance
+admins. Gab had already been banned from silo sites due to its promotion
+of extreme hatred and support for acts of terrorism including mass
+shootings.</p>
+<p>Even before gab dot com officially re-launched at the beginning of
+July fediverse admins were pre-emptively blocking federation with the
+site.</p>
+<p>One fediverse Android app called Tusky took a stand by building the
+block on gab dot com directly into its codebase. Another app called
+Fedilab announced that it would do the same, but then mysteriously
+backpeddled on the decision, raising questions about its political
+bias.</p>
+<p>Anti-feminists attempting to spread hatred of people in the LGBT
+community also used the Gab fork of Mastodon on a site called spinster,
+forming an axis alliance with the nazis.</p>
+<p>But the scourge of nazi boot-lickers proved to be more of a damp
+squib than a Cyber-Blitzkrieg. Their instances were very isolated and
+their user counts were enormously over-inflated in keeping with the
+possession of a dictatorially grandiose mindset (windbags plotting world
+domination while having a handful of real followers and a large number
+of bots spewing conspiratorial nonsense).</p>
+<p>At the end of the year one analysis discovered that of the active
+users on gab dot com over 90% were news bots, with only a small number
+of genuinely active accounts.</p>
+<p>The lesson from the nazi migration is that containment can be a
+fairly successful strategy if there is enough education about the
+threat. Like an immune system isolating a dangerous pathogen. Left to
+their own devices the nazis resort to turning on their own, and their
+ability to mobilize and recruit becomes severely constrained.</p>
+<p>A group with a centralized way of thinking and organizing also tends
+to fare poorly within the jungle of decentralized horizontalists. It was
+only really within the silo systems that they could reach a mass
+audience.</p>
+<h3 id="india-arrives">2019: India Arrives</h3>
+<p>In November there was a major exodus from India into the fediverse,
+after an Indian supreme court lawyer, Sanjay Hegde, was banned from the
+website formerly known as Twitter resulting in a political storm in
+which the Blue Bird Site was accused, unsurprisingly, of yet another
+case of bias. Hegde had been critical of right wing government and had
+posted a classic 1930s photo of many nazis saluting but one person
+conspicuously refusing to do so.</p>
+<h3 id="spanish-exodus">2019: Spanish exodus</h3>
+<p>In December the website formerly known as Twitter had a purge of
+Spanish leftists. Many of them showed up in the fediverse, and on
+Twitter they used the hashtag <strong>YoMigroAMastodon</strong> to
+encourage others to leave.</p>
+<h3 id="chaos-computer-club">2019: Chaos Computer Club</h3>
+<p>At the annual congress Mastodon was significantly more referenced
+than in the previous two years, and some speakers asked the audience to
+give feedback via Mastodon hashtags.</p>
+<h3 id="the-muskening">2022: The Muskening</h3>
+<p>In November, the oligarch Elon Musk, known for electric vehicles and
+spacecraft, purchased the website formerly known as Twitter. One of his
+first decisions was to fire most of the moderators. Admittedly, the
+moderators of Twitter did an abysmal job in the years leading up to the
+acquisition, but becoming an unmoderated space did not go down well with
+many users or advertising customers. This resulted in perhaps the
+biggest exodus up to that time.</p>
+<h3 id="facebook-joins-the-fediverse">2023: Facebook joins the
+fediverse</h3>
+<p>In August Facebook launched its own fediverse instance, known as
+Threads. This was a cynical attempt to scoop up disgruntled Twitter
+users looking for an alternative social media site due to the chaos
+being created by its new owner, Elon Musk. There was a lot of concern
+about the evil empire of Zuckerberg joining the fediverse, and possibly
+squashing it by sheer weight of numbers. A website called <a
+href="https://fedipact.online">fediPact</a> was created on which
+administrators could express their intention to block the Facebook
+instance. Many people had come to the fediverse precisely to get away
+from harassment on Facebook or Twitter, so the prospect of BigTech
+companies showing up in the fediverse and perhaps taking it over was
+scary.</p>
+<h3 id="facebook-integration-and-the-social-web-foundation">2024:
+Facebook integration and the Social Web Foundation</h3>
+<p>In June, Zuckerberg expanded the availability of Threads - which had
+previously been an early beta release - to 100 countries and enabled
+users on his servers to post to the wider fediverse on the open web.</p>
+<p>In September the <a href="https://socialwebfoundation.org">Social Web
+Foundation</a> was launched by identica founder and original ActivityPub
+specification author <a
+href="https://en.wikipedia.org/wiki/Evan_Prodromou">Evan Prodromou</a>,
+to help create a <em>“growing, healthy, financially viable and
+multi-polar Fediverse”</em>. Given the history of Free Software related
+foundations (such as the <a href="https://www.linuxfoundation.org">Linux
+Foundation</a>) there was scepticism about the motives of this new
+foundation.</p>
+<p>In November the website formerly known as Twitter changed it’s terms
+of service such that any posts made by users, including attached images
+or videos, could be used worldwide and royalty-free to train its
+generative AI model and produce derivative grifter-oriented content.
+This resulted in another exodus and shutdowns of Twitter accounts in
+order to try to forestall such abuses of content.</p>
+<h3 id="mastodon-non-profit-and-facebook-fires-fact-checkers">2025:
+Mastodon non-profit and Facebook fires fact checkers</h3>
+<p>To kick off the start of the year Mark Zuckerberg, believed to be a
+major funder of the Social Web Foundation, announced that he would “get
+rid of fact checkers” and that there would consequently be “more bad
+stuff” on his platforms, including Threads. Less reported but perhaps
+more consequentially, Zuck also altered Meta’s moderation policy to be
+more hostile towards women and the LGBTQ community, by removing
+protections which previously existed.</p>
+<p>The Mastodon project announced that it was setting up a non-profit
+and would transfer copyrights and assets to it. The intention was to
+avoid the project being controlled by a single individual. <em>“The
+people should own the town square”</em>.</p>
+<p>By the end of January, after Elon Musk was recorded unambiguously
+doing antisemitic Hitler salutes and his association with hitlerite
+scumbags became more widely understood the momentum for institutions -
+especially in Europe - to leave the website formerly known as Twitter
+accelerated. In terms of public relations, once certain images and
+videos are out there then there isn’t any going back, and the
+reputational damage becomes permanent. Most of the movement away from
+Twitter was to BlueSky, but some also joined Mastodon.</p>
+<h3 id="fediverse-culture-shock">Fediverse culture shock</h3>
+<p>This is what happens when someone has only had a presence within
+large corporate sites, such as the website formerly known as Twitter or
+Facebook, and then moves to a federated system on the open internet.</p>
+<p>Symptoms:</p>
+<ul>
+<li>Not understanding that there is no single company behind it all</li>
+<li>Someone else must take responsibility for XYZ</li>
+<li>There is no viable business model here, so this must be a passing
+fad</li>
+<li>I need to create my preferred username before someone else uses
+it</li>
+<li>I don’t like the name “Mastodon”</li>
+<li>The fediverse is too fractured. I cannot spam millions of adoring
+fans with my latest hot take.</li>
+<li>Why are there no adverts?</li>
+<li>Registering an account on each instance</li>
+</ul>

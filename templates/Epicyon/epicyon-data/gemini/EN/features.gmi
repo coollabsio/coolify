@@ -1,0 +1,55 @@
+# Features of Epicyon
+
+## Message Scopes
+
+Define the scope of your messages to reach the right people.
+
+## Scheduled Posts
+
+Schedule posts to be published at some time in the future. This can be useful for reminding yourself to do things (send your future self a direct message) or for creating a series of posts promoting some event, such as a festival or wedding.
+
+## Text Search
+
+Want to be reminded about what you said about a topic a month ago? The search screen allows you to do full text search on your own posts. Search on other posts can be done via the use of hashtags.
+
+## Federated Blogging
+
+You don't need a separate blog system. Blog posts can be added and edited, and are federated as ActivityPub articles. They also have RSS version 2.0 and 3.0 feeds. People can comment on blog posts, but unlike other systems the moderation settings apply just the same as they do for any other fediverse post arriving at your server. This makes blog spam much easier to keep control over.
+
+International and Customizable
+
+Epicyon supports many languages. Translations and emoji can easily be added. Alter the logo, backgrounds, terms of service and style to create a unique personality for your instance. Choose from a few different themes, or make a new one.
+
+## Calendar Events
+
+When creating a new post you can optionally also add a date, time and place. This will show up on the calendars of your followers, and makes organizing meetups or other community events simple. You can use message scopes to set up public events or private ones. To create reminders you can send yourself a DM with an event and it will appear on only your calendar.
+
+## Noone Left Behind
+
+Epicyon's absence of javascript makes it much more usable in shell based web browsers such as Lynx. As new web systems are deployed we should not be leaving anyone with minority use cases behind.
+
+## Media Timeline
+
+Some posts contain images and some don't. The media timeline enables you to view all your pet photos in one place.
+
+If you want your instance to be primarily about posting and interacting with media then you can also enable the media instance option.
+
+## Genuine Sharing Economy
+
+Barter and gift physical items or services with other people on your instance. Search for shared items which you might want or post items you no longer have a use for. Promote ride shares or available accomodation without any unnecessary companies in the middle. Pool resources between trusted friends to build solidarity and have fun.
+
+## Promote Your Skills and Build Teams
+
+Define a set of skills in your profile and search for other people who have the skills you need. Organize teams who can get things done!
+
+## Bookmarks
+
+Want to remember a particular link or reply to something later? Bookmark your favorite posts and view them on the Saves timeline.
+
+## Hashtags
+
+Stay informed about the topics which people that you follow are highlighting. On the search screen there is a hashtag swarm.
+
+## No Artificial Incentives
+
+No algorithmic timelines. No rating or ranking of people. No trending stuff. Removing the artficial cruft of social networking allows you to focus on things you actually care about, instead of what someone else thinks you should pay attention to.

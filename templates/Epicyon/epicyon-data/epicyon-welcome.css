@@ -1,0 +1,284 @@
+@chaste "UTF-8";
+
+:root {
+    --welcome-bg-color: #282c37;
+    --link-bg-color: #282c37;
+    --welcome-fg-color: #dddddd;
+    --main-link-color: #999;
+    --main-visited-color: #888;
+    --border-color: #505050;
+    --border-width: 2px;
+    --font-size-header: 18px;
+    --font-color-header: #ccc;
+    --welcome-font-size: 22px;
+    --welcome-font-size-mobile: 40px;
+    --welcome-font-size-tiny: 20px;
+    --text-entry-foreground: #ccc;
+    --text-entry-background: #111;
+    --time-color: #aaa;
+    --welcome-button-width: 12ch;
+    --button-text: #FFFFFF;
+    --button-background: #999;
+    --button-selected: #666;
+    --form-border-radius: 30px;
+    --focus-color: white;
+    --line-spacing: 130%;
+    --welcome-logo-width: 20%;
+    --welcome-avatar-width: 40%;
+    --main-link-color-hover: #bbb;
+    --rendering: normal;
+}
+
+@font-face {
+  font-family: 'Bedstead';
+  font-style: italic;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/bedstead.otf') format('opentype');
+}
+@font-face {
+  font-family: 'Bedstead';
+  font-style: normal;
+  font-weight: normal;
+  font-display: block;
+  src: url('./fonts/bedstead.otf') format('opentype');
+}
+
+body, html {
+    background-color: var(--welcome-bg-color);
+    color: var(--welcome-fg-color);
+
+    background-image: url("/welcome-background.jpg");
+    background-size: cover;
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    height: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    max-width: 60%;
+    min-width: 600px;
+    margin: 0 auto;
+    font-size: var(--welcome-font-size);
+    line-height: var(--line-spacing);
+    image-rendering: var(--rendering);
+}
+
+a, u {
+    color: var(--welcome-fg-color);
+}
+
+a:visited{
+    color: var(--main-visited-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link {
+    color: var(--main-link-color);
+    background: var(--link-bg-color);
+    font-weight: normal;
+    text-decoration: none;
+}
+
+a:link:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:visited:hover {
+    color: var(--main-link-color-hover);
+}
+
+a:focus {
+    border: 2px solid var(--focus-color);
+}
+
+form {
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--form-border-radius);
+}
+
+.transparent {
+    color: transparent;
+    background: transparent;
+    font-size: 0px;
+    line-height: 0px;
+    height: 0px;
+}
+
+button {
+    background-color: var(--button-background);
+    color: var(--button-text);
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    cursor: pointer;
+    width: var(--welcome-button-width);
+    font-size: var(--welcome-font-size);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.welcome-text {
+    font-size: var(--welcome-font-size);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+.imgcontainer {
+    text-align: center;
+    margin: 24px 0 12px 0;
+}
+
+.imgcontainer img {
+    width: var(--welcome-logo-width);
+}
+
+img.avatar {
+    width: 40%;
+    border-radius: 50%;
+}
+
+.container {
+    padding: 16px;
+}
+
+.container img.welcomeavatar {
+    width: var(--welcome-avatar-width);
+}
+
+.container img.markdownImage {
+    width: 100%;
+}
+
+.container.next {
+    float: right;
+}
+
+span.psw {
+    float: right;
+    padding-top: 16px;
+}
+
+@media screen and (min-width: 400px) {
+    body, html {
+        background-color: var(--welcome-bg-color);
+        color: var(--welcome-fg-color);
+        height: 100%;
+        font-family: Arial, Helvetica, sans-serif;
+        max-width: 60%;
+        min-width: 600px;
+        margin: 0 auto;
+        font-size: var(--welcome-font-size);
+        font-family: Arial, Helvetica, sans-serif;
+        position: relative;
+    }
+    .welcome-text {
+        font-size: var(--welcome-font-size);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    input[type=text], input[type=password], textarea {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: var(--welcome-font-size);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    button {
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: var(--welcome-button-width);
+        font-size: var(--welcome-font-size);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+}
+
+@media screen and (max-width: 1000px) {
+    body, html {
+        background-color: var(--welcome-bg-color);
+        color: var(--welcome-fg-color);
+        height: 100%;
+        font-family: Arial, Helvetica, sans-serif;
+        max-width: 95%;
+        min-width: 600px;
+        margin: 0 auto;
+        font-size: var(--welcome-font-size-mobile);
+        font-family: Arial, Helvetica, sans-serif;
+        position: relative;
+    }
+    .welcome-text {
+        font-size: var(--welcome-font-size-mobile);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    input[type=text], input[type=password], textarea {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: var(--welcome-font-size-mobile);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    button {
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: var(--welcome-button-width);
+        font-size: var(--welcome-font-size-mobile);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    body, html {
+        background-color: var(--welcome-bg-color);
+        color: var(--welcome-fg-color);
+        height: 100%;
+        font-family: Arial, Helvetica, sans-serif;
+        max-width: 95%;
+        min-width: 400px;
+        margin: 0 auto;
+        font-size: var(--welcome-font-size-tiny);
+        font-family: Arial, Helvetica, sans-serif;
+        position: relative;
+    }
+    .welcome-text {
+        font-size: var(--welcome-font-size-tiny);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    input[type=text], input[type=password], textarea {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: var(--welcome-font-size-tiny);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    button {
+        background-color: var(--button-background);
+        color: var(--button-text);
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        cursor: pointer;
+        width: var(--welcome-button-width);
+        font-size: var(--welcome-font-size-tiny);
+        font-family: Arial, Helvetica, sans-serif;
+    }
+}
