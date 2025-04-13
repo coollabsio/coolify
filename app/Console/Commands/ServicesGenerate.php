@@ -11,7 +11,7 @@ class ServicesGenerate extends Command
     /**
      * {@inheritdoc}
      */
-    protected $signature = 'services:generate';
+    protected $signature = 'generate:services';
 
     /**
      * {@inheritdoc}
