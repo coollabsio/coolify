@@ -30,7 +30,6 @@ COPY --chown=www-data:www-data composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
 USER www-data
-RUN php artisan generate:services
 
 # =================================================================
 # Stage 2: Frontend assets compilation
@@ -123,6 +122,8 @@ COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 
 RUN composer dump-autoload
+
+RUN php artisan generate:services
 
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
