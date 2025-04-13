@@ -89,9 +89,9 @@ RUN echo "alias ll='ls -al'" >> /etc/profile && \
 # Install Cloudflared based on architecture
 RUN mkdir -p /usr/local/bin && \
     if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
-        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
+    curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
     elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
-        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared; \
+    curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared; \
     fi && \
     chmod +x /usr/local/bin/cloudflared
 

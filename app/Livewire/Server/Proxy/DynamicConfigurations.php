@@ -38,7 +38,8 @@ class DynamicConfigurations extends Component
         $contents = collect([]);
         foreach ($files as $file) {
             $without_extension = str_replace('.', '|', $file);
-            $contents[$without_extension] = instant_remote_process(["cat {$proxy_path}/dynamic/{$file}"], $this->server);
+            $content = instant_remote_process(["cat {$proxy_path}/dynamic/{$file}"], $this->server);
+            $contents[$without_extension] = $content ?? '';
         }
         $this->contents = $contents;
         $this->dispatch('$refresh');

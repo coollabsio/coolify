@@ -3094,7 +3094,7 @@ paths:
       tags:
         - Deployments
       summary: Deploy
-      description: 'Deploy by tag or uuid. `Post` request also accepted.'
+      description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.'
       operationId: deploy-by-tag-or-uuid
       parameters:
         -
