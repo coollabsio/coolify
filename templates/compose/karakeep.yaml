@@ -1,19 +1,19 @@
-# documentation: https://docs.hoarder.app/
+# documentation: https://docs.karakeep.app/
 # slogan: an open source "Bookmark Everything" app that uses AI for automatically tagging the content you throw at it.
 # tags: media,read-it-later,pocket-alternative,omnivore-alternative,instapaper-alternative
-# logo: svgs/hoarder.svg
+# logo: svgs/karakeep.svg
 # port: 3000
 
 services:
   web:
-    image: ghcr.io/hoarder-app/hoarder:release
+    image: ghcr.io/karakeep-app/karakeep:release
     volumes:
-      - hoarder-data:/data
+      - karakeep-data:/data
     environment:
-      - SERVICE_FQDN_HOARDER
-      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_HOARDERNEXTAUTH}
+      - SERVICE_FQDN_KARAKEEP
+      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
-      - NEXTAUTH_URL=${SERVICE_FQDN_HOARDER}
+      - NEXTAUTH_URL=${SERVICE_FQDN_KARAKEEP}
       - MEILI_ADDR=http://meilisearch:7700
       - BROWSER_WEB_URL=http://chrome:9222
       - OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY}
@@ -34,11 +34,9 @@ services:
     image: getmeili/meilisearch:v1.6
     environment:
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
-      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_HOARDERNEXTAUTH}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
-      - NEXTAUTH_URL=${SERVICE_FQDN_HOARDER}
     volumes:
-      - hoarder-meilisearch:/meili_data
+      - karakeep-meilisearch:/meili_data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
       interval: 2s
