@@ -123,8 +123,6 @@ COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 
 RUN composer dump-autoload
 
-RUN php artisan generate:services
-
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
 COPY docker/production/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
