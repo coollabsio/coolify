@@ -8,7 +8,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class OpenApi extends Command
 {
-    protected $signature = 'openapi';
+    protected $signature = 'generate:openapi';
 
     protected $description = 'Generate OpenApi file.';
 
