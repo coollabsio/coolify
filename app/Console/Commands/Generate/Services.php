@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Generate;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Symfony\Component\Yaml\Yaml;
 
-class ServicesGenerate extends Command
+class Services extends Command
 {
     /**
      * {@inheritdoc}

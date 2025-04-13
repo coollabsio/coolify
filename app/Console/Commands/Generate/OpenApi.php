@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Generate;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Process;
@@ -18,7 +18,7 @@ class OpenApi extends Command
         echo "Generating OpenAPI documentation.\n";
         // https://github.com/OAI/OpenAPI-Specification/releases
         $process = Process::run([
-            '/var/www/html/vendor/bin/openapi',
+            './vendor/bin/openapi',
             'app',
             '-o',
             'openapi.yaml',
