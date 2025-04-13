@@ -19,5 +19,3 @@ $(pwd)/vendor/bin/pint $files -q
 if [ $? -eq 0 ]; then
     git add $files
 fi
-
-php artisan generate:openapi
