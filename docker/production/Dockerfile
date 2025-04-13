@@ -22,7 +22,7 @@ USER root
 ARG USER_ID
 ARG GROUP_ID
 
-RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID &&
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
     docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
 WORKDIR /var/www/html
@@ -64,13 +64,13 @@ WORKDIR /var/www/html
 
 USER root
 
-RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID &&
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
     docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
 # Install PostgreSQL repository and keys
-RUN apk add --no-cache gnupg &&
-    mkdir -p /usr/share/keyrings &&
-    curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor >/usr/share/keyrings/postgresql.gpg
+RUN apk add --no-cache gnupg && \
+    mkdir -p /usr/share/keyrings && \
+    curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -83,17 +83,17 @@ RUN apk add --no-cache \
     vim
 
 # Configure shell aliases
-RUN echo "alias ll='ls -al'" >>/etc/profile &&
-    echo "alias a='php artisan'" >>/etc/profile &&
-    echo "alias logs='tail -f storage/logs/laravel.log'" >>/etc/profile
+RUN echo "alias ll='ls -al'" >> /etc/profile && \
+    echo "alias a='php artisan'" >> /etc/profile && \
+    echo "alias logs='tail -f storage/logs/laravel.log'" >> /etc/profile
 
 # Install Cloudflared based on architecture
-RUN mkdir -p /usr/local/bin &&
-    if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then
-        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared
-    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then
-        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared
-    fi &&
+RUN mkdir -p /usr/local/bin && \
+    if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
+    curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
+    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
+    curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared; \
+    fi && \
     chmod +x /usr/local/bin/cloudflared
 
 # Configure PHP
@@ -129,8 +129,8 @@ COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.con
 COPY docker/production/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
 COPY --chmod=755 docker/production/etc/s6-overlay/ /etc/s6-overlay/
 
-RUN mkdir -p /etc/nginx/conf.d &&
-    chown -R www-data:www-data /etc/nginx &&
+RUN mkdir -p /etc/nginx/conf.d && \
+    chown -R www-data:www-data /etc/nginx && \
     chmod -R 755 /etc/nginx
 
 # Install MinIO client
