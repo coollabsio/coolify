@@ -6,17 +6,28 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- *(EnvironmentVariable)* Add handling for Redis credentials in the environment variable component
-- *(EnvironmentVariable)* Implement protection for critical environment variables and enhance deletion logic
-- *(Application)* Add networkAliases attribute for handling network aliases as JSON or comma-separated values
+- *(OpenApi)* Enhance OpenAPI specifications by adding UUID parameters for application, project, and service updates; improve deployment listing with pagination parameters; update command signature for OpenApi generation
+- *(subscription)* Enhance subscription management with loading states and Stripe status checks
 
 ### 🐛 Bug Fixes
 
-- *(General)* Change redis_password property to nullable string
+- *(pre-commit)* Correct input redirection for /dev/tty and add OpenAPI generation command
+- *(pricing-plans)* Adjust grid class for improved layout consistency in subscription pricing plans
+- *(migrations)* Make stripe_comment field nullable in subscriptions table
+- *(mongodb)* Also apply custom config when SSL is enabled
+- *(templates)* Correct casing of denoKV references in service templates and YAML files
+- *(deployment)* Handle missing destination in deployment process to prevent errors
+
+### 💼 Other
+
+- Add missing openapi items to PrivateKey
 
 ### 🚜 Refactor
 
-- *(Application)* Rename network_aliases to custom_network_aliases across the application for clarity and consistency
+- *(commands)* Reorganize OpenAPI and Services generation commands into a new namespace for better structure; remove old command files
+- *(Dockerfile)* Remove service generation command from the build process to streamline Dockerfile and improve build efficiency
+- *(navbar-delete-team)* Simplify modal confirmation layout and enhance button styling for better user experience
+- *(Server)* Remove debug logging from isReachableChanged method to clean up code and improve performance
 
 ### 📚 Documentation
 
@@ -24,13 +35,28 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- *(versions)* Bump version to 407 and 408 for coolify and nightly
+- *(versions)* Update nightly version to 4.0.0-beta.410
+- *(pre-commit)* Remove OpenAPI generation command from pre-commit hook
+- *(versions)* Update realtime version to 1.0.7 and bump dependencies in package.json
+
+## [4.0.0-beta.407] - 2025-04-09
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.406] - 2025-04-05
 
 ### 🚀 Features
 
 - *(Deploy)* Add info dispatch for proxy check initiation
+- *(EnvironmentVariable)* Add handling for Redis credentials in the environment variable component
+- *(EnvironmentVariable)* Implement protection for critical environment variables and enhance deletion logic
+- *(Application)* Add networkAliases attribute for handling network aliases as JSON or comma-separated values
+- *(GithubApp)* Update default events to include 'pull_request' and streamline event handling
+- *(CleanupDocker)* Add support for realtime image management in Docker cleanup process
+- *(Deployment)* Enhance queue_application_deployment to handle existing deployments and return appropriate status messages
+- *(SourceManagement)* Add functionality to change Git source and display current source in the application settings
 
 ### 🐛 Bug Fixes
 
@@ -40,14 +66,32 @@ All notable changes to this project will be documented in this file.
 - *(api)* Add back validateDataApplications (#5539)
 - *(CheckProxy, Status)* Prevent proxy checks when force_stop is active; remove debug statement in General
 - *(Status)* Conditionally check proxy status and refresh button based on force_stop state
+- *(General)* Change redis_password property to nullable string
+- *(DeployController)* Update request handling to use input method and enhance OpenAPI description for deployment endpoint
+
+### 💼 Other
+
+- Add missing UUID to openapi spec
 
 ### 🚜 Refactor
 
 - *(Server)* Use data_get for safer access to settings properties in isFunctional method
+- *(Application)* Rename network_aliases to custom_network_aliases across the application for clarity and consistency
+- *(ApplicationDeploymentJob)* Streamline environment variable handling by introducing generate_coolify_env_variables method and consolidating logic for pull request and main branch scenarios
+- *(ApplicationDeploymentJob, ApplicationDeploymentQueue)* Improve deployment status handling and log entry management with transaction support
+- *(SourceManagement)* Sort sources by name and improve UI for changing Git source with better error handling
+- *(Email)* Streamline SMTP and resend settings handling in copyFromInstanceSettings method
+- *(Email)* Enhance error handling in SMTP and resend methods by passing context to handleError function
+- *(DynamicConfigurations)* Improve handling of dynamic configuration content by ensuring fallback to empty string when content is null
+- *(ServicesGenerate)* Update command signature from 'services:generate' to 'generate:services' for consistency; update Dockerfile to run service generation during build; update Odoo image version to 18 and add extra addons volume in compose configuration
+- *(Dockerfile)* Streamline RUN commands for improved readability and maintainability by adding line continuations
+- *(Dockerfile)* Reintroduce service generation command in the build process for consistency and ensure proper asset compilation
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(versions)* Bump version to 406
+- *(versions)* Bump version to 407 and 408 for coolify and nightly
+- *(versions)* Bump version to 408 for coolify and 409 for nightly
 
 ## [4.0.0-beta.405] - 2025-04-04
 
@@ -219,6 +263,14 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(github-source)* Enhance GitHub App configuration with manual and private key support
+- *(ui)* Improve GitHub repository selection and styling
+- *(database)* Implement two-step confirmation for database deletion
+- *(assets)* Add new SVG logo for Coolify
+- *(install)* Enhance Docker address pool configuration and validation
+- *(install)* Improve Docker address pool management and service restart logic
+- *(install)* Add missing env variable to install script
+- *(LocalFileVolume)* Add binary file detection and update UI logic
 - *(service)* Neon
 - *(migration)* Add `ssl_certificates` table and model
 - *(migration)* Add ssl setting to `standalone_postgresqls` table
@@ -260,14 +312,6 @@ All notable changes to this project will be documented in this file.
 - *(ssl)* Improve Redis and remove modes
 - Full SSL support for DrangonflyDB
 - SSL notification
-- *(github-source)* Enhance GitHub App configuration with manual and private key support
-- *(ui)* Improve GitHub repository selection and styling
-- *(database)* Implement two-step confirmation for database deletion
-- *(assets)* Add new SVG logo for Coolify
-- *(install)* Enhance Docker address pool configuration and validation
-- *(install)* Improve Docker address pool management and service restart logic
-- *(install)* Add missing env variable to install script
-- *(LocalFileVolume)* Add binary file detection and update UI logic
 - *(templates)* Change glance for v0.7
 - *(templates)* Add Freescout service template
 - *(service)* Add Evolution API template
@@ -285,6 +329,18 @@ All notable changes to this project will be documented in this file.
 
 - *(api)* Docker compose based apps creationg through api
 - *(database)* Improve database type detection for Supabase Postgres images
+- *(ui)* Correct grammatical error in 404 page
+- *(seeder)* Update GitHub app name in GithubAppSeeder
+- *(plane)* Update APP_RELEASE to v0.25.2 in environment configuration
+- *(domain)* Dispatch refreshStatus event after successful domain update
+- *(database)* Correct container name generation for service databases
+- *(database)* Limit container name length for database proxy
+- *(database)* Handle unsupported database types in StartDatabaseProxy
+- *(database)* Simplify container name generation in StartDatabaseProxy
+- *(install)* Handle potential errors in Docker address pool configuration
+- *(backups)* Retention settings
+- *(redis)* Set default redis_username for new instances
+- *(core)* Improve instantSave logic and error handling
 - *(ssl)* Permission of ssl crt and key inside the container
 - *(ui)* Make sure file mounts do not showing the encrypted values
 - *(ssl)* Make default ssl mode require not verify-full as it does not need a ca cert
@@ -324,18 +380,6 @@ All notable changes to this project will be documented in this file.
 - *(ssl)* Add `--tls` arg to DrangflyDB
 - *(notification)* Always send SSL notifications
 - *(database)* Change default value of enable_ssl to false for multiple tables
-- *(ui)* Correct grammatical error in 404 page
-- *(seeder)* Update GitHub app name in GithubAppSeeder
-- *(plane)* Update APP_RELEASE to v0.25.2 in environment configuration
-- *(domain)* Dispatch refreshStatus event after successful domain update
-- *(database)* Correct container name generation for service databases
-- *(database)* Limit container name length for database proxy
-- *(database)* Handle unsupported database types in StartDatabaseProxy
-- *(database)* Simplify container name generation in StartDatabaseProxy
-- *(install)* Handle potential errors in Docker address pool configuration
-- *(backups)* Retention settings
-- *(redis)* Set default redis_username for new instances
-- *(core)* Improve instantSave logic and error handling
 - *(general)* Correct link to framework specific documentation
 - *(core)* Redirect healthcheck route for dockercompose applications
 - *(api)* Use name from request payload
@@ -384,6 +428,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
+- *(supabase)* Update Supabase service template and Postgres image version
 - *(migration)* Remove unused columns
 - *(ssl)* Improve code in ssl helper
 - *(migration)* Ssl cert and key should not be nullable
@@ -391,7 +436,6 @@ All notable changes to this project will be documented in this file.
 - Rename ca crt folder to ssl
 - *(ui)* Improve valid until handling
 - Improve code quality suggested by code rabbit
-- *(supabase)* Update Supabase service template and Postgres image version
 - *(versions)* Update version numbers for coolify and nightly
 
 ## [4.0.0-beta.398] - 2025-03-01
@@ -784,6 +828,14 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- New ServerReachabilityChanged event
+- Use new ServerReachabilityChanged event instead of isDirty
+- Add infomaniak oauth
+- Add server disk usage check frequency
+- Add environment_uuid support and update API documentation
+- Add service/resource/project labels
+- Add coolify.environment label
+- Add database subtype
 - Able to import full db backups for pg/mysql/mariadb
 - Restore backup from server file
 - Docker volume data cloning
@@ -819,6 +871,35 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- Fallback for copy button
+- Copy the right text
+- Maybe fallback is now working
+- Only show copy button on secure context
+- Render html on error page correctly
+- Invalid API response on missing project
+- Applications API response code + schema
+- Applications API writing to unavailable models
+- If an init script is renamed the old version is still on the server
+- Oauthseeder
+- Compose loading seq
+- Resource clone name + volume name generation
+- Update Dockerfile entrypoint path to /etc/entrypoint.d
+- Debug mode
+- Unreachable notifications
+- Remove duplicated ServerCheckJob call
+- Few fixes and use new ServerReachabilityChanged event
+- Use serverStatus not just status
+- Oauth seeder
+- Service ui structure
+- Check port 8080 and fallback to 80
+- Refactor database view
+- Always use docker cleanup frequency
+- Advanced server UI
+- Html css
+- Fix domain being override when update application
+- Use nixpacks predefined build variables, but still could update the default values from Coolify
+- Use local monaco-editor instead of Cloudflare
+- N8n timezone
 - Compose envs
 - Scheduled tasks and backups are executed by server timezone.
 - Show backup timezone on the UI
@@ -918,6 +999,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Rename `coolify.environment` to `coolify.environmentName`
 - Rename parameter in DatabaseBackupJob for clarity
 - Improve checkbox component accessibility and styling
 - Remove unused tags method from ApplicationDeploymentJob
@@ -933,6 +1015,9 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
+- Regenerate API spec, removing notification fields
+- Remove ray debugging
+- Version ++
 - Improve Penpot healthchecks
 - Switch up readonly lables to make more sense
 - Remove unused computed fields
@@ -956,44 +1041,11 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- New ServerReachabilityChanged event
-- Use new ServerReachabilityChanged event instead of isDirty
-- Add infomaniak oauth
-- Add server disk usage check frequency
-- Add environment_uuid support and update API documentation
-- Add service/resource/project labels
-- Add coolify.environment label
-- Add database subtype
 - Migrate to new encryption options
 - New encryption options
 
 ### 🐛 Bug Fixes
 
-- Render html on error page correctly
-- Invalid API response on missing project
-- Applications API response code + schema
-- Applications API writing to unavailable models
-- If an init script is renamed the old version is still on the server
-- Oauthseeder
-- Compose loading seq
-- Resource clone name + volume name generation
-- Update Dockerfile entrypoint path to /etc/entrypoint.d
-- Debug mode
-- Unreachable notifications
-- Remove duplicated ServerCheckJob call
-- Few fixes and use new ServerReachabilityChanged event
-- Use serverStatus not just status
-- Oauth seeder
-- Service ui structure
-- Check port 8080 and fallback to 80
-- Refactor database view
-- Always use docker cleanup frequency
-- Advanced server UI
-- Html css
-- Fix domain being override when update application
-- Use nixpacks predefined build variables, but still could update the default values from Coolify
-- Use local monaco-editor instead of Cloudflare
-- N8n timezone
 - Smtp encryption
 - Bind() to 0.0.0.0:80 failed
 - Oauth seeder
@@ -1003,15 +1055,11 @@ All notable changes to this project will be documented in this file.
 - Error message
 - Update healthcheck and port configurations to use port 8080
 
-### 🚜 Refactor
+## [4.0.0-beta.379] - 2024-12-13
 
-- Rename `coolify.environment` to `coolify.environmentName`
+### 🐛 Bug Fixes
 
-### ⚙️ Miscellaneous Tasks
-
-- Regenerate API spec, removing notification fields
-- Remove ray debugging
-- Version ++
+- Saving oauth
 
 ## [4.0.0-beta.378] - 2024-12-13
 
@@ -1020,11 +1068,6 @@ All notable changes to this project will be documented in this file.
 - Monaco editor light and dark mode switching
 - Service status indicator + oauth saving
 - Socialite for azure and authentik
-- Saving oauth
-- Fallback for copy button
-- Copy the right text
-- Maybe fallback is now working
-- Only show copy button on secure context
 
 ## [4.0.0-beta.377] - 2024-12-13
 
