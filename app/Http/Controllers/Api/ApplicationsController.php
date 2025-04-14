@@ -880,12 +880,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1004,12 +1009,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1101,12 +1111,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1190,12 +1205,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             }
 
             return response()->json(serializeApiResponse([
@@ -1254,12 +1274,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             }
 
             return response()->json(serializeApiResponse([
@@ -1610,6 +1635,18 @@ class ApplicationsController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
         requestBody: new OA\RequestBody(
             description: 'Application updated.',
             required: true,
@@ -1884,11 +1921,16 @@ class ApplicationsController extends Controller
         if ($instantDeploy) {
             $deployment_uuid = new Cuid2;
 
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 application: $application,
                 deployment_uuid: $deployment_uuid,
                 is_api: true,
             );
+            if ($result['status'] === 'skipped') {
+                return response()->json([
+                    'message' => $result['message'],
+                ], 200);
+            }
         }
 
         return response()->json([
@@ -2705,13 +2747,21 @@ class ApplicationsController extends Controller
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
             force_rebuild: $force,
             is_api: true,
             no_questions_asked: $instant_deploy
         );
+        if ($result['status'] === 'skipped') {
+            return response()->json(
+                [
+                    'message' => $result['message'],
+                ],
+                200
+            );
+        }
 
         return response()->json(
             [
@@ -2866,12 +2916,17 @@ class ApplicationsController extends Controller
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
             restart_only: true,
             is_api: true,
         );
+        if ($result['status'] === 'skipped') {
+            return response()->json([
+                'message' => $result['message'],
+            ], 200);
+        }
 
         return response()->json(
             [
@@ -3006,73 +3061,73 @@ class ApplicationsController extends Controller
     //     ]);
     // }
 
-     private function validateDataApplications(Request $request, Server $server)
-     {
-         $teamId = getTeamIdFromToken();
+    private function validateDataApplications(Request $request, Server $server)
+    {
+        $teamId = getTeamIdFromToken();
 
-         // Validate ports_mappings
-         if ($request->has('ports_mappings')) {
-             $ports = [];
-             foreach (explode(',', $request->ports_mappings) as $portMapping) {
-                 $port = explode(':', $portMapping);
-                 if (in_array($port[0], $ports)) {
-                     return response()->json([
-                         'message' => 'Validation failed.',
-                         'errors' => [
-                             'ports_mappings' => 'The first number before : should be unique between mappings.',
-                         ],
-                     ], 422);
-                 }
-                 $ports[] = $port[0];
-             }
-         }
-         // Validate custom_labels
-         if ($request->has('custom_labels')) {
-             if (! isBase64Encoded($request->custom_labels)) {
-                 return response()->json([
-                     'message' => 'Validation failed.',
-                     'errors' => [
-                         'custom_labels' => 'The custom_labels should be base64 encoded.',
-                     ],
-                 ], 422);
-             }
-             $customLabels = base64_decode($request->custom_labels);
-             if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
-                 return response()->json([
-                     'message' => 'Validation failed.',
-                     'errors' => [
-                         'custom_labels' => 'The custom_labels should be base64 encoded.',
-                     ],
-                 ], 422);
-             }
-         }
-         if ($request->has('domains') && $server->isProxyShouldRun()) {
-             $uuid = $request->uuid;
-             $fqdn = $request->domains;
-             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
-             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
-             $errors = [];
-             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
-                 if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
-                     $errors[] = 'Invalid domain: '.$domain;
-                 }
+        // Validate ports_mappings
+        if ($request->has('ports_mappings')) {
+            $ports = [];
+            foreach (explode(',', $request->ports_mappings) as $portMapping) {
+                $port = explode(':', $portMapping);
+                if (in_array($port[0], $ports)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'ports_mappings' => 'The first number before : should be unique between mappings.',
+                        ],
+                    ], 422);
+                }
+                $ports[] = $port[0];
+            }
+        }
+        // Validate custom_labels
+        if ($request->has('custom_labels')) {
+            if (! isBase64Encoded($request->custom_labels)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_labels' => 'The custom_labels should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $customLabels = base64_decode($request->custom_labels);
+            if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'custom_labels' => 'The custom_labels should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+        }
+        if ($request->has('domains') && $server->isProxyShouldRun()) {
+            $uuid = $request->uuid;
+            $fqdn = $request->domains;
+            $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+            $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+            $errors = [];
+            $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
+                    $errors[] = 'Invalid domain: '.$domain;
+                }
 
-                 return str($domain)->trim()->lower();
-             });
-             if (count($errors) > 0) {
-                 return response()->json([
-                     'message' => 'Validation failed.',
-                     'errors' => $errors,
-                 ], 422);
-             }
-             if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
-                 return response()->json([
-                     'message' => 'Validation failed.',
-                     'errors' => [
-                         'domains' => 'One of the domain is already used.',
-                     ],
-                 ], 422);
-             }
-         }
-     }
+                return str($domain)->trim()->lower();
+            });
+            if (count($errors) > 0) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'domains' => 'One of the domain is already used.',
+                    ],
+                ], 422);
+            }
+        }
+    }
 }

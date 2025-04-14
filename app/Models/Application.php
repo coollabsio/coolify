@@ -45,6 +45,7 @@ use Visus\Cuid2\Cuid2;
         'start_command' => ['type' => 'string', 'description' => 'Start command.'],
         'ports_exposes' => ['type' => 'string', 'description' => 'Ports exposes.'],
         'ports_mappings' => ['type' => 'string', 'nullable' => true, 'description' => 'Ports mappings.'],
+        'custom_network_aliases' => ['type' => 'string', 'nullable' => true, 'description' => 'Network aliases for Docker container.'],
         'base_directory' => ['type' => 'string', 'description' => 'Base directory for all commands.'],
         'publish_directory' => ['type' => 'string', 'description' => 'Publish directory.'],
         'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
@@ -114,6 +115,68 @@ class Application extends BaseModel
     protected $guarded = [];
 
     protected $appends = ['server_status'];
+
+    protected $casts = ['custom_network_aliases' => 'array'];
+
+    public function customNetworkAliases(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (is_null($value) || $value === '') {
+                    return null;
+                }
+
+                // If it's already a JSON string, decode it
+                if (is_string($value) && $this->isJson($value)) {
+                    $value = json_decode($value, true);
+                }
+
+                // If it's a string but not JSON, treat it as a comma-separated list
+                if (is_string($value) && ! is_array($value)) {
+                    $value = explode(',', $value);
+                }
+
+                $value = collect($value)
+                    ->map(function ($alias) {
+                        if (is_string($alias)) {
+                            return str_replace(' ', '-', trim($alias));
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique() // Remove duplicate values
+                    ->values()
+                    ->toArray();
+
+                return empty($value) ? null : json_encode($value);
+            },
+            get: function ($value) {
+                if (is_null($value)) {
+                    return null;
+                }
+
+                if (is_string($value) && $this->isJson($value)) {
+                    return json_decode($value, true);
+                }
+
+                return is_array($value) ? $value : [];
+            }
+        );
+    }
+
+    /**
+     * Check if a string is a valid JSON
+     */
+    private function isJson($string)
+    {
+        if (! is_string($string)) {
+            return false;
+        }
+        json_decode($string);
+
+        return json_last_error() === JSON_ERROR_NONE;
+    }
 
     protected static function booted()
     {
