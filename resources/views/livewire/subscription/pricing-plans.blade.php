@@ -1,4 +1,4 @@
-<div x-data="{ selected: 'monthly' }" class="w-full pb-20 pt-10">
+<div x-data="{ selected: 'monthly' }" class="w-full pb-20">
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
@@ -72,14 +72,16 @@
                             </div>
                         </div>
                     </div>
-                    <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
-                        class="w-full h-10 buyme" wire:click="subscribeStripe('dynamic-monthly')">
-                        Subscribe
-                    </x-forms.button>
-                    <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
-                        class="w-full h-10 buyme" wire:click="subscribeStripe('dynamic-yearly')">
-                        Subscribe
-                    </x-forms.button>
+                    <div class="flex pt-4 h-14">
+                        <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
+                            class="w-full" wire:click="subscribeStripe('dynamic-monthly')">
+                            Subscribe
+                        </x-forms.button>
+                        <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
+                            class="w-full" wire:click="subscribeStripe('dynamic-yearly')">
+                            Subscribe
+                        </x-forms.button>
+                    </div>
                     <ul role="list" class="mt-8 space-y-3 text-sm leading-6 dark:text-neutral-400">
                         <li class="flex">
                             <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
