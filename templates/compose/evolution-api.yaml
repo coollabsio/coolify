@@ -126,6 +126,7 @@ services:
       - S3_SECRET_KEY=${S3_SECRET_KEY:-}
       - S3_BUCKET=${S3_BUCKET:-evolution}
       - S3_PORT=${S3_PORT:-443}
+      - S3_REGION=${S3_REGION:-us-east-1}
       - S3_ENDPOINT=${S3_ENDPOINT:-files.site.com}
       - S3_USE_SSL=${S3_USE_SSL:-true}
       - 'AUTHENTICATION_API_KEY=${SERVICE_PASSWORD_AUTHENTICATIONAPIKEY}'
