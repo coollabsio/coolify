@@ -1,3 +1,9 @@
+# documentation: https://docs.observium.org/
+# slogan: Observium is a comprehensive network monitoring platform designed to deliver powerful monitoring capabilities, combined with an elegant and intuitive user interface.
+# tags: networking, monitoring
+# logo: svgs/observium.webp
+# port: 80
+
 services:
   observium:
     image: 'mbixtech/observium:23.9'
