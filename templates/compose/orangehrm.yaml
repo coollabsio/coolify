@@ -2,6 +2,7 @@
 # slogan: Host OrangeHRM on your own infrastructure. This deployment option provides the greatest level of flexibility and control.
 # tags: HR, HRIS, HRMS, human resource management, OrangeHRM, HR management
 # logo: svgs/orangehrm.svg
+# port: 80
 
 services:
   orangehrm:
@@ -29,7 +30,6 @@ services:
       retries: 10
   mariadb:
     image: 'mariadb:10.11'
-    restart: unless-stopped
     volumes:
       - 'mariadb-data:/var/lib/mysql'
     environment:
