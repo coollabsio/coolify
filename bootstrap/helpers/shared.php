@@ -3206,6 +3206,15 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $use_network_mode = data_get($service, 'network_mode') !== null;
         $depends_on = collect(data_get($service, 'depends_on', []));
         $labels = collect(data_get($service, 'labels', []));
+        if ($labels->count() > 0) {
+            if (isAssociativeArray($labels)) {
+                $newLabels = collect([]);
+                $labels->each(function ($value, $key) use ($newLabels) {
+                    $newLabels->push("$key=$value");
+                });
+                $labels = $newLabels;
+            }
+        }
         $environment = collect(data_get($service, 'environment', []));
         $ports = collect(data_get($service, 'ports', []));
         $buildArgs = collect(data_get($service, 'build.args', []));
@@ -3819,6 +3828,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             return $volume;
         });
 
+        ray($serviceLabels);
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),
