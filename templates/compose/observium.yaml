@@ -1,0 +1,32 @@
+services:
+  observium:
+    image: 'mbixtech/observium:23.9'
+    restart: unless-stopped
+    volumes: 
+      - observium-logs:/opt/observium/logs
+      - observium-rrd:/opt/observium/rrd
+    environment:
+      - SERVICE_FQDN_OBSERVIUM=${SERVICE_FQDN_OBSERVIUM}
+      - 'SERVICE_USER_OBSERVIUMADMIN=${SERVICE_USER_OBSERVIUMADMIN}'
+      - 'SERVICE_PASSWORD_OBSERVIUMADMIN=${SERVICE_PASSWORD_OBSERVIUMADMIN}'
+      - 'OBSERVIUM_ADMIN_PASS=${SERVICE_PASSWORD_OBSERVIUMADMIN}'
+      - 'OBSERVIUM_ADMIN_USER=${SERVICE_USER_OBSERVIUMADMIN}'
+      - OBSERVIUM_DB_HOST=db
+      - OBSERVIUM_DB_NAME=observium
+      - 'OBSERVIUM_DB_PASS=${SERVICE_PASSWORD_MARIADB}'
+      - 'OBSERVIUM_DB_USER=${SERVICE_USER_MARIADB}'
+    depends_on:
+      - db
+  db:
+    image: 'mariadb:lts'
+    restart: unless-stopped
+    volumes: 
+      - db-data:/var/lib/mysql
+    environment:
+      - 'SERVICE_PASSWORD_MARIADBROOT=${SERVICE_PASSWORD_MARIADBROOT}'
+      - 'SERVICE_USER_MARIADB=${SERVICE_USER_MARIADB}'
+      - 'SERVICE_PASSWORD_MARIADB=${SERVICE_PASSWORD_MARIADB}'
+      - 'MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}'
+      - 'MARIADB_USER=${SERVICE_USER_MARIADB}'
+      - 'MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}'
+      - MARIADB_DATABASE=observium
