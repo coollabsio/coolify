@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🐛 Bug Fixes
+
+- *(parser)* Transform associative array labels into key=value format for better compatibility
+- *(redis)* Update username and password input handling to clarify database sync requirements
+- *(source)* Update connected source display to handle cases with no source connected
+
+### 🚜 Refactor
+
+- *(source)* Conditionally display connected source and change source options based on private key presence
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump coolify version to 4.0.0-beta.409 in configuration files
+
 ## [4.0.0-beta.408] - 2025-04-14
 
 ### 🚀 Features
@@ -31,6 +47,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 - Update changelog
 
