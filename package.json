@@ -16,14 +16,24 @@
         "pusher-js": "8.4.0",
         "tailwind-scrollbar": "^3.1.0",
         "tailwindcss": "3.4.17",
+        "typescript": "^5.8.3",
         "vite": "^6.2.6",
         "vue": "3.5.13"
     },
     "dependencies": {
+        "@inertiajs/vue3": "^2.0.8",
         "@tailwindcss/forms": "0.5.10",
         "@tailwindcss/typography": "0.5.16",
         "@xterm/addon-fit": "^0.10.0",
         "@xterm/xterm": "^5.5.0",
-        "ioredis": "5.6.0"
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "ioredis": "5.6.0",
+        "lucide-vue-next": "^0.488.0",
+        "radix-vue": "^1.9.17",
+        "reka-ui": "^2.2.0",
+        "tailwind-merge": "^3.2.0",
+        "tailwindcss-animate": "^1.0.7",
+        "tw-animate-css": "^1.2.5"
     }
 }
