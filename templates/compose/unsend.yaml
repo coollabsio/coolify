@@ -35,8 +35,8 @@ services:
 
   unsend:
     image: unsend/unsend:latest
-    ports:
-      - "3000:3000"
+    expose:
+      - 3000
     environment:
       - SERVICE_FQDN_UNSEND_3000
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${SERVICE_DB_POSTGRES:-unsend}
