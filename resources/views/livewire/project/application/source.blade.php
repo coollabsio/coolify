@@ -28,7 +28,7 @@
         <div class="flex flex-col gap-2">
             @if (!$privateKeyId)
                 <div>Currently connected source: <span
-                        class="font-bold text-warning">{{ $application->source->name }}</span>
+                        class="font-bold text-warning">{{ data_get($application, 'source.name', 'No source connected') }}</span>
                 </div>
             @endif
             <div class="flex gap-2">
