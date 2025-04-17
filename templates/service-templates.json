@@ -563,7 +563,7 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
-    "denokv": {
+    "denoKV": {
         "documentation": "https://docs.deno.com/deploy/kv/manual/?utm_source=coolify.io",
         "slogan": "The Denoland key-value database",
         "compose": "c2VydmljZXM6CiAgZGVub2t2OgogICAgaW1hZ2U6ICdnaGNyLmlvL2Rlbm9sYW5kL2Rlbm9rdjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnQUNDRVNTX1RPS0VOPSR7U0VSVklDRV9QQVNTV09SRF9ERU5PS1Z9JwogICAgICAtIFNFUlZJQ0VfRlFETl9ERU5PS1ZfNDUxMgogICAgdm9sdW1lczoKICAgICAgLSAnJHtDT09MSUZZX1ZPTFVNRV9BUFB9Oi9kYXRhJwogICAgY29tbWFuZDogJy0tc3FsaXRlLXBhdGggL2RhdGEvZGVub2t2LnNxbGl0ZSBzZXJ2ZSAtLWFjY2Vzcy10b2tlbiAke1NFUlZJQ0VfUEFTU1dPUkRfREVOT0tWfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBuYwogICAgICAgIC0gJy16dicKICAgICAgICAtIDEyNy4wLjAuMQogICAgICAgIC0gJzQ1MTInCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAzCg==",
