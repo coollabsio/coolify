@@ -349,6 +349,18 @@
                     @endif
                 </div>
 
+                <h3 class="pt-8">HTTP Basic Authentication</h3>
+                <div x-data="{enabled: {{ $application->http_basic_auth_enable ? "true" : "false" }}}">
+                    <div class="w-96">
+                        <x-forms.checkbox label="Enable" id="application.http_basic_auth_enable" x-model="enabled" />
+                    </div>
+
+                    <div class="w-96" x-show="enabled">
+                        <x-forms.input id="application.http_basic_auth_username" label="Username" />
+                        <x-forms.input id="application.http_basic_auth_password" label="Password" />
+                    </div>
+                </div>
+
                 @if ($application->settings->is_container_label_readonly_enabled)
                     <x-forms.textarea readonly disabled label="Container Labels" rows="15" id="customLabels"
                         monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>
