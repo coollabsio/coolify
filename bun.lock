@@ -4,11 +4,11 @@
     "": {
       "name": "coolify",
       "devDependencies": {
-        "@tailwindcss/vite": "latest",
-        "concurrently": "latest",
-        "laravel-vite-plugin": "latest",
-        "tailwindcss": "latest",
-        "vite": "latest",
+        "@tailwindcss/vite": "^4.1.4",
+        "concurrently": "^9.1.2",
+        "laravel-vite-plugin": "^1.2.0",
+        "tailwindcss": "^4.1.4",
+        "vite": "^6.3.1",
       },
     },
   },
