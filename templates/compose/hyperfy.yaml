@@ -6,19 +6,23 @@
 
 services:
   hyperfy:
-    image: howieduhzit/hyperfy:latest
+    image: 'ghcr.io/hyperfy-xyz/hyperfy:dev'
     environment:
       - SERVICE_FQDN_HYPERFY_3000
-      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - ADMIN_CODE=${SERVICE_PASSWORD_ADMIN}
-      - PUBLIC_WS_URL=${SERVICE_FQDN_HYPERFY}/ws
-      - PUBLIC_API_URL=${SERVICE_FQDN_HYPERFY}/api
-      - PUBLIC_ASSETS_URL=${SERVICE_FQDN_HYPERFY}/assets
-      - SAVE_INTERVAL=${SAVE_INTERVAL:-60}
-      - WORLD=${WORLD:-world}
-      - PUBLIC_MAX_UPLOAD_SIZE=${PUBLIC_MAX_UPLOAD_SIZE:-32}
+      - 'JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - 'ADMIN_CODE=${SERVICE_PASSWORD_ADMIN}'
+      - 'PUBLIC_WS_URL=${SERVICE_FQDN_HYPERFY}/ws'
+      - 'PUBLIC_API_URL=${SERVICE_FQDN_HYPERFY}/api'
+      - 'PUBLIC_ASSETS_URL=${SERVICE_FQDN_HYPERFY}/assets'
+      - 'SAVE_INTERVAL=${SAVE_INTERVAL:-60}'
+      - 'WORLD=${WORLD:-world}'
+      - 'PUBLIC_MAX_UPLOAD_SIZE=${PUBLIC_MAX_UPLOAD_SIZE:-32}'
+      - 'PUBLIC_PLAYER_COLLISION=${PUBLIC_PLAYER_COLLISION:-true}'
+      - 'LIVEKIT_WS_URL=${LIVEKIT_URL:-ENTER URL HERE}'
+      - 'LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-ENTER API KEY HERE}'
+      - 'LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-ENTER SECRET HERE}'
     volumes:
       - type: bind
         source: ./${WORLD}
-        target: /app/${WORLD}
+        target: '/app/${WORLD}'
         is_directory: true
