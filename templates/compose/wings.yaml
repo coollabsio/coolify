@@ -42,3 +42,5 @@ services:
               bind_port: 2022
           allowed_mounts: []
           remote: ''
+    ports:
+      - '2022:2022'
