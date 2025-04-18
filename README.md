@@ -68,6 +68,8 @@ Special thanks to our biggest sponsors!
 * [Saasykit](https://saasykit.com/?ref=coolify.io) - A Laravel-based boilerplate providing essential components and features for building SaaS applications quickly.
 * [Massivegrid](https://massivegrid.com/?ref=coolify.io) - A cloud hosting provider offering scalable infrastructure solutions for businesses of all sizes.
 * [LiquidWeb](https://liquidweb.com/?utm_source=coolify.io) - A Fast web hosting provider.
+* [Supadata AI](https://supadata.ai/?ref=coolify.io) - Scrape YouTube, web, and files. Get AI-ready, clean data for your next project. 
+* [WZ-IT](https://wz-it.com/?ref=coolify.io) - German agency for customised cloud solutions, migration, managed services and open source hosting, specialising in consulting and implementation of tailor-made cloud infrastructures for SMEs.
 
 
 ## Github Sponsors ($40+)
