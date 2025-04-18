@@ -3867,9 +3867,12 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - Update changelog
-- Update changelog
-- Update changelog
 - *(CONTRIBUTING)* Add note about Laravel Horizon accessibility
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
@@ -4467,6 +4470,7 @@ All notable changes to this project will be documented in this file.
 - *(versions)* Update realtime version to 1.0.7 and bump dependencies in package.json
 - *(versions)* Bump coolify version to 4.0.0-beta.409 in configuration files
 - Update environment configuration and add new migration files for SSL certificates and local volume encryption
+- Update changelog and add new migration files for SSL certificates and local volume encryption
 
 ### ◀️ Revert
 
