@@ -129,7 +129,7 @@
             <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
                 <div class="text-error">
                     Unable to deploy. <a class="underline font-bold cursor-pointer"
-                        @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'">
+                        href="{{ route('project.service.environment-variables', $parameters) }}" wire:navigate>
                         Required environment variables missing.</a>
                 </div>
             </div>
