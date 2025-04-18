@@ -73,7 +73,6 @@ class Create extends Component
                 if ($oneClickService) {
                     $destination = StandaloneDocker::whereUuid($destination_uuid)->first();
                     $service_payload = [
-                        'name' => "$oneClickServiceName-".str()->random(10),
                         'docker_compose_raw' => base64_decode($oneClickService),
                         'environment_id' => $environment->id,
                         'service_type' => $oneClickServiceName,

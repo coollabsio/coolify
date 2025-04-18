@@ -45,6 +45,7 @@ use Visus\Cuid2\Cuid2;
         'start_command' => ['type' => 'string', 'description' => 'Start command.'],
         'ports_exposes' => ['type' => 'string', 'description' => 'Ports exposes.'],
         'ports_mappings' => ['type' => 'string', 'nullable' => true, 'description' => 'Ports mappings.'],
+        'custom_network_aliases' => ['type' => 'string', 'nullable' => true, 'description' => 'Network aliases for Docker container.'],
         'base_directory' => ['type' => 'string', 'description' => 'Base directory for all commands.'],
         'publish_directory' => ['type' => 'string', 'description' => 'Publish directory.'],
         'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
@@ -114,6 +115,68 @@ class Application extends BaseModel
     protected $guarded = [];
 
     protected $appends = ['server_status'];
+
+    protected $casts = ['custom_network_aliases' => 'array'];
+
+    public function customNetworkAliases(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (is_null($value) || $value === '') {
+                    return null;
+                }
+
+                // If it's already a JSON string, decode it
+                if (is_string($value) && $this->isJson($value)) {
+                    $value = json_decode($value, true);
+                }
+
+                // If it's a string but not JSON, treat it as a comma-separated list
+                if (is_string($value) && ! is_array($value)) {
+                    $value = explode(',', $value);
+                }
+
+                $value = collect($value)
+                    ->map(function ($alias) {
+                        if (is_string($alias)) {
+                            return str_replace(' ', '-', trim($alias));
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique() // Remove duplicate values
+                    ->values()
+                    ->toArray();
+
+                return empty($value) ? null : json_encode($value);
+            },
+            get: function ($value) {
+                if (is_null($value)) {
+                    return null;
+                }
+
+                if (is_string($value) && $this->isJson($value)) {
+                    return json_decode($value, true);
+                }
+
+                return is_array($value) ? $value : [];
+            }
+        );
+    }
+
+    /**
+     * Check if a string is a valid JSON
+     */
+    private function isJson($string)
+    {
+        if (! is_string($string)) {
+            return false;
+        }
+        json_decode($string);
+
+        return json_last_error() === JSON_ERROR_NONE;
+    }
 
     protected static function booted()
     {
@@ -1065,7 +1128,6 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $base_command = "{$base_command} {$customRepository}";
-            $base_command = $this->setGitImportSettings($deployment_uuid, $base_command, public: true);
 
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $base_command));
@@ -1508,6 +1570,7 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
+        $dockerfile = str($dockerfile)->trim()->explode("\n");
         if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
             $lines = $dockerfile->toArray();
@@ -1527,27 +1590,24 @@ class Application extends BaseModel
                 }
             }
             if (str($healthcheckCommand)->isNotEmpty()) {
-                $interval = str($healthcheckCommand)->match('/--interval=(\d+)/');
-                $timeout = str($healthcheckCommand)->match('/--timeout=(\d+)/');
-                $start_period = str($healthcheckCommand)->match('/--start-period=(\d+)/');
-                $start_interval = str($healthcheckCommand)->match('/--start-interval=(\d+)/');
+                $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
+                $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
+                $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
                 $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
+
                 if ($interval->isNotEmpty()) {
-                    $this->health_check_interval = $interval->toInteger();
+                    $this->health_check_interval = parseDockerfileInterval($interval);
                 }
                 if ($timeout->isNotEmpty()) {
-                    $this->health_check_timeout = $timeout->toInteger();
+                    $this->health_check_timeout = parseDockerfileInterval($timeout);
                 }
                 if ($start_period->isNotEmpty()) {
-                    $this->health_check_start_period = $start_period->toInteger();
+                    $this->health_check_start_period = parseDockerfileInterval($start_period);
                 }
-                // if ($start_interval) {
-                //     $this->health_check_start_interval = $start_interval->value();
-                // }
                 if ($retries->isNotEmpty()) {
                     $this->health_check_retries = $retries->toInteger();
                 }
-                if ($interval || $timeout || $start_period || $start_interval || $retries) {
+                if ($interval || $timeout || $start_period || $retries) {
                     $this->custom_healthcheck_found = true;
                     $this->save();
                 }

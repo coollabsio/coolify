@@ -3,10 +3,13 @@
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable;
+use App\Traits\EnvironmentVariableProtection;
 use Livewire\Component;
 
 class All extends Component
 {
+    use EnvironmentVariableProtection;
+
     public $resource;
 
     public string $resourceClass;
@@ -138,17 +141,57 @@ class All extends Component
     private function handleBulkSubmit()
     {
         $variables = parseEnvFormatToArray($this->variables);
+        $changesMade = false;
+        $errorOccurred = false;
 
-        $this->deleteRemovedVariables(false, $variables);
-        $this->updateOrCreateVariables(false, $variables);
+        // Try to delete removed variables
+        $deletedCount = $this->deleteRemovedVariables(false, $variables);
+        if ($deletedCount > 0) {
+            $changesMade = true;
+        } elseif ($deletedCount === 0 && $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->exists()) {
+            // If we tried to delete but couldn't (due to Docker Compose), mark as error
+            $errorOccurred = true;
+        }
+
+        // Update or create variables
+        $updatedCount = $this->updateOrCreateVariables(false, $variables);
+        if ($updatedCount > 0) {
+            $changesMade = true;
+        }
 
         if ($this->showPreview) {
             $previewVariables = parseEnvFormatToArray($this->variablesPreview);
-            $this->deleteRemovedVariables(true, $previewVariables);
-            $this->updateOrCreateVariables(true, $previewVariables);
+
+            // Try to delete removed preview variables
+            $deletedPreviewCount = $this->deleteRemovedVariables(true, $previewVariables);
+            if ($deletedPreviewCount > 0) {
+                $changesMade = true;
+            } elseif ($deletedPreviewCount === 0 && $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($previewVariables))->exists()) {
+                // If we tried to delete but couldn't (due to Docker Compose), mark as error
+                $errorOccurred = true;
+            }
+
+            // Update or create preview variables
+            $updatedPreviewCount = $this->updateOrCreateVariables(true, $previewVariables);
+            if ($updatedPreviewCount > 0) {
+                $changesMade = true;
+            }
         }
 
-        $this->dispatch('success', 'Environment variables updated.');
+        // Debug information
+        \Log::info('Environment variables update status', [
+            'deletedCount' => $deletedCount,
+            'updatedCount' => $updatedCount,
+            'deletedPreviewCount' => $deletedPreviewCount ?? 0,
+            'updatedPreviewCount' => $updatedPreviewCount ?? 0,
+            'changesMade' => $changesMade,
+            'errorOccurred' => $errorOccurred,
+        ]);
+
+        // Only show success message if changes were actually made and no errors occurred
+        if ($changesMade && ! $errorOccurred) {
+            $this->dispatch('success', 'Environment variables updated.');
+        }
     }
 
     private function handleSingleSubmit($data)
@@ -184,11 +227,46 @@ class All extends Component
     private function deleteRemovedVariables($isPreview, $variables)
     {
         $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
+
+        // Get all environment variables that will be deleted
+        $variablesToDelete = $this->resource->$method()->whereNotIn('key', array_keys($variables))->get();
+
+        // If there are no variables to delete, return 0
+        if ($variablesToDelete->isEmpty()) {
+            return 0;
+        }
+
+        // Check for system variables that shouldn't be deleted
+        foreach ($variablesToDelete as $envVar) {
+            if ($this->isProtectedEnvironmentVariable($envVar->key)) {
+                $this->dispatch('error', "Cannot delete system environment variable '{$envVar->key}'.");
+
+                return 0;
+            }
+        }
+
+        // Check if any of these variables are used in Docker Compose
+        if ($this->resource->type() === 'service' || $this->resource->build_pack === 'dockercompose') {
+            foreach ($variablesToDelete as $envVar) {
+                [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($envVar->key, $this->resource->docker_compose);
+
+                if ($isUsed) {
+                    $this->dispatch('error', "Cannot delete environment variable '{$envVar->key}' <br><br>Please remove it from the Docker Compose file first.");
+
+                    return 0;
+                }
+            }
+        }
+
+        // If we get here, no variables are used in Docker Compose, so we can delete them
         $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
+
+        return $variablesToDelete->count();
     }
 
     private function updateOrCreateVariables($isPreview, $variables)
     {
+        $count = 0;
         foreach ($variables as $key => $value) {
             if (str($key)->startsWith('SERVICE_FQDN') || str($key)->startsWith('SERVICE_URL')) {
                 continue;
@@ -198,8 +276,12 @@ class All extends Component
 
             if ($found) {
                 if (! $found->is_shown_once && ! $found->is_multiline) {
-                    $found->value = $value;
-                    $found->save();
+                    // Only count as a change if the value actually changed
+                    if ($found->value !== $value) {
+                        $found->value = $value;
+                        $found->save();
+                        $count++;
+                    }
                 }
             } else {
                 $environment = new EnvironmentVariable;
@@ -212,8 +294,11 @@ class All extends Component
                 $environment->resourceable_type = $this->resource->getMorphClass();
 
                 $environment->save();
+                $count++;
             }
         }
+
+        return $count;
     }
 
     public function refreshEnvs()

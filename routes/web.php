@@ -3,7 +3,6 @@
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\UploadController;
-use App\Http\Middleware\ApiAllowed;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
@@ -78,13 +77,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use ThreeSidedCube\LaravelRedoc\Http\Controllers\DefinitionController;
-use ThreeSidedCube\LaravelRedoc\Http\Controllers\DocumentationController;
-
-Route::group(['middleware' => ['auth:sanctum', ApiAllowed::class]], function () {
-    Route::get('/docs/api', DocumentationController::class)->name('redoc.documentation');
-    Route::get('/docs/api/definition', DefinitionController::class)->name('redoc.definition');
-});
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
@@ -98,15 +90,6 @@ Route::middleware(['throttle:login'])->group(function () {
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
-
-// Route::prefix('magic')->middleware(['auth'])->group(function () {
-//     Route::get('/servers', [MagicController::class, 'servers']);
-//     Route::get('/destinations', [MagicController::class, 'destinations']);
-//     Route::get('/projects', [MagicController::class, 'projects']);
-//     Route::get('/environments', [MagicController::class, 'environments']);
-//     Route::get('/project/new', [MagicController::class, 'newProject']);
-//     Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
-// });
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {

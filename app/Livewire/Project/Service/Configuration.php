@@ -92,7 +92,9 @@ class Configuration extends Component
     public function check_status()
     {
         try {
-            GetContainersStatus::run($this->service->server);
+            if ($this->service->server->isFunctional()) {
+                GetContainersStatus::dispatch($this->service->server);
+            }
             $this->service->applications->each(function ($application) {
                 $application->refresh();
             });

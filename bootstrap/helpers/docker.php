@@ -8,6 +8,7 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
@@ -778,7 +779,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                     }
                 }
             }
-            ray($payload);
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
@@ -829,26 +829,37 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
-    return 'OK';
+    $uuid = Str::random(18);
+    $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
-        $uuid = Str::random(10);
-        $server = Server::findOrFail($server_id);
-        $base64_compose = base64_encode($compose);
-        $output = instant_remote_process([
+        if (! $server) {
+            throw new \Exception('Server not found');
+        }
+        $yaml_compose = Yaml::parse($compose);
+        foreach ($yaml_compose['services'] as $service_name => $service) {
+            foreach ($service['volumes'] as $volume_name => $volume) {
+                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
+                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
+                }
+            }
+        }
+        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
+        instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "docker compose -f /tmp/{$uuid}.yml config",
+            "chmod 600 /tmp/{$uuid}.yml",
+            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
+            "rm /tmp/{$uuid}.yml",
         ], $server);
-        ray($output);
 
         return 'OK';
     } catch (\Throwable $e) {
-        ray($e);
-
         return $e->getMessage();
     } finally {
-        instant_remote_process([
-            "rm /tmp/{$uuid}.yml",
-        ], $server);
+        if (filled($server)) {
+            instant_remote_process([
+                "rm /tmp/{$uuid}.yml",
+            ], $server, throwError: false);
+        }
     }
 }
 

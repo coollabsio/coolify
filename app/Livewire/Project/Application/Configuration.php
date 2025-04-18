@@ -22,6 +22,7 @@ class Configuration extends Component
     public function mount()
     {
         $this->currentRoute = request()->route()->getName();
+
         $project = currentTeam()
             ->projects()
             ->select('id', 'uuid', 'team_id')
@@ -39,6 +40,9 @@ class Configuration extends Component
         $this->project = $project;
         $this->environment = $environment;
         $this->application = $application;
+        if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
+            return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
+        }
     }
 
     public function render()
