@@ -17,11 +17,13 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 60;
+
     public function __construct() {}
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('cleanup-instance-stuffs'))->dontRelease()];
+        return [(new WithoutOverlapping('cleanup-instance-stuffs'))->expireAfter(60)];
     }
 
     public function handle(): void
