@@ -377,11 +377,9 @@ class ServicesController extends Controller
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
-
             $service = new Service;
-            $result = $this->upsert_service($request, $service, $teamId);
 
-            return response()->json(serializeApiResponse($result))->setStatusCode(201);
+            return $this->upsert_service($request, $service, $teamId, 201);
         } else {
             return response()->json(['message' => 'No service type or docker_compose_raw provided.'], 400);
         }
@@ -613,12 +611,10 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $result = $this->upsert_service($request, $service, $teamId);
-
-        return response()->json(serializeApiResponse($result))->setStatusCode(200);
+        return $this->upsert_service($request, $service, $teamId, 200);
     }
 
-    private function upsert_service(Request $request, Service $service, string $teamId)
+    private function upsert_service(Request $request, Service $service, string $teamId, int $code)
     {
         $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
         $validator = customApiValidator($request->all(), [
@@ -626,7 +622,7 @@ class ServicesController extends Controller
             'environment_name' => 'string|nullable',
             'environment_uuid' => 'string|nullable',
             'server_uuid' => 'string|required',
-            'destination_uuid' => 'string',
+            'destination_uuid' => 'string|nullable',
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
@@ -724,10 +720,10 @@ class ServicesController extends Controller
             return $domain;
         })->values();
 
-        return [
+        return response()->json([
             'uuid' => $service->uuid,
             'domains' => $domains,
-        ];
+        ])->setStatusCode($code);
     }
 
     #[OA\Get(
