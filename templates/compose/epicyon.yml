@@ -1,0 +1,24 @@
+version: '3.3'
+
+services:
+  app:
+    image: anandh612/epicyon:latest 
+    container_name: epidosdc
+    ports:
+      - "7156:7156"
+    env_file:
+      - .env
+    command: >
+      /usr/bin/python3 /app/epicyon.py
+      --bind 0.0.0.0
+      --port 80
+      --proxy 7156
+      --registration open
+      --domain ${DOMAIN}
+      --path /app
+    restart: unless-stopped
+    networks:
+      - internal
+networks:
+  internal:
+    driver: bridge
