@@ -2,6 +2,7 @@
     "auth.login": "ログイン",
     "auth.login.azure": "Microsoftでログイン",
     "auth.login.bitbucket": "Bitbucketでログイン",
+    "auth.login.discord": "Discordでログイン",
     "auth.login.github": "GitHubでログイン",
     "auth.login.gitlab": "Gitlabでログイン",
     "auth.login.google": "Googleでログイン",
