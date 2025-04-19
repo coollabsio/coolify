@@ -3,6 +3,7 @@
   "auth.login.authentik": "Authentik ilə daxil ol",
   "auth.login.azure": "Azure ilə daxil ol",
   "auth.login.bitbucket": "Bitbucket ilə daxil ol",
+  "auth.login.clerk": "Clerk ilə daxil ol",
   "auth.login.github": "Github ilə daxil ol",
   "auth.login.gitlab": "GitLab ilə daxil ol",
   "auth.login.google": "Google ilə daxil ol",

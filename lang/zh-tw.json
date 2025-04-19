@@ -2,6 +2,7 @@
     "auth.login": "登入",
     "auth.login.azure": "使用 Microsoft 登入",
     "auth.login.bitbucket": "使用 Bitbucket 登入",
+    "auth.login.clerk": "使用 Clerk 登入",
     "auth.login.github": "使用 GitHub 登入",
     "auth.login.gitlab": "使用 Gitlab 登入",
     "auth.login.google": "使用 Google 登入",

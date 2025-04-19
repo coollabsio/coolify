@@ -2,6 +2,7 @@
     "auth.login": "Đăng Nhập",
     "auth.login.azure": "Đăng Nhập Bằng Microsoft",
     "auth.login.bitbucket": "Đăng Nhập Bằng Bitbucket",
+    "auth.login.clerk": "Đăng Nhập Bằng Clerk",
     "auth.login.github": "Đăng Nhập Bằng GitHub",
     "auth.login.gitlab": "Đăng Nhập Bằng Gitlab",
     "auth.login.google": "Đăng Nhập Bằng Google",
