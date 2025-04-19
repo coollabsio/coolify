@@ -809,6 +809,6 @@ class ServersController extends Controller
         }
         ValidateServer::dispatch($server);
 
-        return response()->json(['message' => 'Validation started.']);
+        return response()->json(['message' => 'Validation started.'], 201);
     }
 }
