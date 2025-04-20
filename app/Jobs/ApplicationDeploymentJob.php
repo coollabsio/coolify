@@ -1081,6 +1081,29 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return [$nixpacks_php_fallback_path, $nixpacks_php_root_dir];
     }
 
+    private function drain_old_containers()
+    {
+        // First, mark containers as unhealthy (so the reverse proxy stops routing to them)
+        // Only do this if healthcheck is enabled
+        if (! $this->application->isHealthcheckDisabled()) {
+            $drain_time = (int) $this->application->health_check_interval + 1;
+            $this->application_deployment_queue->addLogEntry("Draining old containers for {$drain_time} seconds.");
+            $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+            if ($this->pull_request_id === 0) {
+                $containers = $containers->filter(function ($container) {
+                    return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
+                });
+            }
+            $containers->each(function ($container) {
+                $this->mark_container_unhealthy(data_get($container, 'Names'));
+            });
+            // Sleep to allow the reverse proxy to stop routing to the old containers
+            sleep($drain_time); // Needs to be higher than the reverse proxy's polling interval
+        } else {
+            $this->application_deployment_queue->addLogEntry('Healthcheck is disabled, skipping old container drain.');
+        }
+    }
+
     private function rolling_update()
     {
         if ($this->server->isSwarm()) {
@@ -1121,6 +1144,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry('Rolling update started.');
                 $this->start_by_compose_file();
                 $this->health_check();
+                $this->drain_old_containers();
                 $this->stop_running_container();
                 $this->application_deployment_queue->addLogEntry('Rolling update completed.');
             }
@@ -1793,8 +1817,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->generate_healthcheck_commands(),
             ],
             'interval' => $this->application->health_check_interval.'s',
-            'timeout' => $this->application->health_check_timeout.'s',
-            'retries' => $this->application->health_check_retries,
+            'timeout' => (intval($this->application->health_check_timeout) * intval($this->application->health_check_retries) + 1).'s', // Timeout to allow curl/wget to finish
+            'retries' => 1, // $this->application->health_check_retries // retries are already handled by curl/wget
             'start_period' => $this->application->health_check_start_period.'s',
         ];
 
@@ -1995,15 +2019,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
             $health_check_port = 80;
         }
+
+        // Apply retry count, timeout and interval to commands
+        $retries = $this->application->health_check_retries;
+        $timeout = $this->application->health_check_timeout;
+
         if ($this->application->health_check_path) {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1",
+                "test -f /drain && exit 1 || curl -s --retry {$retries} --max-time {$timeout} -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -t {$retries} -T {$timeout} -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1",
             ];
         } else {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1",
+                "test -f /drain && exit 1 || curl -s --retry {$retries} --max-time {$timeout} -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -t {$retries} -T {$timeout} -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1",
             ];
         }
 
@@ -2255,6 +2284,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
+    }
+
+    private function mark_container_unhealthy(string $containerName)
+    {
+        // $this->application_deployment_queue->addLogEntry("Marking old container as unhealthy.");
+        // docker exec $1 touch /drain && sleep 10
+        $this->execute_remote_command(
+            ["docker exec $containerName touch /drain", 'hidden' => true, 'ignore_errors' => true]
+        );
     }
 
     private function stop_running_container(bool $force = false)
