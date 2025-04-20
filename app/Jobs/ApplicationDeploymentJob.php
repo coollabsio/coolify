@@ -2025,7 +2025,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $health_check_port = 80;
         }
 
-        // Apply retry count, timeout and interval to commands
+        // Apply retry count and timeout to commands
         $retries = $this->application->health_check_retries;
         $timeout = $this->application->health_check_timeout;
 
