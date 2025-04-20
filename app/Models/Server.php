@@ -492,11 +492,7 @@ $schema://$host {
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
             // Do nothing
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
-            } else {
-                $proxy_path = $proxy_path.'/caddy';
-            }
+            $proxy_path = $proxy_path.'/caddy';
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
             if (isDev()) {
                 $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
