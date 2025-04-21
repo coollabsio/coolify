@@ -20,7 +20,12 @@
     </div>
     <div class="w-48 pb-2">
         <x-forms.checkbox instantSave label="Backup Enabled" id="backupEnabled" />
-        <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3" />
+        @if ($s3s->count() > 0)
+            <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3" />
+        @else
+            <x-forms.checkbox instantSave helper="No validated S3 storage available." label="S3 Enabled" id="saveS3"
+                disabled />
+        @endif
     </div>
     @if ($backup->save_s3)
         <div class="pb-6">
