@@ -682,8 +682,10 @@ function isDatabaseImage(?string $image = null)
         $image = str($image)->append(':latest');
     }
     $imageName = $image->before(':');
-    if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
-        return true;
+    foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
+        if (str($imageName)->contains($database_docker_image)) {
+            return true;
+        }
     }
 
     return false;
