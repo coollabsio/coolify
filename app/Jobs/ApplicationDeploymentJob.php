@@ -1822,7 +1822,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->generate_healthcheck_commands(),
             ],
             'interval' => $this->application->health_check_interval.'s',
-            'timeout' => (intval($this->application->health_check_timeout) * intval($this->application->health_check_retries) + 1).'s', // Timeout to allow curl/wget to finish
+            'timeout' => (intval($this->application->health_check_timeout) * intval($this->application->health_check_retries) * intval($this->application->health_check_interval) + 1).'s', // Timeout to allow curl/wget to finish
             'retries' => 1, // $this->application->health_check_retries // retries are already handled by curl/wget
             'start_period' => $this->application->health_check_start_period.'s',
         ];
@@ -2028,16 +2028,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Apply retry count and timeout to commands
         $retries = $this->application->health_check_retries;
         $timeout = $this->application->health_check_timeout;
+        $interval = $this->application->health_check_interval;
 
         if ($this->application->health_check_path) {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
-                "test -f /drain && exit 1 || curl -s --retry {$retries} --max-time {$timeout} -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || wget -q -t {$retries} -T {$timeout} -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null || exit 1",
+                "test -f /drain && exit 1; if command -v curl >/dev/null 2>&1; then for i in $(seq 1 {$retries}); do curl -s --max-time {$timeout} -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null && exit 0; if [ \$i -lt {$retries} ]; then sleep {$interval}; fi; done; exit 1; elif command -v wget >/dev/null 2>&1; then for i in $(seq 1 {$retries}); do wget -q -T {$timeout} -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null && exit 0; if [ \$i -lt {$retries} ]; then sleep {$interval}; fi; done; exit 1; else echo 'Neither curl nor wget is available'; exit 1; fi",
             ];
         } else {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
             $generated_healthchecks_commands = [
-                "test -f /drain && exit 1 || curl -s --retry {$retries} --max-time {$timeout} -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || wget -q -t {$retries} -T {$timeout} -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null || exit 1",
+                "test -f /drain && exit 1; if command -v curl >/dev/null 2>&1; then for i in $(seq 1 {$retries}); do curl -s --max-time {$timeout} -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null && exit 0; if [ \$i -lt {$retries} ]; then sleep {$interval}; fi; done; exit 1; elif command -v wget >/dev/null 2>&1; then for i in $(seq 1 {$retries}); do wget -q -T {$timeout} -O- {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/ > /dev/null && exit 0; if [ \$i -lt {$retries} ]; then sleep {$interval}; fi; done; exit 1; else echo 'Neither curl nor wget is available'; exit 1; fi",
             ];
         }
 
