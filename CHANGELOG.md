@@ -6,17 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
-- *(parser)* Transform associative array labels into key=value format for better compatibility
-- *(redis)* Update username and password input handling to clarify database sync requirements
-- *(source)* Update connected source display to handle cases with no source connected
+- *(navbar)* Update error message link to use route for environment variables navigation
+- Unsend template
+- Replace ports with expose
+- *(templates)* Update Unsend compose configuration for improved service integration
 
 ### 🚜 Refactor
 
-- *(source)* Conditionally display connected source and change source options based on private key presence
+- *(jobs)* Update WithoutOverlapping middleware to use expireAfter for better queue management
 
-### ⚙️ Miscellaneous Tasks
+### 📚 Documentation
 
-- *(versions)* Bump coolify version to 4.0.0-beta.409 in configuration files
+- Update changelog
 
 ## [4.0.0-beta.408] - 2025-04-14
 
@@ -24,6 +25,8 @@ All notable changes to this project will be documented in this file.
 
 - *(OpenApi)* Enhance OpenAPI specifications by adding UUID parameters for application, project, and service updates; improve deployment listing with pagination parameters; update command signature for OpenApi generation
 - *(subscription)* Enhance subscription management with loading states and Stripe status checks
+- *(readme)* Add new sponsors Supadata AI and WZ-IT to the README
+- *(core)* Enable magic env variables for compose based applications
 
 ### 🐛 Bug Fixes
 
@@ -33,6 +36,11 @@ All notable changes to this project will be documented in this file.
 - *(mongodb)* Also apply custom config when SSL is enabled
 - *(templates)* Correct casing of denoKV references in service templates and YAML files
 - *(deployment)* Handle missing destination in deployment process to prevent errors
+- *(parser)* Transform associative array labels into key=value format for better compatibility
+- *(redis)* Update username and password input handling to clarify database sync requirements
+- *(source)* Update connected source display to handle cases with no source connected
+- *(application)* Append base directory to git branch URLs for improved path handling
+- *(templates)* Correct casing of "denokv" to "denoKV" in service templates JSON
 
 ### 💼 Other
 
@@ -44,6 +52,7 @@ All notable changes to this project will be documented in this file.
 - *(Dockerfile)* Remove service generation command from the build process to streamline Dockerfile and improve build efficiency
 - *(navbar-delete-team)* Simplify modal confirmation layout and enhance button styling for better user experience
 - *(Server)* Remove debug logging from isReachableChanged method to clean up code and improve performance
+- *(source)* Conditionally display connected source and change source options based on private key presence
 
 ### 📚 Documentation
 
@@ -56,6 +65,9 @@ All notable changes to this project will be documented in this file.
 - *(versions)* Update nightly version to 4.0.0-beta.410
 - *(pre-commit)* Remove OpenAPI generation command from pre-commit hook
 - *(versions)* Update realtime version to 1.0.7 and bump dependencies in package.json
+- *(versions)* Bump coolify version to 4.0.0-beta.409 in configuration files
+- *(versions)* Bump coolify version to 4.0.0-beta.410 and update nightly version to 4.0.0-beta.411 in configuration files
+- *(templates)* Update plausible and clickhouse images to latest versions and remove mail service
 
 ## [4.0.0-beta.407] - 2025-04-09
 

@@ -7729,6 +7729,12 @@
                         "type": "string",
                         "format": "private-key"
                     },
+                    "public_key": {
+                        "type": "string"
+                    },
+                    "fingerprint": {
+                        "type": "string"
+                    },
                     "is_git_related": {
                         "type": "boolean"
                     },

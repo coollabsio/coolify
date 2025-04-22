@@ -458,22 +458,23 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
+                $base_dir = $this->base_directory ?? '/';
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}";
+                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
+                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
                 }
                 // Convert the SSH URL to HTTPS URL
                 if (strpos($this->git_repository, 'git@') === 0) {
                     $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
 
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "https://{$git_repository}/src/{$this->git_branch}";
+                        return "https://{$git_repository}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "https://{$git_repository}/tree/{$this->git_branch}";
+                    return "https://{$git_repository}/tree/{$this->git_branch}{$base_dir}";
                 }
 
                 return $this->git_repository;

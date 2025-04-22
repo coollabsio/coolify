@@ -2562,10 +2562,6 @@ class ApplicationsController extends Controller
                 ])->setStatusCode(201);
             }
         }
-
-        return response()->json([
-            'message' => 'Something went wrong.',
-        ], 500);
     }
 
     #[OA\Delete(

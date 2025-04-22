@@ -2,7 +2,7 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.409',
+        'version' => '4.0.0-beta.410',
         'helper_version' => '1.0.8',
         'realtime_version' => '1.0.7',
         'self_hosted' => env('SELF_HOSTED', true),
