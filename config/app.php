@@ -57,30 +57,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Application Port
-    |--------------------------------------------------------------------------
-    |
-    | This value determines the port your application is running on. It can be
-    | used to change what port the application is running on.
-    |
-    */
-
-    'port' => env('APP_PORT', 8000),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Force HTTPS
-    |--------------------------------------------------------------------------
-    |
-    | This option can be used to force your application to use HTTPS instead
-    | of HTTP, providing an additional layer of security for your application.
-    |
-    */
-
-    'force_https' => env('APP_FORCE_HTTPS', false),
-
-    /*
-    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
