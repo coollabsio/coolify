@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "coollabsio/coolify",
-    "type": "project",
     "description": "Coolify a free, open-source & self-hostable PaaS alternative to Heroku, Netlify, Vercel and Railway.",
     "homepage": "https://coolify.io",
+    "type": "project",
     "keywords": [
         "coolify",
         "deployment",
@@ -12,7 +12,7 @@
         "docker",
         "podman"
     ],
-    "license": "AGPL-3.0",
+    "license": "Apache-2.0",
     "require": {
         "php": "^8.4",
         "laravel/framework": "^12.9.2",
@@ -63,35 +63,24 @@
             "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
-        "pre-package-uninstall": [
-            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
-        ],
-        "setup": [
-            "composer install",
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "npm install",
-            "npm run build"
-        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite"
         ],
         "refactor": "rector",
+        "typos": "peck",
+        "types": "phpstan --memory-limit=1G",
         "lint": "pint",
         "test": "pest",
-        "test:refactor": "rector --dry-run",
-        "test:lint": "pint --test",
-        "test:typos": "peck",
-        "test:types": "phpstan --memory-limit=1G",
-        "test:test-coverage": "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100",
+        "test:test-coverage": "pest --parallel --coverage --exactly=100",
         "test:type-coverage": "pest --type-coverage --memory-limit=1G --min=100",
+        "test:refactor": "rector --dry-run",
+        "test:types": "phpstan --memory-limit=1G",
+        "test:lint": "pint --test",
         "test:all": [
-            "@php artisan config:clear --ansi",
             "@test:refactor",
-            "@test:lint",
             "@test:types",
+            "@test:lint",
             "@test:test-coverage",
             "@test:type-coverage"
         ]
