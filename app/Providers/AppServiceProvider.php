@@ -11,9 +11,11 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Sleep;
 use Illuminate\Validation\Rules\Password;
 
 final class AppServiceProvider extends ServiceProvider
@@ -28,6 +30,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureCommands();
         $this->configureModels();
         $this->configureDates();
+        $this->configureTests();
         $this->configureRequestExceptions();
         $this->configureVite();
     }
@@ -72,11 +75,15 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureModels(): void
     {
+        Model::automaticallyEagerLoadRelationships();
+
         if (! App::isProduction()) {
             Model::preventLazyLoading();
         }
 
+        Model::preventSilentlyDiscardingAttributes();
         Model::preventAccessingMissingAttributes();
+
         Model::unguard();
 
         Relation::enforceMorphMap([
@@ -91,6 +98,17 @@ final class AppServiceProvider extends ServiceProvider
     private function configureDates(): void
     {
         Date::use(CarbonImmutable::class);
+    }
+
+    /**
+     * Configure tests.
+     */
+    private function configureTests(): void
+    {
+        if (App::runningUnitTests()) {
+            Sleep::fake();
+            Http::preventStrayRequests();
+        }
     }
 
     /**
