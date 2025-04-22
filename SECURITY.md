@@ -6,7 +6,7 @@ This document outlines our support policy, and how to report vulnerabilities.
 
 Below you can find the support status for different versions of Coolify.
 
-| Version | Supported | Support Status | Release Date | End of Life Date |
+| Version | Supported | Support Status | Initial Release | End of Life Date |
 | ------- | ------------------ | -------------- | ------- | ---------------- |
 | **5.x** | :white_check_mark: | Active Development | TBD | N/A - Current Version |
 | **4.x** | :warning: | Security & Critical Fixes Only | July 14th, 2023 | TBD |
