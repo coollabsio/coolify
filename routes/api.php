@@ -16,8 +16,13 @@ use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [OtherController::class, 'healthcheck']);
-Route::post('/feedback', [OtherController::class, 'feedback']);
+Route::group([
+    'prefix' => 'v1',
+], function () {
+    Route::get('/health', [OtherController::class, 'healthcheck']);
+});
 
+Route::post('/feedback', [OtherController::class, 'feedback']);
 Route::group([
     'middleware' => ['auth:sanctum', 'api.ability:write'],
     'prefix' => 'v1',
