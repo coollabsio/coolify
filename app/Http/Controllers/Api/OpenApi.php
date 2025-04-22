@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use OpenApi\Attributes as OA;
 
 #[OA\Info(title: 'Coolify', version: '0.1')]
-#[OA\Server(url: 'https://app.coolify.io/api/v1', description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.')]
+#[OA\Server(url: 'https://app.coolify.io/api/v1', description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.', variables: [
+    new OA\ServerVariable('token', 'your-coolify-token-here', 'Coolify token for authentication'),
+])]
 #[OA\SecurityScheme(
     type: 'http',
     scheme: 'bearer',

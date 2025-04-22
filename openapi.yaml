@@ -6,6 +6,10 @@ servers:
   -
     url: 'https://app.coolify.io/api/v1'
     description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.'
+    variables:
+      token:
+        default: 'Coolify token for authentication'
+        description: your-coolify-token-here
 paths:
   /applications:
     get:
@@ -5159,6 +5163,10 @@ components:
         private_key:
           type: string
           format: private-key
+        public_key:
+          type: string
+        fingerprint:
+          type: string
         is_git_related:
           type: boolean
         team_id:
