@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "coollabsio/coolify",
-    "type": "project",
+    "description": "Coolify a free, open-source & self-hostable PaaS alternative to Heroku, Netlify, Vercel and Railway.",
     "homepage": "https://coolify.io",
-    "description": "Coolify an open-source & self-hostable Heroku, Netlify, Vercel and Railway alternative.",
+    "type": "project",
     "keywords": [
         "coolify",
         "deployment",
@@ -15,23 +15,23 @@
     "license": "Apache-2.0",
     "require": {
         "php": "^8.4",
-        "laravel/framework": "^12.3",
+        "laravel/framework": "^12.9.2",
         "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
-        "driftingly/rector-laravel": "^2.0.2",
+        "driftingly/rector-laravel": "^2.0.4",
         "fakerphp/faker": "^1.24.1",
-        "larastan/larastan": "^3.2",
+        "larastan/larastan": "^3.4.0",
         "laravel/pail": "^1.2.2",
-        "laravel/pint": "^1.21.2",
+        "laravel/pint": "^1.22.0",
         "mockery/mockery": "^1.6.12",
-        "nunomaduro/collision": "^8.7",
-        "peckphp/peck": "^0.1.2",
-        "pestphp/pest": "^3.7.4",
-        "pestphp/pest-plugin-laravel": "^3.1",
-        "pestphp/pest-plugin-type-coverage": "^3.4",
-        "phpstan/phpstan-deprecation-rules": "^2.0",
-        "phpstan/phpstan-strict-rules": "^2.0",
+        "nunomaduro/collision": "^8.8",
+        "peckphp/peck": "^0.1.3",
+        "pestphp/pest": "^3.8.2",
+        "pestphp/pest-plugin-laravel": "^3.2",
+        "pestphp/pest-plugin-type-coverage": "^3.5.1",
+        "phpstan/phpstan-deprecation-rules": "^2.0.1",
+        "phpstan/phpstan-strict-rules": "^2.0.4",
         "rector/rector": "^2.0.11",
         "spatie/laravel-ray": "^1.40.2"
     },
@@ -65,9 +65,10 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
+            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite"
         ],
         "refactor": "rector",
+        "typos": "peck",
         "types": "phpstan --memory-limit=1G",
         "lint": "pint",
         "test": "pest",
