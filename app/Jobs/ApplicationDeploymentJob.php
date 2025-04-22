@@ -329,7 +329,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->application_deployment_queue->addLogEntry("Starting graceful shutdown container: {$this->deployment_uuid}");
+            $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
             $this->graceful_shutdown_container($this->deployment_uuid);
 
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
@@ -899,100 +899,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $sorted_environment_variables_preview = $this->application->environment_variables_preview->sortBy('id');
         }
         $ports = $this->application->main_port();
-        if ($this->pull_request_id !== 0) {
-            $this->env_filename = ".env-pr-$this->pull_request_id";
-            // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (! is_null($this->commit)) {
-                    $envs->push("SOURCE_COMMIT={$this->commit}");
-                } else {
-                    $envs->push('SOURCE_COMMIT=unknown');
-                }
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $envs->push("COOLIFY_FQDN={$this->preview->fqdn}");
-                $envs->push("COOLIFY_DOMAIN_URL={$this->preview->fqdn}");
-            }
-            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
-                $envs->push("COOLIFY_URL={$url}");
-                $envs->push("COOLIFY_DOMAIN_FQDN={$url}");
-            }
-            if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                    $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
-                }
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
-                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
-                }
-                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
-                }
-            }
-
-            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables_preview);
-
-            foreach ($sorted_environment_variables_preview as $env) {
-                $real_value = $env->real_value;
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    if ($env->is_literal || $env->is_multiline) {
-                        $real_value = '\''.$real_value.'\'';
-                    } else {
-                        $real_value = escapeEnvVariables($env->real_value);
-                    }
-                }
-                $envs->push($env->key.'='.$real_value);
-            }
-            // Add PORT if not exists, use the first port as default
-            if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
-                    $envs->push("PORT={$ports[0]}");
-                }
-            }
-            // Add HOST if not exists
-            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
-                $envs->push('HOST=0.0.0.0');
-            }
-        } else {
+        $coolify_envs = $this->generate_coolify_env_variables();
+        $coolify_envs->each(function ($item, $key) use ($envs) {
+            $envs->push($key.'='.$item);
+        });
+        if ($this->pull_request_id === 0) {
             $this->env_filename = '.env';
-            // Add SOURCE_COMMIT if not exists
-            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
-                if (! is_null($this->commit)) {
-                    $envs->push("SOURCE_COMMIT={$this->commit}");
-                } else {
-                    $envs->push('SOURCE_COMMIT=unknown');
-                }
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                if ((int) $this->application->compose_parsing_version >= 3) {
-                    $envs->push("COOLIFY_URL={$this->application->fqdn}");
-                } else {
-                    $envs->push("COOLIFY_FQDN={$this->application->fqdn}");
-                }
-            }
-            if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
-                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
-                if ((int) $this->application->compose_parsing_version >= 3) {
-                    $envs->push("COOLIFY_FQDN={$url}");
-                } else {
-                    $envs->push("COOLIFY_URL={$url}");
-                }
-            }
-            if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
-                if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
-                    $envs->push("COOLIFY_BRANCH=\"{$local_branch}\"");
-                }
-                if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
-                    $envs->push("COOLIFY_RESOURCE_UUID={$this->application->uuid}");
-                }
-                if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-                    $envs->push("COOLIFY_CONTAINER_NAME={$this->container_name}");
-                }
-            }
-
-            add_coolify_default_environment_variables($this->application, $envs, $this->application->environment_variables);
 
             foreach ($sorted_environment_variables as $env) {
                 $real_value = $env->real_value;
@@ -1017,6 +929,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
+        } else {
+            $this->env_filename = ".env-pr-$this->pull_request_id";
+            foreach ($sorted_environment_variables_preview as $env) {
+                $real_value = $env->real_value;
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    if ($env->is_literal || $env->is_multiline) {
+                        $real_value = '\''.$real_value.'\'';
+                    } else {
+                        $real_value = escapeEnvVariables($env->real_value);
+                    }
+                }
+                $envs->push($env->key.'='.$real_value);
+            }
+            // Add PORT if not exists, use the first port as default
+            if ($this->build_pack !== 'dockercompose') {
+                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                    $envs->push("PORT={$ports[0]}");
+                }
+            }
+            // Add HOST if not exists
+            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
+                $envs->push('HOST=0.0.0.0');
+            }
+
         }
         if ($envs->isEmpty()) {
             $this->env_filename = null;
@@ -1361,7 +1299,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
-        $this->application_deployment_queue->addLogEntry("Starting graceful shutdown container: {$this->deployment_uuid}");
         $this->graceful_shutdown_container($this->deployment_uuid);
         $this->execute_remote_command(
             [
@@ -1394,6 +1331,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         foreach ($destination_ids as $destination_id) {
             $destination = StandaloneDocker::find($destination_id);
+            if (! $destination) {
+                continue;
+            }
             $server = $destination->server;
             if ($server->team_id !== $this->mainServer->team_id) {
                 $this->application_deployment_queue->addLogEntry("Skipping deployment to {$server->name}. Not in the same team?!");
@@ -1437,6 +1377,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function check_git_if_build_needed()
     {
+        if ($this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
+            $repository = githubApi($this->source, "repos/{$this->customRepository}");
+            $data = data_get($repository, 'data');
+            if (isset($data->id)) {
+                $repository_project_id = $data->id;
+                if (blank($this->application->repository_project_id) || $this->application->repository_project_id !== $repository_project_id) {
+                    $this->application->repository_project_id = $repository_project_id;
+                    $this->application->save();
+                }
+            }
+        }
         $this->generate_git_import_commands();
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
@@ -1626,20 +1577,128 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
     }
 
+    private function generate_coolify_env_variables(): Collection
+    {
+        $coolify_envs = collect([]);
+        $local_branch = $this->branch;
+        if ($this->pull_request_id !== 0) {
+            // Add SOURCE_COMMIT if not exists
+            if ($this->application->environment_variables_preview->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                if (! is_null($this->commit)) {
+                    $coolify_envs->put('SOURCE_COMMIT', $this->commit);
+                } else {
+                    $coolify_envs->put('SOURCE_COMMIT', 'unknown');
+                }
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+                $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
+                $coolify_envs->put('COOLIFY_DOMAIN_URL', $this->preview->fqdn);
+            }
+            if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
+                $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
+                $coolify_envs->put('COOLIFY_URL', $url);
+                $coolify_envs->put('COOLIFY_DOMAIN_FQDN', $url);
+            }
+            if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                    $coolify_envs->put('COOLIFY_BRANCH', $local_branch);
+                }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
+                }
+                if ($this->application->environment_variables_preview->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
+                }
+            }
+
+            add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables_preview);
+
+        } else {
+            // Add SOURCE_COMMIT if not exists
+            if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
+                if (! is_null($this->commit)) {
+                    $coolify_envs->put('SOURCE_COMMIT', $this->commit);
+                } else {
+                    $coolify_envs->put('SOURCE_COMMIT', 'unknown');
+                }
+            }
+            if ($this->application->environment_variables->where('key', 'COOLIFY_FQDN')->isEmpty()) {
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_URL', $this->application->fqdn);
+                } else {
+                    $coolify_envs->put('COOLIFY_FQDN', $this->application->fqdn);
+                }
+            }
+            if ($this->application->environment_variables->where('key', 'COOLIFY_URL')->isEmpty()) {
+                $url = str($this->application->fqdn)->replace('http://', '')->replace('https://', '');
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_FQDN', $url);
+                } else {
+                    $coolify_envs->put('COOLIFY_URL', $url);
+                }
+            }
+            if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
+                if ($this->application->environment_variables->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
+                    $coolify_envs->put('COOLIFY_BRANCH', $local_branch);
+                }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+                    $coolify_envs->put('COOLIFY_RESOURCE_UUID', $this->application->uuid);
+                }
+                if ($this->application->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
+                    $coolify_envs->put('COOLIFY_CONTAINER_NAME', $this->container_name);
+                }
+            }
+
+            add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables);
+
+        }
+
+        return $coolify_envs;
+    }
+
     private function generate_env_variables()
     {
         $this->env_args = collect([]);
         $this->env_args->put('SOURCE_COMMIT', $this->commit);
+        $coolify_envs = $this->generate_coolify_env_variables();
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
                 if (! is_null($env->real_value)) {
                     $this->env_args->put($env->key, $env->real_value);
+                    if (str($env->real_value)->startsWith('$')) {
+                        $variable_key = str($env->real_value)->after('$');
+                        if ($variable_key->startsWith('COOLIFY_')) {
+                            $variable = $coolify_envs->get($variable_key->value());
+                            if (filled($variable)) {
+                                $this->env_args->prepend($variable, $variable_key->value());
+                            }
+                        } else {
+                            $variable = $this->application->environment_variables()->where('key', $variable_key)->first();
+                            if ($variable) {
+                                $this->env_args->prepend($variable->real_value, $env->key);
+                            }
+                        }
+                    }
                 }
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
                 if (! is_null($env->real_value)) {
                     $this->env_args->put($env->key, $env->real_value);
+                    if (str($env->real_value)->startsWith('$')) {
+                        $variable_key = str($env->real_value)->after('$');
+                        if ($variable_key->startsWith('COOLIFY_')) {
+                            $variable = $coolify_envs->get($variable_key->value());
+                            if (filled($variable)) {
+                                $this->env_args->prepend($variable, $variable_key->value());
+                            }
+                        } else {
+                            $variable = $this->application->environment_variables_preview()->where('key', $variable_key)->first();
+                            if ($variable) {
+                                $this->env_args->prepend($variable->real_value, $env->key);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1664,25 +1723,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $labels = $labels->filter(function ($value, $key) {
                 return ! Str::startsWith($value, 'coolify.');
             });
-            $found_caddy_labels = $labels->filter(function ($value, $key) {
-                return Str::startsWith($value, 'caddy_');
-            });
-            if ($found_caddy_labels->count() === 0) {
-                if ($this->pull_request_id !== 0) {
-                    $domains = str(data_get($this->preview, 'fqdn'))->explode(',');
-                } else {
-                    $domains = str(data_get($this->application, 'fqdn'))->explode(',');
-                }
-                $labels = $labels->merge(fqdnLabelsForCaddy(
-                    network: $this->application->destination->network,
-                    uuid: $this->application->uuid,
-                    domains: $domains,
-                    onlyPort: $onlyPort,
-                    is_force_https_enabled: $this->application->isForceHttpsEnabled(),
-                    is_gzip_enabled: $this->application->isGzipEnabled(),
-                    is_stripprefix_enabled: $this->application->isStripprefixEnabled()
-                ));
-            }
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
@@ -1710,6 +1750,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
         }
+        $custom_network_aliases = [];
+        if (is_array($this->application->custom_network_aliases) && count($this->application->custom_network_aliases) > 0) {
+            $custom_network_aliases = $this->application->custom_network_aliases;
+        }
         $docker_compose = [
             'services' => [
                 $this->container_name => [
@@ -1719,9 +1763,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network => [
-                            'aliases' => [
-                                $this->container_name,
-                            ],
+                            'aliases' => array_merge(
+                                [$this->container_name],
+                                $custom_network_aliases
+                            ),
                         ],
                     ],
                     'mem_limit' => $this->application->limits_memory,
@@ -2409,20 +2454,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function next(string $status)
     {
         queue_next_deployment($this->application);
-        // If the deployment is cancelled by the user, don't update the status
-        if (
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value &&
-            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
-        ) {
-            $this->application_deployment_queue->update([
-                'status' => $status,
-            ]);
+
+        // Never allow changing status from FAILED or CANCELLED_BY_USER to anything else
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value ||
+            $this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+            return;
         }
-        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
+
+        $this->application_deployment_queue->update([
+            'status' => $status,
+        ]);
+
+        if ($status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
 
             return;
         }
+
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();

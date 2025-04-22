@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Stringable;
 use OpenApi\Attributes as OA;
@@ -493,11 +492,7 @@ $schema://$host {
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
             // Do nothing
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
-            } else {
-                $proxy_path = $proxy_path.'/caddy';
-            }
+            $proxy_path = $proxy_path.'/caddy';
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
             if (isDev()) {
                 $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
@@ -925,7 +920,7 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && $this->settings->force_disabled === false && $this->ip !== '1.2.3.4';
+        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && $this->ip !== '1.2.3.4';
 
         if ($isFunctional === false) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());
@@ -1026,22 +1021,11 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-
-        Log::debug('Server reachability check', [
-            'server_id' => $this->id,
-            'is_reachable' => $isReachable,
-            'notification_sent' => $unreachableNotificationSent,
-            'unreachable_count' => $this->unreachable_count,
-        ]);
-
         if ($isReachable === true) {
             $this->unreachable_count = 0;
             $this->save();
 
             if ($unreachableNotificationSent === true) {
-                Log::debug('Server is now reachable, sending notification', [
-                    'server_id' => $this->id,
-                ]);
                 $this->sendReachableNotification();
             }
 
@@ -1049,17 +1033,10 @@ $schema://$host {
         }
 
         $this->increment('unreachable_count');
-        Log::debug('Incremented unreachable count', [
-            'server_id' => $this->id,
-            'new_count' => $this->unreachable_count,
-        ]);
 
         if ($this->unreachable_count === 1) {
             $this->settings->is_reachable = true;
             $this->settings->save();
-            Log::debug('First unreachable attempt, marking as reachable', [
-                'server_id' => $this->id,
-            ]);
 
             return;
         }
@@ -1068,11 +1045,6 @@ $schema://$host {
             $failedChecks = 0;
             for ($i = 0; $i < 3; $i++) {
                 $status = $this->serverStatus();
-                Log::debug('Additional reachability check', [
-                    'server_id' => $this->id,
-                    'attempt' => $i + 1,
-                    'status' => $status,
-                ]);
                 sleep(5);
                 if (! $status) {
                     $failedChecks++;
@@ -1080,9 +1052,6 @@ $schema://$host {
             }
 
             if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
-                    'server_id' => $this->id,
-                ]);
                 $this->sendUnreachableNotification();
             }
         }

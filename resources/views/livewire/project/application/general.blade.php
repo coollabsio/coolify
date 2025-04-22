@@ -342,6 +342,24 @@
                         <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
+                    @if (!$application->destination->server->isSwarm())
+                        <x-forms.input id="application.custom_network_aliases" label="Network Aliases"
+                            helper="A comma separated list of custom network aliases you would like to add for container in Docker network.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>api.internal,api.local"
+                            wire:model="application.custom_network_aliases" />
+                    @endif
+                </div>
+
+                <h3 class="pt-8">HTTP Basic Authentication</h3>
+                <div x-data="{ enabled: {{ $application->http_basic_auth_enabled ? 'true' : 'false' }} }">
+                    <div class="w-96">
+                        <x-forms.checkbox helper="This will add the proper proxy labels to the container."
+                            label="Enable" id="application.http_basic_auth_enabled" x-model="enabled" />
+                    </div>
+
+                    <div class="flex gap-2 py-2" x-show="enabled">
+                        <x-forms.input id="application.http_basic_auth_username" label="Username" />
+                        <x-forms.input id="application.http_basic_auth_password" type="password" label="Password" />
+                    </div>
                 </div>
 
                 @if ($application->settings->is_container_label_readonly_enabled)

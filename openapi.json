@@ -1798,6 +1798,18 @@
                 "summary": "Update",
                 "description": "Update application by UUID.",
                 "operationId": "update-application-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "description": "Application updated.",
                     "required": true,
@@ -4441,7 +4453,7 @@
                     "Deployments"
                 ],
                 "summary": "Deploy",
-                "description": "Deploy by tag or uuid. `Post` request also accepted.",
+                "description": "Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.",
                 "operationId": "deploy-by-tag-or-uuid",
                 "parameters": [
                     {
@@ -4529,6 +4541,40 @@
                 "summary": "List application deployments",
                 "description": "List application deployments by using the app uuid",
                 "operationId": "list-deployments-by-app-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "skip",
+                        "in": "query",
+                        "description": "Number of records to skip.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 0,
+                            "minimum": 0
+                        }
+                    },
+                    {
+                        "name": "take",
+                        "in": "query",
+                        "description": "Number of records to take.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "minimum": 1
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List application deployments by using the app uuid.",
@@ -4921,6 +4967,18 @@
                 "summary": "Update",
                 "description": "Update Project.",
                 "operationId": "update-project-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the project.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "description": "Project updated.",
                     "required": true,
@@ -5321,6 +5379,22 @@
                     },
                     "404": {
                         "description": "Private Key not found."
+                    },
+                    "422": {
+                        "description": "Private Key is in use and cannot be deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Private Key is in use and cannot be deleted."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -6222,6 +6296,18 @@
                 "summary": "Update",
                 "description": "Update service by UUID.",
                 "operationId": "update-service-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "description": "Service updated.",
                     "required": true,
@@ -7198,6 +7284,11 @@
                         "nullable": true,
                         "description": "Ports mappings."
                     },
+                    "custom_network_aliases": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Network aliases for Docker container."
+                    },
                     "base_directory": {
                         "type": "string",
                         "description": "Base directory for all commands."
@@ -7637,6 +7728,12 @@
                     "private_key": {
                         "type": "string",
                         "format": "private-key"
+                    },
+                    "public_key": {
+                        "type": "string"
+                    },
+                    "fingerprint": {
+                        "type": "string"
                     },
                     "is_git_related": {
                         "type": "boolean"

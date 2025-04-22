@@ -28,7 +28,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping($this->server->uuid))->expireAfter(60)];
     }
 
     public function __construct(public Server $server) {}

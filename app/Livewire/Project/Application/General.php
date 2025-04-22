@@ -68,6 +68,7 @@ class General extends Component
         'application.publish_directory' => 'nullable',
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
+        'application.custom_network_aliases' => 'nullable',
         'application.dockerfile' => 'nullable',
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
@@ -93,6 +94,9 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
+        'application.http_basic_auth_enabled' => 'boolean|required',
+        'application.http_basic_auth_username' => 'nullable',
+        'application.http_basic_auth_password' => 'nullable',
     ];
 
     protected $validationAttributes = [
@@ -121,6 +125,7 @@ class General extends Component
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.custom_docker_run_options' => 'Custom docker run commands',
+        'application.custom_network_aliases' => 'Custom docker network aliases',
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
         'application.custom_nginx_configuration' => 'Custom Nginx configuration',
@@ -455,7 +460,6 @@ class General extends Component
     {
         $config = GenerateConfig::run($this->application, true);
         $fileName = str($this->application->name)->slug()->append('_config.json');
-        dd($config);
 
         return response()->streamDownload(function () use ($config) {
             echo $config;
