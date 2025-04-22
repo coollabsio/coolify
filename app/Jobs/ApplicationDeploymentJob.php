@@ -1377,6 +1377,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function check_git_if_build_needed()
     {
+        if ($this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
+            $repository = githubApi($this->source, "repos/{$this->customRepository}");
+            $data = data_get($repository, 'data');
+            if (isset($data->id)) {
+                $repository_project_id = $data->id;
+                if (blank($this->application->repository_project_id) || $this->application->repository_project_id !== $repository_project_id) {
+                    $this->application->repository_project_id = $repository_project_id;
+                    $this->application->save();
+                }
+            }
+        }
         $this->generate_git_import_commands();
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
@@ -1712,25 +1723,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $labels = $labels->filter(function ($value, $key) {
                 return ! Str::startsWith($value, 'coolify.');
             });
-            // $found_caddy_labels = $labels->filter(function ($value, $key) {
-            //     return Str::startsWith($value, 'caddy_');
-            // });
-            // if ($found_caddy_labels->count() === 0) {
-            //     if ($this->pull_request_id !== 0) {
-            //         $domains = str(data_get($this->preview, 'fqdn'))->explode(',');
-            //     } else {
-            //         $domains = str(data_get($this->application, 'fqdn'))->explode(',');
-            //     }
-            //     $labels = $labels->merge(fqdnLabelsForCaddy(
-            //         network: $this->application->destination->network,
-            //         uuid: $this->application->uuid,
-            //         domains: $domains,
-            //         onlyPort: $onlyPort,
-            //         is_force_https_enabled: $this->application->isForceHttpsEnabled(),
-            //         is_gzip_enabled: $this->application->isGzipEnabled(),
-            //         is_stripprefix_enabled: $this->application->isStripprefixEnabled()
-            //     ));
-            // }
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
