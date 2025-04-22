@@ -350,14 +350,15 @@
                 </div>
 
                 <h3 class="pt-8">HTTP Basic Authentication</h3>
-                <div x-data="{enabled: {{ $application->http_basic_auth_enable ? "true" : "false" }}}">
+                <div x-data="{ enabled: {{ $application->http_basic_auth_enabled ? 'true' : 'false' }} }">
                     <div class="w-96">
-                        <x-forms.checkbox label="Enable" id="application.http_basic_auth_enable" x-model="enabled" />
+                        <x-forms.checkbox helper="This will add the proper proxy labels to the container."
+                            label="Enable" id="application.http_basic_auth_enabled" x-model="enabled" />
                     </div>
 
-                    <div class="w-96" x-show="enabled">
+                    <div class="flex gap-2 py-2" x-show="enabled">
                         <x-forms.input id="application.http_basic_auth_username" label="Username" />
-                        <x-forms.input id="application.http_basic_auth_password" label="Password" />
+                        <x-forms.input id="application.http_basic_auth_password" type="password" label="Password" />
                     </div>
                 </div>
 

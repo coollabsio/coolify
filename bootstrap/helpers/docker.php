@@ -344,9 +344,6 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
             $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
         }
-        if (isDev()) {
-            // $labels->push("caddy_{$loop}.tls=internal");
-        }
         if ($http_basic_auth_enabled) {
             $http_basic_auth_password = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
             $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$http_basic_auth_password}\"");
@@ -585,6 +582,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id !== 0) {
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
+    ray($application);
     $labels = collect([]);
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
@@ -601,7 +599,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
                             redirect_direction: $application->redirect,
-                            http_basic_auth_enabled: $application->http_basic_auth_enable,
+                            http_basic_auth_enabled: $application->http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                         ));
@@ -631,7 +629,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect,
-                    http_basic_auth_enabled: $application->http_basic_auth_enable,
+                    http_basic_auth_enabled: $application->http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                 ));
@@ -644,7 +642,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
                     redirect_direction: $application->redirect,
-                    http_basic_auth_enabled: $application->http_basic_auth_enable,
+                    http_basic_auth_enabled: $application->http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                 ));
@@ -667,7 +665,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                        http_basic_auth_enabled: $application->http_basic_auth_enable,
+                        http_basic_auth_enabled: $application->http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                     ));
@@ -681,7 +679,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
                         is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                        http_basic_auth_enabled: $application->http_basic_auth_enable,
+                        http_basic_auth_enabled: $application->http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                     ));
@@ -695,7 +693,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                http_basic_auth_enabled: $application->http_basic_auth_enable,
+                http_basic_auth_enabled: $application->http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
             ));
@@ -707,7 +705,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
                 is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                http_basic_auth_enabled: $application->http_basic_auth_enable,
+                http_basic_auth_enabled: $application->http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
             ));

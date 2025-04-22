@@ -94,7 +94,7 @@ class General extends Component
         'application.settings.is_preserve_repository_enabled' => 'boolean|required',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
-        'application.http_basic_auth_enable' => 'boolean|required',
+        'application.http_basic_auth_enabled' => 'boolean|required',
         'application.http_basic_auth_username' => 'nullable',
         'application.http_basic_auth_password' => 'nullable',
     ];
