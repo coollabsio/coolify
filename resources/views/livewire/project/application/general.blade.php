@@ -349,6 +349,19 @@
                     @endif
                 </div>
 
+                <h3 class="pt-8">HTTP Basic Authentication</h3>
+                <div x-data="{ enabled: {{ $application->http_basic_auth_enabled ? 'true' : 'false' }} }">
+                    <div class="w-96">
+                        <x-forms.checkbox helper="This will add the proper proxy labels to the container."
+                            label="Enable" id="application.http_basic_auth_enabled" x-model="enabled" />
+                    </div>
+
+                    <div class="flex gap-2 py-2" x-show="enabled">
+                        <x-forms.input id="application.http_basic_auth_username" label="Username" />
+                        <x-forms.input id="application.http_basic_auth_password" type="password" label="Password" />
+                    </div>
+                </div>
+
                 @if ($application->settings->is_container_label_readonly_enabled)
                     <x-forms.textarea readonly disabled label="Container Labels" rows="15" id="customLabels"
                         monacoEditorLanguage="ini" useMonacoEditor></x-forms.textarea>

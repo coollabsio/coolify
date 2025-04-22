@@ -296,7 +296,8 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null)
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -304,6 +305,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     } else {
         $labels->push("caddy_ingress_network={$network}");
     }
+
+    $http_basic_auth_enabled = $http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
+
     foreach ($domains as $loop => $domain) {
         $url = Url::fromString($domain);
         $host = $url->getHost();
@@ -340,19 +344,29 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
             $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
         }
-        if (isDev()) {
-            // $labels->push("caddy_{$loop}.tls=internal");
+        if ($http_basic_auth_enabled) {
+            $http_basic_auth_password = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+            $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$http_basic_auth_password}\"");
         }
     }
 
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both')
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     $labels->push('traefik.http.middlewares.gzip.compress=true');
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
+
+    $http_basic_auth_enabled = $http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
+    $http_basic_auth_label = "http-basic-auth-{$uuid}";
+
+    if ($http_basic_auth_enabled) {
+        $http_basic_auth_password = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+        $labels->push("traefik.http.middlewares.{$http_basic_auth_label}.basicauth.users={$http_basic_auth_username}:{$http_basic_auth_password}");
+    }
 
     $middlewares_from_labels = collect([]);
 
@@ -511,6 +525,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    if ($http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -533,6 +550,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
+                    }
+                    if ($http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
                     }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
@@ -562,6 +582,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id !== 0) {
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
+    ray($application);
     $labels = collect([]);
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
@@ -577,7 +598,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                            redirect_direction: $application->redirect
+                            redirect_direction: $application->redirect,
+                            http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                            http_basic_auth_username: $application->http_basic_auth_username,
+                            http_basic_auth_password: $application->http_basic_auth_password,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -589,7 +613,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                            redirect_direction: $application->redirect
+                            redirect_direction: $application->redirect,
+                            http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                            http_basic_auth_username: $application->http_basic_auth_username,
+                            http_basic_auth_password: $application->http_basic_auth_password,
                         ));
                         break;
                 }
@@ -601,7 +628,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                    redirect_direction: $application->redirect
+                    redirect_direction: $application->redirect,
+                    http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                    http_basic_auth_username: $application->http_basic_auth_username,
+                    http_basic_auth_password: $application->http_basic_auth_password,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -611,7 +641,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                    redirect_direction: $application->redirect
+                    redirect_direction: $application->redirect,
+                    http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                    http_basic_auth_username: $application->http_basic_auth_username,
+                    http_basic_auth_password: $application->http_basic_auth_password,
                 ));
             }
         }
@@ -631,7 +664,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                        http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                        http_basic_auth_username: $application->http_basic_auth_username,
+                        http_basic_auth_password: $application->http_basic_auth_password,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -642,7 +678,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                        http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                        http_basic_auth_username: $application->http_basic_auth_username,
+                        http_basic_auth_password: $application->http_basic_auth_password,
                     ));
                     break;
             }
@@ -653,7 +692,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                http_basic_auth_username: $application->http_basic_auth_username,
+                http_basic_auth_password: $application->http_basic_auth_password,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -662,7 +704,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                http_basic_auth_enabled: $application->http_basic_auth_enabled,
+                http_basic_auth_username: $application->http_basic_auth_username,
+                http_basic_auth_password: $application->http_basic_auth_password,
             ));
         }
     }
