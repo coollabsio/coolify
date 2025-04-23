@@ -92,11 +92,11 @@ class General extends Component
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.settings.is_container_label_readonly_enabled' => 'boolean|required',
         'application.settings.is_preserve_repository_enabled' => 'boolean|required',
+        'application.is_http_basic_auth_enabled' => 'boolean|required',
+        'application.http_basic_auth_username' => 'string|nullable',
+        'application.http_basic_auth_password' => 'string|nullable',
         'application.watch_paths' => 'nullable',
         'application.redirect' => 'string|required',
-        'application.http_basic_auth_enabled' => 'boolean|required',
-        'application.http_basic_auth_username' => 'nullable',
-        'application.http_basic_auth_password' => 'nullable',
     ];
 
     protected $validationAttributes = [
@@ -180,6 +180,9 @@ class General extends Component
     {
         if ($this->application->settings->isDirty('is_spa')) {
             $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
+        }
+        if ($this->application->isDirty('is_http_basic_auth_enabled')) {
+            $this->application->save();
         }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');

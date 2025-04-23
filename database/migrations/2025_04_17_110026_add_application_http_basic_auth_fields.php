@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->boolean('http_basic_auth_enabled')->default(false);
+            $table->boolean('is_http_basic_auth_enabled')->default(false);
             $table->string('http_basic_auth_username')->nullable(true)->default(null);
             $table->string('http_basic_auth_password')->nullable(true)->default(null);
         });
@@ -24,7 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->dropColumn('http_basic_auth_enabled');
+            $table->dropColumn('is_http_basic_auth_enabled');
             $table->dropColumn('http_basic_auth_username');
             $table->dropColumn('http_basic_auth_password');
         });
