@@ -99,6 +99,69 @@ class DatabasesController extends Controller
     #[OA\Get(
         summary: 'Get',
         description: 'Get database by UUID.',
+        path: '/databases/{uuid}/backups',
+        operationId: 'get-database-backups-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get all backups for a database',
+                content: new OA\JsonContent(
+                    type: 'string',
+                    example: 'Content is very complex. Will be implemented later.',
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function database_backup_details_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if (! $request->uuid) {
+            return response()->json(['message' => 'UUID is required.'], 404);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $backupConfig = ScheduledDatabaseBackup::with('executions')->where('database_id', $database->id)->first();
+
+        return response()->json($this->removeSensitiveData($backupConfig));
+    }
+
+    #[OA\Get(
+        summary: 'Get',
+        description: 'Get database by UUID.',
         path: '/databases/{uuid}',
         operationId: 'get-database-by-uuid',
         security: [

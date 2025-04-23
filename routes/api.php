@@ -23,6 +23,10 @@ Route::group([
 });
 
 Route::post('/feedback', [OtherController::class, 'feedback']);
+Route::get('/test', function () {
+    return response()->json(['message' => 'test']);
+});
+
 Route::group([
     'middleware' => ['auth:sanctum', 'api.ability:write'],
     'prefix' => 'v1',
@@ -110,6 +114,7 @@ Route::group([
     Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/databases/{uuid}/backups', [DatabasesController::class, 'database_backup_details_uuid'])->middleware(['api.ability:read']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
 
