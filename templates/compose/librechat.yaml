@@ -21,7 +21,7 @@ services:
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
       # RAG settings
       - RAG_PORT=8000
-      - RAG_API_HOST=http://rag_api:8000
+      - RAG_API_URL=http://rag_api:8000
       # Auth settings
       - DOMAIN_CLIENT=${SERVICE_FQDN_LIBRECHAT}
       - DOMAIN_SERVER=${SERVICE_FQDN_LIBRECHAT}
@@ -455,3 +455,4 @@ volumes:
   vectordb-data:
   librechat-images:
   librechat-logs:
+  librechat-uploads:
