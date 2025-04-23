@@ -1,11 +1,11 @@
 <?php
 
 test('ConvertCapAdd', function () {
-    $input = '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add SYS_ADMIN --hostname=test';
+    $input = '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add SYS_ADMIN --hostname=my-super-host';
     $output = convertDockerRunToCompose($input);
     expect($output)->toBe([
         'cap_add' => ['NET_ADMIN', 'NET_RAW', 'SYS_ADMIN'],
-        'hostname' => 'test',
+        'hostname' => 'my-super-host',
     ]);
 });
 

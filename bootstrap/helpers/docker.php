@@ -453,6 +453,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    if ($http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -475,6 +478,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
+                    }
+                    if ($http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
                     }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
@@ -769,6 +775,13 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $regexForParsingDeviceIds = '/device=([0-9A-Za-z-,]+)/';
             preg_match($regexForParsingDeviceIds, $custom_docker_run_options, $device_matches);
             $value = $device_matches[1] ?? 'all';
+            $options[$option][] = $value;
+            $options[$option] = array_unique($options[$option]);
+        }
+        if ($option === '--hostname') {
+            $regexForParsingHostname = '/hostname=([^\s]+)/';
+            preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
+            $value = $hostname_matches[1] ?? null;
             $options[$option][] = $value;
             $options[$option] = array_unique($options[$option]);
         }
