@@ -787,7 +787,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
             preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
             $value = $hostname_matches[1] ?? null;
-            if ($value) {
+            if ($value && ! empty(trim($value))) {
                 $options[$option][] = $value;
                 $options[$option] = array_unique($options[$option]);
             }
@@ -829,7 +829,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             });
             $compose_options->put($mapping[$option], $ulimits);
         } elseif ($option === '--shm-size' || $option === '--hostname') {
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -837,7 +837,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 'driver' => 'nvidia',
                 'capabilities' => ['gpu'],
             ];
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 if (str($value[0]) != 'all') {
                     if (str($value[0])->contains(',')) {
                         $payload['device_ids'] = str($value[0])->explode(',')->toArray();
