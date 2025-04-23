@@ -307,7 +307,9 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     }
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
-    $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    if ($is_http_basic_auth_enabled) {
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    }
 
     foreach ($domains as $loop => $domain) {
         $url = Url::fromString($domain);
@@ -362,7 +364,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
     $http_basic_auth_label = "http-basic-auth-{$uuid}";
-    $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    if ($is_http_basic_auth_enabled) {
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    }
 
     if ($is_http_basic_auth_enabled) {
         $labels->push("traefik.http.middlewares.{$http_basic_auth_label}.basicauth.users={$http_basic_auth_username}:{$hashedPassword}");
