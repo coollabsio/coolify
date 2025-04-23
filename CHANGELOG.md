@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update coolify version to 4.0.0-beta.412 and nightly version to 4.0.0-beta.413 in configuration files
+
+## [4.0.0-beta.411] - 2025-04-23
+
 ### 🚀 Features
 
 - *(deployment)* Add repository_project_id handling for private GitHub apps and clean up unused Caddy label logic
@@ -36,6 +42,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 - Update changelog
 
