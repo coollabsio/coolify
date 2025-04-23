@@ -4,18 +4,19 @@
 .bash_history
 .ssh
 
-.cursor
-.idea
-.fleet
-.vscode
+/.cursor
+/.fleet
+/.idea
+/.nova
+.phpstorm.meta.php
+/.vscode
+/.zed
 
 *.log
 
 .bun
 .npm
 node_modules
-npm-debug.log
-yarn-error.log
 /vendor
 
 auth.json
