@@ -11,6 +11,7 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Project;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -78,7 +79,17 @@ class DatabasesController extends Controller
         foreach ($projects as $project) {
             $databases = $databases->merge($project->databases());
         }
-        $databases = $databases->map(function ($database) {
+
+        $backupConfig = ScheduledDatabaseBackup::with('latest_log')->get();
+        $databases = $databases->map(function ($database) use ($backupConfig) {
+            $databaseBackupConfig = $backupConfig->where('database_id', $database->id)->first();
+
+            if ($databaseBackupConfig) {
+                $database->backup_configs = $databaseBackupConfig;
+            } else {
+                $database->backup_configs = null;
+            }
+
             return $this->removeSensitiveData($database);
         });
 
