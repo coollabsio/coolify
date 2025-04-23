@@ -3819,7 +3819,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             return $volume;
         });
 
-        ray($serviceLabels);
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),

@@ -236,15 +236,6 @@ class All extends Component
             return 0;
         }
 
-        // Check for system variables that shouldn't be deleted
-        foreach ($variablesToDelete as $envVar) {
-            if ($this->isProtectedEnvironmentVariable($envVar->key)) {
-                $this->dispatch('error', "Cannot delete system environment variable '{$envVar->key}'.");
-
-                return 0;
-            }
-        }
-
         // Check if any of these variables are used in Docker Compose
         if ($this->resource->type() === 'service' || $this->resource->build_pack === 'dockercompose') {
             foreach ($variablesToDelete as $envVar) {

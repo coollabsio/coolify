@@ -141,6 +141,6 @@ class ServiceDatabase extends BaseModel
             str($this->databaseType())->contains('postgres') ||
             str($this->databaseType())->contains('postgis') ||
             str($this->databaseType())->contains('mariadb') ||
-            str($this->databaseType())->contains('mongodb');
+            str($this->databaseType())->contains('mongo');
     }
 }
