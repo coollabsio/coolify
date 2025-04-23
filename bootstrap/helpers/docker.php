@@ -582,7 +582,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id !== 0) {
         $appUuid = $appUuid.'-pr-'.$pull_request_id;
     }
-    ray($application);
     $labels = collect([]);
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
@@ -762,6 +761,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ip' => 'ip',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
+        '--hostname' => 'hostname',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -808,7 +808,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
-        } elseif ($option === '--shm-size') {
+        } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
@@ -847,7 +847,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
                 continue;
             }
-            $compose_options->forget($option);
         }
     }
 
