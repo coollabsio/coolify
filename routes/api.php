@@ -23,9 +23,6 @@ Route::group([
 });
 
 Route::post('/feedback', [OtherController::class, 'feedback']);
-Route::get('/test', function () {
-    return response()->json(['message' => 'test']);
-});
 
 Route::group([
     'middleware' => ['auth:sanctum', 'api.ability:write'],
