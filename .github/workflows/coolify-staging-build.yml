@@ -4,7 +4,7 @@ on:
   push:
     branches-ignore:
       - main
-      - v3
+      - v3.x
       - '**v5.x**'
     paths-ignore:
         - .github/workflows/coolify-helper.yml

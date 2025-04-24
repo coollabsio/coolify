@@ -2,7 +2,7 @@ name: Generate Changelog
 
 on:
   push:
-    branches: [ main ]
+    branches: [ v4.x ]
   workflow_dispatch:
 
 permissions:
