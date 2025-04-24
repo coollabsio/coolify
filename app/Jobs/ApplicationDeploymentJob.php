@@ -1377,7 +1377,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function check_git_if_build_needed()
     {
-        if ($this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
+        if (!is_string($this->source) && $this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
             $repository = githubApi($this->source, "repos/{$this->customRepository}");
             $data = data_get($repository, 'data');
             if (isset($data->id)) {
