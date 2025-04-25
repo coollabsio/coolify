@@ -608,7 +608,6 @@ class DatabasesController extends Controller
             $backupConfig->update($backupPayload);
 
             if ($request->backup_now) {
-                dd('test');
                 DatabaseBackupJob::dispatch($backupConfig);
             }
         }
