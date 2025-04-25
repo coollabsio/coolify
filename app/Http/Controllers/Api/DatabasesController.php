@@ -604,6 +604,15 @@ class DatabasesController extends Controller
             $database->update($databasePayload);
         }
 
+        if ($backupPayload && $backupConfig) {
+            $backupConfig->update($backupPayload);
+
+            if ($request->backup_now) {
+                dd('test');
+                DatabaseBackupJob::dispatch($backupConfig);
+            }
+        }
+
         if ($backupPayload && ! $backupConfig) {
             if ($database->type() === 'standalone-postgresql') {
                 $backupPayload['databases_to_backup'] = $database->postgres_db;
@@ -622,14 +631,6 @@ class DatabasesController extends Controller
                 's3_storage_id' => $backupPayload['s3_storage_id'] ?? 1,
                 ...$backupPayload,
             ]);
-
-            if ($request->backup_now) {
-                DatabaseBackupJob::dispatch($backupConfig);
-            }
-        }
-
-        if ($backupPayload && $backupConfig) {
-            $backupConfig->update($backupPayload);
 
             if ($request->backup_now) {
                 DatabaseBackupJob::dispatch($backupConfig);
