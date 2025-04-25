@@ -9,6 +9,7 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
+use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
@@ -80,12 +81,11 @@ class DatabasesController extends Controller
             $databases = $databases->merge($project->databases());
         }
 
-        $backupConfig = ScheduledDatabaseBackup::with('latest_log')->get();
-        $databases = $databases->map(function ($database) use ($backupConfig) {
-            $databaseBackupConfig = $backupConfig->where('database_id', $database->id)->first();
+        $databases = $databases->map(function ($database) {
+            $backupConfig = ScheduledDatabaseBackup::with('latest_log')->where('database_id', $database->id)->get();
 
-            if ($databaseBackupConfig) {
-                $database->backup_configs = $databaseBackupConfig;
+            if ($backupConfig) {
+                $database->backup_configs = $backupConfig;
             } else {
                 $database->backup_configs = null;
             }
@@ -98,7 +98,7 @@ class DatabasesController extends Controller
 
     #[OA\Get(
         summary: 'Get',
-        description: 'Get database by UUID.',
+        description: 'Get backups details by database UUID.',
         path: '/databases/{uuid}/backups',
         operationId: 'get-database-backups-by-uuid',
         security: [
@@ -291,6 +291,7 @@ class DatabasesController extends Controller
                         // WIP
                         'save_s3' => ['type' => 'boolean', 'description' => 'Weather data is saved in s3 or not'],
                         's3_storage_id' => ['type' => 'integer', 'description' => 'S3 storage id'],
+                        'backup_now' => ['type' => 'boolean', 'description' => 'Weather to take a backup now or not'],
                         'enabled' => ['type' => 'boolean', 'description' => 'Weather the backup is enabled or not'],
                         'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
                         'dump_all' => ['type' => 'boolean', 'description' => 'Weather all databases are dumped or not'],
@@ -326,7 +327,7 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedBackupConfigsFields = ['save_s3', 'enabled', 'dump_all', 'frequency',  'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_id'];
+        $allowedBackupConfigsFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_id'];
         $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -352,6 +353,7 @@ class DatabasesController extends Controller
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
             'save_s3' => 'boolean',
+            'backup_now' => 'boolean|nullable',
             'enabled' => 'boolean',
             'dump_all' => 'boolean',
             's3_storage_id' => 'integer|min:1|exists:s3_storages,id|nullable',
@@ -573,7 +575,7 @@ class DatabasesController extends Controller
                 }
                 break;
         }
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields, $allowedBackupConfigsFields);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields, $allowedBackupConfigsFields, ['backup_now']);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
             if (! empty($extraFields)) {
@@ -620,10 +622,18 @@ class DatabasesController extends Controller
                 's3_storage_id' => $backupPayload['s3_storage_id'] ?? 1,
                 ...$backupPayload,
             ]);
+
+            if ($request->backup_now) {
+                DatabaseBackupJob::dispatch($backupConfig);
+            }
         }
 
         if ($backupPayload && $backupConfig) {
             $backupConfig->update($backupPayload);
+
+            if ($request->backup_now) {
+                DatabaseBackupJob::dispatch($backupConfig);
+            }
         }
 
         if ($whatToDoWithDatabaseProxy === 'start') {
