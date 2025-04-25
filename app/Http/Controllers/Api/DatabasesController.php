@@ -1750,6 +1750,101 @@ class DatabasesController extends Controller
         ]);
     }
 
+    #[OA\Delete(
+        summary: 'Delete backup',
+        description: 'Deletes a backup by its database UUID and backup ID.',
+        path: '/databases/{uuid}/backups/{backup_id}',
+        operationId: 'delete-backup-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['backups'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                required: true,
+                description: 'UUID of the database to delete',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'backup_id',
+                in: 'path',
+                required: true,
+                description: 'ID of the backup to delete',
+                schema: new OA\Schema(type: 'string')
+            ),
+            new OA\Parameter(
+                name: 'delete_s3',
+                in: 'query',
+                required: false,
+                description: 'Whether to delete the backup from S3',
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Backup deleted.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        'message' => new OA\Schema(type: 'string', example: 'Backup deleted.'),
+                    ]
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Backup not found.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        'message' => new OA\Schema(type: 'string', example: 'Backup not found.'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function delete_backup_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+        $backup = ScheduledDatabaseBackup::where('database_id', $database->id)->first();
+        if (! $backup) {
+            return response()->json(['message' => 'Backup not found.'], 404);
+        }
+        $execution = $backup->executions()->where('id', $request->backup_id)->first();
+        if (! $execution) {
+            return response()->json(['message' => 'Execution not found.'], 404);
+        }
+
+        $deleteS3 = filter_var($request->query->get('delete_s3', false), FILTER_VALIDATE_BOOLEAN);
+
+        try {
+            if ($execution->filename) {
+                deleteBackupsLocally($execution->filename, $database->destination->server);
+
+                if ($deleteS3 && $backup->s3) {
+                    deleteBackupsS3($execution->filename, $backup->s3);
+                }
+            }
+
+            $execution->delete();
+
+            return response()->json([
+                'message' => 'Backup deleted.',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to delete backup: '.$e->getMessage()], 500);
+        }
+    }
+
     #[OA\Get(
         summary: 'Start',
         description: 'Start database. `Post` request is also accepted.',

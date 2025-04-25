@@ -114,6 +114,7 @@ Route::group([
     Route::get('/databases/{uuid}/backups', [DatabasesController::class, 'database_backup_details_uuid'])->middleware(['api.ability:read']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}', [DatabasesController::class, 'delete_by_uuid'])->middleware(['api.ability:write']);
+    Route::delete('/databases/{uuid}/backups/{backup_id}', [DatabasesController::class, 'delete_backup_by_uuid'])->middleware(['api.ability:write']);
 
     Route::match(['get', 'post'], '/databases/{uuid}/start', [DatabasesController::class, 'action_deploy'])->middleware(['api.ability:write']);
     Route::match(['get', 'post'], '/databases/{uuid}/restart', [DatabasesController::class, 'action_restart'])->middleware(['api.ability:write']);
