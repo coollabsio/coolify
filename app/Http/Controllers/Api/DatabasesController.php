@@ -154,7 +154,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $backupConfig = ScheduledDatabaseBackup::with('executions')->where('database_id', $database->id)->first();
+        $backupConfig = ScheduledDatabaseBackup::with('executions')->where('database_id', $database->id)->get();
 
         return response()->json($this->removeSensitiveData($backupConfig));
     }
