@@ -10,6 +10,7 @@ services:
     environment:
       - SERVICE_FQDN_HOMEPAGE_3000
       - HOMEPAGE_VAR_BASE=${SERVICE_FQDN_HOMEPAGE}
+      - HOMEPAGE_ALLOWED_HOSTS=${SERVICE_FQDN_HOMEPAGE}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./images:/app/public/images
