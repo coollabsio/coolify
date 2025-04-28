@@ -1,3 +1,9 @@
+# documentation: https://gitlab.com/bashrc2/epicyon/-/blob/main/manual/manual.epub
+# slogan: Epicyon is a fediverse server suitable for self-hosting a small number of accounts on low power systems.
+# tags: fediverse,ActivityPub,mastodon
+# logo: svgs/epicyon.svg
+# port: 7156
+
 version: '3.3'
 
 services:
