@@ -88,7 +88,7 @@
                             </div>
                         </a>
                         <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <a :href="`/tags/${tag.name}`" 
                                    wire:navigate 
@@ -139,7 +139,7 @@
                             </div>
                         </a>
                         <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <a :href="`/tags/${tag.name}`" 
                                    wire:navigate 
@@ -190,7 +190,7 @@
                             </div>
                         </a>
                         <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <a :href="`/tags/${tag.name}`" 
                                    wire:navigate 

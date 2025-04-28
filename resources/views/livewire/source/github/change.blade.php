@@ -32,7 +32,7 @@
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
             @if (!data_get($github_app, 'installation_id'))
-                <div class="mb-10 rounded alert-error">
+                <div class="mb-10 rounded-sm alert-error">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                         viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -197,7 +197,7 @@
                 </x-forms.button>
             </div>
             <h3>Automated Installation</h3>
-            <div class=" pb-5 rounded alert-error">
+            <div class=" pb-5 rounded-sm alert-error">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

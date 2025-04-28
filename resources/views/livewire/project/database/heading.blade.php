@@ -8,7 +8,7 @@
     </x-slide-over>
     <div class="navbar-main">
         <nav
-            class="flex overflow-x-scroll flex-shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
+            class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
             <a wire:navigate class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>

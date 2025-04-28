@@ -38,7 +38,7 @@
                     <div class="flex flex-col">
                         <div class="flex items-center gap-2 mb-2">
                             <span @class([
-                                'px-3 py-1 rounded-md text-xs font-medium shadow-sm',
+                                'px-3 py-1 rounded-md text-xs font-medium shadow-xs',
                                 'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' => data_get($deployment, 'status') === 'in_progress',
                                 'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' => data_get($deployment, 'status') === 'queued',
                                 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' => data_get($deployment, 'status') === 'failed',
