@@ -1,0 +1,93 @@
+# documentation: https://fleetdm.com/docs
+# slogan: Fleet is a powerful open-source device management platform
+# tags: device-management, security, monitoring
+# logo: svgs/fleet.svg
+# port: 8412
+
+services:
+  fleet-init:
+    image: 'fleetdm/fleet:latest'
+    command: 'sh -c "/usr/bin/fleet prepare db --no-prompt"'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - 'FLEET_MYSQL_USERNAME=${MYSQL_USER:-fleetuser}'
+      - 'FLEET_MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+      - 'FLEET_MYSQL_DATABASE=${MYSQL_DB:-fleet}'
+      - 'FLEET_MYSQL_ADDRESS=mysql:3306'
+      - 'FLEET_REDIS_ADDRESS=redis:6379'
+    restart: 'no'
+  fleet:
+    image: 'fleetdm/fleet:latest'
+    restart: always
+    command: 'sh -c "/usr/bin/fleet serve"'
+    depends_on:
+      fleet-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - 'fleet:/fleet'
+      - 'fleet-logs:/logs'
+      - 'fleet-vulndb:/vulndb:rw'
+    environment:
+      - SERVICE_FQDN_FLEET_8412
+      - 'FLEET_SERVER_PRIVATE_KEY=${SERVICE_BASE64_32_PRIVATEKEY}'
+      - 'FLEET_MYSQL_USERNAME=${MYSQL_USER}'
+      - 'FLEET_MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+      - 'FLEET_MYSQL_DATABASE=${MYSQL_DB}'
+      - 'FLEET_MYSQL_ADDRESS=mysql:3306'
+      - FLEET_PROMETHEUS_BASIC_AUTH_USERNAME=fleet
+      - 'FLEET_REDIS_ADDRESS=redis:6379'
+      - 'FLEET_PROMETHEUS_BASIC_AUTH_PASSWORD=${SERVICE_PASSWORD_BASICAUTHPW}'
+      - 'FLEET_SERVER_ADDRESS=0.0.0.0:8412'
+      - FLEET_SERVER_TLS=false
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - '-q'
+        - 'http://localhost:8412/api/v1/fleet/sso'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+  redis:
+    image: 'redis:alpine'
+    command: '--save 60 1 --loglevel warning'
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli ping | grep PONG'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+    volumes:
+      - 'redis:/data'
+  mysql:
+    image: 'mysql:8'
+    restart: always
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+    environment:
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}'
+      - 'MYSQL_DATABASE=${MYSQL_DB:-fleet}'
+      - 'MYSQL_USER=${MYSQL_USER:-fleetuser}'
+      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - '-h'
+        - 127.0.0.1
+      interval: 5s
+      timeout: 20s
+      retries: 10
