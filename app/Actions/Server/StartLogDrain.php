@@ -147,7 +147,7 @@ class StartLogDrain
             $compose = base64_encode('
 services:
   coolify-log-drain:
-    image: cr.fluentbit.io/fluent/fluent-bit:2.0
+    image: cr.fluentbit.io/fluent/fluent-bit:4.0
     container_name: coolify-log-drain
     command: -c /fluent-bit.conf
     env_file:
