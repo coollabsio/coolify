@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.413] - 2025-04-28
 
 ### 💼 Other
 
@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 
 ### ⚙️ Miscellaneous Tasks
