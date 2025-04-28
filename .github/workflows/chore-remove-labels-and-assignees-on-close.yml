@@ -21,7 +21,7 @@ jobs:
 
             async function processIssue(issueNumber, isFromPR = false, prBaseBranch = null) {
               try {
-                if (isFromPR && prBaseBranch !== 'main') {
+                if (isFromPR && prBaseBranch !== 'v4.x') {
                   return;
                 }
 
@@ -70,7 +70,7 @@ jobs:
             if (context.eventName === 'pull_request' || context.eventName === 'pull_request_target') {
               const pr = context.payload.pull_request;
               await processIssue(pr.number);
-              if (pr.merged && pr.base.ref === 'main' && pr.body) {
+              if (pr.merged && pr.base.ref === 'v4.x' && pr.body) {
                 const issueReferences = pr.body.match(/#(\d+)/g);
                 if (issueReferences) {
                   for (const reference of issueReferences) {
