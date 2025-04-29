@@ -1,0 +1,65 @@
+name: 🐞 Bug Report
+description: "File a new bug report."
+title: "[v5.x]: "
+type: Bug
+labels: ["🔍 Triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Important Prerequisites
+
+        Before submitting your bug report, please ensure the following:
+
+        - **Latest Version:** Verify you're using the latest version of Coolify. Check the `Latest` release [here](https://github.com/coollabsio/coolify/releases).
+        - **No Duplicate Issues:** Please search for existing/similar issues to avoid creating duplicates.
+
+        ## 💎 Bounty Program
+        If you would like to prioritize the issue resolution, consider adding a bounty through our [Bounty Program](https://console.algora.io/org/coollabsio/bounties/new).
+
+  - type: textarea
+    attributes:
+      label: Error Message and Logs
+      description: Provide a detailed description of the error or exception you encountered, along with any relevant log output.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: Please provide a step-by-step guide to reproduce the issue. Be as detailed as possible, otherwise we may not be able to assist you.
+      placeholder: |
+        1.
+        2.
+        3.
+        4.
+        5.
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Example Repository URL
+      description: If applicable, provide a URL to a repository so that we can reproduce the issue.
+
+  - type: input
+    attributes:
+      label: Coolify Version
+      description: Please provide the Coolify version you are using. This can be found in the top left corner of your Coolify dashboard.
+      placeholder: v5.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Are you using Coolify Cloud?
+      options:
+        - "No (Self-hosted)"
+        - "Yes (Coolify Cloud)"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional Information
+      description: Additional details about the issue.
