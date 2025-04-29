@@ -3,20 +3,20 @@
     <div class="navbar-main">
         <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.configuration', $parameters) }}">
+                href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>
             <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.deployment.index', $parameters) }}">
+                href="{{ route('project.application.deployment.index', $parameters) }}">
                 <button>Deployments</button>
             </a>
             <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.logs', $parameters) }}">
+                href="{{ route('project.application.logs', $parameters) }}">
                 <button>Logs</button>
             </a>
             @if (!$application->destination->server->isSwarm())
                 <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                 href="{{ route('project.application.command', $parameters) }}">
+                    href="{{ route('project.application.command', $parameters) }}">
                     <button>Terminal</button>
                 </a>
             @endif
