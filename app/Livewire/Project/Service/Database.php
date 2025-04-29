@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\InstanceSettings;
 use App\Models\ServiceDatabase;
+use DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -81,6 +82,33 @@ class Database extends Component
         }
         $this->submit();
         $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+    }
+
+    public function convertToApplication()
+    {
+        try {
+            $service = $this->database->service;
+            $serviceDatabase = $this->database;
+            DB::beginTransaction();
+            $service->applications()->create([
+                'name' => $serviceDatabase->name,
+                'human_name' => $serviceDatabase->human_name,
+                'description' => $serviceDatabase->description,
+                'exclude_from_status' => $serviceDatabase->exclude_from_status,
+                'is_log_drain_enabled' => $serviceDatabase->is_log_drain_enabled,
+                'image' => $serviceDatabase->image,
+                'service_id' => $service->id,
+            ]);
+            $serviceDatabase->delete();
+            DB::commit();
+
+            return redirect()->route('project.service.configuration', $this->parameters);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            dd($e);
+
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave()

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
+use DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -71,6 +72,32 @@ class ServiceApplicationView extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+    }
+
+    public function convertToDatabase()
+    {
+        try {
+            $service = $this->application->service;
+            $serviceApplication = $this->application;
+            DB::beginTransaction();
+            $service->databases()->create([
+                'name' => $serviceApplication->name,
+                'human_name' => $serviceApplication->human_name,
+                'description' => $serviceApplication->description,
+                'exclude_from_status' => $serviceApplication->exclude_from_status,
+                'is_log_drain_enabled' => $serviceApplication->is_log_drain_enabled,
+                'image' => $serviceApplication->image,
+                'service_id' => $service->id,
+            ]);
+            $serviceApplication->delete();
+            DB::commit();
+
+            return redirect()->route('project.service.configuration', $this->parameters);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
