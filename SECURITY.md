@@ -1,6 +1,6 @@
 # Security
 
-This document outlines our support policy, and how to report vulnerabilities.
+This page outlines our support policy, and how to report vulnerabilities.
 
 ## Support Policy
 
