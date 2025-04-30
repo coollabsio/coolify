@@ -68,19 +68,19 @@
             "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite"
         ],
         "refactor": "rector",
-        "typos": "peck",
-        "types": "phpstan --memory-limit=1G",
         "lint": "pint",
         "test": "pest",
-        "test:test-coverage": "pest --parallel --coverage --exactly=100",
-        "test:type-coverage": "pest --type-coverage --memory-limit=1G --min=100",
         "test:refactor": "rector --dry-run",
-        "test:types": "phpstan --memory-limit=1G",
         "test:lint": "pint --test",
+        "test:typos": "peck",
+        "test:types": "phpstan --memory-limit=1G",
+        "test:test-coverage": "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100",
+        "test:type-coverage": "pest --type-coverage --memory-limit=1G --min=100",
         "test:all": [
+            "@php artisan config:clear --ansi",
             "@test:refactor",
-            "@test:types",
             "@test:lint",
+            "@test:types",
             "@test:test-coverage",
             "@test:type-coverage"
         ]
