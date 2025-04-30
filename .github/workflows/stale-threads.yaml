@@ -1,0 +1,30 @@
+name: Manage stale threads
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  stale-threads:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Manage stale threads (Issues & PRs)
+        uses: actions/stale@v9
+        with:
+          stale-issue-message: |
+            This issue has been marked as stale due to inactivity. It will be automatically closed in 7 days if no update is received.
+            
+            Please provide the requested information to keep the issue active.
+          stale-pr-message: |
+            This pull request has been marked as stale due to inactivity. It will be automatically closed in 7 days if no update is received.
+            
+            To keep this PR active:
+            - Update your changes based on the requested feedback
+            - Leave a comment with your progress or questions
+          days-before-stale: 14
+          stale-issue-label: '⏱︎ Stale'
+          stale-pr-label: '⏱︎ Stale'
+          only-labels: '💤 Waiting for feedback, 💤 Waiting for changes'
+          remove-stale-when-updated: true
+          operations-per-run: 100
+          labels-to-remove-when-unstale: '⏱︎ Stale, 💤 Waiting for feedback, 💤 Waiting for changes'
