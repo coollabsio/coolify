@@ -3,7 +3,6 @@
         @forelse($database->scheduledBackups as $backup)
             @if ($type == 'database')
                 <a class="box"
-                    wire:navigate
                     href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
                     <div class="flex flex-col">
                         <div>Frequency: {{ $backup->frequency }}
@@ -13,7 +12,7 @@
                     </div>
                 </a>
             @else
-                <div class="box" wire:navigate wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
+                <div class="box" wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
                     <div @class([
                         'border-coollabs' =>
                             data_get($backup, 'id') === data_get($selectedBackup, 'id'),

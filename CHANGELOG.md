@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.413] - 2025-04-28
+
+### 💼 Other
+
+- Adjust Workflows for v5 (#5689)
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(workflows)* Adjust workflow for announcement
+
+## [4.0.0-beta.412] - 2025-04-23
+
 ### ⚙️ Miscellaneous Tasks
 
 - *(versions)* Update coolify version to 4.0.0-beta.412 and nightly version to 4.0.0-beta.413 in configuration files

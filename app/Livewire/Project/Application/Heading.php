@@ -100,7 +100,7 @@ class Heading extends Component
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_uuid' => $this->parameters['environment_uuid'],
-        ], navigate: true);
+        ], navigate: false);
     }
 
     protected function setDeploymentUuid()
@@ -147,7 +147,7 @@ class Heading extends Component
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_uuid' => $this->parameters['environment_uuid'],
-        ], navigate: true);
+        ], navigate: false);
     }
 
     public function render()

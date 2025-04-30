@@ -488,7 +488,7 @@ $schema://$host {
         $proxy_path = "$base_path/proxy";
 
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
-            $proxy_path = '/';
+            $proxy_path = $proxy_path.'/';
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
             $proxy_path = $proxy_path.'/caddy';
         } elseif ($proxyType === ProxyTypes::NGINX->value) {

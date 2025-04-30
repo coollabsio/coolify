@@ -11,7 +11,7 @@
     <div class="subtitle">S3 storages for backups.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($s3 as $storage)
-            <a href="/storages/{{ $storage->uuid }}" wire:navigate @class(['gap-2 border cursor-pointer box group border-transparent'])>
+            <a href="/storages/{{ $storage->uuid }}" @class(['gap-2 border cursor-pointer box group border-transparent'])>
                 <div class="flex flex-col mx-6">
                     <div class="box-title">
                         {{ $storage->name }}

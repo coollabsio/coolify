@@ -24,11 +24,10 @@
                             <div x-text="project.description"></div>
                         </div>
                     </div>
-                    <div class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
-                        <a class="mx-4 font-bold hover:underline" 
-                           wire:navigate 
-                           wire:click.stop
-                           :href="`/project/${project.uuid}/edit`">
+                    <div
+                        class="flex items-center justify-center gap-2 pt-4 pb-2 mr-4 text-xs lg:py-0 lg:justify-normal">
+                        <a class="mx-4 font-bold hover:underline" wire:click.stop
+                            :href="`/project/${project.uuid}/edit`">
                             Settings
                         </a>
                     </div>

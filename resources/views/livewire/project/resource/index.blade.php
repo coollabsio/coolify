@@ -6,15 +6,15 @@
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
             @if ($environment->isEmpty())
-                <a class="button" wire:navigate
+                <a class="button"
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
                     Clone
                 </a>
             @else
                 <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                    wire:navigate class="button">+
+                    class="button">+
                     New</a>
-                <a class="button" wire:navigate
+                <a class="button"
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
                     Clone
                 </a>
@@ -24,7 +24,7 @@
         <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
                 <li class="inline-flex items-center">
-                    <a class="text-xs truncate lg:text-sm" wire:navigate
+                    <a class="text-xs truncate lg:text-sm"
                         href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}">
                         {{ $project->name }}</a>
                 </li>
@@ -44,7 +44,7 @@
         </nav>
     </div>
     @if ($environment->isEmpty())
-        <a wire:navigate href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
+        <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
@@ -61,7 +61,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" wire:navigate :href="item.hrefLink">
+                        <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -90,15 +90,10 @@
                         <div
                             class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" 
-                                   wire:navigate 
-                                   class="tag" 
-                                   x-text="tag.name">
+                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" 
-                               wire:navigate 
-                               class="add-tag">
+                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
                                 Add tag
                             </a>
                         </div>
@@ -112,7 +107,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredDatabases" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" wire:navigate :href="item.hrefLink">
+                        <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -141,15 +136,10 @@
                         <div
                             class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" 
-                                   wire:navigate 
-                                   class="tag" 
-                                   x-text="tag.name">
+                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" 
-                               wire:navigate 
-                               class="add-tag">
+                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
                                 Add tag
                             </a>
                         </div>
@@ -163,7 +153,7 @@
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredServices" :key="item.uuid">
                     <span>
-                        <a class="h-24 box group" wire:navigate :href="item.hrefLink">
+                        <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full">
                                 <div class="flex gap-2 px-4">
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
@@ -192,15 +182,10 @@
                         <div
                             class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" 
-                                   wire:navigate 
-                                   class="tag" 
-                                   x-text="tag.name">
+                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>
                             </template>
-                            <a :href="`${item.hrefLink}/tags`" 
-                               wire:navigate 
-                               class="add-tag">
+                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
                                 Add tag
                             </a>
                         </div>

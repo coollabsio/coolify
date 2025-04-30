@@ -23,7 +23,7 @@ class ServiceApplicationView extends Component
         'application.human_name' => 'nullable',
         'application.description' => 'nullable',
         'application.fqdn' => 'nullable',
-        'application.image' => 'required',
+        'application.image' => 'string|nullable',
         'application.exclude_from_status' => 'required|boolean',
         'application.required_fqdn' => 'required|boolean',
         'application.is_log_drain_enabled' => 'nullable|boolean',
