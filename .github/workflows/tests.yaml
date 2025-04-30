@@ -1,0 +1,84 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - '**v5.x**'
+
+jobs:
+  composer-validate:
+    name: Validate composer.json
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+    
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+    
+      - name: Validate composer.json
+        run: composer validate --check-lock --strict
+
+  security-audit:
+    name: Composer Security Audit
+    runs-on: ubuntu-latest
+    needs: [composer-validate]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install PHP dependencies
+        if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --no-progress --no-interaction
+
+      - name: Run Composer Security Audit
+        run: composer audit --locked --abandoned=fail
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: [composer-validate]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP with Xdebug
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: xdebug
+
+      # - name: Install aspell
+      #   run: sudo apt-get update && sudo apt-get install -y aspell aspell-en
+      
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install PHP dependencies
+        if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --no-progress --no-interaction
+
+      - name: Tests
+        run: composer test:all
