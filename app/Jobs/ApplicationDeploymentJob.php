@@ -2249,28 +2249,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function graceful_shutdown_container(string $containerName, int $timeout = 300)
     {
         try {
-            $process = Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-
-            $startTime = time();
-            while ($process->running()) {
-                if (time() - $startTime >= $timeout) {
-                    $this->execute_remote_command(
-                        ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
-                    );
-                    break;
-                }
-                usleep(100000);
-            }
-
-            $isRunning = $this->execute_remote_command(
-                ["docker inspect -f '{{.State.Running}}' $containerName", 'hidden' => true, 'ignore_errors' => true]
-            ) === 'true';
-
-            if ($isRunning) {
-                $this->execute_remote_command(
-                    ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
-                );
-            }
+          $this->execute_remote_command(
+            ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+          );
         } catch (\Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
