@@ -59,37 +59,36 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'service':
                     StopService::run($this->resource, true);
                     DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->dockerCleanup, $this->deleteConnectedNetworks);
-                    break;
+
+                    return;
             }
-            $isDatabase = $this->resource instanceof StandalonePostgresql
-                || $this->resource instanceof StandaloneRedis
-                || $this->resource instanceof StandaloneMongodb
-                || $this->resource instanceof StandaloneMysql
-                || $this->resource instanceof StandaloneMariadb
-                || $this->resource instanceof StandaloneKeydb
-                || $this->resource instanceof StandaloneDragonfly
-                || $this->resource instanceof StandaloneClickhouse;
 
             if ($this->deleteConfigurations) {
                 $this->resource->deleteConfigurations();
             }
-            if ($this->resource->type() === 'service') {
+            if ($this->deleteVolumes) {
+                $this->resource->deleteVolumes();
+                $this->resource->persistentStorages()->delete();
+            }
+            $this->resource->fileStorages()->delete();
+
+            $isDatabase = $this->resource instanceof StandalonePostgresql
+            || $this->resource instanceof StandaloneRedis
+            || $this->resource instanceof StandaloneMongodb
+            || $this->resource instanceof StandaloneMysql
+            || $this->resource instanceof StandaloneMariadb
+            || $this->resource instanceof StandaloneKeydb
+            || $this->resource instanceof StandaloneDragonfly
+            || $this->resource instanceof StandaloneClickhouse;
+
+            if ($isDatabase) {
+                $this->resource->sslCertificates()->delete();
+                $this->resource->scheduledBackups()->delete();
                 $this->resource->tags()->detach();
-            } else {
-                if ($this->deleteVolumes) {
-                    $this->resource->deleteVolumes();
-                    $this->resource->persistentStorages()->delete();
-                }
-                $this->resource->fileStorages()->delete();
-                if ($isDatabase) {
-                    $this->resource->sslCertificates()->delete();
-                    $this->resource->scheduledBackups()->delete();
-                    $this->resource->tags()->detach();
-                }
             }
             $this->resource->environment_variables()->delete();
 
-            if ($this->deleteConnectedNetworks && ($this->resource->type() === 'service' || $this->resource->type() === 'application')) {
+            if ($this->deleteConnectedNetworks && $this->resource->type() === 'application') {
                 $this->resource->deleteConnectedNetworks();
             }
         } catch (\Throwable $e) {
@@ -98,7 +97,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $this->resource->forceDelete();
             if ($this->dockerCleanup) {
                 $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
-                CleanupDocker::dispatch($server, true);
+                if ($server) {
+                    CleanupDocker::dispatch($server, true);
+                }
             }
             Artisan::queue('cleanup:stucked-resources');
         }
