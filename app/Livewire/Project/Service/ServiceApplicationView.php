@@ -4,8 +4,8 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
-use DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Spatie\Url\Url;

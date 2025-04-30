@@ -6,8 +6,8 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\InstanceSettings;
 use App\Models\ServiceDatabase;
-use DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
@@ -106,7 +106,6 @@ class Database extends Component
             return redirect()->route('project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             DB::rollBack();
-            dd($e);
 
             return handleError($e, $this);
         }
