@@ -23,7 +23,7 @@
                 <x-forms.input label="Description" id="database.description"></x-forms.input>
                 <x-forms.input required
                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
-                    label="Image Tag" id="database.image"></x-forms.input>
+                    label="Image" id="database.image"></x-forms.input>
             </div>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="5432" disabled="{{ $database->is_public }}" id="database.public_port"
