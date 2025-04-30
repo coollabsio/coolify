@@ -24,7 +24,7 @@ class StopDatabase
             return 'Server is not functional';
         }
 
-        $this->stopContainer($database, $database->uuid, 300);
+        $this->stopContainer($database, $database->uuid, 30);
         if ($isDeleteOperation) {
             if ($dockerCleanup) {
                 CleanupDocker::dispatch($server, true);
