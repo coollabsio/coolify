@@ -39,7 +39,7 @@
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10000ms="check_status">
                     @foreach ($applications as $application)
                         <div @class([
-                            'border-l border-dashed border-red-500 ' => str(
+                            'border-l border-dashed border-red-500' => str(
                                 $application->status)->contains(['exited']),
                             'border-l border-dashed border-success' => str(
                                 $application->status)->contains(['running']),
@@ -138,7 +138,7 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    @if ($database->isBackupSolutionAvailable())
+                                    @if ($database->isBackupSolutionAvailable() || $database->is_migrated)
                                         <a class="mx-4 text-xs font-bold hover:underline"
                                             href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups">
                                             Backups
