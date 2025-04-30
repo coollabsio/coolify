@@ -99,7 +99,7 @@ class ServerCheck
                             return data_get($value, 'Name') === '/coolify-proxy';
                         }
                     })->first();
-                    $proxyStatus = data_get($foundProxyContainer, 'State.Status');
+                    $proxyStatus = data_get($foundProxyContainer, 'State.Status', 'exited');
                     if (! $foundProxyContainer || $proxyStatus !== 'running') {
                         try {
                             $shouldStart = CheckProxy::run($this->server);
