@@ -89,24 +89,35 @@ class Database extends Component
         try {
             $service = $this->database->service;
             $serviceDatabase = $this->database;
-            DB::beginTransaction();
-            $service->applications()->create([
-                'name' => $serviceDatabase->name,
-                'human_name' => $serviceDatabase->human_name,
-                'description' => $serviceDatabase->description,
-                'exclude_from_status' => $serviceDatabase->exclude_from_status,
-                'is_log_drain_enabled' => $serviceDatabase->is_log_drain_enabled,
-                'image' => $serviceDatabase->image,
-                'service_id' => $service->id,
-                'is_migrated' => true,
-            ]);
-            $serviceDatabase->delete();
-            DB::commit();
-
-            return redirect()->route('project.service.configuration', $this->parameters);
+            
+            // Check if application with same name already exists
+            if ($service->applications()->where('name', $serviceDatabase->name)->exists()) {
+                throw new \Exception('An application with this name already exists.');
+            }
+            
+            // Create new parameters removing database_uuid
+            $redirectParams = collect($this->parameters)
+                ->except('database_uuid')
+                ->all();
+            
+            DB::transaction(function () use ($service, $serviceDatabase) {
+                $service->applications()->create([
+                    'name' => $serviceDatabase->name,
+                    'human_name' => $serviceDatabase->human_name,
+                    'description' => $serviceDatabase->description,
+                    'exclude_from_status' => $serviceDatabase->exclude_from_status,
+                    'is_log_drain_enabled' => $serviceDatabase->is_log_drain_enabled,
+                    'image' => $serviceDatabase->image,
+                    'service_id' => $service->id,
+                    'is_migrated' => true,
+                ]);
+                $serviceDatabase->delete();
+            });
+            
+            $this->dispatch('success', 'Database converted to Application. Hasta la vista, database!');
+            
+            return redirect()->route('project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
-            DB::rollBack();
-
             return handleError($e, $this);
         }
     }
