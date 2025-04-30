@@ -166,7 +166,7 @@ class Service extends BaseModel
         }
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -175,11 +175,11 @@ class Service extends BaseModel
         }
     }
 
-    public function delete_connected_networks($uuid)
+    public function deleteConnectedNetworks()
     {
         $server = data_get($this, 'destination.server');
-        instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
-        instant_remote_process(["docker network rm {$uuid}"], $server, false);
+        instant_remote_process(["docker network disconnect {$this->uuid} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$this->uuid}"], $server, false);
     }
 
     public function getStatusAttribute()

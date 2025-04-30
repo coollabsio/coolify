@@ -278,7 +278,7 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -287,8 +287,9 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_volumes(?Collection $persistentStorages)
+    public function deleteVolumes()
     {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
             instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
@@ -303,8 +304,9 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_connected_networks($uuid)
+    public function deleteConnectedNetworks()
     {
+        $uuid = $this->uuid;
         $server = data_get($this, 'destination.server');
         instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
         instant_remote_process(["docker network rm {$uuid}"], $server, false);
