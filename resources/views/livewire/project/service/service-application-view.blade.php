@@ -13,8 +13,7 @@
                 confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
                 shortConfirmationLabel="Service Application Name" step3ButtonText="Permanently Delete" />
             <x-modal-confirmation title="Confirm Service Application Deletion?" buttonTitle="Delete" isErrorButton
-                submitAction="delete" {{-- :checkboxes="$checkboxes"  --}} :actions="['The selected service application container will be stopped and permanently deleted.']"
-                confirmationText="{{ Str::headline($application->name) }}"
+                submitAction="delete" :actions="['The selected service application container will be stopped and permanently deleted.']" confirmationText="{{ Str::headline($application->name) }}"
                 confirmationLabel="Please confirm the execution of the actions by entering the Service Application Name below"
                 shortConfirmationLabel="Service Application Name" step3ButtonText="Permanently Delete" />
         </div>

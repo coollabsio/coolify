@@ -88,6 +88,7 @@ class ServiceApplicationView extends Component
                 'is_log_drain_enabled' => $serviceApplication->is_log_drain_enabled,
                 'image' => $serviceApplication->image,
                 'service_id' => $service->id,
+                'is_migrated' => true,
             ]);
             $serviceApplication->delete();
             DB::commit();

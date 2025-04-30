@@ -98,6 +98,7 @@ class Database extends Component
                 'is_log_drain_enabled' => $serviceDatabase->is_log_drain_enabled,
                 'image' => $serviceDatabase->image,
                 'service_id' => $service->id,
+                'is_migrated' => true,
             ]);
             $serviceDatabase->delete();
             DB::commit();
