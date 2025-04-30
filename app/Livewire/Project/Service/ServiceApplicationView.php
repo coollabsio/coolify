@@ -79,24 +79,31 @@ class ServiceApplicationView extends Component
         try {
             $service = $this->application->service;
             $serviceApplication = $this->application;
-            DB::beginTransaction();
-            $service->databases()->create([
-                'name' => $serviceApplication->name,
-                'human_name' => $serviceApplication->human_name,
-                'description' => $serviceApplication->description,
-                'exclude_from_status' => $serviceApplication->exclude_from_status,
-                'is_log_drain_enabled' => $serviceApplication->is_log_drain_enabled,
-                'image' => $serviceApplication->image,
-                'service_id' => $service->id,
-                'is_migrated' => true,
-            ]);
-            $serviceApplication->delete();
-            DB::commit();
 
-            return redirect()->route('project.service.configuration', $this->parameters);
+            // Check if database with same name already exists
+            if ($service->databases()->where('name', $serviceApplication->name)->exists()) {
+                throw new \Exception('A database with this name already exists.');
+            }
+
+            $redirectParams = collect($this->parameters)
+                ->except('database_uuid')
+                ->all();
+            DB::transaction(function () use ($service, $serviceApplication) {
+                $service->databases()->create([
+                    'name' => $serviceApplication->name,
+                    'human_name' => $serviceApplication->human_name,
+                    'description' => $serviceApplication->description,
+                    'exclude_from_status' => $serviceApplication->exclude_from_status,
+                    'is_log_drain_enabled' => $serviceApplication->is_log_drain_enabled,
+                    'image' => $serviceApplication->image,
+                    'service_id' => $service->id,
+                    'is_migrated' => true,
+                ]);
+                $serviceApplication->delete();
+            });
+
+            return redirect()->route('project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
-            DB::rollBack();
-
             return handleError($e, $this);
         }
     }

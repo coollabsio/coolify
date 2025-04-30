@@ -89,17 +89,17 @@ class Database extends Component
         try {
             $service = $this->database->service;
             $serviceDatabase = $this->database;
-            
+
             // Check if application with same name already exists
             if ($service->applications()->where('name', $serviceDatabase->name)->exists()) {
                 throw new \Exception('An application with this name already exists.');
             }
-            
+
             // Create new parameters removing database_uuid
             $redirectParams = collect($this->parameters)
                 ->except('database_uuid')
                 ->all();
-            
+
             DB::transaction(function () use ($service, $serviceDatabase) {
                 $service->applications()->create([
                     'name' => $serviceDatabase->name,
@@ -113,9 +113,7 @@ class Database extends Component
                 ]);
                 $serviceDatabase->delete();
             });
-            
-            $this->dispatch('success', 'Database converted to Application. Hasta la vista, database!');
-            
+
             return redirect()->route('project.service.configuration', $redirectParams);
         } catch (\Throwable $e) {
             return handleError($e, $this);
