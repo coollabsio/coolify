@@ -1,0 +1,44 @@
+# documentation: https://www.limesurvey.org/manual/
+# slogan: Simple, quick and anonymous online survey tool that's bursting with juicy insights.
+# tags: online survey, forms, no code, open source
+# logo: svgs/limesurvey.svg
+# port: 8080
+
+services: 
+  limesurvey:
+    image: adamzammit/limesurvey:latest
+    environment:
+      - LIMESURVEY_DB_HOST=mariadb
+      - LIMESURVEY_DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - LIMESURVEY_DB_USER=$SERVICE_USER_MYSQL
+      - LIMESURVEY_DB_NAME=$MYSQL_DATABASE
+      - LIMESURVEY_ADMIN_USER=${SERVICE_USER_ADMIN:-admin}
+      - LIMESURVEY_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - LIMESURVEY_ADMIN_NAME=${SERVICE_USER_ADMINNAME:-Lime Administrator}
+      - LIMESURVEY_ADMIN_EMAIL=${SERVICE_USER_ADMINEMAIL:-lime@lime.lime}
+      - LIMESURVEY_FROM_EMAIL= 
+      - LIMESURVEY_SMTP_HOST= 
+      - LIMESURVEY_SMTP_USER= 
+      - LIMESURVEY_SMTP_PASSWORD= 
+      - LIMESURVEY_SMTP_SSL= 
+      - LIMESURVEY_PHP_SESSION_SAVE_HANDLER=redis
+      - LIMESURVEY_PHP_SESSION_SAVE_PATH=tcp://redis:6379
+      - TZ=America/Jamaica
+    volumes:
+      - limesurvey-plugins-data:/var/www/html/plugins
+      - limesurvey-upload-data:/var/www/html/upload
+      - limesurvey-config-data:/var/www/html/application/config
+      - limesurvey-sessions-data:/var/lime/sessions
+
+  mysql:
+    image: mariadb:11
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL:-limesurvey}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-limesurvey}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    volumes:
+      - limesurvey-mariadb-data:/var/lib/mysql
+ 
+  redis:
+    image: redis:7
