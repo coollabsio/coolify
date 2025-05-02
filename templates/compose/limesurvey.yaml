@@ -2,20 +2,21 @@
 # slogan: Simple, quick and anonymous online survey tool that's bursting with juicy insights.
 # tags: online survey, forms, no code, open source
 # logo: svgs/limesurvey.svg
-# port: 8080
+# port: 80
 
 services: 
   limesurvey:
     image: adamzammit/limesurvey:latest
     environment:
+      - SERVICE_FQDN_LIMESURVEY_80
       - LIMESURVEY_DB_HOST=mariadb
       - LIMESURVEY_DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
       - LIMESURVEY_DB_USER=$SERVICE_USER_MYSQL
-      - LIMESURVEY_DB_NAME=$MYSQL_DATABASE
-      - LIMESURVEY_ADMIN_USER=${SERVICE_USER_ADMIN:-admin}
+      - LIMESURVEY_DB_NAME=${MYSQL_DATABASE:-limesurvey}
+      - LIMESURVEY_ADMIN_USER=${LIMESURVEY_ADMIN_USER:-admin}
       - LIMESURVEY_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
-      - LIMESURVEY_ADMIN_NAME=${SERVICE_USER_ADMINNAME:-Lime Administrator}
-      - LIMESURVEY_ADMIN_EMAIL=${SERVICE_USER_ADMINEMAIL:-lime@lime.lime}
+      - LIMESURVEY_ADMIN_NAME=${LIMESURVEY_ADMIN_NAME:-Lime Administrator}
+      - LIMESURVEY_ADMIN_EMAIL=${LIMESURVEY_ADMIN_EMAIL:-lime@lime.lime}
       - LIMESURVEY_FROM_EMAIL= 
       - LIMESURVEY_SMTP_HOST= 
       - LIMESURVEY_SMTP_USER= 
@@ -64,6 +65,7 @@ services:
   redis:
     image: redis:7
     healthcheck:
+      test:
         - CMD
         - redis-cli
         - ping
