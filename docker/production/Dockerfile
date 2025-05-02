@@ -2,7 +2,7 @@
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-02-15T10-36-16Z
+ARG MINIO_VERSION=RELEASE.2025-03-12T17-29-24Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2025.2.0
 # https://www.postgresql.org/support/versioning/
@@ -89,9 +89,9 @@ RUN echo "alias ll='ls -al'" >> /etc/profile && \
 # Install Cloudflared based on architecture
 RUN mkdir -p /usr/local/bin && \
     if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
-        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
+    curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
     elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
-        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared; \
+    curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared; \
     fi && \
     chmod +x /usr/local/bin/cloudflared
 

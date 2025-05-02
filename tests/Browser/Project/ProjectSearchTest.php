@@ -16,7 +16,7 @@ class ProjectSearchTest extends DuskTestCase
      *
      * @throws Throwable
      */
-    public function testLogin()
+    public function test_login()
     {
         $this->browse(function (Browser $browser) {
             $browser->loginWithRootUser()

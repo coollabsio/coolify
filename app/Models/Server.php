@@ -7,9 +7,12 @@ use App\Actions\Server\InstallDocker;
 use App\Actions\Server\StartSentinel;
 use App\Enums\ProxyTypes;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\RegenerateSslCertJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
+use App\Services\ConfigurationRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +27,7 @@ use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Server model',
@@ -101,11 +105,13 @@ class Server extends BaseModel
                         'server_id' => $server->id,
                     ]);
                 } else {
-                    StandaloneDocker::create([
+                    $standaloneDocker = new StandaloneDocker([
                         'name' => 'coolify',
+                        'uuid' => (string) new Cuid2,
                         'network' => 'coolify',
                         'server_id' => $server->id,
                     ]);
+                    $standaloneDocker->saveQuietly();
                 }
             }
             if (! isset($server->proxy->redirect_enabled)) {
@@ -437,10 +443,6 @@ class Server extends BaseModel
                     "mkdir -p $dynamic_config_path",
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
-
-                if (config('app.env') === 'local') {
-                    // ray($yaml);
-                }
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
@@ -484,23 +486,13 @@ $schema://$host {
         $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
-        // TODO: should use /traefik for already exisiting configurations?
-        // Should move everything except /caddy and /nginx to /traefik
-        // The code needs to be modified as well, so maybe it does not worth it
+
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
-            // Do nothing
+            $proxy_path = $proxy_path.'/';
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
-            } else {
-                $proxy_path = $proxy_path.'/caddy';
-            }
+            $proxy_path = $proxy_path.'/caddy';
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
-            } else {
-                $proxy_path = $proxy_path.'/nginx';
-            }
+            $proxy_path = $proxy_path.'/nginx';
         }
 
         return $proxy_path;
@@ -543,7 +535,7 @@ $schema://$host {
         $this->settings->save();
         $sshKeyFileLocation = "id.root@{$this->uuid}";
         Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
-        Storage::disk('ssh-mux')->delete($this->muxFilename());
+        $this->disableSshMux();
     }
 
     public function sentinelHeartbeat(bool $isReset = false)
@@ -707,22 +699,6 @@ $schema://$host {
             'containers' => collect($containers) ?? collect([]),
             'containerReplicates' => collect($containerReplicates) ?? collect([]),
         ];
-    }
-
-    public function getContainersWithSentinel(): Collection
-    {
-        $sentinel_found = instant_remote_process(['docker inspect coolify-sentinel'], $this, false);
-        $sentinel_found = json_decode($sentinel_found, true);
-        $status = data_get($sentinel_found, '0.State.Status', 'exited');
-        if ($status === 'running') {
-            $containers = instant_remote_process(['docker exec coolify-sentinel sh -c "curl http://127.0.0.1:8888/api/containers"'], $this, false);
-            if (is_null($containers)) {
-                return collect([]);
-            }
-            $containers = data_get(json_decode($containers, true), 'containers', []);
-
-            return collect($containers);
-        }
     }
 
     public function loadAllContainers(): Collection
@@ -938,7 +914,7 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = $this->settings->is_reachable && $this->settings->is_usable && $this->settings->force_disabled === false && $this->ip !== '1.2.3.4';
+        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && $this->ip !== '1.2.3.4';
 
         if ($isFunctional === false) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());
@@ -970,10 +946,8 @@ $schema://$host {
             }
         });
         if ($supported->count() === 1) {
-            // ray('supported');
             return str($supported->first());
         } else {
-            // ray('not supported');
             return false;
         }
     }
@@ -1041,22 +1015,11 @@ $schema://$host {
         $this->refresh();
         $unreachableNotificationSent = (bool) $this->unreachable_notification_sent;
         $isReachable = (bool) $this->settings->is_reachable;
-
-        \Log::debug('Server reachability check', [
-            'server_id' => $this->id,
-            'is_reachable' => $isReachable,
-            'notification_sent' => $unreachableNotificationSent,
-            'unreachable_count' => $this->unreachable_count,
-        ]);
-
         if ($isReachable === true) {
             $this->unreachable_count = 0;
             $this->save();
 
             if ($unreachableNotificationSent === true) {
-                \Log::debug('Server is now reachable, sending notification', [
-                    'server_id' => $this->id,
-                ]);
                 $this->sendReachableNotification();
             }
 
@@ -1064,17 +1027,10 @@ $schema://$host {
         }
 
         $this->increment('unreachable_count');
-        \Log::debug('Incremented unreachable count', [
-            'server_id' => $this->id,
-            'new_count' => $this->unreachable_count,
-        ]);
 
         if ($this->unreachable_count === 1) {
             $this->settings->is_reachable = true;
             $this->settings->save();
-            \Log::debug('First unreachable attempt, marking as reachable', [
-                'server_id' => $this->id,
-            ]);
 
             return;
         }
@@ -1083,11 +1039,6 @@ $schema://$host {
             $failedChecks = 0;
             for ($i = 0; $i < 3; $i++) {
                 $status = $this->serverStatus();
-                \Log::debug('Additional reachability check', [
-                    'server_id' => $this->id,
-                    'attempt' => $i + 1,
-                    'status' => $status,
-                ]);
                 sleep(5);
                 if (! $status) {
                     $failedChecks++;
@@ -1095,9 +1046,6 @@ $schema://$host {
             }
 
             if ($failedChecks === 3 && ! $unreachableNotificationSent) {
-                \Log::debug('Server confirmed unreachable after 3 attempts, sending notification', [
-                    'server_id' => $this->id,
-                ]);
                 $this->sendUnreachableNotification();
             }
         }
@@ -1121,7 +1069,7 @@ $schema://$host {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
-        config()->set('constants.ssh.mux_enabled', false);
+        $this->disableSshMux();
 
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
@@ -1347,5 +1295,48 @@ $schema://$host {
         return $this->applications()->count() == 0 &&
             $this->databases()->count() == 0 &&
             $this->services()->count() == 0;
+    }
+
+    private function disableSshMux(): void
+    {
+        $configRepository = app(ConfigurationRepository::class);
+        $configRepository->disableSshMux();
+    }
+
+    public function generateCaCertificate()
+    {
+        try {
+            ray('Generating CA certificate for server', $this->id);
+            SslHelper::generateSslCertificate(
+                commonName: 'Coolify CA Certificate',
+                serverId: $this->id,
+                isCaCertificate: true,
+                validityDays: 10 * 365
+            );
+            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            ray('CA certificate generated', $caCertificate);
+            if ($caCertificate) {
+                $certificateContent = $caCertificate->ssl_certificate;
+                $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+
+                $commands = collect([
+                    "mkdir -p $caCertPath",
+                    "chown -R 9999:root $caCertPath",
+                    "chmod -R 700 $caCertPath",
+                    "rm -rf $caCertPath/coolify-ca.crt",
+                    "echo '{$certificateContent}' > $caCertPath/coolify-ca.crt",
+                    "chmod 644 $caCertPath/coolify-ca.crt",
+                ]);
+
+                instant_remote_process($commands, $this, false);
+
+                dispatch(new RegenerateSslCertJob(
+                    server_id: $this->id,
+                    force_regeneration: true
+                ));
+            }
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
     }
 }

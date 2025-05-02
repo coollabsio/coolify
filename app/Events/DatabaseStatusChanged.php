@@ -13,28 +13,24 @@ class DatabaseStatusChanged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $userId = null;
+    public int|string|null $userId = null;
 
     public function __construct($userId = null)
     {
         if (is_null($userId)) {
             $userId = Auth::id() ?? null;
         }
-        if (is_null($userId)) {
-            return false;
-        }
-
         $this->userId = $userId;
     }
 
     public function broadcastOn(): ?array
     {
-        if (! is_null($this->userId)) {
-            return [
-                new PrivateChannel("user.{$this->userId}"),
-            ];
+        if (is_null($this->userId)) {
+            return [];
         }
 
-        return null;
+        return [
+            new PrivateChannel("user.{$this->userId}"),
+        ];
     }
 }

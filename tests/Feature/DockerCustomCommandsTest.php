@@ -1,5 +1,34 @@
 <?php
 
+test('Hostname', function () {
+    $input = '--hostname=test';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'hostname' => 'test',
+    ]);
+});
+test('HostnameWithoutEqualSign', function () {
+    $input = '--hostname test';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'hostname' => 'test',
+    ]);
+});
+test('HostnameWithoutEqualSignAndHyphens', function () {
+    $input = '--hostname my-super-host';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'hostname' => 'my-super-host',
+    ]);
+});
+
+test('HostnameWithHyphens', function () {
+    $input = '--hostname=my-super-host';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'hostname' => 'my-super-host',
+    ]);
+});
 test('ConvertCapAdd', function () {
     $input = '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add SYS_ADMIN';
     $output = convertDockerRunToCompose($input);

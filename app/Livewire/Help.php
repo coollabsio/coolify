@@ -36,7 +36,7 @@ class Help extends Component
             $type = set_transanctional_email_settings($settings);
 
             // Sending feedback through Cloud API
-            if ($type === false) {
+            if (blank($type)) {
                 $url = 'https://app.coolify.io/api/feedback';
                 Http::post($url, [
                     'content' => 'User: `'.auth()->user()?->email.'` with subject: `'.$this->subject.'` has the following problem: `'.$this->description.'`',

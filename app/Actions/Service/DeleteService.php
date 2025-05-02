@@ -48,7 +48,7 @@ class DeleteService
             }
 
             if ($deleteConnectedNetworks) {
-                $service->delete_connected_networks($service->uuid);
+                $service->deleteConnectedNetworks();
             }
 
             instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
@@ -56,7 +56,7 @@ class DeleteService
             throw new \Exception($e->getMessage());
         } finally {
             if ($deleteConfigurations) {
-                $service->delete_configurations();
+                $service->deleteConfigurations();
             }
             foreach ($service->applications()->get() as $application) {
                 $application->forceDelete();

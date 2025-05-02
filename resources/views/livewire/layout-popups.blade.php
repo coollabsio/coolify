@@ -79,6 +79,16 @@
             </x-slot:button-text>
         </x-popup>
     </span>
+    @if (currentTeam()->subscriptionPastOverDue())
+        <x-banner :closable=false>
+            <div><span class="font-bold text-red-500">WARNING:</span> Your subscription is in over-due. If your latest
+                payment is not paid within a week, all automations <span class="font-bold text-red-500">will
+                    be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
+                    class="underline dark:text-white">/subscription</a> to check your subscription status or pay your
+                invoice (or check your email for the invoice).
+            </div>
+        </x-banner>
+    @endif
     @if (currentTeam()->serverOverflow())
         <x-banner :closable=false>
             <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit

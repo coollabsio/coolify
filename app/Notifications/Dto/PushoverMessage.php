@@ -40,7 +40,7 @@ class PushoverMessage
             if ($buttonUrl && str_contains($buttonUrl, 'http://localhost')) {
                 $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
             }
-            $payload['message'] .= "&nbsp;<a href='" . $buttonUrl . "'>" . $text . '</a>';
+            $payload['message'] .= "&nbsp;<a href='".$buttonUrl."'>".$text.'</a>';
         }
 
         Log::info('Pushover message', $payload);

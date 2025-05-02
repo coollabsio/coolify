@@ -30,11 +30,15 @@ class Source extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $gitCommitSha = null;
 
+    #[Locked]
+    public $sources;
+
     public function mount()
     {
         try {
             $this->syncData();
             $this->getPrivateKeys();
+            $this->getSources();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -66,6 +70,14 @@ class Source extends Component
         });
     }
 
+    private function getSources()
+    {
+        // filter the current source out
+        $this->sources = currentTeam()->sources()->whereNotNull('app_id')->reject(function ($source) {
+            return $source->id === $this->application->source_id;
+        })->sortBy('name');
+    }
+
     public function setPrivateKey(int $privateKeyId)
     {
         try {
@@ -88,6 +100,22 @@ class Source extends Component
             }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function changeSource($sourceId, $sourceType)
+    {
+        try {
+            $this->application->update([
+                'source_id' => $sourceId,
+                'source_type' => $sourceType,
+                'repository_project_id' => null,
+            ]);
+            $this->application->refresh();
+            $this->getSources();
+            $this->dispatch('success', 'Source updated!');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

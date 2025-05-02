@@ -39,7 +39,13 @@ class RootResetPassword extends Command
         }
         $this->info('Updating root password...');
         try {
-            User::find(0)->update(['password' => Hash::make($password)]);
+            $user = User::find(0);
+            if (! $user) {
+                $this->error('Root user not found.');
+
+                return;
+            }
+            $user->update(['password' => Hash::make($password)]);
             $this->info('Root password updated successfully.');
         } catch (\Exception $e) {
             $this->error('Failed to update root password.');
