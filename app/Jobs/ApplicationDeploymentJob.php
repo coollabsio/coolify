@@ -1084,87 +1084,88 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function drain_old_containers()
     {
         if ($this->application->custom_healthcheck_found) { // Not implemented yet for custom healthchecks
-            $this->application_deployment_queue->addLogEntry('Custom healthcheck found, skipping old container drain.');
+            $this->application_deployment_queue->addLogEntry('Custom healthcheck found, skipping drain of old containers.');
 
             return;
         }
         // First, mark containers as unhealthy (so the reverse proxy stops routing to them)
         // Only do this if healthcheck is enabled
-        if (! $this->application->isHealthcheckDisabled()) {
-            $max_wait_time = (int) $this->application->health_check_interval * (int) $this->application->health_check_retries * (int) $this->application->health_check_timeout + 1;
-            $this->application_deployment_queue->addLogEntry("Draining old containers (max wait time: {$max_wait_time} seconds).");
+        if ($this->application->isHealthcheckDisabled()) {
+            $this->application_deployment_queue->addLogEntry('Healthcheck is disabled, skipping drain of old containers.');
 
-            // Get containers that need to be drained
-            $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
-            if ($this->pull_request_id === 0) {
-                $containers = $containers->filter(function ($container) {
-                    return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
-                });
-            }
-
-            if ($containers->isEmpty()) {
-                $this->application_deployment_queue->addLogEntry('No old containers to drain.');
-
-                return;
-            }
-
-            // Mark all containers as unhealthy
-            $containerNames = [];
-            $containers->each(function ($container) use (&$containerNames) {
-                $containerName = data_get($container, 'Names');
-                $containerNames[] = $containerName;
-                $this->mark_container_unhealthy($containerName);
-                // $this->application_deployment_queue->addLogEntry("Marked container {$containerName} for draining.");
-            });
-
-            // Wait for containers to become unhealthy
-            $this->application_deployment_queue->addLogEntry('Waiting for the old containers to become unhealthy...');
-            $totalWaitTime = 0;
-            $allUnhealthy = false;
-
-            while ($totalWaitTime < $max_wait_time && ! $allUnhealthy) {
-                $allUnhealthy = true;
-
-                foreach ($containerNames as $containerName) {
-                    $this->execute_remote_command(
-                        [
-                            "docker inspect --format='{{json .State.Health.Status}}' {$containerName}",
-                            'hidden' => true,
-                            'save' => 'container_health_status',
-                            'append' => false,
-                            'ignore_errors' => true,
-                        ]
-                    );
-
-                    $healthStatus = str($this->saved_outputs->get('container_health_status'))->replace('"', '')->value();
-                    // $this->application_deployment_queue->addLogEntry("Container {$containerName} health status: {$healthStatus}");
-
-                    if ($healthStatus !== 'unhealthy') {
-                        $allUnhealthy = false;
-                    }
-                }
-
-                if (! $allUnhealthy) {
-                    // Wait for the health check interval before checking again
-                    $sleepTime = min($this->application->health_check_interval, 5); // Don't sleep more than 5 seconds at a time
-                    Sleep::for($sleepTime)->seconds();
-                    $totalWaitTime += $sleepTime;
-                    // $this->application_deployment_queue->addLogEntry("Waited {$totalWaitTime} of {$max_wait_time} seconds for containers to become unhealthy.");
-                }
-            }
-
-            if ($allUnhealthy) {
-                $this->application_deployment_queue->addLogEntry('All old containers are now marked as unhealthy.');
-            } else {
-                $this->application_deployment_queue->addLogEntry('Warning: Not all containers were confirmed unhealthy within the timeout period, proceeding anyway.');
-            }
-
-            // Wait 1 additional second as requested
-            Sleep::for(1)->seconds();
-            // $this->application_deployment_queue->addLogEntry('Waited 1 additional second after containers were marked unhealthy.');
-        } else {
-            $this->application_deployment_queue->addLogEntry('Healthcheck is disabled, skipping old container drain.');
+            return;
         }
+        $max_wait_time = (int) $this->application->health_check_interval * (int) $this->application->health_check_retries * (int) $this->application->health_check_timeout + 1;
+        $this->application_deployment_queue->addLogEntry("Draining old containers (max wait time: {$max_wait_time} seconds).");
+
+        // Get containers that need to be drained
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        if ($this->pull_request_id === 0) {
+            $containers = $containers->filter(function ($container) {
+                return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name.'-pr-'.$this->pull_request_id;
+            });
+        }
+
+        if ($containers->isEmpty()) {
+            $this->application_deployment_queue->addLogEntry('No old containers to drain.');
+
+            return;
+        }
+
+        // Mark all containers as unhealthy
+        $containerNames = [];
+        $containers->each(function ($container) use (&$containerNames) {
+            $containerName = data_get($container, 'Names');
+            $containerNames[] = $containerName;
+            $this->mark_container_unhealthy($containerName);
+            // $this->application_deployment_queue->addLogEntry("Marked container {$containerName} for draining.");
+        });
+
+        // Wait for containers to become unhealthy
+        $this->application_deployment_queue->addLogEntry('Waiting for the old containers to become unhealthy...');
+        $totalWaitTime = 0;
+        $allUnhealthy = false;
+
+        while ($totalWaitTime < $max_wait_time && ! $allUnhealthy) {
+            $allUnhealthy = true;
+
+            foreach ($containerNames as $containerName) {
+                $this->execute_remote_command(
+                    [
+                        "docker inspect --format='{{json .State.Health.Status}}' {$containerName}",
+                        'hidden' => true,
+                        'save' => 'container_health_status',
+                        'append' => false,
+                        'ignore_errors' => true,
+                    ]
+                );
+
+                $healthStatus = str($this->saved_outputs->get('container_health_status'))->replace('"', '')->value();
+                // $this->application_deployment_queue->addLogEntry("Container {$containerName} health status: {$healthStatus}");
+
+                if ($healthStatus !== 'unhealthy') {
+                    $allUnhealthy = false;
+                }
+            }
+
+            if (! $allUnhealthy) {
+                // Wait for the health check interval before checking again
+                $sleepTime = min($this->application->health_check_interval, 5); // Don't sleep more than 5 seconds at a time
+                Sleep::for($sleepTime)->seconds();
+                $totalWaitTime += $sleepTime;
+                // $this->application_deployment_queue->addLogEntry("Waited {$totalWaitTime} of {$max_wait_time} seconds for containers to become unhealthy.");
+            }
+        }
+
+        if ($allUnhealthy) {
+            $this->application_deployment_queue->addLogEntry('All old containers are now marked as unhealthy.');
+        } else {
+            $this->application_deployment_queue->addLogEntry('Warning: Not all containers were confirmed unhealthy within the timeout period, proceeding anyway.');
+        }
+
+        // Sleep for 1 second to allow the reverse proxy to see the unhealthy containers and stop routing to them
+        Sleep::for(1)->seconds();
+        // $this->application_deployment_queue->addLogEntry('Waited 1 additional second after containers were marked unhealthy.');
     }
 
     private function rolling_update()
