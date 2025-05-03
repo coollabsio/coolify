@@ -46,7 +46,7 @@
                         <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
                     </div>
                 @endif
-            </div>
-        @endisset
+            @endisset
+        </div>
     </div>
 </div>
