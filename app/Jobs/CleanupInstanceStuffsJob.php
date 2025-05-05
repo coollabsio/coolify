@@ -23,7 +23,7 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('cleanup-instance-stuffs'))->expireAfter(60)];
+        return [(new WithoutOverlapping('cleanup-instance-stuffs'))->expireAfter(60)->dontRelease()];
     }
 
     public function handle(): void
