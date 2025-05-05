@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
     <main class="p-2 w-full">
       <SidebarTrigger />
       <RouterView />
+      <slot />
     </main>
   </SidebarProvider>
 </template>
