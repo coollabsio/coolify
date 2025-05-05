@@ -1,0 +1,51 @@
+# documentation: https://www.passbolt.com/ce/docker
+# slogan: Passbolt Community Edition (CE) API. The JSON API for the open source password manager for teams!
+# tags: security, credentials, password-manager, open source
+# logo: svgs/passbolt.svg
+
+services:
+  mariadb:
+    image: 'mariadb:11'
+    environment:
+      - MARIADB_RANDOM_ROOT_PASSWORD=true
+      - MARIADB_DATABASE=${MYSQL_DB:-passbolt}
+      - MARIADB_USER=${SERVICE_USER_PASSBOLT}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_PASSBOLT}
+    volumes:
+      - 'database_volume:/var/lib/mysql'
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  passbolt:
+    image: 'passbolt/passbolt:latest-ce'
+    depends_on:
+      - mariadb
+    environment:
+      - SERVICE_FQDN_PASSBOLT
+      - APP_FULL_BASE_URL=${SERVICE_FQDN_PASSBOLT}
+      - DATASOURCES_DEFAULT_HOST=db
+      - DATASOURCES_DEFAULT_USERNAME=${SERVICE_USER_PASSBOLT}
+      - DATASOURCES_DEFAULT_PASSWORD=${SERVICE_PASSWORD_PASSBOLT}
+      - DATASOURCES_DEFAULT_DATABASE=${MYSQL_DB:-passbolt}
+    volumes:
+      - 'gpg_volume:/etc/passbolt/gpg'
+      - 'jwt_volume:/etc/passbolt/jwt'
+    command:
+      - /usr/bin/wait-for.sh
+      - '-t'
+      - '0'
+      - 'mariadb:3306'
+      - '--'
+      - /docker-entrypoint.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  database_volume:
+  gpg_volume:
+  jwt_volume:
