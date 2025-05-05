@@ -44,7 +44,7 @@ class StartSentinel
         if (isDev()) {
             // data_set($environments, 'DEBUG', 'true');
             // $image = 'sentinel';
-            // $mountDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
+            $mountDir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/sentinel';
         }
         $dockerEnvironments = '-e "'.implode('" -e "', array_map(fn ($key, $value) => "$key=$value", array_keys($environments), $environments)).'"';
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));

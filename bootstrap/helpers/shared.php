@@ -3358,17 +3358,17 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                                 'resource_type' => get_class($originalResource),
                             ]
                         );
-                        // if (isDev()) {
-                        //     if ((int) $resource->compose_parsing_version >= 4) {
-                        //         if ($isApplication) {
-                        //             $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
-                        //         } elseif ($isService) {
-                        //             $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/services/'.$uuid);
-                        //         }
-                        //     } else {
-                        //         $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
-                        //     }
-                        // }
+                        if (isDev()) {
+                            if ((int) $resource->compose_parsing_version >= 4) {
+                                if ($isApplication) {
+                                    $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                                } elseif ($isService) {
+                                    $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/services/'.$uuid);
+                                }
+                            } else {
+                                $source = $source->replace($mainDirectory, '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/applications/'.$uuid);
+                            }
+                        }
                         $volume = "$source:$target";
                     }
                 } elseif ($type->value() === 'volume') {

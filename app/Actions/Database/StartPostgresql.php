@@ -27,6 +27,9 @@ class StartPostgresql
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        if (isDev()) {
+            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
+        }
 
         $this->commands = [
             "echo 'Starting database.'",
