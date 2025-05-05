@@ -57,7 +57,7 @@ services:
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
-    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
+    entrypoint: [ "/bin/sh", "/soketi-entrypoint.sh" ]
   vite:
     image: node:20-alpine
     pull_policy: always
@@ -77,9 +77,14 @@ services:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
     init: true
+    privileged: true
+    cgroup: host
+    ports:
+      - "80:80"
+      - "443:443"
     container_name: coolify-testing-host
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      # - /var/run/docker.sock:/var/run/docker.sock
       - dev_coolify_data:/data/coolify
       - dev_backups_data:/data/coolify/backups
       - dev_postgres_data:/data/coolify/_volumes/database
@@ -118,6 +123,7 @@ volumes:
   dev_redis_data:
   dev_coolify_data:
   dev_minio_data:
+
 
 networks:
   coolify:
