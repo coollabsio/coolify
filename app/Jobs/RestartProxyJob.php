@@ -24,7 +24,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->expireAfter(60)];
+        return [(new WithoutOverlapping($this->server->uuid))->expireAfter(60)->dontRelease()];
     }
 
     public function __construct(public Server $server) {}

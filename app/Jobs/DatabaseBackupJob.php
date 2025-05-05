@@ -390,7 +390,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $backupCommand = 'docker exec';
             if ($this->postgres_password) {
-                $backupCommand .= " -e PGPASSWORD=$this->postgres_password";
+                $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
             }
             if ($this->backup->dump_all) {
                 $backupCommand .= " $this->container_name pg_dumpall --username {$this->database->postgres_user} | gzip > $this->backup_location";
