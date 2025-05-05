@@ -6,11 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex">
     <title>Coolify</title>
-    @vite('resources/css/app.css')
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @inertiaHead
 </head>
 
 <body>
-    <h1 class="text-3xl font-bold">Simple Heading</h1>
+    @inertia
 </body>
 
 </html>

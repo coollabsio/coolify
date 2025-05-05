@@ -15,6 +15,7 @@
     "license": "Apache-2.0",
     "require": {
         "php": "^8.4",
+        "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.9.2",
         "laravel/tinker": "^2.10.1"
     },

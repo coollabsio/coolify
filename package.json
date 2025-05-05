@@ -4,6 +4,7 @@
     "type": "module",
     "devDependencies": {
         "@tailwindcss/vite": "^4.1.4",
+        "@vitejs/plugin-vue": "^5.2.3",
         "concurrently": "^9.1.2",
         "laravel-vite-plugin": "^1.2.0",
         "tailwindcss": "^4.1.4",
@@ -12,5 +13,8 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite"
+    },
+    "dependencies": {
+        "@inertiajs/vue3": "^2.0.8"
     }
 }
