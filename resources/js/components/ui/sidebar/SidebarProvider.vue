@@ -2,7 +2,7 @@
 import { cn } from '@/lib/utils'
 import { useEventListener, useMediaQuery, useVModel } from '@vueuse/core'
 import { TooltipProvider } from 'reka-ui'
-import { computed, type HTMLAttributes, type Ref, ref } from 'vue'
+import { computed, type HTMLAttributes, type Ref, ref, onMounted } from 'vue'
 import { provideSidebarContext, SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME, SIDEBAR_KEYBOARD_SHORTCUT, SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON } from './utils'
 
 const props = withDefaults(defineProps<{
@@ -10,7 +10,7 @@ const props = withDefaults(defineProps<{
   open?: boolean
   class?: HTMLAttributes['class']
 }>(), {
-  defaultOpen: true,
+  defaultOpen: false,
   open: undefined,
 })
 
@@ -25,6 +25,16 @@ const open = useVModel(props, 'open', emits, {
   defaultValue: props.defaultOpen ?? false,
   passive: (props.open === undefined) as false,
 }) as Ref<boolean>
+
+// Read cookie on mount to initialize state
+onMounted(() => {
+  const cookies = document.cookie.split(';')
+  const sidebarCookie = cookies.find(cookie => cookie.trim().startsWith(`${SIDEBAR_COOKIE_NAME}=`))
+  if (sidebarCookie) {
+    const value = sidebarCookie.split('=')[1]
+    open.value = value === 'true'
+  }
+})
 
 function setOpen(value: boolean) {
   open.value = value // emits('update:open', value)
@@ -66,15 +76,11 @@ provideSidebarContext({
 
 <template>
   <TooltipProvider :delay-duration="0">
-    <div
-      data-slot="sidebar-wrapper"
-      :style="{
-        '--sidebar-width': SIDEBAR_WIDTH,
-        '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
-      }"
-      :class="cn('group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full', props.class)"
-      v-bind="$attrs"
-    >
+    <div data-slot="sidebar-wrapper" :style="{
+      '--sidebar-width': SIDEBAR_WIDTH,
+      '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
+    }" :class="cn('group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full', props.class)"
+      v-bind="$attrs">
       <slot />
     </div>
   </TooltipProvider>
