@@ -17,11 +17,19 @@
     },
     "dependencies": {
         "@inertiajs/vue3": "^2.0.8",
+        "@tanstack/vue-table": "^8.21.3",
+        "@vee-validate/zod": "^4.15.0",
+        "@vueuse/core": "^13.1.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "embla-carousel-vue": "^8.6.0",
         "lucide-vue-next": "^0.507.0",
         "reka-ui": "^2.2.0",
         "tailwind-merge": "^3.2.0",
-        "tw-animate-css": "^1.2.9"
+        "tw-animate-css": "^1.2.9",
+        "vaul-vue": "^0.4.1",
+        "vee-validate": "^4.15.0",
+        "vue-sonner": "^1.3.2",
+        "zod": "^3.24.4"
     }
 }
