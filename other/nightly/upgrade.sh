@@ -1,10 +1,12 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to autoupdate!
 
-VERSION="13"
+VERSION="15"
 CDN="https://cdn.coollabs.io/coolify-nightly"
 LATEST_IMAGE=${1:-latest}
 LATEST_HELPER_VERSION=${2:-latest}
+REGISTRY_URL=${3:-ghcr.io}
+
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 
 # Check if.env file exists, if exists get BASE_CONFIG_PATH, if not defaults to data/coolify
@@ -37,12 +39,17 @@ fi
 
 # Make sure coolify network exists
 # It is created when starting Coolify with docker compose
-docker network create --attachable coolify 2>/dev/null
+if ! docker network inspect coolify >/dev/null 2>&1; then
+    if ! docker network create --attachable --ipv6 coolify 2>/dev/null; then
+        echo "Failed to create coolify network with ipv6. Trying without ipv6..."
+        docker network create --attachable coolify 2>/dev/null
+    fi
+fi
 # docker network create --attachable --driver=overlay coolify-overlay 2>/dev/null
 
 if [ -f "$BASE_CONFIG_PATH"/source/docker-compose.custom.yml ]; then
-    echo "docker-compose.custom.yml detected." >> $LOGFILE
-    docker run -v "$BASE_CONFIG_PATH"/source:"$BASE_CONFIG_PATH"/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file $BASE_CONFIG_PATH/source/.env -f $BASE_CONFIG_PATH/source/docker-compose.yml -f $BASE_CONFIG_PATH/source/docker-compose.prod.yml -f $BASE_CONFIG_PATH/source/docker-compose.custom.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >> "$LOGFILE" 2>&1
+    echo "docker-compose.custom.yml detected." >>$LOGFILE
+    docker run -v "$BASE_CONFIG_PATH"/source:"$BASE_CONFIG_PATH"/source -v /var/run/docker.sock:/var/run/docker.sock --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file $BASE_CONFIG_PATH/source/.env -f $BASE_CONFIG_PATH/source/docker-compose.yml -f $BASE_CONFIG_PATH/source/docker-compose.prod.yml -f $BASE_CONFIG_PATH/source/docker-compose.custom.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
 else
-    docker run -v "$BASE_CONFIG_PATH"/source:"$BASE_CONFIG_PATH"/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file $BASE_CONFIG_PATH/source/.env -f $BASE_CONFIG_PATH/source/docker-compose.yml -f $BASE_CONFIG_PATH/source/docker-compose.prod.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >> "$LOGFILE" 2>&1
+    docker run -v "$BASE_CONFIG_PATH"/source:"$BASE_CONFIG_PATH"/source -v /var/run/docker.sock:/var/run/docker.sock --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file $BASE_CONFIG_PATH/source/.env -f $BASE_CONFIG_PATH/source/docker-compose.yml -f $BASE_CONFIG_PATH/source/docker-compose.prod.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
 fi

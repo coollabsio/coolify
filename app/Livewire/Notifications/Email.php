@@ -41,8 +41,8 @@ class Email extends Component
     #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
     public ?int $smtpPort = null;
 
-    #[Validate(['nullable', 'string', 'in:tls,ssl,none'])]
-    public ?string $smtpEncryption = 'tls';
+    #[Validate(['nullable', 'string', 'in:starttls,tls,none'])]
+    public ?string $smtpEncryption = null;
 
     #[Validate(['nullable', 'string'])]
     public ?string $smtpUsername = null;
@@ -235,7 +235,7 @@ class Email extends Component
                 'smtpFromName' => 'required|string',
                 'smtpHost' => 'required|string',
                 'smtpPort' => 'required|numeric',
-                'smtpEncryption' => 'required|string|in:tls,ssl,none',
+                'smtpEncryption' => 'required|string|in:starttls,tls,none',
                 'smtpUsername' => 'nullable|string',
                 'smtpPassword' => 'nullable|string',
                 'smtpTimeout' => 'nullable|numeric',
@@ -269,7 +269,7 @@ class Email extends Component
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -337,32 +337,29 @@ class Email extends Component
     public function copyFromInstanceSettings()
     {
         $settings = instanceSettings();
+        $this->smtpFromAddress = $settings->smtp_from_address;
+        $this->smtpFromName = $settings->smtp_from_name;
 
         if ($settings->smtp_enabled) {
             $this->smtpEnabled = true;
-            $this->smtpFromAddress = $settings->smtp_from_address;
-            $this->smtpFromName = $settings->smtp_from_name;
-            $this->smtpRecipients = $settings->smtp_recipients;
-            $this->smtpHost = $settings->smtp_host;
-            $this->smtpPort = $settings->smtp_port;
-            $this->smtpEncryption = $settings->smtp_encryption;
-            $this->smtpUsername = $settings->smtp_username;
-            $this->smtpPassword = $settings->smtp_password;
-            $this->smtpTimeout = $settings->smtp_timeout;
             $this->resendEnabled = false;
-            $this->saveModel();
-
-            return;
         }
+
+        $this->smtpRecipients = $settings->smtp_recipients;
+        $this->smtpHost = $settings->smtp_host;
+        $this->smtpPort = $settings->smtp_port;
+        $this->smtpEncryption = $settings->smtp_encryption;
+        $this->smtpUsername = $settings->smtp_username;
+        $this->smtpPassword = $settings->smtp_password;
+        $this->smtpTimeout = $settings->smtp_timeout;
+
         if ($settings->resend_enabled) {
             $this->resendEnabled = true;
-            $this->resendApiKey = $settings->resend_api_key;
             $this->smtpEnabled = false;
-            $this->saveModel();
-
-            return;
         }
-        $this->dispatch('error', 'Instance SMTP/Resend settings are not enabled.');
+        $this->resendApiKey = $settings->resend_api_key;
+        $this->saveModel();
+
     }
 
     public function render()

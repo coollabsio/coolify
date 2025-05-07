@@ -226,16 +226,18 @@ class Index extends Component
         }
     }
 
-    public function toggleTwoStepConfirmation($password)
+    public function toggleTwoStepConfirmation($password): bool
     {
         if (! Hash::check($password, Auth::user()->password)) {
             $this->addError('password', 'The provided password is incorrect.');
 
-            return;
+            return false;
         }
 
         $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation = true;
         $this->settings->save();
         $this->dispatch('success', 'Two step confirmation has been disabled.');
+
+        return true;
     }
 }

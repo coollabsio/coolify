@@ -2,11 +2,15 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.381',
+        'version' => '4.0.0-beta.408',
+        'helper_version' => '1.0.8',
+        'realtime_version' => '1.0.7',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
-        'helper_image' => env('HELPER_IMAGE', 'ghcr.io/coollabsio/coolify-helper'),
+        'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
+        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
+        'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-realtime'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
     ],
 
@@ -47,7 +51,7 @@ return [
     ],
 
     'docker' => [
-        'minimum_required_version' => '26.0',
+        'minimum_required_version' => '24.0',
     ],
 
     'ssh' => [
@@ -62,26 +66,6 @@ return [
         'link' => [
             'base_url' => '/invitations/',
             'expiration_days' => 3,
-        ],
-    ],
-
-    'limits' => [
-        'trial_period' => 0,
-        'server' => [
-            'zero' => 0,
-            'self-hosted' => 999999999999,
-            'basic' => env('LIMIT_SERVER_BASIC', 2),
-            'pro' => env('LIMIT_SERVER_PRO', 10),
-            'ultimate' => env('LIMIT_SERVER_ULTIMATE', 25),
-            'dynamic' => env('LIMIT_SERVER_DYNAMIC', 2),
-        ],
-        'email' => [
-            'zero' => true,
-            'self-hosted' => true,
-            'basic' => true,
-            'pro' => true,
-            'ultimate' => true,
-            'dynamic' => true,
         ],
     ],
 

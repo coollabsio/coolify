@@ -52,7 +52,8 @@ class UpdateCoolify
     {
         PullHelperImageJob::dispatch($this->server);
 
-        instant_remote_process(["docker pull -q ghcr.io/coollabsio/coolify:{$this->latestVersion}"], $this->server, false);
+        $image = config('constants.coolify.registry_url').'/coollabsio/coolify:'.$this->latestVersion;
+        instant_remote_process(["docker pull -q $image"], $this->server, false);
 
         $base_path = config('coolify.base_config_path');
 

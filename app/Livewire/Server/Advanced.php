@@ -2,14 +2,25 @@
 
 namespace App\Livewire\Server;
 
-use App\Jobs\DockerCleanupJob;
+use App\Helpers\SslHelper;
+use App\Jobs\RegenerateSslCertJob;
 use App\Models\Server;
+use App\Models\SslCertificate;
+use Carbon\Carbon;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
 {
     public Server $server;
+
+    public ?SslCertificate $caCertificate = null;
+
+    public $showCertificate = false;
+
+    public $certificateContent = '';
+
+    public ?Carbon $certificateValidUntil = null;
 
     public array $parameters = [];
 
@@ -18,21 +29,6 @@ class Advanced extends Component
 
     #[Validate(['integer', 'min:1', 'max:99'])]
     public int $serverDiskUsageNotificationThreshold = 50;
-
-    #[Validate(['string', 'required'])]
-    public string $dockerCleanupFrequency = '*/10 * * * *';
-
-    #[Validate(['integer', 'min:1', 'max:99'])]
-    public int $dockerCleanupThreshold = 10;
-
-    #[Validate('boolean')]
-    public bool $forceDockerCleanup = false;
-
-    #[Validate('boolean')]
-    public bool $deleteUnusedVolumes = false;
-
-    #[Validate('boolean')]
-    public bool $deleteUnusedNetworks = false;
 
     #[Validate(['integer', 'min:1'])]
     public int $concurrentBuilds = 1;
@@ -46,9 +42,97 @@ class Advanced extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->parameters = get_route_parameters();
             $this->syncData();
+            $this->loadCaCertificate();
         } catch (\Throwable) {
-            return redirect()->route('server.show');
+            return redirect()->route('server.index');
         }
+    }
+
+    public function loadCaCertificate()
+    {
+        $this->caCertificate = SslCertificate::where('server_id', $this->server->id)->where('is_ca_certificate', true)->first();
+
+        if ($this->caCertificate) {
+            $this->certificateContent = $this->caCertificate->ssl_certificate;
+            $this->certificateValidUntil = $this->caCertificate->valid_until;
+        }
+    }
+
+    public function toggleCertificate()
+    {
+        $this->showCertificate = ! $this->showCertificate;
+    }
+
+    public function saveCaCertificate()
+    {
+        try {
+            if (! $this->certificateContent) {
+                throw new \Exception('Certificate content cannot be empty.');
+            }
+
+            if (! openssl_x509_read($this->certificateContent)) {
+                throw new \Exception('Invalid certificate format.');
+            }
+
+            if ($this->caCertificate) {
+                $this->caCertificate->ssl_certificate = $this->certificateContent;
+                $this->caCertificate->save();
+
+                $this->loadCaCertificate();
+
+                $this->writeCertificateToServer();
+
+                dispatch(new RegenerateSslCertJob(
+                    server_id: $this->server->id,
+                    force_regeneration: true
+                ));
+            }
+            $this->dispatch('success', 'CA Certificate saved successfully.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function regenerateCaCertificate()
+    {
+        try {
+            SslHelper::generateSslCertificate(
+                commonName: 'Coolify CA Certificate',
+                serverId: $this->server->id,
+                isCaCertificate: true,
+                validityDays: 10 * 365
+            );
+
+            $this->loadCaCertificate();
+
+            $this->writeCertificateToServer();
+
+            dispatch(new RegenerateSslCertJob(
+                server_id: $this->server->id,
+                force_regeneration: true
+            ));
+
+            $this->loadCaCertificate();
+            $this->dispatch('success', 'CA Certificate regenerated successfully.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function writeCertificateToServer()
+    {
+        $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+
+        $commands = collect([
+            "mkdir -p $caCertPath",
+            "chown -R 9999:root $caCertPath",
+            "chmod -R 700 $caCertPath",
+            "rm -rf $caCertPath/coolify-ca.crt",
+            "echo '{$this->certificateContent}' > $caCertPath/coolify-ca.crt",
+            "chmod 644 $caCertPath/coolify-ca.crt",
+        ]);
+
+        remote_process($commands, $this->server);
     }
 
     public function syncData(bool $toModel = false)
@@ -57,23 +141,13 @@ class Advanced extends Component
             $this->validate();
             $this->server->settings->concurrent_builds = $this->concurrentBuilds;
             $this->server->settings->dynamic_timeout = $this->dynamicTimeout;
-            $this->server->settings->force_docker_cleanup = $this->forceDockerCleanup;
-            $this->server->settings->docker_cleanup_frequency = $this->dockerCleanupFrequency;
-            $this->server->settings->docker_cleanup_threshold = $this->dockerCleanupThreshold;
             $this->server->settings->server_disk_usage_notification_threshold = $this->serverDiskUsageNotificationThreshold;
-            $this->server->settings->delete_unused_volumes = $this->deleteUnusedVolumes;
-            $this->server->settings->delete_unused_networks = $this->deleteUnusedNetworks;
             $this->server->settings->server_disk_usage_check_frequency = $this->serverDiskUsageCheckFrequency;
             $this->server->settings->save();
         } else {
             $this->concurrentBuilds = $this->server->settings->concurrent_builds;
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
-            $this->forceDockerCleanup = $this->server->settings->force_docker_cleanup;
-            $this->dockerCleanupFrequency = $this->server->settings->docker_cleanup_frequency;
-            $this->dockerCleanupThreshold = $this->server->settings->docker_cleanup_threshold;
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
-            $this->deleteUnusedVolumes = $this->server->settings->delete_unused_volumes;
-            $this->deleteUnusedNetworks = $this->server->settings->delete_unused_networks;
             $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
         }
     }
@@ -88,23 +162,9 @@ class Advanced extends Component
         }
     }
 
-    public function manualCleanup()
-    {
-        try {
-            DockerCleanupJob::dispatch($this->server, true);
-            $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function submit()
     {
         try {
-            if (! validate_cron_expression($this->dockerCleanupFrequency)) {
-                $this->dockerCleanupFrequency = $this->server->settings->getOriginal('docker_cleanup_frequency');
-                throw new \Exception('Invalid Cron / Human expression for Docker Cleanup Frequency.');
-            }
             if (! validate_cron_expression($this->serverDiskUsageCheckFrequency)) {
                 $this->serverDiskUsageCheckFrequency = $this->server->settings->getOriginal('server_disk_usage_check_frequency');
                 throw new \Exception('Invalid Cron / Human expression for Disk Usage Check Frequency.');

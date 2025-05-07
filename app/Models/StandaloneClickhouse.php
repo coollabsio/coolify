@@ -163,6 +163,11 @@ class StandaloneClickhouse extends BaseModel
         return data_get($this, 'environment.project');
     }
 
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
@@ -218,7 +223,12 @@ class StandaloneClickhouse extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "clickhouse://{$this->clickhouse_admin_user}:{$this->clickhouse_admin_password}@{$this->uuid}:9000/{$this->clickhouse_db}",
+            get: function () {
+                $encodedUser = rawurlencode($this->clickhouse_admin_user);
+                $encodedPass = rawurlencode($this->clickhouse_admin_password);
+
+                return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->uuid}:9000/{$this->clickhouse_db}";
+            },
         );
     }
 
@@ -227,7 +237,10 @@ class StandaloneClickhouse extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "clickhouse://{$this->clickhouse_admin_user}:{$this->clickhouse_admin_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
+                    $encodedUser = rawurlencode($this->clickhouse_admin_user);
+                    $encodedPass = rawurlencode($this->clickhouse_admin_password);
+
+                    return "clickhouse://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/{$this->clickhouse_db}";
                 }
 
                 return null;

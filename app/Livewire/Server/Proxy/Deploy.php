@@ -4,11 +4,10 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
+use App\Actions\Proxy\StopProxy;
 use App\Events\ProxyStatusChanged;
+use App\Jobs\RestartProxyJob;
 use App\Models\Server;
-use Carbon\Carbon;
-use Illuminate\Process\InvokedProcess;
-use Illuminate\Support\Facades\Process;
 use Livewire\Component;
 
 class Deploy extends Component
@@ -65,7 +64,7 @@ class Deploy extends Component
     public function restart()
     {
         try {
-            $this->stop();
+            RestartProxyJob::dispatch($this->server);
             $this->dispatch('checkProxy');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -98,44 +97,10 @@ class Deploy extends Component
     public function stop(bool $forceStop = true)
     {
         try {
-            $containerName = $this->server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
-            $timeout = 30;
-
-            $process = $this->stopContainer($containerName, $timeout);
-
-            $startTime = Carbon::now()->getTimestamp();
-            while ($process->running()) {
-                ray('running');
-                if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
-                    $this->forceStopContainer($containerName);
-                    break;
-                }
-                usleep(100000);
-            }
-
-            $this->removeContainer($containerName);
+            StopProxy::run($this->server, $forceStop);
+            $this->dispatch('proxyStatusUpdated');
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        } finally {
-            $this->server->proxy->force_stop = $forceStop;
-            $this->server->proxy->status = 'exited';
-            $this->server->save();
-            $this->dispatch('proxyStatusUpdated');
         }
-    }
-
-    private function stopContainer(string $containerName, int $timeout): InvokedProcess
-    {
-        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-    }
-
-    private function forceStopContainer(string $containerName)
-    {
-        instant_remote_process(["docker kill $containerName"], $this->server, throwError: false);
-    }
-
-    private function removeContainer(string $containerName)
-    {
-        instant_remote_process(["docker rm -f $containerName"], $this->server, throwError: false);
     }
 }

@@ -15,14 +15,27 @@
             @endif
             <x-forms.checkbox helper="Disable Docker build cache on every deployment." instantSave id="disableBuildCache"
                 label="Disable Build Cache" />
-            <x-forms.checkbox
-                helper="Your application will be available only on https if your domain starts with https://..."
-                instantSave id="isForceHttpsEnabled" label="Force Https" />
-            <x-forms.checkbox label="Enable Gzip Compression"
-                helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this."
-                instantSave id="isGzipEnabled" />
-            <x-forms.checkbox helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api."
-                instantSave id="isStripprefixEnabled" label="Strip Prefixes" />
+
+            @if ($application->settings->is_container_label_readonly_enabled)
+                <x-forms.checkbox
+                    helper="Your application will be available only on https if your domain starts with https://..."
+                    instantSave id="isForceHttpsEnabled" label="Force Https" />
+                <x-forms.checkbox label="Enable Gzip Compression"
+                    helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this."
+                    instantSave id="isGzipEnabled" />
+                <x-forms.checkbox helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api."
+                    instantSave id="isStripprefixEnabled" label="Strip Prefixes" />
+            @else
+                <x-forms.checkbox disabled
+                    helper="Readonly labels are disabled. You need to set the labels in the labels section." instantSave
+                    id="isForceHttpsEnabled" label="Force Https" />
+                <x-forms.checkbox label="Enable Gzip Compression" disabled
+                    helper="Readonly labels are disabled. You need to set the labels in the labels section." instantSave
+                    id="isGzipEnabled" />
+                <x-forms.checkbox
+                    helper="Readonly labels are disabled. You need to set the labels in the labels section." disabled
+                    instantSave id="isStripprefixEnabled" label="Strip Prefixes" />
+            @endif
             @if ($application->build_pack === 'dockercompose')
                 <h3>Docker Compose</h3>
                 <x-forms.checkbox instantSave id="isRawComposeDeploymentEnabled" label="Raw Compose Deployment"
@@ -45,12 +58,9 @@
                 <x-forms.checkbox instantSave id="isConnectToDockerNetworkEnabled" label="Connect To Predefined Network"
                     helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
             @endif
-            @if ($isLogDrainEnabled === false)
-                <h3 class="pt-4">Logs</h3>
-                <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                    instantSave id="isLogDrainEnabled" label="Drain Logs" />
-            @endif
-
+            <h3 class="pt-4">Logs</h3>
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave id="isLogDrainEnabled" label="Drain Logs" />
             @if ($application->git_based())
                 <h3>Git</h3>
                 <x-forms.checkbox instantSave id="isGitSubmodulesEnabled" label="Submodules"

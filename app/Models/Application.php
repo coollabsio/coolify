@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Services\ConfigurationGenerator;
+use App\Traits\HasConfiguration;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -43,6 +45,7 @@ use Visus\Cuid2\Cuid2;
         'start_command' => ['type' => 'string', 'description' => 'Start command.'],
         'ports_exposes' => ['type' => 'string', 'description' => 'Ports exposes.'],
         'ports_mappings' => ['type' => 'string', 'nullable' => true, 'description' => 'Ports mappings.'],
+        'custom_network_aliases' => ['type' => 'string', 'nullable' => true, 'description' => 'Network aliases for Docker container.'],
         'base_directory' => ['type' => 'string', 'description' => 'Base directory for all commands.'],
         'publish_directory' => ['type' => 'string', 'description' => 'Publish directory.'],
         'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
@@ -105,13 +108,75 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasConfiguration, HasFactory, SoftDeletes;
 
     private static $parserVersion = '4';
 
     protected $guarded = [];
 
     protected $appends = ['server_status'];
+
+    protected $casts = ['custom_network_aliases' => 'array'];
+
+    public function customNetworkAliases(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (is_null($value) || $value === '') {
+                    return null;
+                }
+
+                // If it's already a JSON string, decode it
+                if (is_string($value) && $this->isJson($value)) {
+                    $value = json_decode($value, true);
+                }
+
+                // If it's a string but not JSON, treat it as a comma-separated list
+                if (is_string($value) && ! is_array($value)) {
+                    $value = explode(',', $value);
+                }
+
+                $value = collect($value)
+                    ->map(function ($alias) {
+                        if (is_string($alias)) {
+                            return str_replace(' ', '-', trim($alias));
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique() // Remove duplicate values
+                    ->values()
+                    ->toArray();
+
+                return empty($value) ? null : json_encode($value);
+            },
+            get: function ($value) {
+                if (is_null($value)) {
+                    return null;
+                }
+
+                if (is_string($value) && $this->isJson($value)) {
+                    return json_decode($value, true);
+                }
+
+                return is_array($value) ? $value : [];
+            }
+        );
+    }
+
+    /**
+     * Check if a string is a valid JSON
+     */
+    private function isJson($string)
+    {
+        if (! is_string($string)) {
+            return false;
+        }
+        json_decode($string);
+
+        return json_last_error() === JSON_ERROR_NONE;
+    }
 
     protected static function booted()
     {
@@ -610,7 +675,7 @@ class Application extends BaseModel
             },
             get: function ($value) {
                 if ($this->additional_servers->count() === 0) {
-                    //running (healthy)
+                    // running (healthy)
                     if (str($value)->contains('(')) {
                         $status = str($value)->before('(')->trim()->value();
                         $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
@@ -999,7 +1064,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $base_command = "{$base_command} {$this->source->html_url}/{$customRepository}";
                 } else {
-                    $github_access_token = generate_github_installation_token($this->source);
+                    $github_access_token = generateGithubInstallationToken($this->source);
 
                     if ($exec_in_docker) {
                         $base_command = "{$base_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
@@ -1063,7 +1128,6 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $base_command = "{$base_command} {$customRepository}";
-            $base_command = $this->setGitImportSettings($deployment_uuid, $base_command, public: true);
 
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $base_command));
@@ -1111,7 +1175,7 @@ class Application extends BaseModel
                         $commands->push($git_clone_command);
                     }
                 } else {
-                    $github_access_token = generate_github_installation_token($this->source);
+                    $github_access_token = generateGithubInstallationToken($this->source);
                     if ($exec_in_docker) {
                         $git_clone_command = "{$git_clone_command} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git {$baseDir}";
                         $fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$customRepository}.git";
@@ -1506,6 +1570,7 @@ class Application extends BaseModel
 
     public function parseHealthcheckFromDockerfile($dockerfile, bool $isInit = false)
     {
+        $dockerfile = str($dockerfile)->trim()->explode("\n");
         if (str($dockerfile)->contains('HEALTHCHECK') && ($this->isHealthcheckDisabled() || $isInit)) {
             $healthcheckCommand = null;
             $lines = $dockerfile->toArray();
@@ -1525,27 +1590,24 @@ class Application extends BaseModel
                 }
             }
             if (str($healthcheckCommand)->isNotEmpty()) {
-                $interval = str($healthcheckCommand)->match('/--interval=(\d+)/');
-                $timeout = str($healthcheckCommand)->match('/--timeout=(\d+)/');
-                $start_period = str($healthcheckCommand)->match('/--start-period=(\d+)/');
-                $start_interval = str($healthcheckCommand)->match('/--start-interval=(\d+)/');
+                $interval = str($healthcheckCommand)->match('/--interval=([0-9]+[a-zµ]*)/');
+                $timeout = str($healthcheckCommand)->match('/--timeout=([0-9]+[a-zµ]*)/');
+                $start_period = str($healthcheckCommand)->match('/--start-period=([0-9]+[a-zµ]*)/');
                 $retries = str($healthcheckCommand)->match('/--retries=(\d+)/');
+
                 if ($interval->isNotEmpty()) {
-                    $this->health_check_interval = $interval->toInteger();
+                    $this->health_check_interval = parseDockerfileInterval($interval);
                 }
                 if ($timeout->isNotEmpty()) {
-                    $this->health_check_timeout = $timeout->toInteger();
+                    $this->health_check_timeout = parseDockerfileInterval($timeout);
                 }
                 if ($start_period->isNotEmpty()) {
-                    $this->health_check_start_period = $start_period->toInteger();
+                    $this->health_check_start_period = parseDockerfileInterval($start_period);
                 }
-                // if ($start_interval) {
-                //     $this->health_check_start_interval = $start_interval->value();
-                // }
                 if ($retries->isNotEmpty()) {
                     $this->health_check_retries = $retries->toInteger();
                 }
-                if ($interval || $timeout || $start_period || $start_interval || $retries) {
+                if ($interval || $timeout || $start_period || $retries) {
                     $this->custom_healthcheck_found = true;
                     $this->save();
                 }
@@ -1640,35 +1702,28 @@ class Application extends BaseModel
         }
     }
 
+    public function getLimits(): array
+    {
+        return [
+            'limits_memory' => $this->limits_memory,
+            'limits_memory_swap' => $this->limits_memory_swap,
+            'limits_memory_swappiness' => $this->limits_memory_swappiness,
+            'limits_memory_reservation' => $this->limits_memory_reservation,
+            'limits_cpus' => $this->limits_cpus,
+            'limits_cpuset' => $this->limits_cpuset,
+            'limits_cpu_shares' => $this->limits_cpu_shares,
+        ];
+    }
+
     public function generateConfig($is_json = false)
     {
-        $config = collect([]);
-        if ($this->build_pack = 'nixpacks') {
-            $config = collect([
-                'build_pack' => 'nixpacks',
-                'docker_registry_image_name' => $this->docker_registry_image_name,
-                'docker_registry_image_tag' => $this->docker_registry_image_tag,
-                'install_command' => $this->install_command,
-                'build_command' => $this->build_command,
-                'start_command' => $this->start_command,
-                'base_directory' => $this->base_directory,
-                'publish_directory' => $this->publish_directory,
-                'custom_docker_run_options' => $this->custom_docker_run_options,
-                'ports_exposes' => $this->ports_exposes,
-                'ports_mappings' => $this->ports_mapping,
-                'settings' => collect([
-                    'is_static' => $this->settings->is_static,
-                ]),
-            ]);
-        }
-        $config = $config->filter(function ($value) {
-            return str($value)->isNotEmpty();
-        });
+        $generator = new ConfigurationGenerator($this);
+
         if ($is_json) {
-            return json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            return $generator->toJson();
         }
 
-        return $config;
+        return $generator->toArray();
     }
 
     public function setConfig($config)

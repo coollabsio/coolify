@@ -23,6 +23,8 @@ class Select extends Component
 
     public Collection|null|Server $servers;
 
+    public bool $onlyBuildServerAvailable = false;
+
     public ?Collection $standaloneDockers;
 
     public ?Collection $swarmDockers;
@@ -79,7 +81,7 @@ class Select extends Component
 
     public function loadServices()
     {
-        $services = get_service_templates(true);
+        $services = get_service_templates();
         $services = collect($services)->map(function ($service, $key) {
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);
@@ -325,5 +327,11 @@ class Select extends Component
     {
         $this->servers = Server::isUsable()->get()->sortBy('name');
         $this->allServers = $this->servers;
+
+        if ($this->allServers && $this->allServers->isNotEmpty()) {
+            $this->onlyBuildServerAvailable = $this->allServers->every(function ($server) {
+                return $server->isBuildServer();
+            });
+        }
     }
 }

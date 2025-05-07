@@ -68,6 +68,7 @@ class General extends Component
         'application.publish_directory' => 'nullable',
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
+        'application.custom_network_aliases' => 'nullable',
         'application.dockerfile' => 'nullable',
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
@@ -86,6 +87,7 @@ class General extends Component
         'application.post_deployment_command_container' => 'nullable',
         'application.custom_nginx_configuration' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
+        'application.settings.is_spa' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_container_label_escape_enabled' => 'boolean|required',
         'application.settings.is_container_label_readonly_enabled' => 'boolean|required',
@@ -120,10 +122,12 @@ class General extends Component
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.custom_docker_run_options' => 'Custom docker run commands',
+        'application.custom_network_aliases' => 'Custom docker network aliases',
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
         'application.custom_nginx_configuration' => 'Custom Nginx configuration',
         'application.settings.is_static' => 'Is static',
+        'application.settings.is_spa' => 'Is SPA',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
         'application.settings.is_container_label_escape_enabled' => 'Is container label escape enabled',
         'application.settings.is_container_label_readonly_enabled' => 'Is container label readonly',
@@ -153,7 +157,7 @@ class General extends Component
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
-        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
+        if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && $this->application->settings->is_container_label_readonly_enabled === true) {
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -171,6 +175,9 @@ class General extends Component
 
     public function instantSave()
     {
+        if ($this->application->settings->isDirty('is_spa')) {
+            $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
+        }
         $this->application->settings->save();
         $this->dispatch('success', 'Settings saved.');
         $this->application->refresh();
@@ -187,6 +194,10 @@ class General extends Component
                 });
             }
         }
+        if ($this->application->settings->is_container_label_readonly_enabled) {
+            $this->resetDefaultLabels(false);
+        }
+
     }
 
     public function loadComposeFile($isInit = false)
@@ -284,9 +295,9 @@ class General extends Component
         }
     }
 
-    public function generateNginxConfiguration()
+    public function generateNginxConfiguration($type = 'static')
     {
-        $this->application->custom_nginx_configuration = defaultNginxConfiguration();
+        $this->application->custom_nginx_configuration = defaultNginxConfiguration($type);
         $this->application->save();
         $this->dispatch('success', 'Nginx configuration generated.');
     }
@@ -294,7 +305,7 @@ class General extends Component
     public function resetDefaultLabels($manualReset = false)
     {
         try {
-            if ($this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
+            if (! $this->application->settings->is_container_label_readonly_enabled && ! $manualReset) {
                 return;
             }
             $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
@@ -324,6 +335,7 @@ class General extends Component
             }
             check_domain_usage(resource: $this->application);
             $this->application->fqdn = $domains->implode(',');
+            $this->resetDefaultLabels(false);
         }
     }
 
@@ -364,6 +376,9 @@ class General extends Component
 
             if ($this->application->isDirty('redirect')) {
                 $this->setRedirect();
+            }
+            if ($this->application->isDirty('dockerfile')) {
+                $this->application->parseHealthcheckFromDockerfile($this->application->dockerfile);
             }
 
             $this->checkFqdns();

@@ -48,11 +48,11 @@ services:
       - SSH_MUX_ENABLED=false
       - IS_WINDOWS_DOCKER_DESKTOP=true
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "${APP_PORT:-8000}:8080"
     expose:
       - "${APP_PORT:-8000}"
     healthcheck:
-      test: curl --fail http://localhost:80/api/health || exit 1
+      test: curl --fail http://localhost:8080/api/health || exit 1
       interval: 5s
       retries: 10
       timeout: 2s

@@ -18,6 +18,7 @@ use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
@@ -811,6 +812,11 @@ class ApplicationsController extends Controller
                 'docker_compose_raw' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
             ];
+            // ports_exposes is not required for dockercompose
+            if ($request->build_pack === 'dockercompose') {
+                $validationRules['ports_exposes'] = 'string';
+                $request->offsetSet('ports_exposes', '80');
+            }
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validator = customApiValidator($request->all(), $validationRules);
             if ($validator->fails()) {
@@ -822,10 +828,6 @@ class ApplicationsController extends Controller
             if (! $request->has('name')) {
                 $request->offsetSet('name', generate_application_name($request->git_repository, $request->git_branch));
             }
-            if ($request->build_pack === 'dockercompose') {
-                $request->offsetSet('ports_exposes', '80');
-            }
-
             $return = $this->validateDataApplications($request, $server);
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
@@ -848,7 +850,13 @@ class ApplicationsController extends Controller
             if ($dockerComposeDomainsJson->count() > 0) {
                 $application->docker_compose_domains = $dockerComposeDomainsJson;
             }
-
+            $repository_url_parsed = Url::fromString($request->git_repository);
+            $git_host = $repository_url_parsed->getHost();
+            if ($git_host === 'github.com') {
+                $application->source_type = GithubApp::class;
+                $application->source_id = GithubApp::find(0)->id;
+            }
+            $application->git_repository = $repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2);
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
@@ -863,7 +871,7 @@ class ApplicationsController extends Controller
                 $application->settings->save();
             }
             $application->refresh();
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -872,12 +880,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -924,10 +937,31 @@ class ApplicationsController extends Controller
             if (! $githubApp) {
                 return response()->json(['message' => 'Github App not found.'], 404);
             }
+            $token = generateGithubInstallationToken($githubApp);
+            if (! $token) {
+                return response()->json(['message' => 'Failed to generate Github App token.'], 400);
+            }
+
+            $repositories = collect();
+            $page = 1;
+            $repositories = loadRepositoryByPage($githubApp, $token, $page);
+            if ($repositories['total_count'] > 0) {
+                while (count($repositories['repositories']) < $repositories['total_count']) {
+                    $page++;
+                    $repositories = loadRepositoryByPage($githubApp, $token, $page);
+                }
+            }
+
             $gitRepository = $request->git_repository;
             if (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
                 $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
             }
+            $gitRepositoryFound = collect($repositories['repositories'])->firstWhere('full_name', $gitRepository);
+            if (! $gitRepositoryFound) {
+                return response()->json(['message' => 'Repository not found.'], 404);
+            }
+            $repository_project_id = data_get($gitRepositoryFound, 'id');
+
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 
@@ -958,13 +992,15 @@ class ApplicationsController extends Controller
             $application->environment_id = $environment->id;
             $application->source_type = $githubApp->getMorphClass();
             $application->source_id = $githubApp->id;
+            $application->repository_project_id = $repository_project_id;
+
             $application->save();
             $application->refresh();
             if (isset($useBuildServer)) {
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -973,12 +1009,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1061,7 +1102,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -1070,12 +1111,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             } else {
                 if ($application->build_pack === 'dockercompose') {
                     LoadComposeFile::dispatch($application);
@@ -1142,7 +1188,6 @@ class ApplicationsController extends Controller
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
 
-            
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
@@ -1151,7 +1196,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -1160,12 +1205,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             }
 
             return response()->json(serializeApiResponse([
@@ -1206,7 +1256,7 @@ class ApplicationsController extends Controller
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
-            
+
             $application->git_repository = 'coollabsio/coolify';
             $application->git_branch = 'main';
             $application->save();
@@ -1215,7 +1265,7 @@ class ApplicationsController extends Controller
                 $application->settings->is_build_server_enabled = $useBuildServer;
                 $application->settings->save();
             }
-            if (! $application->settings->is_container_label_readonly_enabled) {
+            if ($application->settings->is_container_label_readonly_enabled) {
                 $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
                 $application->save();
             }
@@ -1224,12 +1274,17 @@ class ApplicationsController extends Controller
             if ($instantDeploy) {
                 $deployment_uuid = new Cuid2;
 
-                queue_application_deployment(
+                $result = queue_application_deployment(
                     application: $application,
                     deployment_uuid: $deployment_uuid,
                     no_questions_asked: true,
                     is_api: true,
                 );
+                if ($result['status'] === 'skipped') {
+                    return response()->json([
+                        'message' => $result['message'],
+                    ], 200);
+                }
             }
 
             return response()->json(serializeApiResponse([
@@ -1292,11 +1347,6 @@ class ApplicationsController extends Controller
             $dockerCompose = base64_decode($request->docker_compose_raw);
             $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
-            // $isValid = validateComposeFile($dockerComposeRaw, $server_id);
-            // if ($isValid !== 'OK') {
-            //     return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
-            // }
-
             $service = new Service;
             removeUnnecessaryFieldsFromRequest($request);
             $service->fill($request->all());
@@ -1308,7 +1358,6 @@ class ApplicationsController extends Controller
             $service->destination_type = $destination->getMorphClass();
             $service->save();
 
-            $service->name = "service-$service->uuid";
             $service->parse(isNew: true);
             if ($instantDeploy) {
                 StartService::dispatch($service);
@@ -1387,6 +1436,108 @@ class ApplicationsController extends Controller
         }
 
         return response()->json($this->removeSensitiveData($application));
+    }
+
+    #[OA\Get(
+        summary: 'Get application logs.',
+        description: 'Get application logs by UUID.',
+        path: '/applications/{uuid}/logs',
+        operationId: 'get-application-logs-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'lines',
+                in: 'query',
+                description: 'Number of lines to show from the end of the logs.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    format: 'int32',
+                    default: 100,
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Get application logs by UUID.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'logs' => ['type' => 'string'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function logs_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+
+        if ($containers->count() == 0) {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
+        }
+
+        $container = $containers->first();
+
+        $status = getContainerStatus($application->destination->server, $container['Names']);
+        if ($status !== 'running') {
+            return response()->json([
+                'message' => 'Application is not running.',
+            ], 400);
+        }
+
+        $lines = $request->query->get('lines', 100) ?: 100;
+        $logs = getContainerLogs($application->destination->server, $container['ID'], $lines);
+
+        return response()->json([
+            'logs' => $logs,
+        ]);
     }
 
     #[OA\Delete(
@@ -1484,6 +1635,18 @@ class ApplicationsController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the application.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
         requestBody: new OA\RequestBody(
             description: 'Application updated.',
             required: true,
@@ -1682,7 +1845,8 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $domains = $request->domains;
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        $requestHasDomains = $request->has('domains');
+        if ($requestHasDomains && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;
             $fqdn = $request->domains;
             $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
@@ -1744,7 +1908,7 @@ class ApplicationsController extends Controller
         removeUnnecessaryFieldsFromRequest($request);
 
         $data = $request->all();
-        if ($request->has('domains') && $server->isProxyShouldRun()) {
+        if ($requestHasDomains && $server->isProxyShouldRun()) {
             data_set($data, 'fqdn', $domains);
         }
 
@@ -1757,11 +1921,16 @@ class ApplicationsController extends Controller
         if ($instantDeploy) {
             $deployment_uuid = new Cuid2;
 
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 application: $application,
                 deployment_uuid: $deployment_uuid,
                 is_api: true,
             );
+            if ($result['status'] === 'skipped') {
+                return response()->json([
+                    'message' => $result['message'],
+                ], 200);
+            }
         }
 
         return response()->json([
@@ -2578,13 +2747,21 @@ class ApplicationsController extends Controller
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
             force_rebuild: $force,
             is_api: true,
             no_questions_asked: $instant_deploy
         );
+        if ($result['status'] === 'skipped') {
+            return response()->json(
+                [
+                    'message' => $result['message'],
+                ],
+                200
+            );
+        }
 
         return response()->json(
             [
@@ -2739,12 +2916,17 @@ class ApplicationsController extends Controller
 
         $deployment_uuid = new Cuid2;
 
-        queue_application_deployment(
+        $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
             restart_only: true,
             is_api: true,
         );
+        if ($result['status'] === 'skipped') {
+            return response()->json([
+                'message' => $result['message'],
+            ], 200);
+        }
 
         return response()->json(
             [
@@ -2754,130 +2936,130 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Post(
-        summary: 'Execute Command',
-        description: "Execute a command on the application's current container.",
-        path: '/applications/{uuid}/execute',
-        operationId: 'execute-command-application',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Applications'],
-        parameters: [
-            new OA\Parameter(
-                name: 'uuid',
-                in: 'path',
-                description: 'UUID of the application.',
-                required: true,
-                schema: new OA\Schema(
-                    type: 'string',
-                    format: 'uuid',
-                )
-            ),
-        ],
-        requestBody: new OA\RequestBody(
-            required: true,
-            description: 'Command to execute.',
-            content: new OA\MediaType(
-                mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'command' => ['type' => 'string', 'description' => 'Command to execute.'],
-                    ],
-                ),
-            ),
-        ),
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: "Execute a command on the application's current container.",
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => ['type' => 'string', 'example' => 'Command executed.'],
-                                'response' => ['type' => 'string'],
-                            ]
-                        )
-                    ),
-                ]
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-            new OA\Response(
-                response: 404,
-                ref: '#/components/responses/404',
-            ),
-        ]
-    )]
-    public function execute_command_by_uuid(Request $request)
-    {
-        // TODO: Need to review this from security perspective, to not allow arbitrary command execution
-        $allowedFields = ['command'];
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        $uuid = $request->route('uuid');
-        if (! $uuid) {
-            return response()->json(['message' => 'UUID is required.'], 400);
-        }
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
-        if (! $application) {
-            return response()->json(['message' => 'Application not found.'], 404);
-        }
-        $return = validateIncomingRequest($request);
-        if ($return instanceof \Illuminate\Http\JsonResponse) {
-            return $return;
-        }
-        $validator = customApiValidator($request->all(), [
-            'command' => 'string|required',
-        ]);
+    // #[OA\Post(
+    //     summary: 'Execute Command',
+    //     description: "Execute a command on the application's current container.",
+    //     path: '/applications/{uuid}/execute',
+    //     operationId: 'execute-command-application',
+    //     security: [
+    //         ['bearerAuth' => []],
+    //     ],
+    //     tags: ['Applications'],
+    //     parameters: [
+    //         new OA\Parameter(
+    //             name: 'uuid',
+    //             in: 'path',
+    //             description: 'UUID of the application.',
+    //             required: true,
+    //             schema: new OA\Schema(
+    //                 type: 'string',
+    //                 format: 'uuid',
+    //             )
+    //         ),
+    //     ],
+    //     requestBody: new OA\RequestBody(
+    //         required: true,
+    //         description: 'Command to execute.',
+    //         content: new OA\MediaType(
+    //             mediaType: 'application/json',
+    //             schema: new OA\Schema(
+    //                 type: 'object',
+    //                 properties: [
+    //                     'command' => ['type' => 'string', 'description' => 'Command to execute.'],
+    //                 ],
+    //             ),
+    //         ),
+    //     ),
+    //     responses: [
+    //         new OA\Response(
+    //             response: 200,
+    //             description: "Execute a command on the application's current container.",
+    //             content: [
+    //                 new OA\MediaType(
+    //                     mediaType: 'application/json',
+    //                     schema: new OA\Schema(
+    //                         type: 'object',
+    //                         properties: [
+    //                             'message' => ['type' => 'string', 'example' => 'Command executed.'],
+    //                             'response' => ['type' => 'string'],
+    //                         ]
+    //                     )
+    //                 ),
+    //             ]
+    //         ),
+    //         new OA\Response(
+    //             response: 401,
+    //             ref: '#/components/responses/401',
+    //         ),
+    //         new OA\Response(
+    //             response: 400,
+    //             ref: '#/components/responses/400',
+    //         ),
+    //         new OA\Response(
+    //             response: 404,
+    //             ref: '#/components/responses/404',
+    //         ),
+    //     ]
+    // )]
+    // public function execute_command_by_uuid(Request $request)
+    // {
+    //     // TODO: Need to review this from security perspective, to not allow arbitrary command execution
+    //     $allowedFields = ['command'];
+    //     $teamId = getTeamIdFromToken();
+    //     if (is_null($teamId)) {
+    //         return invalidTokenResponse();
+    //     }
+    //     $uuid = $request->route('uuid');
+    //     if (! $uuid) {
+    //         return response()->json(['message' => 'UUID is required.'], 400);
+    //     }
+    //     $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+    //     if (! $application) {
+    //         return response()->json(['message' => 'Application not found.'], 404);
+    //     }
+    //     $return = validateIncomingRequest($request);
+    //     if ($return instanceof \Illuminate\Http\JsonResponse) {
+    //         return $return;
+    //     }
+    //     $validator = customApiValidator($request->all(), [
+    //         'command' => 'string|required',
+    //     ]);
 
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
-            $errors = $validator->errors();
-            if (! empty($extraFields)) {
-                foreach ($extraFields as $field) {
-                    $errors->add($field, 'This field is not allowed.');
-                }
-            }
+    //     $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+    //     if ($validator->fails() || ! empty($extraFields)) {
+    //         $errors = $validator->errors();
+    //         if (! empty($extraFields)) {
+    //             foreach ($extraFields as $field) {
+    //                 $errors->add($field, 'This field is not allowed.');
+    //             }
+    //         }
 
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ], 422);
-        }
+    //         return response()->json([
+    //             'message' => 'Validation failed.',
+    //             'errors' => $errors,
+    //         ], 422);
+    //     }
 
-        $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
-        $status = getContainerStatus($application->destination->server, $container['Names']);
+    //     $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
+    //     $status = getContainerStatus($application->destination->server, $container['Names']);
 
-        if ($status !== 'running') {
-            return response()->json([
-                'message' => 'Application is not running.',
-            ], 400);
-        }
+    //     if ($status !== 'running') {
+    //         return response()->json([
+    //             'message' => 'Application is not running.',
+    //         ], 400);
+    //     }
 
-        $commands = collect([
-            executeInDocker($container['Names'], $request->command),
-        ]);
+    //     $commands = collect([
+    //         executeInDocker($container['Names'], $request->command),
+    //     ]);
 
-        $res = instant_remote_process(command: $commands, server: $application->destination->server);
+    //     $res = instant_remote_process(command: $commands, server: $application->destination->server);
 
-        return response()->json([
-            'message' => 'Command executed.',
-            'response' => $res,
-        ]);
-    }
+    //     return response()->json([
+    //         'message' => 'Command executed.',
+    //         'response' => $res,
+    //     ]);
+    // }
 
     private function validateDataApplications(Request $request, Server $server)
     {

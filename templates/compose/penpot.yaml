@@ -2,35 +2,41 @@
 # slogan: Penpot is the first Open Source design and prototyping platform for product teams.
 # tags: penpot,design,prototyping,figma,open,source
 # logo: svgs/penpot.svg
+# port: 8080
 
 services:
   frontend:
-    image: "penpotapp/frontend:latest"
+    image: penpotapp/frontend:latest
     volumes:
       - penpot-assets:/opt/data/assets
     depends_on:
-      - penpot-backend
-      - penpot-exporter
+      penpot-backend:
+        condition: service_healthy
+      penpot-exporter:
+        condition: service_healthy
     environment:
-      - SERVICE_FQDN_FRONTEND
+      - SERVICE_FQDN_FRONTEND_8080
       - PENPOT_FLAGS=${PENPOT_FRONTEND_FLAGS:-enable-login-with-password}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:8080']
       interval: 2s
       timeout: 10s
       retries: 15
+
   penpot-backend:
     image: penpotapp/backend:latest
     volumes:
       - penpot-assets:/opt/data/assets
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - PENPOT_FLAGS=${PENPOT_BACKEND_FLAGS:-enable-login-with-password enable-smtp enable-prepl-server}
       - PENPOT_HTTP_SERVER_PORT=6060
       - PENPOT_SECRET_KEY=$SERVICE_REALBASE64_64_PENPOT
-      - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND
+      - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND_8080
       - PENPOT_BACKEND_URI=http://penpot-backend
       - PENPOT_EXPORTER_URI=http://penpot-exporter
       - PENPOT_DATABASE_URI=postgresql://postgres/${POSTGRES_DB:-penpot}
@@ -49,19 +55,32 @@ services:
       - PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS:-false}
       - PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL:-false}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:6060"]
-      interval: 2s
-      timeout: 10s
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:6060/readyz']
+      interval: 10s
+      timeout: 30s
       retries: 15
+
   penpot-exporter:
     image: penpotapp/exporter:latest
     environment:
-      - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND
+      - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND_8080
       - PENPOT_REDIS_URI=redis://redis/0
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:6061/readyz']
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
   mailpit:
-    image: "axllent/mailpit:latest"
+    image: axllent/mailpit:latest
     environment:
       - SERVICE_FQDN_MAILPIT_8025
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
   postgres:
     image: postgres:15
     volumes:
@@ -72,17 +91,18 @@ services:
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
       - POSTGRES_DB=${POSTGRES_DB:-penpot}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
       timeout: 20s
       retries: 10
+
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
       - penpot-redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 20s
       retries: 10

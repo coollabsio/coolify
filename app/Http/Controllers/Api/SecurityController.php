@@ -195,6 +195,31 @@ class SecurityController extends Controller
         if (! $request->description) {
             $request->offsetSet('description', 'Created by Coolify via API');
         }
+
+        $isPrivateKeyString = str_starts_with($request->private_key, '-----BEGIN');
+        if (! $isPrivateKeyString) {
+            try {
+                $base64PrivateKey = base64_decode($request->private_key);
+                $request->offsetSet('private_key', $base64PrivateKey);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Invalid private key.',
+                ], 422);
+            }
+        }
+        $isPrivateKeyValid = PrivateKey::validatePrivateKey($request->private_key);
+        if (! $isPrivateKeyValid) {
+            return response()->json([
+                'message' => 'Invalid private key.',
+            ], 422);
+        }
+        $fingerPrint = PrivateKey::generateFingerprint($request->private_key);
+        $isFingerPrintExists = PrivateKey::fingerprintExists($fingerPrint);
+        if ($isFingerPrintExists) {
+            return response()->json([
+                'message' => 'Private key already exists.',
+            ], 422);
+        }
         $key = PrivateKey::create([
             'team_id' => $teamId,
             'name' => $request->name,
@@ -343,6 +368,20 @@ class SecurityController extends Controller
                 response: 404,
                 description: 'Private Key not found.',
             ),
+            new OA\Response(
+                response: 422,
+                description: 'Private Key is in use and cannot be deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Private Key is in use and cannot be deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
         ]
     )]
     public function delete_key(Request $request)
@@ -359,6 +398,14 @@ class SecurityController extends Controller
         if (is_null($key)) {
             return response()->json(['message' => 'Private Key not found.'], 404);
         }
+
+        if ($key->isInUse()) {
+            return response()->json([
+                'message' => 'Private Key is in use and cannot be deleted.',
+                'details' => 'This private key is currently being used by servers, applications, or Git integrations.',
+            ], 422);
+        }
+
         $key->forceDelete();
 
         return response()->json([

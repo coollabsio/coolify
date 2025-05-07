@@ -4,6 +4,8 @@
 
 You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
 
+To understand the tech stack, please refer to the [Tech Stack](TECH_STACK.md) document.
+
 ## Table of Contents
 
 1. [Setup Development Environment](#1-setup-development-environment)
@@ -134,6 +136,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    - Password: `password`
 
 2. Additional development tools:
+
    | Tool | URL | Note |
    |------|-----|------|
    | Laravel Horizon (scheduler) | `http://localhost:8000/horizon` | Only accessible when logged in as root user |
@@ -235,9 +238,9 @@ After completing these steps, you'll have a fresh development setup.
 ### Contributing a New Service
 
 To add a new service to Coolify, please refer to our documentation:
-[Adding a New Service](https://coolify.io/docs/knowledge-base/contribute/service)
+[Adding a New Service](https://coolify.io/docs/get-started/contribute/service)
 
 ### Contributing to Documentation
 
 To contribute to the Coolify documentation, please refer to this guide:
-[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/CONTRIBUTING.md)
+[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/readme.md)

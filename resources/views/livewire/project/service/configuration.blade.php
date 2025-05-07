@@ -36,10 +36,10 @@
                 wire:navigate>Danger Zone</a>
         </div>
         <div class="w-full">
-            @if (request()->route()->getName() === 'project.service.configuration')
+            @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
+                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10000ms="check_status">
                     @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500 ' => str(
@@ -95,7 +95,8 @@
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}">
+                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}"
+                                        wire:navigate>
                                         Settings
                                     </a>
                                     @if (str($application->status)->contains('running'))
@@ -143,12 +144,14 @@
                                 <div class="flex items-center px-4">
                                     @if ($database->isBackupSolutionAvailable())
                                         <a class="mx-4 text-xs font-bold hover:underline"
-                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups">
+                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups"
+                                            wire:navigate>
                                             Backups
                                         </a>
                                     @endif
                                     <a class="mx-4 text-xs font-bold hover:underline"
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
+                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}"
+                                        wire:navigate>
                                         Settings
                                     </a>
                                     @if (str($database->status)->contains('running'))
@@ -165,15 +168,17 @@
                         </div>
                     @endforeach
                 </div>
-            @elseif (request()->route()->getName() === 'project.service.environment-variables')
+            @elseif ($currentRoute === 'project.service.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.storages')
+            @elseif ($currentRoute === 'project.service.storages')
                 <div class="flex gap-2 items-center">
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
                 <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
-                    your compose file (Service Stack tab).</div>
+                    your compose file (<a class="underline"
+                        href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
+                        wire:navigate>General tab</a>).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />
@@ -181,15 +186,15 @@
                 @foreach ($databases as $database)
                     <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
-            @elseif (request()->route()->getName() === 'project.service.scheduled-tasks.show')
+            @elseif ($currentRoute === 'project.service.scheduled-tasks.show')
                 <livewire:project.shared.scheduled-task.all :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.webhooks')
+            @elseif ($currentRoute === 'project.service.webhooks')
                 <livewire:project.shared.webhooks :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.resource-operations')
+            @elseif ($currentRoute === 'project.service.resource-operations')
                 <livewire:project.shared.resource-operations :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.tags')
+            @elseif ($currentRoute === 'project.service.tags')
                 <livewire:project.shared.tags :resource="$service" />
-            @elseif (request()->route()->getName() === 'project.service.danger')
+            @elseif ($currentRoute === 'project.service.danger')
                 <livewire:project.shared.danger :resource="$service" />
             @endif
         </div>

@@ -50,6 +50,11 @@ class Service extends BaseModel
 
     protected static function booted()
     {
+        static::creating(function ($service) {
+            if (blank($service->name)) {
+                $service->name = 'service-'.(new Cuid2);
+            }
+        });
         static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
             $service->save();
@@ -1050,10 +1055,11 @@ class Service extends BaseModel
                     $fields->put('MySQL', $data->toArray());
                     break;
                 case $image->contains('mariadb'):
-                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER', 'SERVICE_USER_MYSQL', 'MYSQL_USER'];
+                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', 'SERVICE_USER_MYSQL', 'MYSQL_USER'];
                     $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS', 'MYSQL_PASSWORD'];
                     $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS', 'MYSQL_ROOT_PASSWORD'];
                     $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA', 'MYSQL_DATABASE'];
+
                     $mariadb_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
@@ -1102,6 +1108,23 @@ class Service extends BaseModel
                     break;
             }
         }
+        $fields = collect($fields)->map(function ($extraFields) {
+            if (is_array($extraFields)) {
+                $extraFields = collect($extraFields)->map(function ($field) {
+                    if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
+                        $searchValue = str($field['value'])->after('$')->value;
+                        $newValue = $this->environment_variables()->where('key', $searchValue)->first();
+                        if ($newValue) {
+                            $field['value'] = $newValue->value;
+                        }
+                    }
+
+                    return $field;
+                });
+            }
+
+            return $extraFields;
+        });
 
         return $fields;
     }

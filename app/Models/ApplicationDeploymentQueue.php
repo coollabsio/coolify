@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -70,13 +71,18 @@ class ApplicationDeploymentQueue extends Model
         return collect(json_decode($this->logs))->where('name', $name)->first()?->output ?? null;
     }
 
+    public function getHorizonJobStatus()
+    {
+        return getJobStatus($this->horizon_job_id);
+    }
+
     public function commitMessage()
     {
         if (empty($this->commit_message) || is_null($this->commit_message)) {
             return null;
         }
 
-        return str($this->commit_message)->trim()->limit(50)->value();
+        return str($this->commit_message)->value();
     }
 
     public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false)
@@ -96,17 +102,23 @@ class ApplicationDeploymentQueue extends Model
             'hidden' => $hidden,
             'batch' => 1,
         ];
-        if ($this->logs) {
-            $previousLogs = json_decode($this->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-            $newLogEntry['order'] = count($previousLogs) + 1;
-            $previousLogs[] = $newLogEntry;
-            $this->update([
-                'logs' => json_encode($previousLogs, flags: JSON_THROW_ON_ERROR),
-            ]);
-        } else {
-            $this->update([
-                'logs' => json_encode([$newLogEntry], flags: JSON_THROW_ON_ERROR),
-            ]);
-        }
+
+        // Use a transaction to ensure atomicity
+        DB::transaction(function () use ($newLogEntry) {
+            // Reload the model to get the latest logs
+            $this->refresh();
+
+            if ($this->logs) {
+                $previousLogs = json_decode($this->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                $newLogEntry['order'] = count($previousLogs) + 1;
+                $previousLogs[] = $newLogEntry;
+                $this->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
+            } else {
+                $this->logs = json_encode([$newLogEntry], flags: JSON_THROW_ON_ERROR);
+            }
+
+            // Save without triggering events to prevent potential race conditions
+            $this->saveQuietly();
+        });
     }
 }

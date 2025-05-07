@@ -27,67 +27,6 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-2">
-                    <div class="flex gap-4">
-                        <h3>Docker Cleanup</h3>
-                        <x-modal-confirmation title="Confirm Docker Cleanup?" buttonTitle="Trigger Manual Cleanup"
-                            isHighlightedButton submitAction="manualCleanup" :actions="[
-                                'Permanently deletes all stopped containers managed by Coolify (as containers are non-persistent, no data will be lost)',
-                                'Permanently deletes all unused images',
-                                'Clears build cache',
-                                'Removes old versions of the Coolify helper image',
-                                'Optionally permanently deletes all unused volumes (if enabled in advanced options).',
-                                'Optionally permanently deletes all unused networks (if enabled in advanced options).',
-                            ]" :confirmWithText="false"
-                            :confirmWithPassword="false" step2ButtonText="Trigger Docker Cleanup" />
-                    </div>
-                    <div class="flex flex-wrap items-center gap-4">
-                        <x-forms.input placeholder="*/10 * * * *" id="dockerCleanupFrequency"
-                            label="Docker cleanup frequency" required
-                            helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
-                        @if (!$forceDockerCleanup)
-                        <x-forms.input id="dockerCleanupThreshold" label="Docker cleanup threshold (%)" required
-                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
-                        @endif
-                        <div class="w-96">
-                            <x-forms.checkbox
-                                helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
-                        <ul class='list-disc pl-4 mt-2'>
-                            <li>Removes stopped containers managed by Coolify (as containers are none persistent, no data will be lost).</li>
-                            <li>Deletes unused images.</li>
-                            <li>Clears build cache.</li>
-                            <li>Removes old versions of the Coolify helper image.</li>
-                            <li>Optionally delete unused volumes (if enabled in advanced options).</li>
-                            <li>Optionally remove unused networks (if enabled in advanced options).</li>
-                        </ul>"
-                                instantSave id="forceDockerCleanup" label="Force Docker Cleanup" />
-                        </div>
-
-                    </div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        <span class="dark:text-warning font-bold">Warning: Enable these
-                            options only if you fully understand their implications and
-                            consequences!</span><br>Improper use will result in data loss and could cause
-                        functional issues.
-                    </p>
-                    <div class="w-96">
-                        <x-forms.checkbox instantSave id="deleteUnusedVolumes" label="Delete Unused Volumes"
-                            helper="This option will remove all unused Docker volumes during cleanup.<br><br><strong>Warning: Data form stopped containers will be lost!</strong><br><br>Consequences include:<br>
-            <ul class='list-disc pl-4 mt-2'>
-                <li>Volumes not attached to running containers will be deleted and data will be permanently lost (stopped containers are affected).</li>
-                <li>Data from stopped containers volumes will be permanently lost.</li>
-                <li>No way to recover deleted volume data.</li>
-            </ul>" />
-                        <x-forms.checkbox instantSave id="deleteUnusedNetworks" label="Delete Unused Networks"
-                            helper="This option will remove all unused Docker networks during cleanup.<br><br><strong>Warning: Functionality may be lost and containers may not be able to communicate with each other!</strong><br><br>Consequences include:<br>
-            <ul class='list-disc pl-4 mt-2'>
-                <li>Networks not attached to running containers will be permanently deleted (stopped containers are affected).</li>
-                <li>Custom networks for stopped containers will be permanently deleted.</li>
-                <li>Functionality may be lost and containers may not be able to communicate with each other.</li>
-            </ul>" />
-                    </div>
-                </div>
-
                 <div class="flex flex-col">
                     <h3>Builds</h3>
                     <div>Customize the build process.</div>
@@ -97,6 +36,95 @@
                         <x-forms.input id="dynamicTimeout" label="Deployment timeout (seconds)" required
                             helper="You can define the maximum duration for a deployment to run before timing it out." />
                     </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col gap-4 pt-8">
+                <h3>CA SSL Certificate</h3>
+                <div class="flex gap-2">
+                    <x-modal-confirmation 
+                        title="Confirm changing of CA Certificate?" 
+                        buttonTitle="Save Certificate"
+                        submitAction="saveCaCertificate" 
+                        :actions="[
+                            'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.', 
+                            'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
+                            'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
+                            'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.'
+                        ]"
+                        confirmationText="/data/coolify/ssl/coolify-ca.crt"
+                        shortConfirmationLabel="CA Certificate Path"
+                        step3ButtonText="Save Certificate">
+                    </x-modal-confirmation>
+                    <x-modal-confirmation 
+                        title="Confirm Regenerate Certificate?" 
+                        buttonTitle="Regenerate Certificate" 
+                        submitAction="regenerateCaCertificate" 
+                        :actions="[
+                            'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.', 
+                            'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
+                            'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with the new CA certificate.',
+                            'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.'
+                        ]"
+                        confirmationText="/data/coolify/ssl/coolify-ca.crt"
+                        shortConfirmationLabel="CA Certificate Path"
+                        step3ButtonText="Regenerate Certificate">
+                    </x-modal-confirmation>
+                </div>
+                <div class="space-y-4">
+                    <div class="text-sm">
+                        <p class="font-medium mb-2">Recommended Configuration:</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>Mount this CA certificate of Coolify into all containers that need to connect to one of your databases over SSL. You can see and copy the bind mount below.</li>
+                            <li>Read more when and why this is needed <a class="underline" href="https://coolify.io/docs/databases/ssl" target="_blank">here</a>.</li>
+                        </ul>
+                    </div>
+                    <div class="relative">
+                        <x-forms.copy-button 
+                            text="- /data/coolify/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" 
+                        />
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm">CA Certificate</span>
+                            @if($certificateValidUntil)
+                                <span class="text-sm">(Valid until: 
+                                    @if(now()->gt($certificateValidUntil))
+                                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired)</span>
+                                    @elseif(now()->addDays(30)->gt($certificateValidUntil))
+                                        <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expiring soon)</span>
+                                    @else
+                                        <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }})</span>
+                                    @endif
+                                </span>
+                            @endif
+                        </div>
+                        <x-forms.button 
+                            wire:click="toggleCertificate" 
+                            type="button" 
+                            class="!py-1 !px-2 text-sm">
+                            {{ $showCertificate ? 'Hide' : 'Show' }}
+                        </x-forms.button>
+                    </div>
+                    @if($showCertificate)
+                        <textarea 
+                            class="w-full h-[370px] input"
+                            wire:model="certificateContent"
+                            placeholder="Paste or edit CA certificate content here..."></textarea>
+                    @else
+                        <div class="w-full h-[370px] input">
+                            <div class="h-full flex flex-col items-center justify-center text-gray-300">
+                                <div class="mb-2">
+                                    ━━━━━━━━ CERTIFICATE CONTENT ━━━━━━━━
+                                </div>
+                                <div class="text-sm">
+                                    Click "Show" to view or edit
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         </form>
