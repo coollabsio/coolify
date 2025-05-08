@@ -162,12 +162,13 @@ class StartMariadb
         }
 
         if ($this->database->enable_ssl) {
+            $base_config_path = config('constants.coolify.base_config_path');
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'] ?? [],
                 [
                     [
                         'type' => 'bind',
-                        'source' => '/data/coolify/ssl/coolify-ca.crt',
+                        'source' => $base_config_path . '/ssl/coolify-ca.crt',
                         'target' => '/etc/mysql/certs/coolify-ca.crt',
                         'read_only' => true,
                     ],

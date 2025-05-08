@@ -15,7 +15,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    protected string $cloneDir = '/data/coolify/clone';
+    protected string $cloneDir;
 
     public function __construct(
         protected string $sourceVolume,
@@ -24,6 +24,7 @@ class VolumeCloneJob implements ShouldBeEncrypted, ShouldQueue
         protected ?Server $targetServer,
         protected LocalPersistentVolume $persistentVolume
     ) {
+        $this->cloneDir = config('constants.coolify.base_config_path') . '/clone';
         $this->onQueue('high');
     }
 

@@ -20,7 +20,7 @@ services:
       - PHP_FPM_PM_MIN_SPARE_SERVERS=${PHP_FPM_PM_MIN_SPARE_SERVERS:-1}
       - PHP_FPM_PM_MAX_SPARE_SERVERS=${PHP_FPM_PM_MAX_SPARE_SERVERS:-10}
     env_file:
-      - /data/coolify/source/.env
+      - ${BASE_CONFIG_PATH:-/data/coolify}/source/.env
     ports:
       - "${APP_PORT:-8000}:8080"
     expose:

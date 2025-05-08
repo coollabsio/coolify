@@ -55,7 +55,7 @@ class UpdateCoolify
         $image = config('constants.coolify.registry_url').'/coollabsio/coolify:'.$this->latestVersion;
         instant_remote_process(["docker pull -q $image"], $this->server, false);
 
-        $base_path = config('coolify.base_config_path');
+        $base_path = config('constants.coolify.base_config_path');
 
         remote_process([
             "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o {$base_path}/source/upgrade.sh",

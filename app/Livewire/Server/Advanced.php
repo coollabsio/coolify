@@ -24,6 +24,8 @@ class Advanced extends Component
 
     public array $parameters = [];
 
+    public string $baseConfigPath;
+
     #[Validate(['string'])]
     public string $serverDiskUsageCheckFrequency = '0 23 * * *';
 
@@ -38,6 +40,7 @@ class Advanced extends Component
 
     public function mount(string $server_uuid)
     {
+        $this->baseConfigPath = config('constants.coolify.base_config_path');
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->parameters = get_route_parameters();

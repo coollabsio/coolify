@@ -57,7 +57,7 @@ use Visus\Cuid2\Cuid2;
 
 function base_configuration_dir(): string
 {
-    return config('coolify.base_config_path') ?? '/data/coolify';
+    return config('constants.coolify.base_config_path') ?? '/data/coolify';
 }
 function application_configuration_dir(): string
 {
