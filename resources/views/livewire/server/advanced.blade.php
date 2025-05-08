@@ -38,16 +38,15 @@
                     </div>
                 </div>
             </div>
-
+            
             <div class="flex flex-col gap-4 pt-8">
                 <h3>CA SSL Certificate</h3>
                 <div class="flex gap-2">
-                    <x-modal-confirmation
-                        title="Confirm changing of CA Certificate?"
+                    <x-modal-confirmation 
+                        title="Confirm changing of CA Certificate?" 
                         buttonTitle="Save Certificate"
-                        submitAction="saveCaCertificate"
-                        :actions="
-                        [
+                        submitAction="saveCaCertificate" 
+                        :actions="[
                             'This will overwrite the existing CA certificate at ' . $baseConfigPath . '/ssl/coolify-ca.crt with your custom CA certificate.',
                             'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
                             'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
@@ -57,10 +56,10 @@
                         shortConfirmationLabel="CA Certificate Path"
                         step3ButtonText="Save Certificate">
                     </x-modal-confirmation>
-                    <x-modal-confirmation
-                        title="Confirm Regenerate Certificate?"
-                        buttonTitle="Regenerate Certificate"
-                        submitAction="regenerateCaCertificate"
+                    <x-modal-confirmation 
+                        title="Confirm Regenerate Certificate?" 
+                        buttonTitle="Regenerate Certificate" 
+                        submitAction="regenerateCaCertificate" 
                         :actions="[
                             'This will generate a new CA certificate at ' . $baseConfigPath . '/ssl/coolify-ca.crt and replace the existing one.',
                             'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
@@ -81,7 +80,7 @@
                         </ul>
                     </div>
                     <div class="relative">
-                        <x-forms.copy-button
+                        <x-forms.copy-button 
                             text="- {{ $baseConfigPath }}/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro"
                         />
                     </div>
@@ -91,7 +90,7 @@
                         <div class="flex items-center gap-2">
                             <span class="text-sm">CA Certificate</span>
                             @if($certificateValidUntil)
-                                <span class="text-sm">(Valid until:
+                                <span class="text-sm">(Valid until: 
                                     @if(now()->gt($certificateValidUntil))
                                         <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired)</span>
                                     @elseif(now()->addDays(30)->gt($certificateValidUntil))
@@ -102,15 +101,15 @@
                                 </span>
                             @endif
                         </div>
-                        <x-forms.button
-                            wire:click="toggleCertificate"
-                            type="button"
+                        <x-forms.button 
+                            wire:click="toggleCertificate" 
+                            type="button" 
                             class="!py-1 !px-2 text-sm">
                             {{ $showCertificate ? 'Hide' : 'Show' }}
                         </x-forms.button>
                     </div>
                     @if($showCertificate)
-                        <textarea
+                        <textarea 
                             class="w-full h-[370px] input"
                             wire:model="certificateContent"
                             placeholder="Paste or edit CA certificate content here..."></textarea>

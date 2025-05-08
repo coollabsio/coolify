@@ -2,11 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [4.0.0-beta.416] - 2025-05-05
+## [unreleased]
 
 ### 📚 Documentation
 
-- Update changelog
 - Update changelog
 
 ## [4.0.0-beta.415] - 2025-04-29
