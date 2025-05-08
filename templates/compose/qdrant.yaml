@@ -12,6 +12,8 @@ services:
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}
     volumes:
       - "qdrant-storage:/qdrant/storage"
+    ports:
+      - "6333:6333"
     healthcheck:
       test:
         - CMD-SHELL
