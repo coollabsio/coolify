@@ -27,7 +27,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -1377,6 +1376,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function check_git_if_build_needed()
     {
+        if (is_object($this->source) && $this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
+            $repository = githubApi($this->source, "repos/{$this->customRepository}");
+            $data = data_get($repository, 'data');
+            if (isset($data->id)) {
+                $repository_project_id = $data->id;
+                if (blank($this->application->repository_project_id) || $this->application->repository_project_id !== $repository_project_id) {
+                    $this->application->repository_project_id = $repository_project_id;
+                    $this->application->save();
+                }
+            }
+        }
         $this->generate_git_import_commands();
         $local_branch = $this->branch;
         if ($this->pull_request_id !== 0) {
@@ -1712,25 +1722,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $labels = $labels->filter(function ($value, $key) {
                 return ! Str::startsWith($value, 'coolify.');
             });
-            $found_caddy_labels = $labels->filter(function ($value, $key) {
-                return Str::startsWith($value, 'caddy_');
-            });
-            if ($found_caddy_labels->count() === 0) {
-                if ($this->pull_request_id !== 0) {
-                    $domains = str(data_get($this->preview, 'fqdn'))->explode(',');
-                } else {
-                    $domains = str(data_get($this->application, 'fqdn'))->explode(',');
-                }
-                $labels = $labels->merge(fqdnLabelsForCaddy(
-                    network: $this->application->destination->network,
-                    uuid: $this->application->uuid,
-                    domains: $domains,
-                    onlyPort: $onlyPort,
-                    is_force_https_enabled: $this->application->isForceHttpsEnabled(),
-                    is_gzip_enabled: $this->application->isGzipEnabled(),
-                    is_stripprefix_enabled: $this->application->isStripprefixEnabled()
-                ));
-            }
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
@@ -2254,43 +2245,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName, int $timeout = 300)
+    private function graceful_shutdown_container(string $containerName, int $timeout = 30)
     {
         try {
-            $process = Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-
-            $startTime = time();
-            while ($process->running()) {
-                if (time() - $startTime >= $timeout) {
-                    $this->execute_remote_command(
-                        ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
-                    );
-                    break;
-                }
-                usleep(100000);
-            }
-
-            $isRunning = $this->execute_remote_command(
-                ["docker inspect -f '{{.State.Running}}' $containerName", 'hidden' => true, 'ignore_errors' => true]
-            ) === 'true';
-
-            if ($isRunning) {
-                $this->execute_remote_command(
-                    ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
-                );
-            }
-        } catch (\Exception $error) {
+            $this->execute_remote_command(
+                ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+            );
+        } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
-
-        $this->remove_container($containerName);
-    }
-
-    private function remove_container(string $containerName)
-    {
-        $this->execute_remote_command(
-            ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
-        );
     }
 
     private function stop_running_container(bool $force = false)

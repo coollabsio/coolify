@@ -111,6 +111,7 @@ class Source extends Component
             $this->application->update([
                 'source_id' => $sourceId,
                 'source_type' => $sourceType,
+                'repository_project_id' => null,
             ]);
             $this->application->refresh();
             $this->getSources();
