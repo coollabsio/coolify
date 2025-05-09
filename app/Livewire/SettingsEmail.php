@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
-use App\Notifications\Test;
+use App\Notifications\TransactionalEmails\Test;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -177,7 +177,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -207,7 +207,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->resendEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -225,7 +225,7 @@ class SettingsEmail extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress, 'email'));
+                    $this->team?->notify(new Test($this->testEmailAddress));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
@@ -235,7 +235,7 @@ class SettingsEmail extends Component
                 throw new \Exception('Too many messages sent!');
             }
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 }

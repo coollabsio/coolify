@@ -59,6 +59,17 @@ class StartMariadb
             $server = $this->database->destination->server;
             $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
 
+            if (! $caCert) {
+                $server->generateCaCertificate();
+                $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+            }
+
+            if (! $caCert) {
+                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
+
+                return;
+            }
+
             $this->ssl_certificate = $this->database->sslCertificates()->first();
 
             if (! $this->ssl_certificate) {
@@ -183,7 +194,7 @@ class StartMariadb
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
         if ($this->database->enable_ssl) {
             $docker_compose['services'][$container_name]['command'] = [
-                'mysqld',
+                'mariadbd',
                 '--ssl-cert=/etc/mysql/certs/server.crt',
                 '--ssl-key=/etc/mysql/certs/server.key',
                 '--ssl-ca=/etc/mysql/certs/coolify-ca.crt',

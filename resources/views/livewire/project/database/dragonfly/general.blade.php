@@ -76,8 +76,16 @@
                 </span>
             @endif
             <div class="flex flex-col gap-2">
-                <x-forms.checkbox id="enable_ssl" label="Enable SSL" wire:model.live="enable_ssl"
-                    instantSave="instantSaveSSL" />
+                <div class="w-64">
+                    @if (str($database->status)->contains('exited'))
+                        <x-forms.checkbox id="enable_ssl" label="Enable SSL" wire:model.live="enable_ssl"
+                            instantSave="instantSaveSSL" />
+                    @else
+                        <x-forms.checkbox id="enable_ssl" label="Enable SSL" wire:model.live="enable_ssl"
+                            instantSave="instantSaveSSL" disabled
+                            helper="Database should be stopped to change this settings." />
+                    @endif
+                </div>
             </div>
         </div>
         <div>
