@@ -339,6 +339,20 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean",
+                                        "description": "HTTP Basic Authentication enabled."
+                                    },
+                                    "http_basic_auth_username": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Username for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Password for HTTP Basic Authentication"
                                     }
                                 },
                                 "type": "object"
@@ -673,6 +687,20 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean",
+                                        "description": "HTTP Basic Authentication enabled."
+                                    },
+                                    "http_basic_auth_username": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Username for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Password for HTTP Basic Authentication"
                                     }
                                 },
                                 "type": "object"
@@ -1007,6 +1035,20 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean",
+                                        "description": "HTTP Basic Authentication enabled."
+                                    },
+                                    "http_basic_auth_username": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Username for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Password for HTTP Basic Authentication"
                                     }
                                 },
                                 "type": "object"
@@ -1270,6 +1312,20 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean",
+                                        "description": "HTTP Basic Authentication enabled."
+                                    },
+                                    "http_basic_auth_username": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Username for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Password for HTTP Basic Authentication"
                                     }
                                 },
                                 "type": "object"
@@ -1516,6 +1572,20 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean",
+                                        "description": "HTTP Basic Authentication enabled."
+                                    },
+                                    "http_basic_auth_username": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Username for HTTP Basic Authentication"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Password for HTTP Basic Authentication"
                                     }
                                 },
                                 "type": "object"
@@ -7553,6 +7623,20 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Custom Nginx configuration base64 encoded."
+                    },
+                    "is_http_basic_auth_enabled": {
+                        "type": "boolean",
+                        "description": "HTTP Basic Authentication enabled."
+                    },
+                    "http_basic_auth_username": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Username for HTTP Basic Authentication"
+                    },
+                    "http_basic_auth_password": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Password for HTTP Basic Authentication"
                     }
                 },
                 "type": "object"
@@ -7728,6 +7812,14 @@
                     "private_key": {
                         "type": "string",
                         "format": "private-key"
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "The public key of the private key."
+                    },
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "The fingerprint of the private key."
                     },
                     "is_git_related": {
                         "type": "boolean"

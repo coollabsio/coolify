@@ -81,7 +81,7 @@
                             </x-modal-confirmation>
                         </div>
                     @empty
-                        <div class="text-center">No sources found</div>
+                        <div>No other sources found</div>
                     @endforelse
                 </div>
             </div>
