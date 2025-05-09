@@ -12,7 +12,7 @@
             @if ($upgrade)
                 <div>{{ $upgrade }}</div>
             @else
-                <div class="text-xs font-bold dark:text-neutral-500 group-hover:dark:text-neutral-300">
+                <div class="text-xs font-bold dark:text-neutral-500 dark:group-hover:text-neutral-300">
                     {{ $description }}
                 </div>
             @endif

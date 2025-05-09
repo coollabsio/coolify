@@ -21,7 +21,7 @@
     }" class="relative w-full py-2 mx-auto overflow-hidden text-sm font-normal rounded-md">
         <div x-data="{ id: $id('accordion') }" class="cursor-pointer">
             <button @click="setActiveAccordion(id)"
-                class="flex items-center justify-between w-full px-1 py-2 text-left select-none hover:dark:text-white hover:bg-white/5"
+                class="flex items-center justify-between w-full px-1 py-2 text-left select-none dark:hover:text-white hover:bg-white/5"
                 type="button">
                 <h4>Self-hosted / Enterprise GitHub</h4>
                 <svg class="w-4 h-4 duration-200 ease-out" :class="{ 'rotate-180': activeAccordion == id }"

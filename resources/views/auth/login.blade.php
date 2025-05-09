@@ -4,7 +4,7 @@
             <a class="flex items-center mb-6 text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                 Coolify
             </a>
-            <div class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
+            <div class="w-full bg-white shadow-sm md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
                 @if ($errors->any())
                     <div class="text-center text-error">
                         @foreach ($errors->all() as $error)
