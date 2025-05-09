@@ -13,7 +13,6 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Update changelog
-- Update changelog
 
 ## [4.0.0-beta.415] - 2025-04-29
 

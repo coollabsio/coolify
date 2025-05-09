@@ -10,6 +10,8 @@
 ## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 ## REGISTRY_URL - Custom registry URL for Docker images (default: ghcr.io)
+## BASE_CONFIG_PATH - Custom installation path (default: /data/coolify) useful for immutable OSes like openSUSE MicroOS, Fedora Silverblue, etc...
+## MANUAL_DEPENDENCIES - Set to "true" to disable automatic dependencies installation and allow installation on unsupported platforms
 
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
@@ -19,11 +21,11 @@ CDN="https://cdn.coollabs.io/coolify"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
-ENV_FILE="/data/coolify/source/.env"
 VERSION="20"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
+MANUAL_DEPENDENCIES=${MANUAL_DEPENDENCIES:-false}
 
 if [ $EUID != 0 ]; then
     echo "Please run this script as root or with sudo"
@@ -38,6 +40,30 @@ echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/in
 ROOT_USERNAME=${ROOT_USERNAME:-}
 ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
 ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
+
+if [ -f ./.env ]; then
+    if grep -q -w "BASE_CONFIG_PATH" ./.env; then
+        BASE_CONFIG_PATH_FROM_DOTENV=$(grep -w "BASE_CONFIG_PATH" ./.env | cut -d "=" -f 2 | tr -d '"')
+        BASE_CONFIG_PATH="$BASE_CONFIG_PATH_FROM_DOTENV"
+    fi
+fi
+BASE_CONFIG_PATH=${BASE_CONFIG_PATH:-"/data/coolify"}
+
+if [ ! -w "$BASE_CONFIG_PATH" ]; then
+    echo "-----------------------"
+    echo "Error on Installation:"
+    echo "Directory to install Coolify is not writable. Please check your permissions and try again."
+    echo "-----------------------"
+    exit 1
+fi
+
+if [ "$MANUAL_DEPENDENCIES" = "true" ]; then
+    echo "Warning: Manual dependencies mode enabled."
+    echo "Warning: Skipping OS check and automatic dependencies installation."
+    echo "Warning: Ensure all required dependencies are installed manually."
+fi
+
+ENV_FILE="$BASE_CONFIG_PATH/source/.env"
 
 if [ -n "${REGISTRY_URL+x}" ]; then
     echo "Using registry URL from environment variable: $REGISTRY_URL"
@@ -120,9 +146,9 @@ DOCKER_ADDRESS_POOL_BASE=${DOCKER_ADDRESS_POOL_BASE:-"$DOCKER_ADDRESS_POOL_BASE_
 DOCKER_ADDRESS_POOL_SIZE=${DOCKER_ADDRESS_POOL_SIZE:-$DOCKER_ADDRESS_POOL_SIZE_DEFAULT}
 
 # Load Docker address pool configuration from .env file if it exists and environment variables were not provided
-if [ -f "/data/coolify/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
-    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
-    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
+if [ -f "$ENV_FILE" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
+    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" "$ENV_FILE" | cut -d '=' -f2 || true)
+    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" "$ENV_FILE" | cut -d '=' -f2 || true)
 
     if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ]; then
         DOCKER_ADDRESS_POOL_BASE="$ENV_DOCKER_ADDRESS_POOL_BASE"
@@ -224,14 +250,14 @@ if [ "$WARNING_SPACE" = true ]; then
     sleep 5
 fi
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+mkdir -p "$BASE_CONFIG_PATH"/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
+mkdir -p "$BASE_CONFIG_PATH"/ssh/{keys,mux}
+mkdir -p "$BASE_CONFIG_PATH"/proxy/dynamic
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root "$BASE_CONFIG_PATH"
+chmod -R 700 "$BASE_CONFIG_PATH"
 
-INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
+INSTALLATION_LOG_WITH_DATE="$BASE_CONFIG_PATH/source/installation-${DATE}.log"
 
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
@@ -296,13 +322,17 @@ if [ -z "$LATEST_REALTIME_VERSION" ]; then
     LATEST_REALTIME_VERSION=latest
 fi
 
-case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+
+if [ "$MANUAL_DEPENDENCIES" = "false" ]; then
+    case "$OS_TYPE" in
+    arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine) ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
+        echo "If you still want to install Coolify, please do it manually, read the documentation: https://coolify.io/docs/installation"
+        exit
+        ;;
+    esac
+fi
 
 # Overwrite LATEST_VERSION if user pass a version number
 if [ "$1" != "" ]; then
@@ -319,44 +349,47 @@ echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
 echo "| Registry URL      | $REGISTRY_URL"
+echo "| Installation Path | $BASE_CONFIG_PATH"
 echo -e "---------------------------------------------\n"
 echo -e "1. Installing required packages (curl, wget, git, jq, openssl). "
 
-case "$OS_TYPE" in
-arch)
-    pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
-    ;;
-alpine)
-    sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
-    apk update >/dev/null
-    apk add curl wget git jq openssl >/dev/null
-    ;;
-ubuntu | debian | raspbian)
-    apt-get update -y >/dev/null
-    apt-get install -y curl wget git jq openssl >/dev/null
-    ;;
-centos | fedora | rhel | ol | rocky | almalinux | amzn)
-    if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq openssl >/dev/null
-    else
-        if ! command -v dnf >/dev/null; then
-            yum install -y dnf >/dev/null
+if [ "$MANUAL_DEPENDENCIES" = "false" ]; then
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
+        ;;
+    alpine)
+        sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
+        apk update >/dev/null
+        apk add curl wget git jq openssl >/dev/null
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        apt-get install -y curl wget git jq openssl >/dev/null
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y wget git jq openssl >/dev/null
+        else
+            if ! command -v dnf >/dev/null; then
+                yum install -y dnf >/dev/null
+            fi
+            if ! command -v curl >/dev/null; then
+                dnf install -y curl >/dev/null
+            fi
+            dnf install -y wget git jq openssl >/dev/null
         fi
-        if ! command -v curl >/dev/null; then
-            dnf install -y curl >/dev/null
-        fi
-        dnf install -y wget git jq openssl >/dev/null
-    fi
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null
-    zypper install -y curl wget git jq openssl >/dev/null
-    ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null
+        zypper install -y curl wget git jq openssl >/dev/null
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
+    esac
+fi
 
 echo -e "2. Check OpenSSH server configuration. "
 
@@ -687,10 +720,10 @@ else
 fi
 
 echo -e "5. Download required files from CDN. "
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL $CDN/docker-compose.yml -o "$BASE_CONFIG_PATH"/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o "$BASE_CONFIG_PATH"/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o "$BASE_CONFIG_PATH"/source/.env.production
+curl -fsSL $CDN/upgrade.sh -o "$BASE_CONFIG_PATH"/source/upgrade.sh
 
 echo -e "6. Make backup of .env to .env-$DATE"
 
@@ -700,7 +733,7 @@ if [ -f $ENV_FILE ]; then
 else
     echo " - File does not exist: $ENV_FILE"
     echo " - Copying .env.production to .env-$DATE"
-    cp /data/coolify/source/.env.production $ENV_FILE-$DATE
+    cp "$BASE_CONFIG_PATH"/source/.env.production "$ENV_FILE-$DATE"
     # Generate a secure APP_ID and APP_KEY
     sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
     sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
@@ -744,32 +777,39 @@ fi
 
 # Merge .env and .env.production. New values will be added to .env
 echo -e "7. Propagating .env with new values - if necessary."
-awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production >$ENV_FILE
+awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" "$BASE_CONFIG_PATH"/source/.env.production > "$ENV_FILE"
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    if ! grep -q "AUTOUPDATE=" "$ENV_FILE"; then
+        echo "AUTOUPDATE=false" >>"$ENV_FILE"
     else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" "$ENV_FILE"
     fi
+fi
+
+# Merge BASE_CONFIG_PATH to .env file
+if ! grep -q "BASE_CONFIG_PATH=" "$ENV_FILE"; then
+    echo "BASE_CONFIG_PATH=$BASE_CONFIG_PATH" >>"$ENV_FILE"
+else
+    sed -i "s|BASE_CONFIG_PATH=.*|BASE_CONFIG_PATH=$BASE_CONFIG_PATH|g" "$ENV_FILE"
 fi
 
 # Save Docker address pool configuration to .env file
-if ! grep -q "DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env; then
-    echo "DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE" >>/data/coolify/source/.env
+if ! grep -q "DOCKER_ADDRESS_POOL_BASE=" "$ENV_FILE"; then
+    echo "DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE" >>"$ENV_FILE"
 else
     # Only update if explicitly provided
     if [ "$DOCKER_POOL_BASE_PROVIDED" = true ]; then
-        sed -i "s|DOCKER_ADDRESS_POOL_BASE=.*|DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE|g" /data/coolify/source/.env
+        sed -i "s|DOCKER_ADDRESS_POOL_BASE=.*|DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE|g" "$ENV_FILE"
     fi
 fi
 
-if ! grep -q "DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env; then
-    echo "DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE" >>/data/coolify/source/.env
+if ! grep -q "DOCKER_ADDRESS_POOL_SIZE=" "$ENV_FILE"; then
+    echo "DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE" >>"$ENV_FILE"
 else
     # Only update if explicitly provided
     if [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
-        sed -i "s|DOCKER_ADDRESS_POOL_SIZE=.*|DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE|g" /data/coolify/source/.env
+        sed -i "s|DOCKER_ADDRESS_POOL_SIZE=.*|DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE|g" "$ENV_FILE"
     fi
 fi
 
@@ -787,15 +827,15 @@ set -e
 
 if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
-    chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    ssh-keygen -t ed25519 -a 100 -f "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
+    chown 9999 "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal
     sed -i "/coolify/d" ~/.ssh/authorized_keys
-    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
-    rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+    cat "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >> ~/.ssh/authorized_keys
+    rm -f "$BASE_CONFIG_PATH"/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root "$BASE_CONFIG_PATH"
+chmod -R 700 "$BASE_CONFIG_PATH"
 
 echo -e "9. Installing Coolify ($LATEST_VERSION)"
 echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
@@ -803,12 +843,12 @@ echo -e " - Please wait."
 getAJoke
 
 if [[ $- == *x* ]]; then
-    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+    bash -x "$BASE_CONFIG_PATH"/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
 else
-    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+    bash "$BASE_CONFIG_PATH"/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
 fi
 echo " - Coolify installed successfully."
-rm -f $ENV_FILE-$DATE
+rm -f "$ENV_FILE-$DATE"
 
 echo " - Waiting for 20 seconds for Coolify (database migrations) to be ready."
 getAJoke
@@ -847,5 +887,5 @@ if [ -n "$PRIVATE_IPS" ]; then
         fi
     done
 fi
-echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
-cp /data/coolify/source/.env /data/coolify/source/.env.backup
+echo -e "\nWARNING: It is highly recommended to backup your Environment variables file ($ENV_FILE) to a safe location, outside of this server (e.g. into a Password Manager).\n"
+cp "$ENV_FILE" "$BASE_CONFIG_PATH"/source/.env.backup
