@@ -32,13 +32,21 @@ services:
       - SECRET_KEY=$SERVICE_PASSWORD_64_BUGSINK
       - CREATE_SUPERUSER=admin:$SERVICE_PASSWORD_BUGSINK
       - SERVICE_FQDN_BUGSINK_8000
-      - BASE_URL=$SERVICE_FQDN_BUGSINK_8000
-      - DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}
+      - 'BASE_URL=${SERVICE_FQDN_BUGSINK_8000}'
+      - 'DATABASE_URL=mysql://${SERVICE_USER_BUGSINK}:$SERVICE_PASSWORD_BUGSINK@mysql:3306/${MYSQL_DATABASE:-bugsink}'
+      - ALLOWED_HOSTS=${SERVICE_FQDN_BUGSINK_8000}
+      - 'SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https'
+      - 'CSRF_TRUSTED_ORIGINS=${SERVICE_FQDN_BUGSINK_8000}'
+      - USE_X_FORWARDED_HOST=True
+      - 'GUNICORN_CMD_ARGS=--forwarded-allow-ips="*"'
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bugsink.rule=Host(`${SERVICE_FQDN_BUGSINK_8000}`)
+      - traefik.http.routers.bugsink.entrypoints=websecure
+      - traefik.http.routers.bugsink.tls=true
     depends_on:
       mysql:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/\").raise_for_status()'"]
-      interval: 5s
-      timeout: 20s
-      retries: 10
+
+volumes:
+  my-datavolume:
