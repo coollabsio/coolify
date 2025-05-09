@@ -9,9 +9,11 @@ REGISTRY_URL=${3:-ghcr.io}
 
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 
-# Check if.env file exists, if exists get BASE_CONFIG_PATH, if not defaults to data/coolify
 if [ -f ./.env ]; then
-    BASE_CONFIG_PATH=$(grep -w "BASE_CONFIG_PATH" ./.env | cut -d "=" -f 2 | tr -d '"') || true
+    if grep -q -w "BASE_CONFIG_PATH" ./.env; then
+        BASE_CONFIG_PATH_FROM_DOTENV=$(grep -w "BASE_CONFIG_PATH" ./.env | cut -d "=" -f 2 | tr -d '"')
+        BASE_CONFIG_PATH="$BASE_CONFIG_PATH_FROM_DOTENV"
+    fi
 fi
 
 BASE_CONFIG_PATH=${BASE_CONFIG_PATH:-"/data/coolify"}

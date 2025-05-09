@@ -42,7 +42,10 @@ ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
 ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
 
 if [ -f ./.env ]; then
-    BASE_CONFIG_PATH=$(grep -w "BASE_CONFIG_PATH" ./.env | cut -d "=" -f 2 | tr -d '"') || true
+    if grep -q -w "BASE_CONFIG_PATH" ./.env; then
+        BASE_CONFIG_PATH_FROM_DOTENV=$(grep -w "BASE_CONFIG_PATH" ./.env | cut -d "=" -f 2 | tr -d '"')
+        BASE_CONFIG_PATH="$BASE_CONFIG_PATH_FROM_DOTENV"
+    fi
 fi
 BASE_CONFIG_PATH=${BASE_CONFIG_PATH:-"/data/coolify"}
 
