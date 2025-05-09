@@ -159,7 +159,7 @@
                                                             {{ data_get($resource, 'environment.name') }}
                                                         </td>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap"><a
-                                                                class="" wire:navigate
+                                                                class=""
                                                                 href="{{ $resource->link() }}">{{ $resource->name }}
                                                                 <x-internal-link /></a>
                                                         </td>
@@ -277,12 +277,15 @@
                         emails: 'read',
                         administration: 'read'
                     };
+                    const default_events = ['push'];
                     if (preview_deployment_permissions) {
                         default_permissions.pull_requests = 'write';
+                        default_events.push('pull_request');
                     }
                     if (administration) {
                         default_permissions.administration = 'write';
                     }
+
                     const data = {
                         name,
                         url: baseUrl,
@@ -297,7 +300,7 @@
                         setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,
                         setup_on_update: true,
                         default_permissions,
-                        default_events: ['pull_request', 'push']
+                        default_events
                     };
                     const form = document.createElement('form');
                     form.setAttribute('method', 'post');

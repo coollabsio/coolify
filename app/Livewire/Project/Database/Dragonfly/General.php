@@ -60,10 +60,12 @@ class General extends Component
 
     public function getListeners()
     {
+        $userId = Auth::id();
         $teamId = Auth::user()->currentTeam()->id;
 
         return [
             "echo-private:team.{$teamId},DatabaseProxyStopped" => 'databaseProxyStopped',
+            "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
         ];
     }
 
@@ -212,9 +214,22 @@ class General extends Component
                 return;
             }
 
-            $caCert = SslCertificate::where('server_id', $existingCert->server_id)
+            $server = $this->database->destination->server;
+
+            $caCert = SslCertificate::where('server_id', $server->id)
                 ->where('is_ca_certificate', true)
                 ->first();
+
+            if (! $caCert) {
+                $server->generateCaCertificate();
+                $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+            }
+
+            if (! $caCert) {
+                $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
+
+                return;
+            }
 
             SslHelper::generateSslCertificate(
                 commonName: $existingCert->commonName,
@@ -226,6 +241,7 @@ class General extends Component
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
+                isPemKeyFileRequired: true,
             );
 
             $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');

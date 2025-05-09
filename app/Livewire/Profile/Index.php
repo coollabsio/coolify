@@ -70,6 +70,7 @@ class Index extends Component
             $this->current_password = '';
             $this->new_password = '';
             $this->new_password_confirmation = '';
+            $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

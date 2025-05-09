@@ -5,8 +5,8 @@
         "@xterm/addon-fit": "0.10.0",
         "@xterm/xterm": "5.5.0",
         "cookie": "1.0.2",
-        "axios": "1.7.9",
-        "dotenv": "16.4.7",
+        "axios": "1.8.4",
+        "dotenv": "16.5.0",
         "node-pty": "1.0.0",
         "ws": "8.18.1"
     }

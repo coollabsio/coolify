@@ -90,8 +90,6 @@
 
         </div>
         <h4 class="pt-6">API</h4>
-        <div class="pb-4">For API documentation, please visit <a class="dark:text-warning underline"
-                href="/docs/api">/docs/api</a></div>
         <div class="md:w-96 pb-2">
             <x-forms.checkbox instantSave id="is_api_enabled" label="Enabled" />
         </div>
@@ -141,7 +139,7 @@
                 <x-modal-confirmation title="Disable Two Step Confirmation?"
                     buttonTitle="Disable Two Step Confirmation" isErrorButton submitAction="toggleTwoStepConfirmation"
                     :actions="[
-                        'Two Step confimation will be disabled globally.',
+                        'Two Step confirmation will be disabled globally.',
                         'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
                         'The risk of accidental actions will increase.',
                     ]" confirmationText="DISABLE TWO STEP CONFIRMATION"

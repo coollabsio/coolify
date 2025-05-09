@@ -19,6 +19,7 @@
             <h2>Change Password</h2>
             <x-forms.button type="submit" label="Save">Save</x-forms.button>
         </div>
+        <div class="text-xs font-bold text-warning pb-2">Resetting the password will logout all sessions.</div>
         <div class="flex flex-col gap-2">
             <x-forms.input id="current_password" label="Current Password" required type="password" />
             <div class="flex gap-2">
@@ -36,23 +37,21 @@
         <div class="flex flex-col gap-4">
             <form action="/user/confirmed-two-factor-authentication" method="POST" class="flex items-end gap-2">
                 @csrf
-                <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code" label="One time (OTP) code" required />
+                <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code"
+                    label="One time (OTP) code" required />
                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
             </form>
             <div class="flex flex-col items-start">
-                <div class="flex items-center justify-center w-80 h-80 bg-white p-4 border-4 border-gray-300 rounded-lg shadow-lg">
+                <div
+                    class="flex items-center justify-center w-80 h-80 bg-white p-4 border-4 border-gray-300 rounded-lg shadow-lg">
                     {!! request()->user()->twoFactorQrCodeSvg() !!}
                 </div>
                 <div x-data="{
                     showCode: false,
                 }" class="py-4 w-full">
                     <div class="flex flex-col gap-2 pb-2" x-show="showCode">
-                        <x-forms.copy-button 
-                            text="{{ decrypt(request()->user()->two_factor_secret) }}" 
-                        />
-                        <x-forms.copy-button 
-                            text="{{ request()->user()->twoFactorQrCodeUrl() }}" 
-                        />
+                        <x-forms.copy-button text="{{ decrypt(request()->user()->two_factor_secret) }}" />
+                        <x-forms.copy-button text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
                     </div>
                     <x-forms.button x-on:click="showCode = !showCode" class="mt-2">
                         <span x-text="showCode ? 'Hide Secret Key and OTP URL' : 'Show Secret Key and OTP URL'"></span>

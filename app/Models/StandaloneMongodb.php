@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -98,7 +97,7 @@ class StandaloneMongodb extends BaseModel
         return database_configuration_dir()."/{$this->uuid}";
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -107,8 +106,9 @@ class StandaloneMongodb extends BaseModel
         }
     }
 
-    public function delete_volumes(Collection $persistentStorages)
+    public function deleteVolumes()
     {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($persistentStorages->count() === 0) {
             return;
         }
@@ -248,9 +248,9 @@ class StandaloneMongodb extends BaseModel
                 $encodedPass = rawurlencode($this->mongo_initdb_root_password);
                 $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->uuid}:27017/?directConnection=true";
                 if ($this->enable_ssl) {
-                    $url .= '&tls=true';
+                    $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                     if (in_array($this->ssl_mode, ['verify-full'])) {
-                        $url .= '&tlsCAFile=/etc/ssl/certs/coolify-ca.crt';
+                        $url .= '&tlsCertificateKeyFile=/etc/mongo/certs/server.pem';
                     }
                 }
 
@@ -268,9 +268,9 @@ class StandaloneMongodb extends BaseModel
                     $encodedPass = rawurlencode($this->mongo_initdb_root_password);
                     $url = "mongodb://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
                     if ($this->enable_ssl) {
-                        $url .= '&tls=true';
+                        $url .= '&tls=true&tlsCAFile=/etc/mongo/certs/ca.pem';
                         if (in_array($this->ssl_mode, ['verify-full'])) {
-                            $url .= '&tlsCAFile=/etc/ssl/certs/coolify-ca.crt';
+                            $url .= '&tlsCertificateKeyFile=/etc/mongo/certs/server.pem';
                         }
                     }
 

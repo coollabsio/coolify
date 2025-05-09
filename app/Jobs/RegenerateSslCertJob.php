@@ -49,6 +49,11 @@ class RegenerateSslCertJob implements ShouldQueue
                     ->where('is_ca_certificate', true)
                     ->first();
 
+                if (! $caCert) {
+                    Log::error("No CA certificate found for server_id: {$certificate->server_id}");
+
+                    return;
+                }
                 SSLHelper::generateSslCertificate(
                     commonName: $certificate->common_name,
                     subjectAlternativeNames: $certificate->subject_alternative_names,

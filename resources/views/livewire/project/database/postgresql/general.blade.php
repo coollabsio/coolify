@@ -102,52 +102,72 @@
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
-                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl"
-                    instantSave="instantSaveSSL" />
+                <div class="w-64" wire:key='enable_ssl'>
+                    @if ($database->isExited())
+                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                    @else
+                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" disabled
+                            helper="Database should be stopped to change this settings." />
+                    @endif
+                </div>
                 @if ($database->enable_ssl)
                     <div class="mx-2">
-                        <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
-                            instantSave="instantSaveSSL"
-                            helper="Choose the SSL verification mode for PostgreSQL connections">
-                            <option value="allow" title="Allow insecure connections">allow (insecure)</option>
-                            <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
-                            <option value="require" title="Require secure connections">require (secure)</option>
-                            <option value="verify-ca" title="Verify CA certificate">verify-ca (secure)</option>
-                            <option value="verify-full" title="Verify full certificate">verify-full (secure)</option>
-                        </x-forms.select>
+                        @if ($database->isExited())
+                            <x-forms.select id="database.ssl_mode" label="SSL Mode"
+                                wire:model.live="database.ssl_mode" instantSave="instantSaveSSL"
+                                helper="Choose the SSL verification mode for PostgreSQL connections">
+                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
+                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
+                                <option value="require" title="Require secure connections">require (secure)</option>
+                                <option value="verify-ca" title="Verify CA certificate">verify-ca (secure)</option>
+                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
+                                </option>
+                            </x-forms.select>
+                        @else
+                            <x-forms.select id="database.ssl_mode" label="SSL Mode" instantSave="instantSaveSSL"
+                                disabled helper="Database should be stopped to change this settings.">
+                                <option value="allow" title="Allow insecure connections">allow (insecure)</option>
+                                <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
+                                <option value="require" title="Require secure connections">require (secure)</option>
+                                <option value="verify-ca" title="Verify CA certificate">verify-ca (secure)</option>
+                                <option value="verify-full" title="Verify full certificate">verify-full (secure)
+                                </option>
+                            </x-forms.select>
+                        @endif
                     </div>
                 @endif
-            </div>
-        </div>
 
-        <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between py-2">
-                <div class="flex items-center gap-2">
-                    <h3>Proxy</h3>
-                    <x-loading wire:loading wire:target="instantSave" />
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between py-2">
+                        <div class="flex items-center gap-2">
+                            <h3>Proxy</h3>
+                            <x-loading wire:loading wire:target="instantSave" />
+                        </div>
+                        @if (data_get($database, 'is_public'))
+                            <x-slide-over fullScreen>
+                                <x-slot:title>Proxy Logs</x-slot:title>
+                                <x-slot:content>
+                                    <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                        container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                                </x-slot:content>
+                                <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
+                                    @click="slideOverOpen=true">Logs</x-forms.button>
+                            </x-slide-over>
+                        @endif
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+                        <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                            id="database.public_port" label="Public Port" />
+                    </div>
                 </div>
-                @if (data_get($database, 'is_public'))
-                    <x-slide-over fullScreen>
-                        <x-slot:title>Proxy Logs</x-slot:title>
-                        <x-slot:content>
-                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                        </x-slot:content>
-                        <x-forms.button disabled="{{ !data_get($database, 'is_public') }}"
-                            @click="slideOverOpen=true">Logs</x-forms.button>
-                    </x-slide-over>
-                @endif
-            </div>
-            <div class="flex flex-col gap-2">
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
-                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                    id="database.public_port" label="Public Port" />
-            </div>
-        </div>
 
-        <div class="flex flex-col gap-2">
-            <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
-        </div>
+                <div class="flex flex-col gap-2">
+                    <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10"
+                        id="database.postgres_conf" />
+                </div>
     </form>
 
     <div class="flex flex-col gap-4 pt-4">
