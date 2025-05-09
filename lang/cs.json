@@ -2,6 +2,7 @@
     "auth.login": "Přihlásit se",
     "auth.login.azure": "Přihlásit se pomocí Microsoftu",
     "auth.login.bitbucket": "Přihlásit se pomocí Bitbucketu",
+    "auth.login.clerk": "Přihlásit se pomocí Clerk",
     "auth.login.github": "Přihlásit se pomocí GitHubu",
     "auth.login.gitlab": "Přihlásit se pomocí Gitlabu",
     "auth.login.google": "Přihlásit se pomocí Google",

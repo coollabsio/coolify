@@ -2,6 +2,7 @@
     "auth.login": "ورود",
     "auth.login.azure": "ورود با مایکروسافت",
     "auth.login.bitbucket": "ورود با Bitbucket",
+    "auth.login.clerk": "ورود با Clerk",
     "auth.login.github": "ورود با گیت هاب",
     "auth.login.gitlab": "ورود با گیت لب",
     "auth.login.google": "ورود با گوگل",
