@@ -1,0 +1,67 @@
+# documentation: https://miru.nordstud.io/
+# slogan: Miru is a free, open-source and fully customisable status page and monitoring service built with Rust and Next.js.
+# tags: status-page,monitoring,service
+# logo: svgs/miru.svg
+# port: 3000
+
+volumes:
+  database:
+  minio:
+
+services:
+  database:
+    container_name: database
+    image: postgres:17.3
+    volumes:
+      - database:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-miru}
+
+  minio:
+    container_name: minio
+    image: bitnami/minio
+    volumes:
+      - minio:/bitnami/minio/data
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+      - MINIO_DEFAULT_BUCKETS=public
+
+  monitor:
+    container_name: monitor
+    image: ghcr.io/nord-studio/miru/monitor:latest
+    environment:
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/${POSTGRES_DB}
+      - DATABASE_SSL=${DATABASE_SSL:-false}
+    depends_on:
+      - database
+      - web
+
+  web:
+    container_name: web
+    image: ghcr.io/nord-studio/miru/web:latest
+    environment:
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/${POSTGRES_DB}
+      - DATABASE_SSL=${DATABASE_SSL}
+      - S3_ENDPOINT=minio
+      - S3_PORT=9000
+      - S3_SECURE=false
+      - S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - BETTER_AUTH_SECRET=${SERVICE_BASE64_AUTH_SECRET}
+      - SERVICE_FQDN_WEB_3000
+      - APP_DOMAIN=${SERVICE_FQDN_WEB}
+      - MONITOR_URL=http://monitor:8080
+      - ENABLE_EMAIL=${ENABLE_EMAIL:-false}
+      - EMAIL_VERIFICATION=${EMAIL_VERIFICATION:-false}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_SECURE=${SMTP_SECURE:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+    depends_on:
+      - database
+      - minio
