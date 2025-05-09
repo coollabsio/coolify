@@ -9,6 +9,7 @@ services:
     image: ghcr.io/maybe-finance/maybe:latest
     volumes:
       - app_storage:/rails/storage
+    restart: unless-stopped
     environment:
       - SERVICE_FQDN_MAYBE
       - SELF_HOSTED=true
@@ -20,8 +21,13 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -29,9 +35,35 @@ services:
         - curl
         - "-f"
         - "http://localhost:3000"
-
+      interval: 10s
+      timeout: 10s
+      retries: 5
+  worker:
+    image: "ghcr.io/maybe-finance/maybe:latest"
+    command: "bundle exec sidekiq"
+    restart: unless-stopped
+    exclude_from_hc: true
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   postgres:
     image: postgres:16
+    restart: unless-stopped
     volumes:
       - maybe_postgres_data:/var/lib/postgresql/data
     environment:
@@ -43,3 +75,19 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+volumes:
+  app_storage: null
+  maybe_postgres_data: null
+  redis_data: null
