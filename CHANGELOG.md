@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.417] - 2025-05-07
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.416] - 2025-05-05
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.415] - 2025-04-29
 
 ### 📚 Documentation
 
