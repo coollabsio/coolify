@@ -1,0 +1,26 @@
+# documentation: https://gitlab.com/bashrc2/epicyon/-/blob/main/manual/manual.epub
+# slogan: Epicyon is a fediverse server suitable for self-hosting a small number of accounts on low power systems.
+# tags: fediverse,ActivityPub,mastodon
+# logo: svgs/epicyon.svg
+# port: 7156
+
+version: '3.8'
+
+services:
+  app:
+    image: anandh612/epicyon:latest
+    environment:
+      - DOMAIN=${DOMAIN}
+    command: >
+      /usr/bin/python3 /app/epicyon.py
+      --bind 0.0.0.0
+      --port 7156
+      --proxy 7156
+      --registration open
+      --domain ${DOMAIN}
+      --path /app
+    volumes:
+      - ${COOLIFY_VOLUME_APP}:/app/epicyon_data
+    ports:
+      - "7156:7156"
+
