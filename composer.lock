@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f0ef990aa6e05ab48d61fcc22c0c1ca2",
+    "content-hash": "721aab079651c85ea802ea5fed39553e",
     "packages": [
         {
             "name": "amphp/amp",
@@ -7695,6 +7695,49 @@
                 "source": "https://github.com/socialiteproviders/providers"
             },
             "time": "2024-03-15T03:02:10+00:00"
+        },
+        {
+            "name": "socialiteproviders/zitadel",
+            "version": "4.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Zitadel.git",
+                "reference": "2e1c0843a9531eb0e31a04b31683a63f1a7d1865"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Zitadel/zipball/2e1c0843a9531eb0e31a04b31683a63f1a7d1865",
+                "reference": "2e1c0843a9531eb0e31a04b31683a63f1a7d1865",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^8.1",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Socialiteproviders\\Zitadel\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Gurkirat Singh",
+                    "email": "tbhaxor@gmail.com"
+                }
+            ],
+            "description": "Zitadel OAuth2 Provider for Laravel Socialite",
+            "support": {
+                "docs": "https://socialiteproviders.com/zoho",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2024-08-26T06:14:57+00:00"
         },
         {
             "name": "spatie/backtrace",
