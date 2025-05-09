@@ -28,6 +28,7 @@ function queue_application_deployment(Application $application, string $deployme
     // Check if there's already a deployment in progress or queued for this application and commit
     $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
         ->where('commit', $commit)
+        ->where('pull_request_id', $pull_request_id)
         ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
         ->first();
 

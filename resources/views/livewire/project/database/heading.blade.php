@@ -14,7 +14,7 @@
                 <button>Configuration</button>
             </a>
 
-            <a wire:navigate class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.logs', $parameters) }}">
                 <button>Logs</button>
             </a>
@@ -27,8 +27,7 @@
                     $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-                <a wire:navigate
-                    class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
+                <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
                     href="{{ route('project.database.backup.index', $parameters) }}">
                     <button>Backups</button>
                 </a>
