@@ -8,17 +8,17 @@
 services:
   supabase-kong:
     image: kong:2.8.1
-    # https://unix.stackexchange.com/a/294837
-    entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
     depends_on:
       supabase-analytics:
         condition: service_healthy
+    user: "root"
+    entrypoint: bash -c 'eval "echo \"$$(cat /root/temp.yml)\"" > /usr/local/kong/kong.yml && chown -R kong:kong /usr/local/kong && exec su kong -s /bin/sh -c "/docker-entrypoint.sh kong start"'
     environment:
       - SERVICE_FQDN_SUPABASEKONG_8000
       - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
-      - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
+      - KONG_DECLARATIVE_CONFIG=/usr/local/kong/kong.yml
       # https://github.com/supabase/cli/issues/14
       - KONG_DNS_ORDER=LAST,A,CNAME
       - KONG_PLUGINS=request-transformer,cors,key-auth,acl,basic-auth
@@ -32,7 +32,7 @@ services:
       # https://github.com/supabase/supabase/issues/12661
       - type: bind
         source: ./volumes/api/kong.yml
-        target: /home/kong/temp.yml
+        target: /root/temp.yml
         content: |
           _format_version: '2.1'
           _transform: true
@@ -328,11 +328,17 @@ services:
       supabase-vector:
         condition: service_healthy
     command:
-      - postgres
+      - bash
       - -c
-      - config_file=/etc/postgresql/postgresql.conf
-      - -c
-      - log_min_messages=fatal
+      - |
+        # Adjust ownership and permissions
+        chown -R postgres:postgres /docker-entrypoint-initdb.d
+        find /docker-entrypoint-initdb.d -type f -name "*.sh" -exec chmod 755 {} +
+        find /docker-entrypoint-initdb.d -type f -name "*.sql" -exec chmod 644 {} +
+        chmod 755 /docker-entrypoint-initdb.d
+
+        # Then execute the entry point
+        exec /usr/local/bin/docker-entrypoint.sh postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
     environment:
       - POSTGRES_HOST=/var/run/postgresql
       - PGPORT=${POSTGRES_PORT:-5432}
@@ -615,6 +621,112 @@ services:
           \c postgres
       # Use named volume to persist pgsodium decryption key between restarts
       - supabase-db-config:/etc/postgresql-custom
+      # NOTE: Bug fix: The original migration script tries to connect to the _supabase database by default based on environment variables,
+      # but an error occurs if the _supabase database does not exist yet.
+      # Therefore, replace the migration script to connect to the default database first when creating the _supabase database.
+      - type: bind
+        source: ./volumes/scripts/migrate.sh
+        target: /docker-entrypoint-initdb.d/migrate.sh
+        permissions: 0755
+        content: |
+          #!/bin/sh
+          set -eu
+
+          #######################################
+          # Used by both ami and docker builds to initialise database schema.
+          # Env vars:
+          #   POSTGRES_DB        defaults to postgres
+          #   POSTGRES_HOST      defaults to localhost
+          #   POSTGRES_PORT      defaults to 5432
+          #   POSTGRES_PASSWORD  defaults to ""
+          #   USE_DBMATE         defaults to ""
+          # Exit code:
+          #   0 if migration succeeds, non-zero on error.
+          #######################################
+
+          export PGDATABASE="${POSTGRES_DB:-postgres}"
+          export PGHOST="${POSTGRES_HOST:-localhost}"
+          export PGPORT="${POSTGRES_PORT:-5432}"
+          export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+
+          connect="$PGPASSWORD@$PGHOST:$PGPORT/$PGDATABASE?sslmode=disable"
+
+          # If dbmate command is passed, execute dbmate directly
+          if [ "$#" -ne 0 ]; then
+              export DATABASE_URL="${DATABASE_URL:-postgres://supabase_admin:$connect}"
+              exec dbmate "$@"
+              exit 0
+          fi
+
+          db=$( cd -- "$( dirname -- "$0" )" > /dev/null 2>&1 && pwd )
+
+          # First, run 97-_supabase.sql alone (create _supabase database)
+          echo "$0: 🎯 ensuring _supabase database exists via 97-_supabase.sql"
+          psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin -d postgres -f "$db/migrations/97-_supabase.sql"
+
+          if [ -z "${USE_DBMATE:-}" ]; then
+              echo "$0: 🎯 creating postgres role if not exists"
+              psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin <<EOSQL
+          do \$\$
+          begin
+            if not exists (select from pg_roles where rolname = 'postgres') then
+              create role postgres superuser login password '$PGPASSWORD';
+              alter database postgres owner to postgres;
+            end if;
+          end \$\$
+          EOSQL
+
+              echo "$0: 🎯 running init-scripts"
+              for sql in "$db"/init-scripts/*.sql; do
+                  echo "$0: running init script $sql"
+                  psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U postgres -f "$sql"
+              done
+
+              echo "$0: 🎯 running migrations (excluding 97-_supabase.sql)"
+              for sql in "$db"/migrations/*.sql; do
+                  if [ "$(basename "$sql")" = "97-_supabase.sql" ]; then
+                      continue
+                  fi
+                  echo "$0: running migration $sql"
+                  psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin -f "$sql"
+              done
+
+              echo "$0: 🎯 resetting supabase_admin password (self-reset)"
+              psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin -c "ALTER USER supabase_admin WITH PASSWORD '$PGPASSWORD'"
+
+          else
+              echo "$0: 🎯 running init-scripts using dbmate"
+              DBMATE_MIGRATIONS_DIR="$db/init-scripts" DATABASE_URL="postgres://postgres:$connect" dbmate --no-dump-schema migrate
+
+              echo "$0: 🎯 running migrations (excluding 97-_supabase.sql) using dbmate"
+              DBMATE_MIGRATIONS_DIR="$db/migrations" DATABASE_URL="postgres://supabase_admin:$connect" dbmate --no-dump-schema up --exclude 97-_supabase.sql
+
+              echo "$0: 🎯 creating postgres role if not exists"
+              psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin <<EOSQL
+          do \$\$
+          begin
+            if not exists (select from pg_roles where rolname = 'postgres') then
+              create role postgres superuser login password '$PGPASSWORD';
+              alter database postgres owner to postgres;
+            end if;
+          end \$\$
+          EOSQL
+
+              echo "$0: 🎯 resetting supabase_admin password (self-reset)"
+              psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin -c "ALTER USER supabase_admin WITH PASSWORD '$PGPASSWORD'"
+          fi
+
+          # execute postinit script (if it exists)
+          postinit="/etc/postgresql.schema.sql"
+          if [ -e "$postinit" ]; then
+              echo "$0: running $postinit"
+              psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin -f "$postinit"
+          fi
+
+          # Reset statistics (continue even if it fails)
+          psql -v ON_ERROR_STOP=1 --no-password --no-psqlrc -U supabase_admin -c 'SELECT extensions.pg_stat_statements_reset(); SELECT pg_stat_reset();' || true
+
+          echo "$0: ✅ database migrations completed."
 
   supabase-analytics:
     image: supabase/logflare:1.4.0
