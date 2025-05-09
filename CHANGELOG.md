@@ -2,7 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.417] - 2025-05-07
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.416] - 2025-05-05
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.415] - 2025-04-29
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.413] - 2025-04-28
+
+### 💼 Other
+
+- Adjust Workflows for v5 (#5689)
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(workflows)* Adjust workflow for announcement
+
+## [4.0.0-beta.412] - 2025-04-23
 
 ### ⚙️ Miscellaneous Tasks
 
