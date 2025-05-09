@@ -21,6 +21,7 @@
     'dispatchEvent' => false,
     'dispatchEventType' => 'success',
     'dispatchEventMessage' => '',
+    'ignoreWire' => true,
 ])
 
 @php
@@ -28,7 +29,7 @@
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
 @endphp
 
-<div wire:ignore x-data="{
+<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -98,8 +99,9 @@
             this.selectedActions.push(id);
         }
     }
-}" @keydown.escape.window="modalOpen = false; resetModal()"
-    :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+}"
+    @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
+    class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
@@ -247,9 +249,7 @@
                                     <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2">
-                                        <x-forms.copy-button 
-                                            text="{{ $confirmationText }}"
-                                        />
+                                        <x-forms.copy-button text="{{ $confirmationText }}" />
                                     </div>
 
                                     <label for="userConfirmationText"

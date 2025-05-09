@@ -116,9 +116,9 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
-    public function getRecipients($notification)
+    public function getRecipients(): array
     {
-        return $this->email;
+        return [$this->email];
     }
 
     public function sendVerificationEmail()

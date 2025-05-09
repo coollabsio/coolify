@@ -79,7 +79,7 @@ class Destination extends Component
             $deployment_uuid = new Cuid2;
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->resource,
                 server: $server,
@@ -87,6 +87,11 @@ class Destination extends Component
                 only_this_server: true,
                 no_questions_asked: true,
             );
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
 
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => data_get($this->resource, 'environment.project.uuid'),

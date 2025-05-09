@@ -248,6 +248,17 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                is_http_basic_auth_enabled:
+                  type: boolean
+                  description: 'HTTP Basic Authentication enabled.'
+                http_basic_auth_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTP Basic Authentication'
+                http_basic_auth_password:
+                  type: string
+                  nullable: true
+                  description: 'Password for HTTP Basic Authentication'
               type: object
       responses:
         '201':
@@ -487,6 +498,17 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                is_http_basic_auth_enabled:
+                  type: boolean
+                  description: 'HTTP Basic Authentication enabled.'
+                http_basic_auth_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTP Basic Authentication'
+                http_basic_auth_password:
+                  type: string
+                  nullable: true
+                  description: 'Password for HTTP Basic Authentication'
               type: object
       responses:
         '201':
@@ -726,6 +748,17 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                is_http_basic_auth_enabled:
+                  type: boolean
+                  description: 'HTTP Basic Authentication enabled.'
+                http_basic_auth_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTP Basic Authentication'
+                http_basic_auth_password:
+                  type: string
+                  nullable: true
+                  description: 'Password for HTTP Basic Authentication'
               type: object
       responses:
         '201':
@@ -912,6 +945,17 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                is_http_basic_auth_enabled:
+                  type: boolean
+                  description: 'HTTP Basic Authentication enabled.'
+                http_basic_auth_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTP Basic Authentication'
+                http_basic_auth_password:
+                  type: string
+                  nullable: true
+                  description: 'Password for HTTP Basic Authentication'
               type: object
       responses:
         '201':
@@ -1089,6 +1133,17 @@ paths:
                   type: boolean
                   nullable: true
                   description: 'Use build server.'
+                is_http_basic_auth_enabled:
+                  type: boolean
+                  description: 'HTTP Basic Authentication enabled.'
+                http_basic_auth_username:
+                  type: string
+                  nullable: true
+                  description: 'Username for HTTP Basic Authentication'
+                http_basic_auth_password:
+                  type: string
+                  nullable: true
+                  description: 'Password for HTTP Basic Authentication'
               type: object
       responses:
         '201':
@@ -1277,6 +1332,15 @@ paths:
       summary: Update
       description: 'Update application by UUID.'
       operationId: update-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         description: 'Application updated.'
         required: true
@@ -1895,52 +1959,6 @@ paths:
                 properties:
                   message: { type: string, example: 'Restart request queued.' }
                   deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-        '404':
-          $ref: '#/components/responses/404'
-      security:
-        -
-          bearerAuth: []
-  '/applications/{uuid}/execute':
-    post:
-      tags:
-        - Applications
-      summary: 'Execute Command'
-      description: "Execute a command on the application's current container."
-      operationId: execute-command-application
-      parameters:
-        -
-          name: uuid
-          in: path
-          description: 'UUID of the application.'
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        description: 'Command to execute.'
-        required: true
-        content:
-          application/json:
-            schema:
-              properties:
-                command:
-                  type: string
-                  description: 'Command to execute.'
-              type: object
-      responses:
-        '200':
-          description: "Execute a command on the application's current container."
-          content:
-            application/json:
-              schema:
-                properties:
-                  message: { type: string, example: 'Command executed.' }
-                  response: { type: string }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -3131,7 +3149,7 @@ paths:
       tags:
         - Deployments
       summary: Deploy
-      description: 'Deploy by tag or uuid. `Post` request also accepted.'
+      description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.'
       operationId: deploy-by-tag-or-uuid
       parameters:
         -
@@ -3152,6 +3170,12 @@ paths:
           description: 'Force rebuild (without cache)'
           schema:
             type: boolean
+        -
+          name: pr
+          in: query
+          description: 'Pull Request Id for deploying specific PR builds. Cannot be used with tag parameter.'
+          schema:
+            type: integer
       responses:
         '200':
           description: "Get deployment(s) UUID's"
@@ -3161,6 +3185,56 @@ paths:
                 properties:
                   deployments: { type: array, items: { properties: { message: { type: string }, resource_uuid: { type: string }, deployment_uuid: { type: string } }, type: object } }
                 type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  '/deployments/applications/{uuid}':
+    get:
+      tags:
+        - Deployments
+      summary: 'List application deployments'
+      description: 'List application deployments by using the app uuid'
+      operationId: list-deployments-by-app-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: skip
+          in: query
+          description: 'Number of records to skip.'
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        -
+          name: take
+          in: query
+          description: 'Number of records to take.'
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+      responses:
+        '200':
+          description: 'List application deployments by using the app uuid.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
         '401':
           $ref: '#/components/responses/401'
         '400':
@@ -3394,6 +3468,15 @@ paths:
       summary: Update
       description: 'Update Project.'
       operationId: update-project-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the project.'
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         description: 'Project updated.'
         required: true
@@ -3647,6 +3730,14 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           description: 'Private Key not found.'
+        '422':
+          description: 'Private Key is in use and cannot be deleted.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Private Key is in use and cannot be deleted.' }
+                type: object
       security:
         -
           bearerAuth: []
@@ -3995,8 +4086,8 @@ paths:
     post:
       tags:
         - Services
-      summary: Create
-      description: 'Create a service'
+      summary: 'Create service'
+      description: 'Create a one-click / custom service'
       operationId: create-service
       requestBody:
         required: true
@@ -4008,78 +4099,6 @@ paths:
                 - project_uuid
                 - environment_name
                 - environment_uuid
-                - docker_compose_raw
-              properties:
-                name:
-                  type: string
-                  maxLength: 255
-                  description: 'Name of the service.'
-                description:
-                  type: string
-                  nullable: true
-                  description: 'Description of the service.'
-                project_uuid:
-                  type: string
-                  description: 'Project UUID.'
-                environment_name:
-                  type: string
-                  description: 'Environment name. You need to provide at least one of environment_name or environment_uuid.'
-                environment_uuid:
-                  type: string
-                  description: 'Environment UUID. You need to provide at least one of environment_name or environment_uuid.'
-                server_uuid:
-                  type: string
-                  description: 'Server UUID.'
-                destination_uuid:
-                  type: string
-                  description: 'Destination UUID. Required if server has multiple destinations.'
-                instant_deploy:
-                  type: boolean
-                  default: false
-                  description: 'Start the service immediately after creation.'
-                connect_to_docker_network:
-                  type: boolean
-                  default: false
-                  description: 'The flag to connect the service to the predefined Docker network.'
-                docker_compose_raw:
-                  type: string
-                  description: 'The Docker Compose raw content.'
-              type: object
-      responses:
-        '201':
-          description: 'Service created successfully.'
-          content:
-            application/json:
-              schema:
-                properties:
-                  uuid: { type: string, description: 'Service UUID.' }
-                  domains: { type: array, items: { type: string, nullable: true }, description: 'Service domains.' }
-                type: object
-        '401':
-          $ref: '#/components/responses/401'
-        '400':
-          $ref: '#/components/responses/400'
-      security:
-        -
-          bearerAuth: []
-  /services/one-click:
-    post:
-      tags:
-        - Services
-      summary: 'Create one-click'
-      description: 'Create a one-click service'
-      operationId: create-one-click-service
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              required:
-                - server_uuid
-                - project_uuid
-                - environment_name
-                - environment_uuid
-                - type
               properties:
                 type:
                   description: 'The one-click service type'
@@ -4112,6 +4131,9 @@ paths:
                   type: boolean
                   default: false
                   description: 'Start the service immediately after creation.'
+                docker_compose_raw:
+                  type: string
+                  description: 'The Docker Compose raw content.'
               type: object
       responses:
         '201':
@@ -4231,6 +4253,15 @@ paths:
       summary: Update
       description: 'Update service by UUID.'
       operationId: update-service-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         description: 'Service updated.'
         required: true
@@ -4271,7 +4302,7 @@ paths:
                 connect_to_docker_network:
                   type: boolean
                   default: false
-                  description: 'The flag to connect the service to the predefined Docker network.'
+                  description: 'Connect the service to the predefined docker network.'
                 docker_compose_raw:
                   type: string
                   description: 'The Docker Compose raw content.'
@@ -4855,6 +4886,10 @@ components:
           type: string
           nullable: true
           description: 'Ports mappings.'
+        custom_network_aliases:
+          type: string
+          nullable: true
+          description: 'Network aliases for Docker container.'
         base_directory:
           type: string
           description: 'Base directory for all commands.'
@@ -5062,6 +5097,17 @@ components:
           type: string
           nullable: true
           description: 'Custom Nginx configuration base64 encoded.'
+        is_http_basic_auth_enabled:
+          type: boolean
+          description: 'HTTP Basic Authentication enabled.'
+        http_basic_auth_username:
+          type: string
+          nullable: true
+          description: 'Username for HTTP Basic Authentication'
+        http_basic_auth_password:
+          type: string
+          nullable: true
+          description: 'Password for HTTP Basic Authentication'
       type: object
     ApplicationDeploymentQueue:
       description: 'Project model'
@@ -5179,6 +5225,12 @@ components:
         private_key:
           type: string
           format: private-key
+        public_key:
+          type: string
+          description: 'The public key of the private key.'
+        fingerprint:
+          type: string
+          description: 'The fingerprint of the private key.'
         is_git_related:
           type: boolean
         team_id:

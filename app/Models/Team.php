@@ -172,12 +172,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function getRecipients($notification)
     {
-        $recipients = data_get($notification, 'emails', null);
-        if (is_null($recipients)) {
-            return $this->members()->pluck('email')->toArray();
+        $recipients = $this->members()->pluck('email')->toArray();
+        $validatedEmails = array_filter($recipients, function ($email) {
+            return filter_var($email, FILTER_VALIDATE_EMAIL);
+        });
+        if (is_null($validatedEmails)) {
+            return [];
         }
 
-        return explode(',', $recipients);
+        return array_values($validatedEmails);
     }
 
     public function isAnyNotificationEnabled()
@@ -197,8 +200,6 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function subscriptionEnded()
     {
         $this->subscription->update([
-            'stripe_subscription_id' => null,
-            'stripe_plan_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,
             'stripe_trial_already_ended' => false,

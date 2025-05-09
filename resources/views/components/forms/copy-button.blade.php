@@ -1,9 +1,10 @@
 @props(['text'])
 
-<div class="relative" x-data="{ copied: false }">
+<div class="relative" x-data="{ copied: false, isSecure: window.isSecureContext }">
     <input type="text" value="{{ $text }}" readonly class="input">
     <button
-        @click.prevent="copied = true; navigator.clipboard.writeText('{{ $text }}'); setTimeout(() => copied = false, 1000)"
+        x-show="isSecure"
+        @click.prevent="copied = true; navigator.clipboard.writeText({{ Js::from($text) }}); setTimeout(() => copied = false, 1000)"
         class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-300 transition-colors"
         title="Copy to clipboard">
         <svg x-show="!copied" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

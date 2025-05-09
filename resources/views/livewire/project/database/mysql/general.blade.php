@@ -95,19 +95,38 @@
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col gap-2">
-                <x-forms.checkbox id="database.enable_ssl" label="Enable SSL" wire:model.live="database.enable_ssl"
-                    instantSave="instantSaveSSL" />
+                <div class="w-64">
+                    @if (str($database->status)->contains('exited'))
+                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                    @else
+                        <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" disabled
+                            helper="Database should be stopped to change this settings." />
+                    @endif
+                </div>
                 @if ($database->enable_ssl)
                     <div class="mx-2">
-                        <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
-                            instantSave="instantSaveSSL"
-                            helper="Choose the SSL verification mode for MySQL connections">
-                            <option value="PREFERRED" title="Prefer secure connections">Prefer (secure)</option>
-                            <option value="REQUIRED" title="Require secure connections">Require (secure)</option>
-                            <option value="VERIFY_CA" title="Verify CA certificate">Verify CA (secure)</option>
-                            <option value="VERIFY_IDENTITY" title="Verify full certificate">Verify Full (secure)
-                            </option>
-                        </x-forms.select>
+                        @if (str($database->status)->contains('exited'))
+                            <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
+                                instantSave="instantSaveSSL"
+                                helper="Choose the SSL verification mode for MySQL connections">
+                                <option value="PREFERRED" title="Prefer secure connections">Prefer (secure)</option>
+                                <option value="REQUIRED" title="Require secure connections">Require (secure)</option>
+                                <option value="VERIFY_CA" title="Verify CA certificate">Verify CA (secure)</option>
+                                <option value="VERIFY_IDENTITY" title="Verify full certificate">Verify Full (secure)
+                                </option>
+                            </x-forms.select>
+                        @else
+                            <x-forms.select id="database.ssl_mode" label="SSL Mode" instantSave="instantSaveSSL"
+                                disabled helper="Database should be stopped to change this settings.">
+                                <option value="PREFERRED" title="Prefer secure connections">Prefer (secure)</option>
+                                <option value="REQUIRED" title="Require secure connections">Require (secure)</option>
+                                <option value="VERIFY_CA" title="Verify CA certificate">Verify CA (secure)</option>
+                                <option value="VERIFY_IDENTITY" title="Verify full certificate">Verify Full (secure)
+                                </option>
+                            </x-forms.select>
+                        @endif
                     </div>
                 @endif
             </div>
