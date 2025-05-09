@@ -120,6 +120,8 @@ class General extends Component
         try {
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
+            $this->db_url = $this->database->internal_db_url;
+            $this->db_url_public = $this->database->external_db_url;
         } catch (Exception $e) {
             return handleError($e, $this);
         }
