@@ -1,5 +1,7 @@
-<div x-init="$wire.checkProxy()" class="flex gap-2">
-    <x-forms.button wire:click='checkProxy(true)' :showLoadingIndicator="false">Refresh</x-forms.button>
+<div @if (data_get($server, 'proxy.force_stop', false) === false) x-init="$wire.checkProxy()" @endif class="flex gap-2">
+    @if (data_get($server, 'proxy.force_stop', false) === false)
+        <x-forms.button wire:click='checkProxy(true)' :showLoadingIndicator="false">Refresh</x-forms.button>
+    @endif
     @if (data_get($server, 'proxy.status') === 'running')
         <x-status.running status="Proxy Running" />
     @elseif (data_get($server, 'proxy.status') === 'restarting')

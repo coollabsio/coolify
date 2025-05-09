@@ -5,6 +5,7 @@
 
 x-app-env: &app-env
   environment:
+    - APP_RELEASE=${APP_RELEASE:-v0.25.2}
     - WEB_URL=${SERVICE_FQDN_PLANE}
     - DEBUG=${DEBUG:-0}
     - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
@@ -54,7 +55,7 @@ services:
       - SERVICE_FQDN_PLANE
       - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
       - BUCKET_NAME=${BUCKET_NAME:-uploads}
-    image: makeplane/plane-proxy:stable
+    image: makeplane/plane-proxy:${APP_RELEASE:-v0.25.1}
     depends_on:
       - web
       - api
@@ -66,8 +67,7 @@ services:
       retries: 15
 
   web:
-    <<: *app-env
-    image: makeplane/plane-frontend:stable
+    image: makeplane/plane-frontend:${APP_RELEASE:-v0.25.1}
     command: node web/server.js web
     depends_on:
       - api
@@ -78,8 +78,7 @@ services:
       timeout: 10s
       retries: 15
   space:
-    <<: *app-env
-    image: makeplane/plane-space:stable
+    image: makeplane/plane-space:${APP_RELEASE:-v0.25.1}
     command: node space/server.js space
     depends_on:
       - api
@@ -92,8 +91,7 @@ services:
       retries: 15
 
   admin:
-    <<: *app-env
-    image: makeplane/plane-admin:stable
+    image: makeplane/plane-admin:${APP_RELEASE:-v0.25.1}
     command: node admin/server.js admin
     depends_on:
       - api
@@ -106,7 +104,7 @@ services:
 
   live:
     <<: *app-env
-    image: makeplane/plane-live:stable
+    image: makeplane/plane-live:${APP_RELEASE:-v0.25.1}
     command: node live/dist/server.js live
     depends_on:
       - api
@@ -119,7 +117,7 @@ services:
 
   api:
     <<: *app-env
-    image: makeplane/plane-backend:stable
+    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
     command: ./bin/docker-entrypoint-api.sh
     volumes:
       - logs_api:/code/plane/logs
@@ -134,7 +132,7 @@ services:
 
   worker:
     <<: *app-env
-    image: makeplane/plane-backend:stable
+    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
     command: ./bin/docker-entrypoint-worker.sh
     volumes:
       - logs_worker:/code/plane/logs
@@ -150,7 +148,7 @@ services:
 
   beat-worker:
     <<: *app-env
-    image: makeplane/plane-backend:stable
+    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
     command: ./bin/docker-entrypoint-beat.sh
     volumes:
       - logs_beat-worker:/code/plane/logs
@@ -166,7 +164,7 @@ services:
 
   migrator:
     <<: *app-env
-    image: makeplane/plane-backend:stable
+    image: makeplane/plane-backend:${APP_RELEASE:-v0.25.1}
     restart: "no"
     command: ./bin/docker-entrypoint-migrator.sh
     volumes:

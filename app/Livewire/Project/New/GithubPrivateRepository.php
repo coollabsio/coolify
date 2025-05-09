@@ -106,11 +106,15 @@ class GithubPrivateRepository extends Component
         $this->selected_github_app_id = $github_app_id;
         $this->github_app = GithubApp::where('id', $github_app_id)->first();
         $this->token = generateGithubInstallationToken($this->github_app);
-        $this->loadRepositoryByPage();
+        $repositories = loadRepositoryByPage($this->github_app, $this->token, $this->page);
+        $this->total_repositories_count = $repositories['total_count'];
+        $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
         if ($this->repositories->count() < $this->total_repositories_count) {
             while ($this->repositories->count() < $this->total_repositories_count) {
                 $this->page++;
-                $this->loadRepositoryByPage();
+                $repositories = loadRepositoryByPage($this->github_app, $this->token, $this->page);
+                $this->total_repositories_count = $repositories['total_count'];
+                $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
             }
         }
         $this->repositories = $this->repositories->sortBy('name');
@@ -118,21 +122,6 @@ class GithubPrivateRepository extends Component
             $this->selected_repository_id = data_get($this->repositories->first(), 'id');
         }
         $this->current_step = 'repository';
-    }
-
-    protected function loadRepositoryByPage()
-    {
-        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100&page={$this->page}");
-        $json = $response->json();
-        if ($response->status() !== 200) {
-            return $this->dispatch('error', $json['message']);
-        }
-
-        if ($json['total_count'] === 0) {
-            return;
-        }
-        $this->total_repositories_count = $json['total_count'];
-        $this->repositories = $this->repositories->concat(collect($json['repositories']));
     }
 
     public function loadBranches()

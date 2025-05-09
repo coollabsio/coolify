@@ -1,20 +1,18 @@
 # Versions
-
-
 # https://hub.docker.com/_/alpine
 ARG BASE_IMAGE=alpine:3.21
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=27.4.1
+ARG DOCKER_VERSION=28.0.0
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.32.2
+ARG DOCKER_COMPOSE_VERSION=2.34.0
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.19.3
+ARG DOCKER_BUILDX_VERSION=0.22.0
 # https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=0.36.2
+ARG PACK_VERSION=0.37.0
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.29.0
+ARG NIXPACKS_VERSION=1.34.1
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2024-11-21T17-21-54Z
+ARG MINIO_VERSION=RELEASE.2025-03-12T17-29-24Z
 
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 

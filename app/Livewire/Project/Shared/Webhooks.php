@@ -29,8 +29,6 @@ class Webhooks extends Component
 
     public function mount()
     {
-        // ray()->clearAll();
-        // ray()->showQueries();
         $this->deploywebhook = generateDeployWebhook($this->resource);
 
         $this->githubManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_github');

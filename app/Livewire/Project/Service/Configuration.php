@@ -31,8 +31,9 @@ class Configuration extends Component
 
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
-            'check_status',
             'refreshStatus' => '$refresh',
+            'check_status',
+            'refreshServices',
         ];
     }
 
@@ -59,6 +60,13 @@ class Configuration extends Component
 
         $this->project = $project;
         $this->environment = $environment;
+        $this->applications = $this->service->applications->sort();
+        $this->databases = $this->service->databases->sort();
+    }
+
+    public function refreshServices()
+    {
+        $this->service->refresh();
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
     }
@@ -92,7 +100,9 @@ class Configuration extends Component
     public function check_status()
     {
         try {
-            GetContainersStatus::run($this->service->server);
+            if ($this->service->server->isFunctional()) {
+                GetContainersStatus::dispatch($this->service->server);
+            }
             $this->service->applications->each(function ($application) {
                 $application->refresh();
             });

@@ -31,12 +31,22 @@ class EditCompose extends Component
 
     public function refreshEnvs()
     {
-        $this->service = Service::find($this->serviceId);
+        $this->service = Service::ownedByCurrentTeam()->find($this->serviceId);
     }
 
     public function mount()
     {
-        $this->service = Service::find($this->serviceId);
+        $this->service = Service::ownedByCurrentTeam()->find($this->serviceId);
+    }
+
+    public function validateCompose()
+    {
+        $isValid = validateComposeFile($this->service->docker_compose_raw, $this->service->server_id);
+        if ($isValid !== 'OK') {
+            $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
+        } else {
+            $this->dispatch('success', 'Docker compose is valid.');
+        }
     }
 
     public function saveEditedCompose()

@@ -2,9 +2,9 @@
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2024-11-21T17-21-54Z
+ARG MINIO_VERSION=RELEASE.2025-03-12T17-29-24Z
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2025.1.0
+ARG CLOUDFLARED_VERSION=2025.2.0
 # https://www.postgresql.org/support/versioning/
 ARG POSTGRES_VERSION=15
 

@@ -31,8 +31,8 @@ class Heading extends Component
         $this->database->update([
             'started_at' => now(),
         ]);
-        $this->dispatch('refresh');
         $this->check_status();
+
         if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
             $this->database->isConfigurationChanged(true);
             $this->dispatch('configurationChanged');
@@ -43,8 +43,10 @@ class Heading extends Component
 
     public function check_status($showNotification = false)
     {
-        GetContainersStatus::run($this->database->destination->server);
-        $this->database->refresh();
+        if ($this->database->destination->server->isFunctional()) {
+            GetContainersStatus::run($this->database->destination->server);
+        }
+
         if ($showNotification) {
             $this->dispatch('success', 'Database status updated.');
         }
@@ -61,6 +63,7 @@ class Heading extends Component
         $this->database->status = 'exited';
         $this->database->save();
         $this->check_status();
+        $this->dispatch('refresh');
     }
 
     public function restart()
