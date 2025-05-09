@@ -85,7 +85,6 @@ class RunRemoteProcess
         ]);
 
         $processResult = $process->wait();
-        // $processResult = Process::timeout($timeout)->run($this->getCommand(), $this->handleOutput(...));
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {

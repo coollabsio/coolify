@@ -7,6 +7,7 @@ use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
 use App\Models\Server;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -49,6 +50,9 @@ class Show extends Component
 
     #[Validate(['required'])]
     public bool $isBuildServer;
+
+    #[Locked]
+    public bool $isBuildServerLocked = false;
 
     #[Validate(['required'])]
     public bool $isMetricsEnabled;
@@ -95,6 +99,9 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
+            if (! $this->server->isEmpty()) {
+                $this->isBuildServerLocked = true;
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

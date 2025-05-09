@@ -21,6 +21,7 @@
     'dispatchEvent' => false,
     'dispatchEventType' => 'success',
     'dispatchEventMessage' => '',
+    'ignoreWire' => true,
 ])
 
 @php
@@ -28,7 +29,7 @@
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
 @endphp
 
-<div wire:ignore x-data="{
+<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -40,7 +41,6 @@
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
     confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
-    copied: false,
     submitAction: @js($submitAction),
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
@@ -91,13 +91,6 @@
                 }
             });
     },
-    copyConfirmationText() {
-        navigator.clipboard.writeText(this.confirmationText);
-        this.copied = true;
-        setTimeout(() => {
-            this.copied = false;
-        }, 2000);
-    },
     toggleAction(id) {
         const index = this.selectedActions.indexOf(id);
         if (index > -1) {
@@ -106,8 +99,9 @@
             this.selectedActions.push(id);
         }
     }
-}" @keydown.escape.window="modalOpen = false; resetModal()"
-    :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+}"
+    @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
+    class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
@@ -255,29 +249,7 @@
                                     <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2">
-                                        <input type="text" x-model="confirmationText"
-                                            class="p-2 pr-10 w-full text-black rounded cursor-text input" readonly>
-                                        <button @click="copyConfirmationText()"
-                                            x-show="window.isSecureContext"
-                                            class="absolute right-2 top-1/2 text-gray-500 transform -translate-y-1/2 hover:text-gray-700"
-                                            title="Copy confirmation text" x-ref="copyButton">
-                                            <template x-if="!copied">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                                                    viewBox="0 0 20 20" fill="currentColor">
-                                                    <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                                                    <path
-                                                        d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                                                </svg>
-                                            </template>
-                                            <template x-if="copied">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-500"
-                                                    viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd"
-                                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                        clip-rule="evenodd" />
-                                                </svg>
-                                            </template>
-                                        </button>
+                                        <x-forms.copy-button text="{{ $confirmationText }}" />
                                     </div>
 
                                     <label for="userConfirmationText"

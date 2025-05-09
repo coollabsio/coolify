@@ -8,6 +8,7 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
@@ -295,7 +296,8 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null)
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -303,6 +305,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     } else {
         $labels->push("caddy_ingress_network={$network}");
     }
+
+    $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
+    if ($is_http_basic_auth_enabled) {
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    }
+
     foreach ($domains as $loop => $domain) {
         $url = Url::fromString($domain);
         $host = $url->getHost();
@@ -339,19 +347,30 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
             $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
         }
-        if (isDev()) {
-            // $labels->push("caddy_{$loop}.tls=internal");
+        if ($is_http_basic_auth_enabled) {
+            $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$hashedPassword}\"");
         }
     }
 
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both')
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     $labels->push('traefik.http.middlewares.gzip.compress=true');
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
+
+    $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
+    $http_basic_auth_label = "http-basic-auth-{$uuid}";
+    if ($is_http_basic_auth_enabled) {
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    }
+
+    if ($is_http_basic_auth_enabled) {
+        $labels->push("traefik.http.middlewares.{$http_basic_auth_label}.basicauth.users={$http_basic_auth_username}:{$hashedPassword}");
+    }
 
     $middlewares_from_labels = collect([]);
 
@@ -438,6 +457,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -460,6 +482,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
+                    }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
                     }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
@@ -510,6 +535,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -532,6 +560,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
+                    }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
                     }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
@@ -576,7 +607,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                            redirect_direction: $application->redirect
+                            redirect_direction: $application->redirect,
+                            is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                            http_basic_auth_username: $application->http_basic_auth_username,
+                            http_basic_auth_password: $application->http_basic_auth_password,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -588,7 +622,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                            redirect_direction: $application->redirect
+                            redirect_direction: $application->redirect,
+                            is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                            http_basic_auth_username: $application->http_basic_auth_username,
+                            http_basic_auth_password: $application->http_basic_auth_password,
                         ));
                         break;
                 }
@@ -600,7 +637,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                    redirect_direction: $application->redirect
+                    redirect_direction: $application->redirect,
+                    is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                    http_basic_auth_username: $application->http_basic_auth_username,
+                    http_basic_auth_password: $application->http_basic_auth_password,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -610,7 +650,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                    redirect_direction: $application->redirect
+                    redirect_direction: $application->redirect,
+                    is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                    http_basic_auth_username: $application->http_basic_auth_username,
+                    http_basic_auth_password: $application->http_basic_auth_password,
                 ));
             }
         }
@@ -630,7 +673,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                        is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                        http_basic_auth_username: $application->http_basic_auth_username,
+                        http_basic_auth_password: $application->http_basic_auth_password,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -641,7 +687,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                        is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                        http_basic_auth_username: $application->http_basic_auth_username,
+                        http_basic_auth_password: $application->http_basic_auth_password,
                     ));
                     break;
             }
@@ -652,7 +701,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                http_basic_auth_username: $application->http_basic_auth_username,
+                http_basic_auth_password: $application->http_basic_auth_password,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -661,7 +713,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                http_basic_auth_username: $application->http_basic_auth_username,
+                http_basic_auth_password: $application->http_basic_auth_password,
             ));
         }
     }
@@ -681,8 +736,10 @@ function isDatabaseImage(?string $image = null)
         $image = str($image)->append(':latest');
     }
     $imageName = $image->before(':');
-    if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
-        return true;
+    foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
+        if (str($imageName)->contains($database_docker_image)) {
+            return true;
+        }
     }
 
     return false;
@@ -714,6 +771,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ip' => 'ip',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
+        '--hostname' => 'hostname',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -723,6 +781,16 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $value = $device_matches[1] ?? 'all';
             $options[$option][] = $value;
             $options[$option] = array_unique($options[$option]);
+        }
+        if ($option === '--hostname') {
+            // Match --hostname=value or --hostname value
+            $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
+            preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
+            $value = $hostname_matches[1] ?? null;
+            if ($value && ! empty(trim($value))) {
+                $options[$option][] = $value;
+                $options[$option] = array_unique($options[$option]);
+            }
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
@@ -760,8 +828,8 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
-        } elseif ($option === '--shm-size') {
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+        } elseif ($option === '--shm-size' || $option === '--hostname') {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -769,7 +837,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 'driver' => 'nvidia',
                 'capabilities' => ['gpu'],
             ];
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 if (str($value[0]) != 'all') {
                     if (str($value[0])->contains(',')) {
                         $payload['device_ids'] = str($value[0])->explode(',')->toArray();
@@ -778,7 +846,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                     }
                 }
             }
-            ray($payload);
             $compose_options->put('deploy', [
                 'resources' => [
                     'reservations' => [
@@ -800,7 +867,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
                 continue;
             }
-            $compose_options->forget($option);
         }
     }
 
@@ -829,27 +895,55 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
-    return 'OK';
+    $uuid = Str::random(18);
+    $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
-        $uuid = Str::random(10);
-        $server = Server::findOrFail($server_id);
-        $base64_compose = base64_encode($compose);
-        $output = instant_remote_process([
+        if (! $server) {
+            throw new \Exception('Server not found');
+        }
+        $yaml_compose = Yaml::parse($compose);
+        foreach ($yaml_compose['services'] as $service_name => $service) {
+            foreach ($service['volumes'] as $volume_name => $volume) {
+                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
+                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
+                }
+            }
+        }
+        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
+        instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "docker compose -f /tmp/{$uuid}.yml config",
+            "chmod 600 /tmp/{$uuid}.yml",
+            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
+            "rm /tmp/{$uuid}.yml",
         ], $server);
-        ray($output);
 
         return 'OK';
     } catch (\Throwable $e) {
-        ray($e);
-
         return $e->getMessage();
     } finally {
-        instant_remote_process([
-            "rm /tmp/{$uuid}.yml",
+        if (filled($server)) {
+            instant_remote_process([
+                "rm /tmp/{$uuid}.yml",
+            ], $server, throwError: false);
+        }
+    }
+}
+
+function getContainerLogs(Server $server, string $container_id, int $lines = 100): string
+{
+    if ($server->isSwarm()) {
+        $output = instant_remote_process([
+            "docker service logs -n {$lines} {$container_id}",
+        ], $server);
+    } else {
+        $output = instant_remote_process([
+            "docker logs -n {$lines} {$container_id}",
         ], $server);
     }
+
+    $output .= removeAnsiColors($output);
+
+    return $output;
 }
 
 function escapeEnvVariables($value)

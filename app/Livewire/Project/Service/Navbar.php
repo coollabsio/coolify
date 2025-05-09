@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
-use App\Actions\Shared\PullImage;
 use App\Enums\ProcessStatus;
 use App\Events\ServiceStatusChanged;
 use App\Models\Service;
@@ -41,6 +40,7 @@ class Navbar extends Component
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
             'envsUpdated' => '$refresh',
+            'refreshStatus' => '$refresh',
         ];
     }
 
@@ -85,8 +85,7 @@ class Navbar extends Component
 
     public function start()
     {
-        $this->service->parse();
-        $activity = StartService::run($this->service);
+        $activity = StartService::run($this->service, pullLatestImages: true);
         $this->dispatch('activityMonitor', $activity->id);
     }
 
@@ -98,8 +97,7 @@ class Navbar extends Component
                 $activity->properties->status = ProcessStatus::ERROR->value;
                 $activity->save();
             }
-            $this->service->parse();
-            $activity = StartService::run($this->service);
+            $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
@@ -129,10 +127,7 @@ class Navbar extends Component
 
             return;
         }
-        StopService::run(service: $this->service, dockerCleanup: false);
-        $this->service->parse();
-        $this->dispatch('imagePulled');
-        $activity = StartService::run($this->service);
+        $activity = StartService::run($this->service, stopBeforeStart: true);
         $this->dispatch('activityMonitor', $activity->id);
     }
 
@@ -144,11 +139,7 @@ class Navbar extends Component
 
             return;
         }
-        PullImage::run($this->service);
-        StopService::run(service: $this->service, dockerCleanup: false);
-        $this->service->parse();
-        $this->dispatch('imagePulled');
-        $activity = StartService::run($this->service);
+        $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
         $this->dispatch('activityMonitor', $activity->id);
     }
 

@@ -16,7 +16,7 @@ class LoginTest extends DuskTestCase
      *
      * @throws Throwable
      */
-    public function testLogin()
+    public function test_login()
     {
         $this->browse(callback: function (Browser $browser) {
             $browser->loginWithRootUser()

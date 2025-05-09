@@ -116,19 +116,27 @@ class Gitea extends Controller
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
                             $deployment_uuid = new Cuid2;
-                            queue_application_deployment(
+                            $result = queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
                                 force_rebuild: false,
                                 commit: data_get($payload, 'after', 'HEAD'),
                                 is_webhook: true,
                             );
-                            $return_payloads->push([
-                                'status' => 'success',
-                                'message' => 'Deployment queued.',
-                                'application_uuid' => $application->uuid,
-                                'application_name' => $application->name,
-                            ]);
+                            if ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => $result['message'],
+                                ]);
+                            } else {
+                                $return_payloads->push([
+                                    'status' => 'success',
+                                    'message' => 'Deployment queued.',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                ]);
+                            }
                         } else {
                             $paths = str($application->watch_paths)->explode("\n");
                             $return_payloads->push([
@@ -152,7 +160,7 @@ class Gitea extends Controller
                     }
                 }
                 if ($x_gitea_event === 'pull_request') {
-                    if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
+                    if ($action === 'opened' || $action === 'synchronized' || $action === 'reopened') {
                         if ($application->isPRDeployable()) {
                             $deployment_uuid = new Cuid2;
                             $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -175,7 +183,7 @@ class Gitea extends Controller
                                     ]);
                                 }
                             }
-                            queue_application_deployment(
+                            $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
@@ -184,11 +192,19 @@ class Gitea extends Controller
                                 is_webhook: true,
                                 git_type: 'gitea'
                             );
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'success',
-                                'message' => 'Preview deployment queued.',
-                            ]);
+                            if ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => $result['message'],
+                                ]);
+                            } else {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'success',
+                                    'message' => 'Preview deployment queued.',
+                                ]);
+                            }
                         } else {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -202,7 +218,6 @@ class Gitea extends Controller
                         if ($found) {
                             $found->delete();
                             $container_name = generateApplicationContainerName($application, $pull_request_id);
-                            // ray('Stopping container: ' . $container_name);
                             instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
                             $return_payloads->push([
                                 'application' => $application->name,

@@ -36,3 +36,4 @@ scripts/load-test/*
 .env.dusk.local
 docker/coolify-realtime/node_modules
 .DS_Store
+Changelog.md

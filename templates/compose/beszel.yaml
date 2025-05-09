@@ -20,5 +20,4 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PORT=45876
-    # Public Key from "Add a new system" in the UI and restart the agent
-    # - KEY=""
+      - KEY=${KEY}

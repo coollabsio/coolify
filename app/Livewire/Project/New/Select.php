@@ -81,7 +81,7 @@ class Select extends Component
 
     public function loadServices()
     {
-        $services = get_service_templates(true);
+        $services = get_service_templates();
         $services = collect($services)->map(function ($service, $key) {
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);

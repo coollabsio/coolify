@@ -35,7 +35,7 @@ class TransactionalEmailChannel
     private function bootConfigs(): void
     {
         $type = set_transanctional_email_settings();
-        if (! $type) {
+        if (blank($type)) {
             throw new Exception('No email settings found.');
         }
     }

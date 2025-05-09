@@ -34,7 +34,7 @@ class StatusChanged extends CustomEmailNotification
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = base_url()."/project/{$this->project_uuid}/environments/{$this->environment_uuid}/application/{$this->resource->uuid}";
+        $this->resource_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array
@@ -103,9 +103,9 @@ class StatusChanged extends CustomEmailNotification
         $title = 'Application stopped';
         $description = "{$this->resource_name} has been stopped";
 
-        $description .= "\n\n**Project:** ".data_get($this->resource, 'environment.project.name');
-        $description .= "\n**Environment:** {$this->environment_name}";
-        $description .= "\n**Application URL:** {$this->resource_url}";
+        $description .= "\n\n*Project:* ".data_get($this->resource, 'environment.project.name');
+        $description .= "\n*Environment:* {$this->environment_name}";
+        $description .= "\n*Application URL:* {$this->resource_url}";
 
         return new SlackMessage(
             title: $title,
