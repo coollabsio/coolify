@@ -1,0 +1,458 @@
+# documentation: https://docs.librechat.ai/install/configuration/dotenv.html
+# slogan: Self-hosted, powerful, and privacy-focused chat UI for multiple AI models
+# tags: ai,chat,gpt,claude,palm,openai,azure,huggingface,anthropic,ollama,llm
+# logo: svgs/librechat.svg
+# port: 3080
+
+services:
+  librechat:
+    image: ghcr.io/danny-avila/librechat-dev-api:latest
+    depends_on:
+      - mongodb
+      - rag_api
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - SERVICE_FQDN_LIBRECHAT_3080
+      # MongoDB settings
+      - MONGO_URI=mongodb://${SERVICE_USER_MONGO}:${SERVICE_PASSWORD_MONGO}@mongodb:27017/librechat?authSource=admin
+      # Meilisearch settings
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      # RAG settings
+      - RAG_PORT=8000
+      - RAG_API_URL=http://rag_api:8000
+      # Auth settings
+      - DOMAIN_CLIENT=${SERVICE_FQDN_LIBRECHAT}
+      - DOMAIN_SERVER=${SERVICE_FQDN_LIBRECHAT}
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - JWT_REFRESH_SECRET=${SERVICE_PASSWORD_64_JWT}
+      # App settings
+      - APP_TITLE=${APP_TITLE:-LibreChat}
+      - ALLOW_EMAIL_LOGIN=${ALLOW_EMAIL_LOGIN:-true}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - ALLOW_SOCIAL_LOGIN=${ALLOW_SOCIAL_LOGIN:-false}
+      - ALLOW_SOCIAL_REGISTRATION=${ALLOW_SOCIAL_REGISTRATION:-false}
+      - ALLOW_PASSWORD_RESET=${ALLOW_PASSWORD_RESET:-false}
+      - ALLOW_UNVERIFIED_EMAIL_LOGIN=${ALLOW_UNVERIFIED_EMAIL_LOGIN:-true}
+      # Encryption settings
+      - CREDS_KEY=${SERVICE_PASSWORD_64_CREDS}
+      - CREDS_IV=${SERVICE_PASSWORD_CREDS}
+      # API Keys
+      - ANTHROPIC_API_KEY=${SERVICE_ANTHROPIC_API_KEY:-user_provided}
+      - GOOGLE_KEY=${SERVICE_GOOGLE_API_KEY:-user_provided}
+      - OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY:-user_provided}
+      - ASSISTANTS_API_KEY=${SERVICE_ASSISTANTS_API_KEY:-user_provided}
+      # Debug settings
+      - DEBUG_LOGGING=${DEBUG_LOGGING:-false}
+      - DEBUG_OPENAI=${DEBUG_OPENAI:-false}
+      - DEBUG_PLUGINS=${DEBUG_OPENAI:-false}
+      - NO_INDEX=${NO_INDEX:-true}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:3080/api/health',
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - librechat-images:/app/client/public/images
+      - librechat-logs:/app/api/logs
+      - librechat-uploads:/app/uploads
+      - type: bind
+        source: ./librechat.yaml
+        target: /app/librechat.yaml
+        content: |
+          # For more information, see the Configuration Guide:
+          # https://www.librechat.ai/docs/configuration/librechat_yaml
+
+          # Configuration version (required)
+          version: 1.2.1
+
+          # Cache settings: Set to true to enable caching
+          cache: true
+
+          # File strategy s3/firebase
+          # fileStrategy: "s3"
+
+          # Custom interface configuration
+          interface:
+            customWelcome: "Welcome to LibreChat! Enjoy your experience."
+            # Privacy policy settings
+            # privacyPolicy:
+              # externalUrl: 'https://librechat.ai/privacy-policy'
+              # openNewTab: true
+
+            # Terms of service
+            termsOfService:
+              externalUrl: 'https://librechat.ai/tos'
+              openNewTab: true
+              modalAcceptance: true
+              modalTitle: "Terms of Service for LibreChat"
+              modalContent: |
+                # Terms and Conditions for LibreChat
+
+                *Effective Date: February 18, 2024*
+
+                Welcome to LibreChat, the informational website for the open-source AI chat platform, available at https://librechat.ai. These Terms of Service ("Terms") govern your use of our website and the services we offer. By accessing or using the Website, you agree to be bound by these Terms and our Privacy Policy, accessible at https://librechat.ai//privacy.
+
+                ## 1. Ownership
+
+                Upon purchasing a package from LibreChat, you are granted the right to download and use the code for accessing an admin panel for LibreChat. While you own the downloaded code, you are expressly prohibited from reselling, redistributing, or otherwise transferring the code to third parties without explicit permission from LibreChat.
+
+                ## 2. User Data
+
+                We collect personal data, such as your name, email address, and payment information, as described in our Privacy Policy. This information is collected to provide and improve our services, process transactions, and communicate with you.
+
+                ## 3. Non-Personal Data Collection
+
+                The Website uses cookies to enhance user experience, analyze site usage, and facilitate certain functionalities. By using the Website, you consent to the use of cookies in accordance with our Privacy Policy.
+
+                ## 4. Use of the Website
+
+                You agree to use the Website only for lawful purposes and in a manner that does not infringe the rights of, restrict, or inhibit anyone else's use and enjoyment of the Website. Prohibited behavior includes harassing or causing distress or inconvenience to any person, transmitting obscene or offensive content, or disrupting the normal flow of dialogue within the Website.
+
+                ## 5. Governing Law
+
+                These Terms shall be governed by and construed in accordance with the laws of the United States, without giving effect to any principles of conflicts of law.
+
+                ## 6. Changes to the Terms
+
+                We reserve the right to modify these Terms at any time. We will notify users of any changes by email. Your continued use of the Website after such changes have been notified will constitute your consent to such changes.
+
+                ## 7. Contact Information
+
+                If you have any questions about these Terms, please contact us at contact@librechat.ai.
+
+                By using the Website, you acknowledge that you have read these Terms of Service and agree to be bound by them.
+
+            endpointsMenu: true
+            modelSelect: true
+            parameters: true
+            sidePanel: true
+            presets: true
+            prompts: true
+            bookmarks: true
+            multiConvo: true
+            agents: true
+
+          # Example Registration Object Structure (optional)
+          registration:
+            socialLogins: ['github', 'google', 'discord', 'openid', 'facebook', 'apple']
+            # allowedDomains:
+            # - "gmail.com"
+
+
+          # Example Balance settings
+          # balance:
+          #   enabled: false
+          #   startBalance: 20000
+          #   autoRefillEnabled: false
+          #   refillIntervalValue: 30
+          #   refillIntervalUnit: 'days'
+          #   refillAmount: 10000
+
+          # speech:
+          #   tts:
+          #     openai:
+          #       url: ''
+          #       apiKey: '${TTS_API_KEY}'
+          #       model: ''
+          #       voices: ['']
+
+          #
+          #   stt:
+          #     openai:
+          #       url: ''
+          #       apiKey: '${STT_API_KEY}'
+          #       model: ''
+
+          # rateLimits:
+          #   fileUploads:
+          #     ipMax: 100
+          #     ipWindowInMinutes: 60  # Rate limit window for file uploads per IP
+          #     userMax: 50
+          #     userWindowInMinutes: 60  # Rate limit window for file uploads per user
+          #   conversationsImport:
+          #     ipMax: 100
+          #     ipWindowInMinutes: 60  # Rate limit window for conversation imports per IP
+          #     userMax: 50
+          #     userWindowInMinutes: 60  # Rate limit window for conversation imports per user
+
+          # Example Actions Object Structure
+          actions:
+            allowedDomains:
+              - "swapi.dev"
+              - "librechat.ai"
+              - "google.com"
+
+          # Example MCP Servers Object Structure
+          # mcpServers:
+          #   everything:
+          #     # type: sse # type can optionally be omitted
+          #     url: http://localhost:3001/sse
+          #     timeout: 60000  # 1 minute timeout for this server, this is the default timeout for MCP servers.
+          #   puppeteer:
+          #     type: stdio
+          #     command: npx
+          #     args:
+          #       - -y
+          #       - "@modelcontextprotocol/server-puppeteer"
+          #     timeout: 300000  # 5 minutes timeout for this server
+          #   filesystem:
+          #     # type: stdio
+          #     command: npx
+          #     args:
+          #       - -y
+          #       - "@modelcontextprotocol/server-filesystem"
+          #       - /home/user/LibreChat/
+          #     iconPath: /home/user/LibreChat/client/public/assets/logo.svg
+          #   mcp-obsidian:
+          #     command: npx
+          #     args:
+          #       - -y
+          #       - "mcp-obsidian"
+          #       - /path/to/obsidian/vault
+
+          # Definition of custom endpoints
+          endpoints:
+            # assistants:
+            #   disableBuilder: false # Disable Assistants Builder Interface by setting to `true`
+            #   pollIntervalMs: 3000  # Polling interval for checking assistant updates
+            #   timeoutMs: 180000  # Timeout for assistant operations
+            #   # Should only be one or the other, either `supportedIds` or `excludedIds`
+            #   supportedIds: ["asst_supportedAssistantId1", "asst_supportedAssistantId2"]
+            #   # excludedIds: ["asst_excludedAssistantId"]
+            #   # Only show assistants that the user created or that were created externally (e.g. in Assistants playground).
+            #   # privateAssistants: false # Does not work with `supportedIds` or `excludedIds`
+            #   # (optional) Models that support retrieval, will default to latest known OpenAI models that support the feature
+            #   retrievalModels: ["gpt-4-turbo-preview"]
+            #   # (optional) Assistant Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
+            #   capabilities: ["code_interpreter", "retrieval", "actions", "tools", "image_vision"]
+            # agents:
+            #   # (optional) Default recursion depth for agents, defaults to 25
+            #   recursionLimit: 50
+            #   # (optional) Max recursion depth for agents, defaults to 25
+            #   maxRecursionLimit: 100
+            #   # (optional) Disable the builder interface for agents
+            #   disableBuilder: false
+            #   # (optional) Agent Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
+            #   capabilities: ["execute_code", "file_search", "actions", "tools"]
+            custom:
+              # Groq Example
+              - name: 'groq'
+                apiKey: '${GROQ_API_KEY}'
+                baseURL: 'https://api.groq.com/openai/v1/'
+                models:
+                  default:
+                    [
+                      'llama3-70b-8192',
+                      'llama3-8b-8192',
+                      'llama2-70b-4096',
+                      'mixtral-8x7b-32768',
+                      'gemma-7b-it',
+                    ]
+                  fetch: false
+                titleConvo: true
+                titleModel: 'mixtral-8x7b-32768'
+                modelDisplayLabel: 'groq'
+
+              # Mistral AI Example
+              - name: 'Mistral' # Unique name for the endpoint
+                # For `apiKey` and `baseURL`, you can use environment variables that you define.
+                # recommended environment variables:
+                apiKey: '${MISTRAL_API_KEY}'
+                baseURL: 'https://api.mistral.ai/v1'
+
+                # Models configuration
+                models:
+                  # List of default models to use. At least one value is required.
+                  default: ['mistral-tiny', 'mistral-small', 'mistral-medium']
+                  # Fetch option: Set to true to fetch models from API.
+                  fetch: true # Defaults to false.
+
+                # Optional configurations
+
+                # Title Conversation setting
+                titleConvo: true # Set to true to enable title conversation
+
+                # Title Method: Choose between "completion" or "functions".
+                # titleMethod: "completion"  # Defaults to "completion" if omitted.
+
+                # Title Model: Specify the model to use for titles.
+                titleModel: 'mistral-tiny' # Defaults to "gpt-3.5-turbo" if omitted.
+
+                # Summarize setting: Set to true to enable summarization.
+                # summarize: false
+
+                # Summary Model: Specify the model to use if summarization is enabled.
+                # summaryModel: "mistral-tiny"  # Defaults to "gpt-3.5-turbo" if omitted.
+
+                # Force Prompt setting: If true, sends a `prompt` parameter instead of `messages`.
+                # forcePrompt: false
+
+                # The label displayed for the AI model in messages.
+                modelDisplayLabel: 'Mistral' # Default is "AI" when not set.
+
+                # Add additional parameters to the request. Default params will be overwritten.
+                # addParams:
+                # safe_prompt: true # This field is specific to Mistral AI: https://docs.mistral.ai/api/
+
+                # Drop Default params parameters from the request. See default params in guide linked below.
+                # NOTE: For Mistral, it is necessary to drop the following parameters or you will encounter a 422 Error:
+                dropParams: ['stop', 'user', 'frequency_penalty', 'presence_penalty']
+
+              # OpenRouter Example
+              - name: 'OpenRouter'
+                # For `apiKey` and `baseURL`, you can use environment variables that you define.
+                # recommended environment variables:
+                apiKey: '${OPENROUTER_KEY}'
+                baseURL: 'https://openrouter.ai/api/v1'
+                models:
+                  default: ['meta-llama/llama-3-70b-instruct']
+                  fetch: true
+                titleConvo: true
+                titleModel: 'meta-llama/llama-3-70b-instruct'
+                # Recommended: Drop the stop parameter from the request as Openrouter models use a variety of stop tokens.
+                dropParams: ['stop']
+                modelDisplayLabel: 'OpenRouter'
+
+              # Portkey AI Example
+              - name: "Portkey"
+                apiKey: "dummy"
+                baseURL: 'https://api.portkey.ai/v1'
+                headers:
+                    x-portkey-api-key: '${PORTKEY_API_KEY}'
+                    x-portkey-virtual-key: '${PORTKEY_OPENAI_VIRTUAL_KEY}'
+                models:
+                    default: ['gpt-4o-mini', 'gpt-4o', 'chatgpt-4o-latest']
+                    fetch: true
+                titleConvo: true
+                titleModel: 'current_model'
+                summarize: false
+                summaryModel: 'current_model'
+                forcePrompt: false
+                modelDisplayLabel: 'Portkey'
+                iconURL: https://images.crunchbase.com/image/upload/c_pad,f_auto,q_auto:eco,dpr_1/rjqy7ghvjoiu4cd1xjbf
+          # fileConfig:
+          #   endpoints:
+          #     assistants:
+          #       fileLimit: 5
+          #       fileSizeLimit: 10  # Maximum size for an individual file in MB
+          #       totalSizeLimit: 50  # Maximum total size for all files in a single request in MB
+          #       supportedMimeTypes:
+          #         - "image/.*"
+          #         - "application/pdf"
+          #     openAI:
+          #       disabled: true  # Disables file uploading to the OpenAI endpoint
+          #     default:
+          #       totalSizeLimit: 20
+          #     YourCustomEndpointName:
+          #       fileLimit: 2
+          #       fileSizeLimit: 5
+          #   serverFileSizeLimit: 100  # Global server file size limit in MB
+          #   avatarSizeLimit: 2  # Limit for user avatar image size in MB
+          # # See the Custom Configuration Guide for more information on Assistants Config:
+          # # https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/assistants_endpoint
+
+
+  mongodb:
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${SERVICE_USER_MONGO}
+      - MONGO_INITDB_ROOT_PASSWORD=${SERVICE_PASSWORD_MONGO}
+      - ALLOW_EMPTY_PASSWORD=${MONGO_ALLOW_EMPTY_PASSWORD:-yes}
+    image: mongo
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--eval',
+          "db.runCommand('ping').ok",
+          '127.0.0.1:27017/test',
+          '--quiet',
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12.3
+    environment:
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_ENV=production
+      - MEILI_HOST=http://meilisearch:7700
+    volumes:
+      - meilisearch-data:/meili_data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:7700/health']
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  vectordb:
+    image: ankane/pgvector:latest
+    environment:
+      - POSTGRES_DB=rag
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - vectordb-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - '--username=$SERVICE_USER_POSTGRES'
+        - '--host=127.0.0.1'
+        - '--port=5432'
+        - '--dbname=rag'
+      interval: 2s
+      timeout: 1m
+      retries: 5
+      start_period: 10s
+
+  rag_api:
+    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:latest
+    depends_on:
+      - vectordb
+    environment:
+      - POSTGRES_DB=rag
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_HOST=vectordb
+      - DB_USER=${SERVICE_USER_POSTGRES}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_NAME=rag
+      - RAG_PORT=8000
+      - RAG_OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY:-user_provided}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:8000/health',
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+volumes:
+  mongodb-data:
+  meilisearch-data:
+  vectordb-data:
+  librechat-images:
+  librechat-logs:
+  librechat-uploads:
