@@ -84,6 +84,8 @@ Thank you so much!
 * [Tolgee](https://tolgee.io?ref=coolify.io) - The open source localization platform
 * [CompAI](https://www.trycomp.ai?ref=coolify.io) - Open source compliance automation platform
 * [GoldenVM](https://billing.goldenvm.com?ref=coolify.io) - Premium virtual machine hosting solutions
+* [Gozunga](https://gozunga.com?ref=coolify.io) - Seriously Simple Cloud Infrastructure
+* [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 
 ## Small Sponsors
 

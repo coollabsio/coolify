@@ -37,7 +37,7 @@
                     <div x-cloak x-show="activeTab === 'backups'">
                         <div class="flex gap-2 ">
                             <h2 class="pb-4">Scheduled Backups</h2>
-                            @if (filled($serviceDatabase->custom_type))
+                            @if (filled($serviceDatabase->custom_type) || !$serviceDatabase->is_migrated)
                                 <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
                                     <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
                                 </x-modal-input>
@@ -46,7 +46,7 @@
                         <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
                     </div>
                 @endif
-            </div>
-        @endisset
+            @endisset
+        </div>
     </div>
 </div>
