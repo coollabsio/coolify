@@ -985,17 +985,17 @@ services:
       - GOTRUE_MAILER_URLPATHS_CONFIRMATION=${MAILER_URLPATHS_CONFIRMATION:-/auth/v1/verify}
       - GOTRUE_MAILER_URLPATHS_RECOVERY=${MAILER_URLPATHS_RECOVERY:-/auth/v1/verify}
       - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=${MAILER_URLPATHS_EMAIL_CHANGE:-/auth/v1/verify}
-      - GOTRUE_MAILER_TEMPLATES_INVITE=${MAILER_TEMPLATES_INVITE}
-      - GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${MAILER_TEMPLATES_CONFIRMATION}
-      - GOTRUE_MAILER_TEMPLATES_RECOVERY=${MAILER_TEMPLATES_RECOVERY}
-      - GOTRUE_MAILER_TEMPLATES_MAGIC_LINK=${MAILER_TEMPLATES_MAGIC_LINK}
-      - GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${MAILER_TEMPLATES_EMAIL_CHANGE}
+      - GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${MAILER_TEMPLATES_CONFIRMATION:-http://nginx:80/confirmation.html}
+      - GOTRUE_MAILER_TEMPLATES_INVITE=${MAILER_TEMPLATES_INVITE:-http://nginx:80/invitation.html}
+      - GOTRUE_MAILER_TEMPLATES_RECOVERY=${MAILER_TEMPLATES_RECOVERY:-http://nginx:80/recovery.html}
+      - GOTRUE_MAILER_TEMPLATES_MAGIC_LINK=${MAILER_TEMPLATES_MAGIC_LINK:-http://nginx:80/magic_link.html}
+      - GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${MAILER_TEMPLATES_EMAIL_CHANGE:-http://nginx:80/email_change.html}
 
-      - GOTRUE_MAILER_SUBJECTS_CONFIRMATION=${MAILER_SUBJECTS_CONFIRMATION}
-      - GOTRUE_MAILER_SUBJECTS_RECOVERY=${MAILER_SUBJECTS_RECOVERY}
-      - GOTRUE_MAILER_SUBJECTS_MAGIC_LINK=${MAILER_SUBJECTS_MAGIC_LINK}
-      - GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE=${MAILER_SUBJECTS_EMAIL_CHANGE}
-      - GOTRUE_MAILER_SUBJECTS_INVITE=${MAILER_SUBJECTS_INVITE}
+      - GOTRUE_MAILER_SUBJECTS_CONFIRMATION=${MAILER_SUBJECTS_CONFIRMATION:-Confirm Your Signup}
+      - GOTRUE_MAILER_SUBJECTS_RECOVERY=${MAILER_SUBJECTS_RECOVERY:-Reset Your Password}
+      - GOTRUE_MAILER_SUBJECTS_MAGIC_LINK=${MAILER_SUBJECTS_MAGIC_LINK:-Your Magic Link}
+      - GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE=${MAILER_SUBJECTS_EMAIL_CHANGE:-Confirm Email Change}
+      - GOTRUE_MAILER_SUBJECTS_INVITE=${MAILER_SUBJECTS_INVITE:-You have been invited}
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
@@ -1349,6 +1349,69 @@ services:
       - start
       - --main-service
       - /home/deno/functions/main
+
+  nginx:
+    container_name: supabase-nginx
+    image: 'nginx:alpine'
+    volumes:
+      - type: bind
+        source: ./email_template/confirmation.html
+        target: /usr/share/nginx/html/confirmation.html
+        content: |
+          <!-- Default template -->
+          <!-- use {{ .ConfirmationURL }} {{ .Token }} {{ .TokenHash }} {{ .SiteURL }} {{ .Email }} {{ .Data }} {{ .RedirectTo }} -->
+
+          <h2>Confirm your signup</h2>
+
+          <p>Follow this link to confirm your user:</p>
+          <p><a href="{{ .ConfirmationURL }}">Confirm your mail</a></p>
+
+      - type: bind
+        source: ./email_template/email_change.html
+        target: /usr/share/nginx/html/email_change.html
+        content: |
+          <!-- Default template -->
+          <!-- use {{ .ConfirmationURL }} {{ .Token }} {{ .TokenHash }} {{ .SiteURL }} {{ .Email }} {{ .NewEmail }} {{ .Data }} {{ .RedirectTo }} -->
+
+          <h2>Confirm Change of Email</h2>
+
+          <p>Follow this link to confirm the update of your email from {{ .Email }} to {{ .NewEmail }}:</p>
+          <p><a href="{{ .ConfirmationURL }}">Change Email</a></p>
+
+      - type: bind
+        source: ./email_template/invitation.html
+        target: /usr/share/nginx/html/invitation.html
+        content: |
+          <!-- Default template -->
+          <!-- use {{ .ConfirmationURL }} {{ .Token }} {{ .TokenHash }} {{ .SiteURL }} {{ .Email }} {{ .Data }} {{ .RedirectTo }} -->
+
+          <h2>You have been invited</h2>
+
+          <p>You have been invited to create a user on {{ .SiteURL }}. Follow this link to accept the invite:</p>
+          <p><a href="{{ .ConfirmationURL }}">Accept the invite</a></p>
+
+      - type: bind
+        source: ./email_template/magiclink.html
+        target: /usr/share/nginx/html/magiclink.html
+        content: |
+          <!-- Default template -->
+          <!-- use {{ .ConfirmationURL }} {{ .Token }} {{ .TokenHash }} {{ .SiteURL }} {{ .Email }} {{ .Data }} {{ .RedirectTo }} -->
+
+          <h2>Magic Link</h2>
+
+          <p>Follow this link to login:</p>
+          <p><a href="{{ .ConfirmationURL }}">Log In</a></p>
+
+      - type: bind
+        source: ./email_template/recovery.html
+        target: /usr/share/nginx/html/recovery.html
+        content: |
+          <!-- Default template -->
+          <!-- use {{ .ConfirmationURL }} {{ .Token }} {{ .TokenHash }} {{ .SiteURL }} {{ .Email }} {{ .Data }} {{ .RedirectTo }} -->
+          <h2>Reset Password</h2>
+
+          <p>Follow this link to reset the password for your user:</p>
+          <p><a href="{{ .ConfirmationURL }}">Reset Password</a></p>
 
   supabase-supavisor:
     image: 'supabase/supavisor:1.1.56'
