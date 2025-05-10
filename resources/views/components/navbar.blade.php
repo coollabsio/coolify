@@ -79,6 +79,22 @@
     <div class="flex pt-6 pb-4 pl-2">
         <div class="flex flex-col w-full">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
+            @use('App\Models\InstanceSettings')
+            @php
+                $instanceSettings = instanceSettings();
+                $name = null;
+
+                if ($instanceSettings) {
+                    $displayName = $instanceSettings->getTitleDisplayNameWithoutBrackets();
+
+                    if (strlen($displayName) > 0) {
+                        $name = $displayName;
+                    }
+                }
+            @endphp
+            @if (strlen($name) > 0)
+                <div class="text-sm font-medium tracking-wide dark:text-white">{{ $name }}</div>
+            @endif
             <x-version />
         </div>
         <div class="pt-1">

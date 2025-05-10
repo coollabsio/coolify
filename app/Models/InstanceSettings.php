@@ -108,6 +108,16 @@ class InstanceSettings extends Model
         return "[{$instanceName}]";
     }
 
+    public function getTitleDisplayNameWithoutBrackets(): string
+    {
+        $instanceName = $this->instance_name;
+        if (! $instanceName) {
+            return '';
+        }
+
+        return $instanceName;
+    }
+
     // public function helperVersion(): Attribute
     // {
     //     return Attribute::make(
