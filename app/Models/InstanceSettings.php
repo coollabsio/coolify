@@ -98,24 +98,14 @@ class InstanceSettings extends Model
     //     return explode(',', $recipients);
     // }
 
-    public function getTitleDisplayName(): string
+    public function getTitleDisplayName($prefix = '', $suffix = ''): string
     {
         $instanceName = $this->instance_name;
         if (! $instanceName) {
             return '';
         }
 
-        return "[{$instanceName}]";
-    }
-
-    public function getTitleDisplayNameWithoutBrackets(): string
-    {
-        $instanceName = $this->instance_name;
-        if (! $instanceName) {
-            return '';
-        }
-
-        return $instanceName;
+        return $prefix.$instanceName.$suffix;
     }
 
     // public function helperVersion(): Attribute

@@ -85,7 +85,7 @@
                 $name = null;
 
                 if ($instanceSettings) {
-                    $displayName = $instanceSettings->getTitleDisplayNameWithoutBrackets();
+                    $displayName = $instanceSettings->getTitleDisplayName();
 
                     if (strlen($displayName) > 0) {
                         $name = $displayName;
