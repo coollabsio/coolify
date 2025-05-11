@@ -1,8 +1,24 @@
 <x-layout-simple>
     <section class="bg-gray-50 dark:bg-base">
         <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
-            <a class="flex items-center text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            <a class="flex flex-col items-center text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                 Coolify
+                @php
+
+                    $instanceSettings = instanceSettings();
+                    $name = null;
+
+                    if ($instanceSettings) {
+                        $displayName = $instanceSettings->getTitleDisplayName();
+
+                        if (strlen($displayName) > 0) {
+                            $name = $displayName;
+                        }
+                    }
+                @endphp
+                @if (strlen($name) > 0)
+                    <span class="text-sm text-gray-500 block">{{ $name }}</span>
+                @endif
             </a>
             <div class="flex items-center justify-center pb-6 text-center">
                 {{ __('auth.reset_password') }}
