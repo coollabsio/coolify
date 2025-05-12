@@ -1,0 +1,46 @@
+# documentation: https://paymenter.org/docs/guides/docker
+# slogan: Open-Source Billing, Built for Hosting
+# tags: automation, billing, open source
+# logo: svgs/paymenter.svg
+# port: 80
+
+services:
+  database:
+    image: mariadb:10.11
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - "mysql:/var/lib/mysql"
+    environment:
+      MYSQL_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
+      MYSQL_ROOT_PASSWORD: ${SERVICE_PASSWORD_MYSQLROOT}
+      MYSQL_DATABASE: "paymenter"
+      MYSQL_USER: "paymenter"
+  cache:
+    image: redis:alpine
+    restart: always
+  paymenter:
+    image: ghcr.io/paymenter/paymenter:latest
+    restart: always
+    links:
+      - database
+      - cache
+    volumes:
+      - "app_logs:/app/storage/logs"
+      - "app_public:/app/storage/public"
+    environment:
+      DB_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
+      APP_ENV: "production"
+      CACHE_STORE: "redis"
+      SESSION_DRIVER: "redis"
+      QUEUE_CONNECTION: "redis"
+      REDIS_HOST: "cache"
+      DB_CONNECTION: "mariadb"
+      DB_HOST: "database"
+      DB_PORT: "3306"
+      APP_KEY: ${SERVICE_BASE64_KEY}
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
