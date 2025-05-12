@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     xz-utils
 
-# Add S6 Overlay
+# Add S6-overlay
 RUN mkdir -p /s6/downloads /s6/extracted && \
     if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
         curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" -o /s6/downloads/s6-overlay-noarch.tar.xz && \
@@ -46,6 +46,7 @@ FROM debian:${BASE_OS_VERSION} AS final
 ARG DOCKER_VERSION
 ARG TARGETPLATFORM
 
+# Install Coolify dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
@@ -62,7 +63,7 @@ RUN apt-get update && \
     curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
     chmod a+r /etc/apt/keyrings/docker.asc
 
-# Add the repository to Apt sources
+# Add the Docker repository to Apt sources
 RUN echo \
     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
     $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
@@ -87,12 +88,11 @@ RUN ssh-keygen -A && \
     mkdir -p ~/.ssh && \
     echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 root@coolify-dev" >> ~/.ssh/authorized_keys
 
-# Copy s6-overlay from s6-builder stage
+# Copy s6-overlay from s6-builder
 COPY --from=s6-builder /s6/extracted /
 
-# Set up s6-overlay
-COPY --chmod=755 docker/testing-host/etc/s6-overlay/ /etc/s6-overlay/
-RUN chmod +x /etc/s6-overlay/scripts/wait-for-docker.sh
+# Setup s6-overlay
+COPY --chmod=555 docker/testing-host/etc/s6-overlay/ /etc/s6-overlay/
 
 EXPOSE 22
 
