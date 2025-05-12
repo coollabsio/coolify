@@ -1,6 +1,6 @@
 #!/command/execlineb -P
 
-# Wait for Docker daemon to be ready
+# Wait for the Docker daemon to be ready
 bash /etc/s6-overlay/scripts/wait-for-docker.sh
 
 # Create the coolify network if it doesn't exist
