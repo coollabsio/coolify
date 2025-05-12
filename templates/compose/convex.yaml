@@ -1,0 +1,40 @@
+# documentation: https://docs.convex.dev/
+# slogan: Convex is the open-source reactive database for app developers.
+# tags: database, reactive, database, ai, agents, chatbot, api, team, bot, flows
+# logo: svgs/convex.svg
+# port: 6791
+
+services:
+  backend:
+    image: ghcr.io/get-convex/convex-backend:4499dd4fd7f2148687a7774599c613d052950f46
+    volumes:
+      - data:/convex/data
+    environment:
+      - SERVICE_FQDN_BACKEND_3210
+      - INSTANCE_NAME=${INSTANCE_NAME:-self-hosted-convex}
+      - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
+      - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
+      - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-}
+      - CONVEX_CLOUD_ORIGIN=${SERVICE_FQDN_CONVEX_6791}
+      - CONVEX_SITE_ORIGIN=${SERVICE_FQDN_CONVEX_6791}/http
+      - DATABASE_URL=${DATABASE_URL:-}
+      - DISABLE_BEACON=${DISABLE_BEACON:-}
+      - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:-}
+      - CONVEX_SELF_HOSTED_URL=${SERVICE_FQDN_CONVEX_6791}
+    healthcheck:
+      test: curl -f http://127.0.0.1:3210/version
+      interval: 5s
+      start_period: 5s
+
+  dashboard:
+    image: ghcr.io/get-convex/convex-dashboard:4499dd4fd7f2148687a7774599c613d052950f46
+    environment:
+      - SERVICE_FQDN_CONVEX_6791
+      - NEXT_PUBLIC_DEPLOYMENT_URL=$SERVICE_FQDN_BACKEND_3210
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:6791/
+      interval: 5s
+      start_period: 5s

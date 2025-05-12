@@ -90,8 +90,6 @@
 
         </div>
         <h4 class="pt-6">API</h4>
-        <div class="pb-4">For API documentation, please visit <a class="dark:text-warning underline"
-                href="/docs/api">/docs/api</a></div>
         <div class="md:w-96 pb-2">
             <x-forms.checkbox instantSave id="is_api_enabled" label="Enabled" />
         </div>
@@ -132,16 +130,16 @@
         <h4 class="py-4">Confirmation Settings</h4>
 
         @if ($disable_two_step_confirmation)
-            <div class="md:w-96 pb-4">
+            <div class="md:w-96 pb-4" wire:key="two-step-confirmation-enabled">
                 <x-forms.checkbox instantSave id="disable_two_step_confirmation" label="Disable Two Step Confirmation"
                     helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
             </div>
         @else
-            <div class="md:w-96 pb-4">
+            <div class="md:w-96 pb-4" wire:key="two-step-confirmation-disabled">
                 <x-modal-confirmation title="Disable Two Step Confirmation?"
                     buttonTitle="Disable Two Step Confirmation" isErrorButton submitAction="toggleTwoStepConfirmation"
                     :actions="[
-                        'Two Step confimation will be disabled globally.',
+                        'Two Step confirmation will be disabled globally.',
                         'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
                         'The risk of accidental actions will increase.',
                     ]" confirmationText="DISABLE TWO STEP CONFIRMATION"

@@ -32,6 +32,11 @@
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.tenant"
                                 label="Tenant" />
                         @endif
+                        @if ($oauth_setting->provider == 'google')
+                            <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.tenant"
+                                helper="Optional parameter that supplies a hosted domain (HD) to Google, which<br>triggers a login hint to be displayed on the OAuth screen with this domain.<br><br><a class='underline dark:text-warning text-coollabs' href='https://developers.google.com/identity/openid-connect/openid-connect#hd-param' target='_blank'>Google Documentation</a>"
+                                label="Tenant" />
+                        @endif
                         @if ($oauth_setting->provider == 'authentik')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.base_url"
                                 label="Base URL" />

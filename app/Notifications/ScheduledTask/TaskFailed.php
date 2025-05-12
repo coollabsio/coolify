@@ -101,11 +101,11 @@ class TaskFailed extends CustomEmailNotification
         $description = "Scheduled task ({$this->task->name}) failed.";
 
         if ($this->output) {
-            $description .= "\n\n**Error Output:**\n{$this->output}";
+            $description .= "\n\n*Error Output:* {$this->output}";
         }
 
         if ($this->url) {
-            $description .= "\n\n**Task URL:** {$this->url}";
+            $description .= "\n\n*Task URL:* {$this->url}";
         }
 
         return new SlackMessage(

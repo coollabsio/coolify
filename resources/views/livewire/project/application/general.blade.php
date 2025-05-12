@@ -69,6 +69,17 @@
                 <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
                     Configuration</x-forms.button>
             @endif
+            <div class="w-96 pb-8">
+                @if ($application->could_set_build_commands())
+                    <x-forms.checkbox instantSave id="application.settings.is_static" label="Is it a static site?"
+                        helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                @endif
+                @if ($application->settings->is_static && $application->build_pack !== 'static')
+                    <x-forms.checkbox label="Is it a SPA (Single Page Application)?"
+                        helper="If your application is a SPA, enable this." id="application.settings.is_spa"
+                        instantSave></x-forms.checkbox>
+                @endif
+            </div>
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
@@ -170,7 +181,7 @@
                 @if ($application->build_pack === 'dockerimage')
                     <x-forms.input
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
-                        placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+                        placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
                         id="application.custom_docker_run_options" label="Custom Docker Options" />
                 @else
                     @if ($application->could_set_build_commands())
@@ -185,7 +196,7 @@
                             </div>
                             <div class="pt-1 text-xs">Nixpacks will detect the required configuration
                                 automatically.
-                                <a class="underline" href="https://coolify.io/docs/applications">Framework
+                                <a class="underline" href="https://coolify.io/docs/applications/">Framework
                                     Specific Docs</a>
                             </div>
                         @endif
@@ -263,7 +274,7 @@
                             @endif
                             <x-forms.input
                                 helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
-                                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+                                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
                                 id="application.custom_docker_run_options" label="Custom Docker Options" />
 
                             @if ($application->build_pack !== 'dockercompose')
@@ -272,13 +283,6 @@
                                         helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         instantSave id="application.settings.is_build_server_enabled"
                                         label="Use a Build Server?" />
-                                </div>
-                            @endif
-                            @if ($application->could_set_build_commands())
-                                <div class="w-96">
-                                    <x-forms.checkbox instantSave id="application.settings.is_static"
-                                        label="Is it a static site?"
-                                        helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                                 </div>
                             @endif
                         @endif
@@ -291,16 +295,18 @@
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"
-                        helper="You need to modify the docker compose file." monacoEditorLanguage="yaml"
-                        useMonacoEditor />
+                        helper="You need to modify the docker compose file in the git repository."
+                        monacoEditorLanguage="yaml" useMonacoEditor />
                 @else
                     @if ((int) $application->compose_parsing_version >= 3)
                         <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
-                            label="Docker Compose Content (raw)" helper="You need to modify the docker compose file."
+                            label="Docker Compose Content (raw)"
+                            helper="You need to modify the docker compose file in the git repository."
                             monacoEditorLanguage="yaml" useMonacoEditor />
                     @endif
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
-                        label="Docker Compose Content" helper="You need to modify the docker compose file."
+                        label="Docker Compose Content"
+                        helper="You need to modify the docker compose file in the git repository."
                         monacoEditorLanguage="yaml" useMonacoEditor />
                 @endif
                 <div class="w-96">
@@ -308,7 +314,7 @@
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
                         id="application.settings.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
                     {{-- <x-forms.checkbox label="Readonly labels"
-                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenerate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenerate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox> --}}
                 </div>
             @endif
@@ -336,6 +342,26 @@
                         <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                             helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
                     @endif
+                    @if (!$application->destination->server->isSwarm())
+                        <x-forms.input id="application.custom_network_aliases" label="Network Aliases"
+                            helper="A comma separated list of custom network aliases you would like to add for container in Docker network.<br><br><span class='inline-block font-bold dark:text-warning'>Example:</span><br>api.internal,api.local"
+                            wire:model="application.custom_network_aliases" />
+                    @endif
+                </div>
+
+                <h3 class="pt-8">HTTP Basic Authentication</h3>
+                <div>
+                    <div class="w-96">
+                        <x-forms.checkbox helper="This will add the proper proxy labels to the container." instantSave
+                            label="Enable" id="application.is_http_basic_auth_enabled" />
+                    </div>
+                    @if ($application->is_http_basic_auth_enabled)
+                        <div class="flex gap-2 py-2">
+                            <x-forms.input id="application.http_basic_auth_username" label="Username" required />
+                            <x-forms.input id="application.http_basic_auth_password" type="password" label="Password"
+                                required />
+                        </div>
+                    @endif
                 </div>
 
                 @if ($application->settings->is_container_label_readonly_enabled)
@@ -347,7 +373,7 @@
                 @endif
                 <div class="w-96">
                     <x-forms.checkbox label="Readonly labels"
-                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenrate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenrate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
+                        helper="Labels are readonly by default. Readonly means that edits you do to the labels could be lost and Coolify will autogenerate the labels for you. If you want to edit the labels directly, disable this option. <br><br>Be careful, it could break the proxy configuration after you restart the container as Coolify will now NOT autogenerate the labels for you (ofc you can always reset the labels to the coolify defaults manually)."
                         id="application.settings.is_container_label_readonly_enabled" instantSave></x-forms.checkbox>
                     <x-forms.checkbox label="Escape special characters in labels?"
                         helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."

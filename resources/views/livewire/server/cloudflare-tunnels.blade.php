@@ -31,7 +31,7 @@
                         then you should validate the server.
                         <br /><br />
                         For more information, please read our <a
-                            href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/" target="_blank"
+                            href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/overview" target="_blank"
                             class="font-medium underline hover:text-yellow-600 dark:hover:text-yellow-200">documentation</a>.
                     </div>
                 @endif

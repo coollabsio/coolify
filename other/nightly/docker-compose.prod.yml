@@ -1,6 +1,6 @@
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    image: "${REGISTRY_URL:-ghcr.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -14,7 +14,7 @@ services:
       - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     environment:
       - APP_ENV=${APP_ENV:-production}
-      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-128M}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
       - PHP_FPM_PM_CONTROL=${PHP_FPM_PM_CONTROL:-dynamic}
       - PHP_FPM_PM_START_SERVERS=${PHP_FPM_PM_START_SERVERS:-1}
       - PHP_FPM_PM_MIN_SPARE_SERVERS=${PHP_FPM_PM_MIN_SPARE_SERVERS:-1}
@@ -61,7 +61,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.5'
+      image: '${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-realtime:1.0.8'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"

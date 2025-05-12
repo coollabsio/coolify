@@ -72,6 +72,7 @@
     @script
         <script>
             $wire.$on('checkProxyEvent', () => {
+                $wire.$dispatch('info', 'Checking proxy.');
                 $wire.$call('checkProxy');
             });
             $wire.$on('restartEvent', () => {

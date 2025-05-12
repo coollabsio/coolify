@@ -6,7 +6,7 @@
 
 services:
   plausible:
-    image: "ghcr.io/plausible/community-edition:v2.1.4"
+    image: "ghcr.io/plausible/community-edition:v3.0.1"
     command: 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"'
     environment:
       - SERVICE_FQDN_PLAUSIBLE
@@ -15,12 +15,20 @@ services:
       - BASE_URL=${SERVICE_FQDN_PLAUSIBLE}
       - SECRET_KEY_BASE=${SERVICE_BASE64_64_PLAUSIBLE}
       - TOTP_VAULT_KEY=${SERVICE_REALBASE64_32_TOTP}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - MAILER_ADAPTER=${MAILER_ADAPTER:-Bamboo.LocalAdapter}
+      - MAILER_EMAIL=${MAILER_EMAIL}
+      - MAILER_NAME=${MAILER_NAME}
+      - SMTP_HOST_ADDR=${SMTP_HOST_ADDR}
+      - SMTP_HOST_PORT=${SMTP_HOST_PORT}
+      - SMTP_USER_NAME=${SMTP_USER_NAME}
+      - SMTP_USER_PWD=${SMTP_USER_PWD}
+      - SMTP_HOST_SSL_ENABLED=${SMTP_HOST_SSL_ENABLED}
     depends_on:
       plausible-db:
         condition: service_healthy
       plausible-events-db:
-        condition: service_healthy
-      mail:
         condition: service_healthy
     healthcheck:
       test:
@@ -37,15 +45,6 @@ services:
       retries: 5
       start_period: 45s
 
-  mail:
-    image: bytemark/smtp
-    platform: linux/amd64
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/25' || exit 1"]
-      interval: 5s
-      timeout: 10s
-      retries: 20
-
   plausible-db:
     image: "postgres:16-alpine"
     volumes:
@@ -61,7 +60,9 @@ services:
       retries: 10
 
   plausible-events-db:
-    image: "clickhouse/clickhouse-server:24.3.3.102-alpine"
+    image: "clickhouse/clickhouse-server:24.12-alpine"
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
     volumes:
       - plausible-events-data:/var/lib/clickhouse
       - type: bind

@@ -8,7 +8,7 @@
                 </x-modal-input>
             </div>
             <x-forms.button
-                wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view (required to set variables at build time)' }}</x-forms.button>
+                wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
         <div>Environment variables (secrets) for this resource. </div>
         @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
@@ -41,9 +41,9 @@
             $requiredEmptyVars = $resource->environment_variables->filter(function ($env) {
                 return $env->is_required && empty($env->value);
             });
+
             $otherVars = $resource->environment_variables->diff($requiredEmptyVars);
         @endphp
-
         @forelse ($requiredEmptyVars->merge($otherVars) as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
