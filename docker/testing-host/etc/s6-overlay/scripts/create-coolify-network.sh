@@ -10,7 +10,7 @@ waited=0
 while [ $waited -lt $MAX_WAIT ]; do
     if docker ps >/dev/null 2>&1; then
         echo "Docker daemon is ready."
-        echo "Creating Coolify network…"
+        echo "Creating Coolify network if it doesn't exist…"
         docker network create coolify >/dev/null 2>&1 || true
         echo "Coolify network created."
         exit 0
