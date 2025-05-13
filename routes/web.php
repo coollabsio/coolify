@@ -149,6 +149,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json(['authenticated' => false], 401);
     })->name('terminal.auth');
 
+    Route::post('/terminal/auth/ips', function () {
+        if (auth()->check()) {
+            $team = auth()->user()->currentTeam();
+            $ipAddresses = $team->servers()->pluck('ip')->toArray();
+
+            return response()->json(['ipAddresses' => $ipAddresses], 200);
+        }
+
+        return response()->json(['ipAddresses' => []], 401);
+    })->name('terminal.auth.ips');
+
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
         Route::get('/{uuid}/revoke', [Controller::class, 'revoke_invitation'])->name('team.invitation.revoke');

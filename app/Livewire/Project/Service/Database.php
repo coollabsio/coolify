@@ -7,6 +7,7 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Models\InstanceSettings;
 use App\Models\ServiceDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
@@ -81,6 +82,42 @@ class Database extends Component
         }
         $this->submit();
         $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+    }
+
+    public function convertToApplication()
+    {
+        try {
+            $service = $this->database->service;
+            $serviceDatabase = $this->database;
+
+            // Check if application with same name already exists
+            if ($service->applications()->where('name', $serviceDatabase->name)->exists()) {
+                throw new \Exception('An application with this name already exists.');
+            }
+
+            // Create new parameters removing database_uuid
+            $redirectParams = collect($this->parameters)
+                ->except('database_uuid')
+                ->all();
+
+            DB::transaction(function () use ($service, $serviceDatabase) {
+                $service->applications()->create([
+                    'name' => $serviceDatabase->name,
+                    'human_name' => $serviceDatabase->human_name,
+                    'description' => $serviceDatabase->description,
+                    'exclude_from_status' => $serviceDatabase->exclude_from_status,
+                    'is_log_drain_enabled' => $serviceDatabase->is_log_drain_enabled,
+                    'image' => $serviceDatabase->image,
+                    'service_id' => $service->id,
+                    'is_migrated' => true,
+                ]);
+                $serviceDatabase->delete();
+            });
+
+            return redirect()->route('project.service.configuration', $redirectParams);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSave()
