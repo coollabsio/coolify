@@ -20,3 +20,8 @@ services:
     volumes:
       - './data:/data'
       - './music:/music:ro'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '--quiet', 'http://127.0.0.1:4533/ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
