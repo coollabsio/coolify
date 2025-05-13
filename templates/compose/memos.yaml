@@ -9,5 +9,5 @@ services:
     image: neosmemo/memos:stable
     volumes:
       - memos/:/var/opt/memos
-    ports:
-      - 5230:5230
+    environment:
+      - SERVICE_FQDN_MEMOS_5230
