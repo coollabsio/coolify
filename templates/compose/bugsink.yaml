@@ -39,11 +39,6 @@ services:
       - 'CSRF_TRUSTED_ORIGINS=${SERVICE_FQDN_BUGSINK_8000}'
       - USE_X_FORWARDED_HOST=True
       - 'GUNICORN_CMD_ARGS=--forwarded-allow-ips="*"'
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.bugsink.rule=Host(`${SERVICE_FQDN_BUGSINK_8000}`)
-      - traefik.http.routers.bugsink.entrypoints=websecure
-      - traefik.http.routers.bugsink.tls=true
     depends_on:
       mysql:
         condition: service_healthy
