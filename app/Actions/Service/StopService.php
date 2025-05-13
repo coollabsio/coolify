@@ -24,7 +24,7 @@ class StopService
             $service->stopContainers($containersToStop, $server);
 
             if ($isDeleteOperation) {
-                $service->delete_connected_networks($service->uuid);
+                $service->deleteConnectedNetworks();
                 if ($dockerCleanup) {
                     CleanupDocker::dispatch($server, true);
                 }

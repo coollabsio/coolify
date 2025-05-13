@@ -15,18 +15,17 @@ class StartLogDrain
     {
         if ($server->settings->is_logdrain_newrelic_enabled) {
             $type = 'newrelic';
-            StopLogDrain::run($server);
         } elseif ($server->settings->is_logdrain_highlight_enabled) {
             $type = 'highlight';
-            StopLogDrain::run($server);
         } elseif ($server->settings->is_logdrain_axiom_enabled) {
             $type = 'axiom';
-            StopLogDrain::run($server);
         } elseif ($server->settings->is_logdrain_custom_enabled) {
             $type = 'custom';
-            StopLogDrain::run($server);
         } else {
             $type = 'none';
+        }
+        if ($type !== 'none') {
+            StopLogDrain::run($server);
         }
         try {
             if ($type === 'none') {
@@ -147,7 +146,7 @@ class StartLogDrain
             $compose = base64_encode('
 services:
   coolify-log-drain:
-    image: cr.fluentbit.io/fluent/fluent-bit:2.0
+    image: cr.fluentbit.io/fluent/fluent-bit:4.0
     container_name: coolify-log-drain
     command: -c /fluent-bit.conf
     env_file:
@@ -186,7 +185,6 @@ Files:
                 "echo '{$compose}' | base64 -d | tee $compose_path > /dev/null",
                 "echo '{$readme}' | base64 -d | tee $readme_path > /dev/null",
                 "test -f $config_path/.env && rm $config_path/.env",
-
             ];
             if ($type === 'newrelic') {
                 $add_envs_command = [

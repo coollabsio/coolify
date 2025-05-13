@@ -486,23 +486,13 @@ $schema://$host {
         $base_path = config('constants.coolify.base_config_path');
         $proxyType = $this->proxyType();
         $proxy_path = "$base_path/proxy";
-        // TODO: should use /traefik for already existing configurations?
-        // Should move everything except /caddy and /nginx to /traefik
-        // The code needs to be modified as well, so maybe it does not worth it
+
         if ($proxyType === ProxyTypes::TRAEFIK->value) {
-            // Do nothing
+            $proxy_path = $proxy_path.'/';
         } elseif ($proxyType === ProxyTypes::CADDY->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/caddy';
-            } else {
-                $proxy_path = $proxy_path.'/caddy';
-            }
+            $proxy_path = $proxy_path.'/caddy';
         } elseif ($proxyType === ProxyTypes::NGINX->value) {
-            if (isDev()) {
-                $proxy_path = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/nginx';
-            } else {
-                $proxy_path = $proxy_path.'/nginx';
-            }
+            $proxy_path = $proxy_path.'/nginx';
         }
 
         return $proxy_path;

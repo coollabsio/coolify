@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.410',
+        'version' => '4.0.0-beta.419',
         'helper_version' => '1.0.8',
-        'realtime_version' => '1.0.7',
+        'realtime_version' => '1.0.8',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
