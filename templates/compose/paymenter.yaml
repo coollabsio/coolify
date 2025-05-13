@@ -29,6 +29,7 @@ services:
       - "app_logs:/app/storage/logs"
       - "app_public:/app/storage/public"
     environment:
+      SERVICE_FQDN_PAYMENTER: '${SERVICE_FQDN_PAYMENTER}'
       DB_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
       APP_ENV: "production"
       CACHE_STORE: "redis"
