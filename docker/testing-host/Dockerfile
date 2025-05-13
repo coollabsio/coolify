@@ -106,11 +106,11 @@ RUN VERSION_STRING="5:${DOCKER_VERSION}-1~debian.12~bookworm" \
     /tmp/* \
     /var/tmp/*
 
-# Set up Development SSH
-RUN ssh-keygen -A && \
-    mkdir -p /run/sshd && \
-    mkdir -p ~/.ssh && \
-    echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 root@coolify-dev" >> ~/.ssh/authorized_keys
+# Create SSH directories
+RUN mkdir -p /run/sshd \
+    && chmod 755 /run/sshd \
+    && mkdir -p /root/.ssh \
+    && chmod 700 /root/.ssh
 
 # Copy s6-overlay from s6-builder
 COPY --from=s6-builder /s6/extracted /
