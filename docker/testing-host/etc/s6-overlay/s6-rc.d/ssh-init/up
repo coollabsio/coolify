@@ -1,0 +1,4 @@
+#!/command/execlineb -P
+
+# Create the coolify network if it doesn't exist
+foreground { bash /etc/s6-overlay/scripts/ssh-init.sh }
