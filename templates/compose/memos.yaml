@@ -2,7 +2,7 @@
 # slogan: An open-source, lightweight note-taking solution. The pain-less way to create your meaningful notes. Your Notes, Your Way.
 # tags: note-taking,microblog,social-network,markdown
 # logo: svgs/memos.png
-# port: 8000
+# port: 5230
 
 services:
   wg-easy:
