@@ -2085,6 +2085,20 @@
         "minversion": "0.0.0",
         "port": "5678"
     },
+    "navidrome": {
+        "documentation": "https://www.navidrome.org/docs/?utm_source=coolify.io",
+        "slogan": "Standalone server, that allows you to browse and listen to your music collection using a web browser or any Subsonic-compatible client.",
+        "compose": "c2VydmljZXM6CiAgbmF2aWRyb21lOgogICAgaW1hZ2U6ICdkZWx1YW4vbmF2aWRyb21lOmxhdGVzdCcKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTkFWSURST01FXzQ1MzMKICAgICAgLSAnTkRfQkFTRVVSTD0ke1NFUlZJQ0VfRlFETl9OQVZJRFJPTUV9JwogICAgICAtICdORF9TQ0FOU0NIRURVTEU9JHtORF9TQ0FOU0NIRURVTEU6LTFofScKICAgICAgLSAnTkRfTE9HTEVWRUw9JHtORF9MT0dMRVZFTDotaW5mb30nCiAgICAgIC0gJ05EX1NFU1NJT05USU1FT1VUPSR7TkRfU0VTU0lPTlRJTUVPVVQ6LTI0aH0nCiAgICAgIC0gJ05EX0VOQUJMRUlOU0lHSFRTQ09MTEVDVE9SPSR7TkRfRU5BQkxFSU5TSUdIVFNDT0xMRUNUT1I6LWZhbHNlfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJy4vZGF0YTovZGF0YScKICAgICAgLSAnLi9tdXNpYzovbXVzaWM6cm8nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gd2dldAogICAgICAgIC0gJy0tc3BpZGVyJwogICAgICAgIC0gJy0tcXVpZXQnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo0NTMzL3BpbmcnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQo=",
+        "tags": [
+            "media",
+            "server",
+            "music",
+            "subsonic"
+        ],
+        "logo": "svgs/navidrome.svg",
+        "minversion": "0.0.0",
+        "port": "4533"
+    },
     "neon-ws-proxy": {
         "documentation": "https://neon.tech?utm_source=coolify.io",
         "slogan": "The database you love, on a serverless platform designed to help you build reliable and scalable applications faster.",
