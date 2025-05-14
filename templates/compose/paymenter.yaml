@@ -24,6 +24,8 @@ services:
       MYSQL_USER: "paymenter"
   cache:
     image: redis:alpine
+    environment:
+      - 'REDIS_PASSWORD=${SERVICE_PASSWORD_64_REDIS}'    
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping || exit 1"]
       interval: 10s
@@ -47,6 +49,8 @@ services:
       SESSION_DRIVER: "redis"
       QUEUE_CONNECTION: "redis"
       REDIS_HOST: "cache"
+      REDIS_USERNAME: default
+      REDIS_PASSWORD: '${SERVICE_PASSWORD_64_REDIS}'
       DB_CONNECTION: "mariadb"
       DB_HOST: "database"
       DB_PORT: "3306"
