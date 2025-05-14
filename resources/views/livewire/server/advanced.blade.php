@@ -104,7 +104,7 @@
                         <x-forms.button 
                             wire:click="toggleCertificate" 
                             type="button" 
-                            class="!py-1 !px-2 text-sm">
+                            class="py-1! px-2! text-sm">
                             {{ $showCertificate ? 'Hide' : 'Show' }}
                         </x-forms.button>
                     </div>
