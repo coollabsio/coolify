@@ -1,0 +1,81 @@
+# https://manual.seafile.com/12.0/setup/setup_ce_by_docker
+
+services:
+  seafile-db:
+    image: mariadb:10.11
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MYSQLDB}
+      - MYSQL_LOG_CONSOLE=true
+      - MARIADB_AUTO_UPGRADE=1
+    volumes:
+      - "${SEAFILE_MYSQL_VOLUME:-/opt/seafile/seafile-mysql/db}:/var/lib/mysql"
+    networks:
+      - seafile-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/usr/local/bin/healthcheck.sh",
+          "--connect",
+          "--mariadbupgrade",
+          "--innodb_initialized",
+        ]
+      interval: 20s
+      start_period: 30s
+      timeout: 5s
+      retries: 10
+
+  memcached:
+    image: memcached:1.6.29
+    entrypoint: memcached -m 256
+    networks:
+      - seafile-net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'bash -c "echo version | (exec 3<>/dev/tcp/localhost/11211; cat >&3; timeout 0.5 cat <&3; exec 3<&-)"',
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  seafile:
+    image: seafileltd/seafile-mc:12.0-latest
+    volumes:
+      - ${SEAFILE_VOLUME:-/opt/seafile/seafile-data}:/shared
+    environment:
+      - SERVICE_FQDN_SEAFILE_80
+      - DB_HOST=${SEAFILE_MYSQL_DB_HOST:-seafile-db}
+      - DB_PORT=${SEAFILE_MYSQL_DB_PORT:-3306}
+      - DB_USER=${SEAFILE_MYSQL_DB_USER:-seafile}
+      - DB_ROOT_PASSWD=${SERVICE_PASSWORD_64_MYSQLDB}
+      - DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQLDB}
+      - SEAFILE_MYSQL_DB_CCNET_DB_NAME=${SEAFILE_MYSQL_DB_CCNET_DB_NAME:-ccnet_db}
+      - SEAFILE_MYSQL_DB_SEAFILE_DB_NAME=${SEAFILE_MYSQL_DB_SEAFILE_DB_NAME:-seafile_db}
+      - SEAFILE_MYSQL_DB_SEAHUB_DB_NAME=${SEAFILE_MYSQL_DB_SEAHUB_DB_NAME:-seahub_db}
+      - TIME_ZONE=${TIME_ZONE:-Etc/UTC}
+      - INIT_SEAFILE_ADMIN_EMAIL=${INIT_SEAFILE_ADMIN_EMAIL:-me@example.com}
+      - INIT_SEAFILE_ADMIN_PASSWORD=${INIT_SEAFILE_ADMIN_PASSWORD:-asecret}
+      - SEAFILE_SERVER_HOSTNAME=${SERVICE_FQDN_SEAFILE_80}
+      - SEAFILE_SERVER_PROTOCOL=${SEAFILE_SERVER_PROTOCOL:-https}
+      - SITE_ROOT=${SITE_ROOT:-/}
+      - NON_ROOT=${NON_ROOT:-false}
+      - JWT_PRIVATE_KEY=${SERVICE_PASSWORD_64_JWT}
+      - SEAFILE_LOG_TO_STDOUT=${SEAFILE_LOG_TO_STDOUT:-true}
+    depends_on:
+      seafile-db:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+    networks:
+      - seafile-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/api2/ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+networks:
+  seafile-net:
+    name: seafile-net
