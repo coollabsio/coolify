@@ -95,7 +95,7 @@
                                     @endif
                                 </div>
                                 @if ($build_pack === 'dockercompose')
-                                    <x-forms.input placeholder="/" wire:model.blur="base_directory"
+                                    <x-forms.input placeholder="/" wire:model.blur-sm="base_directory"
                                         label="Base Directory"
                                         helper="Directory to use as root. Useful for monorepos." />
                                     <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
