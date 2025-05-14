@@ -16,7 +16,7 @@ services:
       - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
       - NTFY_WEB_PUSH_FILE=/var/cache/ntfy/webpush.db
-      - NTFY_BEHIND_PROXY=${NTFY_BEHIND_PROXY:-false}
+      - NTFY_BEHIND_PROXY=${NTFY_BEHIND_PROXY:-true}
       - NTFY_UPSTREAM_BASE_URL=${UPSTREAM_BASE_URL:-https://ntfy.sh}
       - NTFY_ENABLE_SIGNUP=${NTFY_ENABLE_SIGNUP:-true}
       - NTFY_ENABLE_LOGIN=${NTFY_ENABLE_LOGIN:-true}
