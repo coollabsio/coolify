@@ -47,12 +47,12 @@
                         buttonTitle="Save Certificate"
                         submitAction="saveCaCertificate" 
                         :actions="[
-                            'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.', 
+                            'This will overwrite the existing CA certificate at ' . $baseConfigPath . '/ssl/coolify-ca.crt with your custom CA certificate.',
                             'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
                             'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
                             'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.'
                         ]"
-                        confirmationText="/data/coolify/ssl/coolify-ca.crt"
+                        confirmationText="{{ $baseConfigPath }}/ssl/coolify-ca.crt"
                         shortConfirmationLabel="CA Certificate Path"
                         step3ButtonText="Save Certificate">
                     </x-modal-confirmation>
@@ -61,12 +61,12 @@
                         buttonTitle="Regenerate Certificate" 
                         submitAction="regenerateCaCertificate" 
                         :actions="[
-                            'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.', 
+                            'This will generate a new CA certificate at ' . $baseConfigPath . '/ssl/coolify-ca.crt and replace the existing one.',
                             'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
                             'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with the new CA certificate.',
                             'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.'
                         ]"
-                        confirmationText="/data/coolify/ssl/coolify-ca.crt"
+                        confirmationText="{{ $baseConfigPath }}/ssl/coolify-ca.crt"
                         shortConfirmationLabel="CA Certificate Path"
                         step3ButtonText="Regenerate Certificate">
                     </x-modal-confirmation>
@@ -81,7 +81,7 @@
                     </div>
                     <div class="relative">
                         <x-forms.copy-button 
-                            text="- /data/coolify/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" 
+                            text="- {{ $baseConfigPath }}/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro"
                         />
                     </div>
                 </div>
