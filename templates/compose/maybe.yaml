@@ -9,7 +9,6 @@ services:
     image: ghcr.io/maybe-finance/maybe:latest
     volumes:
       - app_storage:/rails/storage
-    restart: unless-stopped
     environment:
       - SERVICE_FQDN_MAYBE
       - SELF_HOSTED=true
@@ -22,7 +21,7 @@ services:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/1
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379/1
       - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
     depends_on:
       postgres:
@@ -41,7 +40,6 @@ services:
   worker:
     image: "ghcr.io/maybe-finance/maybe:latest"
     command: "bundle exec sidekiq"
-    restart: unless-stopped
     exclude_from_hc: true
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -54,7 +52,7 @@ services:
       - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
       - DB_HOST=postgres
       - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/1
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379/1
       - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
     depends_on:
       postgres:
@@ -63,7 +61,6 @@ services:
         condition: service_healthy
   postgres:
     image: postgres:16
-    restart: unless-stopped
     volumes:
       - maybe_postgres_data:/var/lib/postgresql/data
     environment:
@@ -77,17 +74,15 @@ services:
       retries: 10
   redis:
     image: redis:latest
-    restart: unless-stopped
-    ports:
-      - 6379:6379
+    command: redis-server --appendonly yes --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - redis_data:/data
+    environment:
+      - REDIS_PORT=6379
+      - REDIS_DB=1
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-volumes:
-  app_storage: null
-  maybe_postgres_data: null
-  redis_data: null
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
