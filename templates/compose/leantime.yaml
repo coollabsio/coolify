@@ -10,19 +10,21 @@ services:
     environment:
       - SERVICE_FQDN_LEANTIME_8080
       - LEAN_APP_URL=${SERVICE_FQDN_LEANTIME}
-      - LEAN_DB_HOST=${DB_HOST:-leantimedb}
+      - LEAN_DB_HOST=mysql
       - LEAN_DB_USER=${SERVICE_USER_MYSQLDB}
       - LEAN_DB_PASSWORD=${SERVICE_PASSWORD_MYSQLDB}
-      - LEAN_DB_DATABASE=${DB_NAME:-leantime}
+      - LEAN_DB_DATABASE=${DB_NAME:-leantime-db}
       - LEAN_SESSION_PASSWORD=${SERVICE_PASSWORD_64_SALT}
       - LEAN_SESSION_EXPIRATION=${SESSION_EXPIRATION:-28800}
       - LEAN_USE_REDIS=${USE_REDIS:-true}
-      - LEAN_REDIS_HOST=${REDIS_HOST:-leantimeredis}
+      - LEAN_REDIS_HOST=redis
       - LEAN_REDIS_PORT=${REDIS_PORT:-6379}
       - LEAN_REDIS_SCHEME=${REDIS_SCHEME:-tcp}
     depends_on:
-      - leantimedb
-      - leantimeredis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - public-userfiles:/var/www/html/public/userfiles
       - userfiles:/var/www/html/userfiles
@@ -33,16 +35,15 @@ services:
       timeout: 20s
       retries: 10
 
-  leantimedb:
+  mysql:
     image: mysql:8.4
     volumes:
-      - db_data:/var/lib/mysql
-    restart: unless-stopped
+      - leantime_mysql_data:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
       - MYSQL_USER=${SERVICE_USER_MYSQLDB}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQLDB}
-      - MYSQL_DATABASE=${DB_NAME:-leantime}
+      - MYSQL_DATABASE=${DB_NAME:-leantime-db}
     command: --character-set-server=UTF8MB4 --collation-server=UTF8MB4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -50,13 +51,13 @@ services:
       timeout: 10s
       retries: 3
 
-  leantimeredis:
+  redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     volumes:
-      - leantimeredis-data:/data
+      - leantime_redis_data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 3
