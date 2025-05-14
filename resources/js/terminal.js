@@ -166,7 +166,7 @@ export function initializeTerminalComponent() {
                     }
                     this.terminalActive = true;
                     this.term.focus();
-                    document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded');
+                    document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
                     this.resizeTerminal();
                 } else if (event.data === 'unprocessable') {
                     if (this.term) this.term.reset();
