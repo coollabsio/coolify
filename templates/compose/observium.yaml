@@ -7,6 +7,7 @@
 services:
   observium:
     image: mbixtech/observium:latest
+    platform: linux/amd64
     volumes:
       - observium_logs:/opt/observium/logs
       - observium_rrd:/opt/observium/rrd
