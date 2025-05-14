@@ -2447,6 +2447,20 @@
         "minversion": "0.0.0",
         "port": "8000"
     },
+    "passbolt": {
+        "documentation": "https://www.passbolt.com/ce/docker?utm_source=coolify.io",
+        "slogan": "Passbolt Community Edition (CE) API. The JSON API for the open source password manager for teams!",
+        "compose": "c2VydmljZXM6CiAgcGFzc2JvbHQ6CiAgICBpbWFnZTogJ3Bhc3Nib2x0L3Bhc3Nib2x0OmxhdGVzdC1jZScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9QQVNTQk9MVAogICAgICAtICdBUFBfRlVMTF9CQVNFX1VSTD0ke1NFUlZJQ0VfRlFETl9QQVNTQk9MVH0nCiAgICAgIC0gREFUQVNPVVJDRVNfREVGQVVMVF9IT1NUPW1hcmlhZGIKICAgICAgLSAnREFUQVNPVVJDRVNfREVGQVVMVF9VU0VSTkFNRT0ke1NFUlZJQ0VfVVNFUl9QQVNTQk9MVH0nCiAgICAgIC0gJ0RBVEFTT1VSQ0VTX0RFRkFVTFRfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1BBU1NCT0xUfScKICAgICAgLSAnREFUQVNPVVJDRVNfREVGQVVMVF9EQVRBQkFTRT0ke01ZU1FMX0RCOi1wYXNzYm9sdC1kYn0nCiAgICB2b2x1bWVzOgogICAgICAtICdncGdfdm9sdW1lOi9ldGMvcGFzc2JvbHQvZ3BnJwogICAgICAtICdqd3Rfdm9sdW1lOi9ldGMvcGFzc2JvbHQvand0JwogICAgY29tbWFuZDoKICAgICAgLSAvdXNyL2Jpbi93YWl0LWZvci5zaAogICAgICAtICctdCcKICAgICAgLSAnMCcKICAgICAgLSAnbWFyaWFkYjozMzA2JwogICAgICAtICctLScKICAgICAgLSAvZG9ja2VyLWVudHJ5cG9pbnQuc2gKICAgIGRlcGVuZHNfb246CiAgICAgIG1hcmlhZGI6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIG1hcmlhZGI6CiAgICBpbWFnZTogJ21hcmlhZGI6MTEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTUFSSUFEQl9ST09UX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9ST09UTUFSSUFEQn0nCiAgICAgIC0gJ01BUklBREJfREFUQUJBU0U9JHtNWVNRTF9EQjotcGFzc2JvbHQtZGJ9JwogICAgICAtICdNQVJJQURCX1VTRVI9JHtTRVJWSUNFX1VTRVJfUEFTU0JPTFR9JwogICAgICAtICdNQVJJQURCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QQVNTQk9MVH0nCiAgICB2b2x1bWVzOgogICAgICAtICdwYXNzYm9sdF9tYXJpYWRiX2RhdGE6L3Zhci9saWIvbXlzcWwnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gaGVhbHRoY2hlY2suc2gKICAgICAgICAtICctLWNvbm5lY3QnCiAgICAgICAgLSAnLS1pbm5vZGJfaW5pdGlhbGl6ZWQnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "security",
+            "credentials",
+            "password-manager",
+            "open source"
+        ],
+        "logo": "svgs/passbolt.svg",
+        "minversion": "0.0.0",
+        "port": "80"
+    },
     "penpot": {
         "documentation": "https://help.penpot.app/technical-guide/getting-started/#install-with-docker?utm_source=coolify.io",
         "slogan": "Penpot is the first Open Source design and prototyping platform for product teams.",
