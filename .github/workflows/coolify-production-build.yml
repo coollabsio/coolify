@@ -2,7 +2,7 @@ name: Production Build (v4)
 
 on:
   push:
-    branches: ["main"]
+    branches: ["v4.x"]
     paths-ignore:
       - .github/workflows/coolify-helper.yml
       - .github/workflows/coolify-helper-next.yml

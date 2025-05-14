@@ -318,7 +318,7 @@ services:
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
   supabase-db:
-    image: supabase/postgres:15.6.1.146
+    image: supabase/postgres:15.8.1.048
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s

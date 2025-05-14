@@ -21,6 +21,7 @@
     'dispatchEvent' => false,
     'dispatchEventType' => 'success',
     'dispatchEventMessage' => '',
+    'ignoreWire' => true,
 ])
 
 @php
@@ -28,7 +29,7 @@
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
 @endphp
 
-<div wire:ignore x-data="{
+<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -40,7 +41,6 @@
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
     confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
-    copied: false,
     submitAction: @js($submitAction),
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
@@ -91,13 +91,6 @@
                 }
             });
     },
-    copyConfirmationText() {
-        navigator.clipboard.writeText(this.confirmationText);
-        this.copied = true;
-        setTimeout(() => {
-            this.copied = false;
-        }, 2000);
-    },
     toggleAction(id) {
         const index = this.selectedActions.indexOf(id);
         if (index > -1) {
@@ -106,8 +99,9 @@
             this.selectedActions.push(id);
         }
     }
-}" @keydown.escape.window="modalOpen = false; resetModal()"
-    :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+}"
+    @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
+    class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
@@ -169,8 +163,8 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm">
+            class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
+            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -178,7 +172,7 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+                class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex justify-between items-center pb-3">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
@@ -228,7 +222,7 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-center text-red-500">
-                                    <svg class="flex-shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                    <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M6 18L18 6M6 6l12 12"></path>
@@ -239,7 +233,7 @@
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-center text-red-500">
-                                        <svg class="flex-shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                        <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M6 18L18 6M6 6l12 12"></path>
@@ -255,29 +249,7 @@
                                     <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2">
-                                        <input type="text" x-model="confirmationText"
-                                            class="p-2 pr-10 w-full text-black rounded cursor-text input" readonly>
-                                        <button @click="copyConfirmationText()"
-                                            x-show="window.isSecureContext"
-                                            class="absolute right-2 top-1/2 text-gray-500 transform -translate-y-1/2 hover:text-gray-700"
-                                            title="Copy confirmation text" x-ref="copyButton">
-                                            <template x-if="!copied">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
-                                                    viewBox="0 0 20 20" fill="currentColor">
-                                                    <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                                                    <path
-                                                        d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                                                </svg>
-                                            </template>
-                                            <template x-if="copied">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-500"
-                                                    viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd"
-                                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                        clip-rule="evenodd" />
-                                                </svg>
-                                            </template>
-                                        </button>
+                                        <x-forms.copy-button text="{{ $confirmationText }}" />
                                     </div>
 
                                     <label for="userConfirmationText"
@@ -285,7 +257,7 @@
                                         {{ $shortConfirmationLabel }}
                                     </label>
                                     <input type="text" x-model="userConfirmationText"
-                                        class="p-2 mt-1 w-full text-black rounded input">
+                                        class="p-2 mt-1 w-full text-black rounded-sm input">
                                 </div>
                             @endif
                         @endif

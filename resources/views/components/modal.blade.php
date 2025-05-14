@@ -1,8 +1,8 @@
 <dialog id="{{ $modalId }}" class="modal">
     @if ($yesOrNo)
-        <form method="dialog" class="rounded modal-box" @if (!$noSubmit) wire:submit='submit' @endif>
+        <form method="dialog" class="rounded-sm modal-box" @if (!$noSubmit) wire:submit='submit' @endif>
             <div class="flex items-start">
-                <div class="flex items-center justify-center flex-shrink-0 w-10 h-10 mr-4 rounded-full">
+                <div class="flex items-center justify-center shrink-0 w-10 h-10 mr-4 rounded-full">
                     <svg class="w-8 h-8 text-error" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -33,7 +33,7 @@
             </div>
         </form>
     @else
-        <form method="dialog" class="flex flex-col w-11/12 max-w-5xl gap-2 rounded modal-box"
+        <form method="dialog" class="flex flex-col w-11/12 max-w-5xl gap-2 rounded-sm modal-box"
             @if ($submitWireAction) wire:submit={{ $submitWireAction }} @endif
             @if (!$noSubmit && !$submitWireAction) wire:submit='submit' @endif>
             @isset($modalTitle)

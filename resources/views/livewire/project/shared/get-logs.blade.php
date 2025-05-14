@@ -57,7 +57,7 @@
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
             <div class="flex overflow-y-auto flex-col-reverse px-4 py-2 w-full bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
-                :class="fullscreen ? '' : 'max-h-96 border border-solid rounded'">
+                :class="fullscreen ? '' : 'max-h-96 border border-solid rounded-sm'">
                 <div :class="fullscreen ? 'fixed top-4 right-4' : 'absolute top-6 right-0'">
                     <div class="flex justify-end gap-4" :class="fullscreen ? 'fixed' : ''"
                         style="transform: translateX(-100%)">
