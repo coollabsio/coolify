@@ -9,9 +9,6 @@ services:
     image: chibisafe/chibisafe:latest
     environment:
       - BASE_API_URL=http://chibisafe_server:8000
-    expose:
-      - 8001
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8001"]
       interval: 30s
@@ -25,9 +22,6 @@ services:
       - database:/app/database:rw
       - uploads:/app/uploads:rw
       - logs:/app/logs:rw
-    expose:
-      - 8000
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8000/api/health"]
       interval: 30s
@@ -40,7 +34,6 @@ services:
     environment:
       - SERVICE_FQDN_CHIBISAFE_80
       - BASE_URL=":80"
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
       interval: 30s
