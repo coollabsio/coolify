@@ -3,10 +3,10 @@
 set -euo pipefail
 
 main() {
-    local MAX_WAIT=30
+    local -r MAX_WAIT=30
     local waited=0
 
-    while [ $waited -lt $MAX_WAIT ]; do
+    while [ "$waited" -lt "$MAX_WAIT" ]; do
         if docker ps >/dev/null 2>&1; then
             echo "Docker daemon is ready."
             echo "Creating Coolify network if it doesn't exist…"
@@ -22,4 +22,4 @@ main() {
 }
 
 main
-exit $?
+exit
