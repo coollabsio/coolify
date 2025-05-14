@@ -42,7 +42,7 @@
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 py-1 text-sm text-black normal-case rounded-sm border cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600 disabled:border-none disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
+    @apply flex gap-2 justify-center items-center px-2 py-1 text-sm text-black normal-case rounded-sm border outline-0 cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-none disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
 }
 
 @utility alert-success {
