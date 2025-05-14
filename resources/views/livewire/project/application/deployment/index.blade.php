@@ -44,17 +44,12 @@
                     <div class="flex flex-col">
                         <div class="flex items-center gap-2 mb-2">
                             <span @class([
-                                'px-3 py-1 rounded-md text-xs font-medium shadow-sm',
-                                'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' =>
-                                    data_get($deployment, 'status') === 'in_progress',
-                                'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' =>
-                                    data_get($deployment, 'status') === 'queued',
-                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' =>
-                                    data_get($deployment, 'status') === 'failed',
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' =>
-                                    data_get($deployment, 'status') === 'finished',
-                                'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' =>
-                                    data_get($deployment, 'status') === 'cancelled-by-user',
+                                'px-3 py-1 rounded-md text-xs font-medium shadow-xs',
+                                'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' => data_get($deployment, 'status') === 'in_progress',
+                                'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' => data_get($deployment, 'status') === 'queued',
+                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' => data_get($deployment, 'status') === 'failed',
+                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' => data_get($deployment, 'status') === 'finished',
+                                'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' => data_get($deployment, 'status') === 'cancelled-by-user',
                             ])>
                                 @php
                                     $statusText = match (data_get($deployment, 'status')) {
@@ -91,8 +86,7 @@
                                 <div x-data="{ expanded: false }">
                                     <div class="flex items-center gap-2">
                                         <span class="font-medium">Commit:</span>
-                                        <a .prevent
-                                            href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
+                                        <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
                                             target="_blank" class="underline">
                                             {{ substr(data_get($deployment, 'commit'), 0, 7) }}
                                         </a>
@@ -117,8 +111,7 @@
                                         @endif
                                         @if ($deployment->commitMessage())
                                             <span class="text-gray-600 dark:text-gray-400">-</span>
-                                            <a .prevent
-                                                href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
+                                            <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
                                                 target="_blank"
                                                 class="text-gray-600 dark:text-gray-400 truncate max-w-md underline">
                                                 {{ Str::before($deployment->commitMessage(), "\n") }}

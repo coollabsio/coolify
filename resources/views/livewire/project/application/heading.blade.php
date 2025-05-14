@@ -1,7 +1,7 @@
 <nav wire:poll.10000ms="check_status">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
-        <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
+        <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
@@ -117,7 +117,8 @@
     @script
         <script>
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info', 'Stopping application.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping application, it could take a while depending on the application.');
                 $wire.$call('stop');
             });
         </script>

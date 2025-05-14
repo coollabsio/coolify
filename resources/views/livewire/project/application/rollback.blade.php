@@ -9,7 +9,7 @@
         <div class="flex flex-wrap">
             @forelse ($images as $image)
                 <div class="w-2/4 p-2">
-                    <div class="bg-white border rounded dark:border-black dark:bg-coolgray-100">
+                    <div class="bg-white border rounded-sm dark:border-black dark:bg-coolgray-100">
                         <div class="p-2">
                             <div class="">
                                 @if (data_get($image, 'is_current'))

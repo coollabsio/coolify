@@ -27,7 +27,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -2246,43 +2245,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName, int $timeout = 300)
+    private function graceful_shutdown_container(string $containerName, int $timeout = 30)
     {
         try {
-            $process = Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-
-            $startTime = time();
-            while ($process->running()) {
-                if (time() - $startTime >= $timeout) {
-                    $this->execute_remote_command(
-                        ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
-                    );
-                    break;
-                }
-                usleep(100000);
-            }
-
-            $isRunning = $this->execute_remote_command(
-                ["docker inspect -f '{{.State.Running}}' $containerName", 'hidden' => true, 'ignore_errors' => true]
-            ) === 'true';
-
-            if ($isRunning) {
-                $this->execute_remote_command(
-                    ["docker kill $containerName", 'hidden' => true, 'ignore_errors' => true]
-                );
-            }
-        } catch (\Exception $error) {
+            $this->execute_remote_command(
+                ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+            );
+        } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
-
-        $this->remove_container($containerName);
-    }
-
-    private function remove_container(string $containerName)
-    {
-        $this->execute_remote_command(
-            ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
-        );
     }
 
     private function stop_running_container(bool $force = false)

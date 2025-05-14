@@ -9,9 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -270,51 +268,17 @@ class Application extends BaseModel
         return $containers->pluck('Names')->toArray();
     }
 
-    public function stopContainers(array $containerNames, $server, int $timeout = 600)
-    {
-        $processes = [];
-        foreach ($containerNames as $containerName) {
-            $processes[$containerName] = $this->stopContainer($containerName, $server, $timeout);
-        }
-
-        $startTime = time();
-        while (count($processes) > 0) {
-            $finishedProcesses = array_filter($processes, function ($process) {
-                return ! $process->running();
-            });
-            foreach ($finishedProcesses as $containerName => $process) {
-                unset($processes[$containerName]);
-                $this->removeContainer($containerName, $server);
-            }
-
-            if (time() - $startTime >= $timeout) {
-                $this->forceStopRemainingContainers(array_keys($processes), $server);
-                break;
-            }
-
-            usleep(100000);
-        }
-    }
-
-    public function stopContainer(string $containerName, $server, int $timeout): InvokedProcess
-    {
-        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-    }
-
-    public function removeContainer(string $containerName, $server)
-    {
-        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
-    }
-
-    public function forceStopRemainingContainers(array $containerNames, $server)
+    public function stopContainers(array $containerNames, $server, int $timeout = 30)
     {
         foreach ($containerNames as $containerName) {
-            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
-            $this->removeContainer($containerName, $server);
+            instant_remote_process(command: [
+                "docker stop --time=$timeout $containerName",
+                "docker rm -f $containerName",
+            ], server: $server, throwError: false);
         }
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -323,8 +287,9 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_volumes(?Collection $persistentStorages)
+    public function deleteVolumes()
     {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
             instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
@@ -339,8 +304,9 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_connected_networks($uuid)
+    public function deleteConnectedNetworks()
     {
+        $uuid = $this->uuid;
         $server = data_get($this, 'destination.server');
         instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
         instant_remote_process(["docker network rm {$uuid}"], $server, false);
