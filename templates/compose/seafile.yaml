@@ -1,4 +1,8 @@
-# https://manual.seafile.com/12.0/setup/setup_ce_by_docker
+# documentation: https://manual.seafile.com
+# slogan: Open source cloud storage system for file sync, share and document collaboration
+# tags: file-manager,file-sharing",storage
+# logo: svgs/seafile.svg
+# port: 80
 
 services:
   seafile-db:
