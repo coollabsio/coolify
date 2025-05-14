@@ -164,7 +164,7 @@
     <template x-teleport="body">
         <div x-show="modalOpen"
             class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-xs">
+            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"

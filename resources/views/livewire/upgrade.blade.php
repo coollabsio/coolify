@@ -33,7 +33,7 @@
                         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                         x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
                         x-transition:leave-end="opacity-0"
-                        class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-xs"></div>
+                        class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
                     <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                         x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
@@ -54,7 +54,7 @@
                         <div class="relative w-auto pb-8">
                             <p>Are you sure you would like to upgrade your instance to {{ $latestVersion }}?</p>
                             <br />
-                            
+
                             <div class="p-4 mb-4 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
                                 <p class="font-medium">Warning: Any deployments running during the update process will fail. Please ensure no deployments are in progress on any server before continuing.</p>
                             </div>
