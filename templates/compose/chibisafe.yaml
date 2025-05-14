@@ -70,8 +70,3 @@ services:
               }
             }
           }
-
-volumes:
-  database:
-  uploads:
-  logs:
