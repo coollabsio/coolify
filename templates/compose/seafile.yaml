@@ -13,8 +13,6 @@ services:
       - MARIADB_AUTO_UPGRADE=1
     volumes:
       - /opt/seafile/seafile-mysql/db:/var/lib/mysql"
-    networks:
-      - seafile-net
     healthcheck:
       test:
         [
@@ -32,8 +30,6 @@ services:
   memcached:
     image: memcached:1.6.29
     entrypoint: memcached -m 256
-    networks:
-      - seafile-net
     healthcheck:
       test:
         [
@@ -72,14 +68,8 @@ services:
         condition: service_healthy
       memcached:
         condition: service_started
-    networks:
-      - seafile-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/api2/ping"]
       interval: 20s
       timeout: 5s
       retries: 10
-
-networks:
-  seafile-net:
-    name: seafile-net
