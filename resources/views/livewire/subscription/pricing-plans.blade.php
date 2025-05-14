@@ -1,16 +1,16 @@
-<div x-data="{ selected: 'monthly' }" class="w-full pb-20 pt-10">
+<div x-data="{ selected: 'monthly' }" class="w-full pb-20">
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-sm dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
                 <legend class="sr-only">Payment frequency</legend>
-                <label class="cursor-pointer rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded-sm px-2.5 py-1"
                     :class="selected === 'monthly' ? 'dark:bg-coollabs-100 bg-warning dark:text-white' : ''">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
                     <span>Monthly</span>
                 </label>
-                <label class="cursor-pointer rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded-sm px-2.5 py-1"
                     :class="selected === 'yearly' ? 'dark:bg-coollabs-100 bg-warning dark:text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
@@ -20,7 +20,7 @@
         </div>
         <div class="flow-root mt-12">
             <div
-                class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-neutral-200 dark:divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-1 lg:divide-x lg:divide-y-0 xl:-mx-4">
+                class="grid grid-cols-1 -mt-16 divide-y divide-neutral-200 dark:divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-1 lg:divide-x lg:divide-y-0 xl:-mx-4">
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
                     <h3 id="tier-dynamic" class="text-4xl font-semibold leading-7 dark:text-white">Pay-as-you-go</h3>
                     <p class="mt-4 text-sm leading-6 dark:text-neutral-400">
@@ -72,14 +72,16 @@
                             </div>
                         </div>
                     </div>
-                    <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
-                        class="w-full h-10 buyme" wire:click="subscribeStripe('dynamic-monthly')">
-                        Subscribe
-                    </x-forms.button>
-                    <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
-                        class="w-full h-10 buyme" wire:click="subscribeStripe('dynamic-yearly')">
-                        Subscribe
-                    </x-forms.button>
+                    <div class="flex pt-4 h-14">
+                        <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
+                            class="w-full" wire:click="subscribeStripe('dynamic-monthly')">
+                            Subscribe
+                        </x-forms.button>
+                        <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
+                            class="w-full" wire:click="subscribeStripe('dynamic-yearly')">
+                            Subscribe
+                        </x-forms.button>
+                    </div>
                     <ul role="list" class="mt-8 space-y-3 text-sm leading-6 dark:text-neutral-400">
                         <li class="flex">
                             <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"

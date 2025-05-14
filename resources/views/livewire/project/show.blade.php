@@ -5,7 +5,7 @@
     <div class="flex items-center gap-2">
         <h1>Environments</h1>
         <x-modal-input buttonTitle="+ Add" title="New Environment">
-            <form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
+            <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
                 <x-forms.input placeholder="production" id="name" label="Name" required />
                 <x-forms.button type="submit">
                     Save
@@ -20,7 +20,6 @@
             <div class="gap-2 border border-transparent box group">
                 <div class="flex flex-1 mx-6">
                     <a class="flex flex-col justify-center flex-1"
-                        wire:navigate
                         href="{{ route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
                         <div class="font-bold dark:text-white"> {{ $environment->name }}</div>
                         <div class="description">
@@ -28,7 +27,6 @@
                     </a>
                     <div class="flex items-center justify-center gap-2 text-xs">
                         <a class="font-bold hover:underline"
-                            wire:navigate
                             href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}">
                             Settings
                         </a>

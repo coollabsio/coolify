@@ -103,7 +103,7 @@ class ServicesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'type'],
+                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
                     properties: [
                         'type' => [
                             'description' => 'The one-click service type',
@@ -205,6 +205,7 @@ class ServicesController extends Controller
                         'server_uuid' => ['type' => 'string', 'description' => 'Server UUID.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'Destination UUID. Required if server has multiple destinations.'],
                         'instant_deploy' => ['type' => 'boolean', 'default' => false, 'description' => 'Start the service immediately after creation.'],
+                        'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
                     ],
                 ),
             ),
@@ -256,7 +257,7 @@ class ServicesController extends Controller
             'environment_name' => 'string|nullable',
             'environment_uuid' => 'string|nullable',
             'server_uuid' => 'string|required',
-            'destination_uuid' => 'string',
+            'destination_uuid' => 'string|nullable',
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
@@ -379,6 +380,9 @@ class ServicesController extends Controller
 
             $service = new Service;
             $result = $this->upsert_service($request, $service, $teamId);
+            if ($result instanceof \Illuminate\Http\JsonResponse) {
+                return $result;
+            }
 
             return response()->json(serializeApiResponse($result))->setStatusCode(201);
         } else {
@@ -526,6 +530,18 @@ class ServicesController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
         requestBody: new OA\RequestBody(
             description: 'Service updated.',
             required: true,
@@ -595,12 +611,14 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
         $result = $this->upsert_service($request, $service, $teamId);
+        if ($result instanceof \Illuminate\Http\JsonResponse) {
+            return $result;
+        }
 
         return response()->json(serializeApiResponse($result))->setStatusCode(200);
     }

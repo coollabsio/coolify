@@ -40,7 +40,7 @@
     @if ($unsupported)
         <div>Database restore is not supported.</div>
     @else
-        <div class="pt-2 rounded alert-error">
+        <div class="pt-2 rounded-sm alert-error">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

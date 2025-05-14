@@ -103,14 +103,14 @@
                                                 :src='service.logo'
                                                 x-on:error.window="$event.target.src = service.logo_github_url"
                                                 onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                x-on:error="$event.target.src = 'coolify-logo.svg'"
+                                                x-on:error="$event.target.src = '/coolify-logo.svg'"
                                                 :data-fallback='service.logo_github_url' />
                                         </template>
                                     </x-slot:logo>
                                     <x-slot:documentation>
                                         <template x-if="service.documentation">
                                             <div class="flex items-center px-2" title="Read the documentation.">
-                                                <a class="p-2 rounded hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
+                                                <a class="p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline dark:group-hover:text-white text-neutral-600"
                                                     onclick="event.stopPropagation()" :href="service.documentation"
                                                     target="_blank">
                                                     Docs
@@ -253,7 +253,7 @@
                 @foreach ($swarmDockers as $swarmDocker)
                     <div class="w-full box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:dark:text-white">
+                            <div class="font-bold dark:group-hover:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
                             </div>
                         </div>
@@ -290,7 +290,7 @@
                 <div class="flex-1"></div>
 
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-6000"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
                         onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
                         Documentation
                     </a>
@@ -306,7 +306,7 @@
                 </div>
                 <div class="flex-1"></div>
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
                         onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
                         target="_blank">
                         Documentation
@@ -323,7 +323,7 @@
                 </div>
                 <div class="flex-1"></div>
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
                         onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
                         target="_blank">
                         Documentation
@@ -341,7 +341,7 @@
                 <div class="flex-1"></div>
 
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
                         onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
                         target="_blank">
                         Documentation

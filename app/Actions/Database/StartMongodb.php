@@ -181,6 +181,7 @@ class StartMongodb
                     'read_only' => true,
                 ]]
             );
+            $docker_compose['services'][$container_name]['command'] = ['mongod', '--config', '/etc/mongo/mongod.conf'];
         }
 
         $this->add_default_database();
@@ -215,6 +216,10 @@ class StartMongodb
 
         if ($this->database->enable_ssl) {
             $commandParts = ['mongod'];
+
+            if (! empty($this->database->mongo_conf)) {
+                $commandParts = ['mongod', '--config', '/etc/mongo/mongod.conf'];
+            }
 
             $sslConfig = match ($this->database->ssl_mode) {
                 'allow' => [
