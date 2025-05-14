@@ -52,6 +52,7 @@ class Kernel extends ConsoleKernel
 
         // $this->scheduleInstance->job(new CleanupStaleMultiplexedConnections)->hourly();
         $this->scheduleInstance->command('cleanup:redis')->hourly();
+
         if (isDev()) {
             // Instance Jobs
             $this->scheduleInstance->command('horizon:snapshot')->everyMinute();
