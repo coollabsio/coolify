@@ -57,7 +57,7 @@
         <div id="screen" :class="fullscreen ? 'fullscreen' : 'relative'">
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                 class="flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
-                :class="fullscreen ? '' : 'min-h-14 max-h-[40rem] border border-dotted rounded'">
+                :class="fullscreen ? '' : 'min-h-14 max-h-[40rem] border border-dotted rounded-sm'">
                 <div :class="fullscreen ? 'fixed' : 'absolute'" class="top-2 right-5">
                     <div class="flex justify-end gap-4 fixed -translate-x-full">
                         <button title="Toggle timestamps" x-on:click="showTimestamps = !showTimestamps">
