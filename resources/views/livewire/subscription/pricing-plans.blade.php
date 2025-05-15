@@ -2,15 +2,15 @@
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-sm dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
                 <legend class="sr-only">Payment frequency</legend>
-                <label class="cursor-pointer rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded-sm px-2.5 py-1"
                     :class="selected === 'monthly' ? 'dark:bg-coollabs-100 bg-warning dark:text-white' : ''">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
                     <span>Monthly</span>
                 </label>
-                <label class="cursor-pointer rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded-sm px-2.5 py-1"
                     :class="selected === 'yearly' ? 'dark:bg-coollabs-100 bg-warning dark:text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
