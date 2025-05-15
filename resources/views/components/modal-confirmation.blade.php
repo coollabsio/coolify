@@ -6,6 +6,7 @@
     'buttonFullWidth' => false,
     'customButton' => null,
     'disabled' => false,
+    'dispatchAction' => false,
     'submitAction' => 'delete',
     'content' => null,
     'checkboxes' => [],
@@ -42,6 +43,7 @@
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
     confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
     submitAction: @js($submitAction),
+    dispatchAction: @js($dispatchAction),
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
@@ -71,6 +73,10 @@
             if (this.passwordError) {
                 return Promise.resolve(this.passwordError);
             }
+        }
+        if (this.dispatchAction) {
+            $wire.dispatch(this.submitAction);
+            return true;
         }
 
         const methodName = this.submitAction.split('(')[0];
@@ -163,8 +169,8 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 lg:pt-10 left-0 z-[99] flex items-start justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm">
+            class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
+            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -172,7 +178,7 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
+                class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
                 <div class="flex justify-between items-center pb-3">
                     <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
@@ -222,7 +228,7 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-center text-red-500">
-                                    <svg class="flex-shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                    <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M6 18L18 6M6 6l12 12"></path>
@@ -233,7 +239,7 @@
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-center text-red-500">
-                                        <svg class="flex-shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                        <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M6 18L18 6M6 6l12 12"></path>
@@ -257,7 +263,7 @@
                                         {{ $shortConfirmationLabel }}
                                     </label>
                                     <input type="text" x-model="userConfirmationText"
-                                        class="p-2 mt-1 w-full text-black rounded input">
+                                        class="p-2 mt-1 w-full text-black rounded-sm input">
                                 </div>
                             @endif
                         @endif

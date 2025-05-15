@@ -6,10 +6,10 @@
     x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
     x-transition:leave="transition ease-in duration-300" x-transition:leave-start="translate-y-0"
     x-transition:leave-end="translate-y-full" x-init="setTimeout(() => { bannerVisible = true }, bannerVisibleAfter);"
-    class="fixed bottom-0 right-0 w-full h-auto duration-300 ease-out sm:px-5 sm:pb-5 w-full z-[999]"
+    class="fixed bottom-0 right-0 w-full h-auto duration-300 ease-out sm:px-5 sm:pb-5 w-full z-999"
     x-cloak>
     <div
-        class="flex items-center flex-col justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:rounded">
+        class="flex items-center flex-col justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:rounded-sm">
         <div
             class="flex flex-col items-start h-full pb-6 text-xs lg:items-center lg:flex-row lg:pb-0 lg:pr-6 lg:space-x-5 dark:text-neutral-300">
             @if (isset($icon))
@@ -27,7 +27,7 @@
                 @if ($buttonText->attributes->whereStartsWith('@click')->first()) @click="bannerVisible=false;{{ $buttonText->attributes->get('@click') }}"
                     @else
                 @click="bannerVisible=false;" @endif
-                class="w-full px-4 py-2 text-sm font-medium tracking-wide transition-colors duration-200 rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-coolgray-200 lg:w-auto dark:text-neutral-200 dark:hover:bg-coolgray-300 focus:shadow-outline focus:outline-none">
+                class="w-full px-4 py-2 text-sm font-medium tracking-wide transition-colors duration-200 rounded-md bg-neutral-100 hover:bg-neutral-200 dark:bg-coolgray-200 lg:w-auto dark:text-neutral-200 dark:hover:bg-coolgray-300 focus:shadow-outline focus:outline-hidden">
                 {{ $buttonText }}
             </button>
     </div>
