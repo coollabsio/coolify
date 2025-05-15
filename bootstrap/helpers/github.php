@@ -52,6 +52,9 @@ function generateGithubToken(GithubApp $source, string $type)
 
             if (! $response->successful()) {
                 $error = data_get($response->json(), 'message', 'no error message found');
+                if ($error === 'Not Found') {
+                    $error = 'Repository not found. Is it moved or deleted?';
+                }
                 throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
 
@@ -128,4 +131,28 @@ function getPermissionsPath(GithubApp $source)
     $name = str(Str::kebab($github->name));
 
     return "$github->html_url/settings/apps/$name/permissions";
+}
+
+function loadRepositoryByPage(GithubApp $source, string $token, int $page)
+{
+    $response = Http::withToken($token)->get("{$source->api_url}/installation/repositories?per_page=100&page={$page}");
+    $json = $response->json();
+    if ($response->status() !== 200) {
+        return [
+            'total_count' => 0,
+            'repositories' => [],
+        ];
+    }
+
+    if ($json['total_count'] === 0) {
+        return [
+            'total_count' => 0,
+            'repositories' => [],
+        ];
+    }
+
+    return [
+        'total_count' => $json['total_count'],
+        'repositories' => $json['repositories'],
+    ];
 }

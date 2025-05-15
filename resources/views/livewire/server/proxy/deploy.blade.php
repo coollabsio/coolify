@@ -14,7 +14,7 @@
                         $traefikDashboardAvailable &&
                         $server->proxyType() === ProxyTypes::TRAEFIK->value)
                     <button>
-                        <a wire:navigate target="_blank" href="http://{{ $serverIp }}:8080">
+                        <a target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard
                             <x-external-link />
                         </a>
@@ -72,6 +72,7 @@
     @script
         <script>
             $wire.$on('checkProxyEvent', () => {
+                $wire.$dispatch('info', 'Checking proxy.');
                 $wire.$call('checkProxy');
             });
             $wire.$on('restartEvent', () => {

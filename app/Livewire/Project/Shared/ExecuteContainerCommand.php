@@ -27,6 +27,8 @@ class ExecuteContainerCommand extends Component
 
     public Collection $servers;
 
+    public bool $hasShell = true;
+
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
@@ -141,6 +143,21 @@ class ExecuteContainerCommand extends Component
         }
     }
 
+    private function checkShellAvailability(Server $server, string $container): bool
+    {
+        $escapedContainer = escapeshellarg($container);
+        try {
+            instant_remote_process([
+                "docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
+                "docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
+            ], $server);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     #[On('connectToServer')]
     public function connectToServer()
     {
@@ -148,6 +165,7 @@ class ExecuteContainerCommand extends Component
             if ($this->server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
+            $this->hasShell = true;
             $this->dispatch(
                 'send-terminal-command',
                 false,
@@ -199,6 +217,11 @@ class ExecuteContainerCommand extends Component
 
             if ($server->id !== $resourceServer->id && ! $this->resource->additional_servers->contains('id', $server->id)) {
                 throw new \RuntimeException('Server ownership verification failed.');
+            }
+
+            $this->hasShell = $this->checkShellAvailability($server, data_get($container, 'container.Names'));
+            if (! $this->hasShell) {
+                return;
             }
 
             $this->dispatch(

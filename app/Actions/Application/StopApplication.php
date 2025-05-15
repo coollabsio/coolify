@@ -30,7 +30,7 @@ class StopApplication
             $application->stopContainers($containersToStop, $server);
 
             if ($application->build_pack === 'dockercompose') {
-                $application->delete_connected_networks($application->uuid);
+                $application->deleteConnectedNetworks();
             }
 
             if ($dockerCleanup) {

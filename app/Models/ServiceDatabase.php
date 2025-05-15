@@ -16,6 +16,7 @@ class ServiceDatabase extends BaseModel
         static::deleting(function ($service) {
             $service->persistentStorages()->delete();
             $service->fileStorages()->delete();
+            $service->scheduledBackups()->delete();
         });
         static::saving(function ($service) {
             if ($service->isDirty('status')) {
@@ -77,12 +78,19 @@ class ServiceDatabase extends BaseModel
 
     public function databaseType()
     {
+        if (filled($this->custom_type)) {
+            return 'standalone-'.$this->custom_type;
+        }
         $image = str($this->image)->before(':');
-        if ($image->value() === 'postgres') {
-            $image = 'postgresql';
+        if ($image->contains('supabase/postgres')) {
+            $finalImage = 'supabase/postgres';
+        } elseif ($image->contains('postgres') || $image->contains('postgis')) {
+            $finalImage = 'postgresql';
+        } else {
+            $finalImage = $image;
         }
 
-        return "standalone-$image";
+        return "standalone-$finalImage";
     }
 
     public function getServiceDatabaseUrl()
@@ -137,6 +145,7 @@ class ServiceDatabase extends BaseModel
             str($this->databaseType())->contains('postgres') ||
             str($this->databaseType())->contains('postgis') ||
             str($this->databaseType())->contains('mariadb') ||
-            str($this->databaseType())->contains('mongodb');
+            str($this->databaseType())->contains('mongo') ||
+            filled($this->custom_type);
     }
 }
