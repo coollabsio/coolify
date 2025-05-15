@@ -45,7 +45,7 @@ x-common-env:
   - SEARXNG_CATEGORIES=${SEARXNG_CATEGORIES}
 services:
   playwright-service:
-    image: yipfram/firecrawl-playwright-service:latest
+    image: mcr.microsoft.com/playwright:v1.52.0-noble
     environment:
       - PORT=3000
       - PROXY_SERVER=${PROXY_SERVER}
