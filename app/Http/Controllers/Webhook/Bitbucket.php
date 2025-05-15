@@ -49,7 +49,7 @@ class Bitbucket extends Controller
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = data_get($payload, 'push.changes.0.new.target.hash');
 
-                if (!$branch) {
+                if (! $branch) {
                     return response([
                         'status' => 'failed',
                         'message' => 'Nothing to do. No branch found in the request.',
@@ -100,18 +100,26 @@ class Bitbucket extends Controller
                 if ($x_bitbucket_event === 'repo:push') {
                     if ($application->isDeployable()) {
                         $deployment_uuid = new Cuid2;
-                        queue_application_deployment(
+                        $result = queue_application_deployment(
                             application: $application,
                             deployment_uuid: $deployment_uuid,
                             commit: $commit,
                             force_rebuild: false,
                             is_webhook: true
                         );
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'success',
-                            'message' => 'Preview deployment queued.',
-                        ]);
+                        if ($result['status'] === 'skipped') {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'skipped',
+                                'message' => $result['message'],
+                            ]);
+                        } else {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'success',
+                                'message' => 'Deployment queued.',
+                            ]);
+                        }
                     } else {
                         $return_payloads->push([
                             'application' => $application->name,
@@ -143,7 +151,7 @@ class Bitbucket extends Controller
                                 ]);
                             }
                         }
-                        queue_application_deployment(
+                        $result = queue_application_deployment(
                             application: $application,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
@@ -152,11 +160,19 @@ class Bitbucket extends Controller
                             is_webhook: true,
                             git_type: 'bitbucket'
                         );
-                        $return_payloads->push([
-                            'application' => $application->name,
-                            'status' => 'success',
-                            'message' => 'Preview deployment queued.',
-                        ]);
+                        if ($result['status'] === 'skipped') {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'skipped',
+                                'message' => $result['message'],
+                            ]);
+                        } else {
+                            $return_payloads->push([
+                                'application' => $application->name,
+                                'status' => 'success',
+                                'message' => 'Preview deployment queued.',
+                            ]);
+                        }
                     } else {
                         $return_payloads->push([
                             'application' => $application->name,

@@ -50,7 +50,7 @@ class CloudCleanupSubscriptions extends Command
                 } else {
                     $subscription = $stripe->subscriptions->retrieve(data_get($team, 'subscription.stripe_subscription_id'), []);
                     $status = data_get($subscription, 'status');
-                    if ($status === 'active' || $status === 'past_due') {
+                    if ($status === 'active') {
                         $team->subscription->update([
                             'stripe_invoice_paid' => true,
                             'stripe_trial_already_ended' => false,

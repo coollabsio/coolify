@@ -38,7 +38,7 @@
                                         wire:model="contents.{{ $fileName }}" rows="5" />
                                 @else
                                     <livewire:server.proxy.dynamic-configuration-navbar :server_id="$server->id"
-                                        :fileName="$fileName" :value="$value" :newFile="false"
+                                        :fileName="$fileName" :value="$value ?? ''" :newFile="false"
                                         wire:key="{{ $fileName }}-{{ $loop->index }}" />
                                     <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
                                         rows="10" />

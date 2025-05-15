@@ -21,7 +21,7 @@
                     </div>
                 @elseif (!$server->isFunctional())
                     <div
-                        class="p-4 mb-4 w-full text-sm text-yellow-800 bg-yellow-100 rounded dark:bg-yellow-900 dark:text-yellow-300">
+                        class="p-4 mb-4 w-full text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
                         To <span class="font-semibold">automatically</span> configure Cloudflare Tunnels, please
                         validate your server first.</span> Then you will need a Cloudflare token and an SSH
                         domain configured.
@@ -31,7 +31,7 @@
                         then you should validate the server.
                         <br /><br />
                         For more information, please read our <a
-                            href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/" target="_blank"
+                            href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/overview" target="_blank"
                             class="font-medium underline hover:text-yellow-600 dark:hover:text-yellow-200">documentation</a>.
                     </div>
                 @endif

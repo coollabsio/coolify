@@ -9,40 +9,37 @@
             <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation
                 <x-external-link /></a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>General</a>
+                href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">General</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Environment Variables</a>
+                href="{{ route('project.service.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Environment
+                Variables</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.storages', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Persistent Storages</a>
+                href="{{ route('project.service.storages', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Persistent
+                Storages</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Scheduled Tasks</a>
+                href="{{ route('project.service.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Scheduled
+                Tasks</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Webhooks</a>
+                href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Webhooks</a>
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Resource Operations</a>
+                href="{{ route('project.service.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Resource
+                Operations</a>
 
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Tags</a>
+                href="{{ route('project.service.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Tags</a>
 
             <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.service.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"
-                wire:navigate>Danger Zone</a>
+                href="{{ route('project.service.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">Danger
+                Zone</a>
         </div>
         <div class="w-full">
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10s="check_status">
+                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10000ms="check_status">
                     @foreach ($applications as $application)
                         <div @class([
-                            'border-l border-dashed border-red-500 ' => str(
+                            'border-l border-dashed border-red-500' => str(
                                 $application->status)->contains(['exited']),
                             'border-l border-dashed border-success' => str(
                                 $application->status)->contains(['running']),
@@ -95,8 +92,7 @@
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="mx-4 text-xs font-bold hover:underline"
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}"
-                                        wire:navigate>
+                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}">
                                         Settings
                                     </a>
                                     @if (str($application->status)->contains('running'))
@@ -142,16 +138,14 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    @if ($database->isBackupSolutionAvailable())
+                                    @if ($database->isBackupSolutionAvailable() || $database->is_migrated)
                                         <a class="mx-4 text-xs font-bold hover:underline"
-                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups"
-                                            wire:navigate>
+                                            href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}#backups">
                                             Backups
                                         </a>
                                     @endif
                                     <a class="mx-4 text-xs font-bold hover:underline"
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}"
-                                        wire:navigate>
+                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
                                         Settings
                                     </a>
                                     @if (str($database->status)->contains('running'))
@@ -176,7 +170,9 @@
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
                 <div class="pb-4 dark:text-warning text-coollabs">If you would like to add a volume, you must add it to
-                    your compose file (Service Stack tab).</div>
+                    your compose file (<a class="underline"
+                        href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}">General
+                        tab</a>).</div>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />

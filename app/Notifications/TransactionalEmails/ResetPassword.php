@@ -3,6 +3,7 @@
 namespace App\Notifications\TransactionalEmails;
 
 use App\Models\InstanceSettings;
+use Exception;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -16,7 +17,7 @@ class ResetPassword extends Notification
 
     public InstanceSettings $settings;
 
-    public function __construct($token)
+    public function __construct($token, public bool $isTransactionalEmail = true)
     {
         $this->settings = instanceSettings();
         $this->token = $token;
@@ -35,8 +36,8 @@ class ResetPassword extends Notification
     public function via($notifiable)
     {
         $type = set_transanctional_email_settings();
-        if (! $type) {
-            throw new \Exception('No email settings found.');
+        if (blank($type)) {
+            throw new Exception('No email settings found.');
         }
 
         return ['mail'];
