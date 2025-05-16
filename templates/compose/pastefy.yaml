@@ -1,0 +1,42 @@
+# documentation: https://github.com/interaapps/pastefy
+# slogan: Pastefy is an Open Source self-hostable Pastebin.
+# tags: pastebin, open-source, self-hosted
+# logo: svgs/pastefy.svg
+# minversion: 4.0.0-beta.222
+# port: 80
+
+version: '3.3'
+
+services:
+   db:
+     image: mariadb:10.11
+     volumes:
+       - dbvol:/var/lib/mysql
+
+     environment:
+       MYSQL_ROOT_PASSWORD: pastefy
+       MYSQL_DATABASE: pastefy
+       MYSQL_USER: pastefy
+       MYSQL_PASSWORD: pastefy
+
+   pastefy:
+     depends_on:
+       - db
+     image: interaapps/pastefy:latest
+       
+     environment:
+       HTTP_SERVER_PORT: 80
+       HTTP_SERVER_CORS: "*"
+       DATABASE_DRIVER: mysql
+       DATABASE_NAME: pastefy
+       DATABASE_USER: pastefy
+       DATABASE_PASSWORD: pastefy
+       DATABASE_HOST: db
+       DATABASE_PORT: 3306
+       SERVER_NAME: "http://localhost"
+       # There is INTERAAPPS, GOOGLE, GITHUB, DISCORD, TWITCH
+       OAUTH2_EXAMPLE_CLIENT_ID:
+       OAUTH2_EXAMPLE_CLIENT_SECRET:
+
+volumes:
+  dbvol:
