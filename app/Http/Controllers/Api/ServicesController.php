@@ -627,6 +627,11 @@ class ServicesController extends Controller
             'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw',
             'connect_to_docker_network', 'domains'
         ];
+        $allowedFields = [
+            'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid',
+            'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw',
+            'connect_to_docker_network', 'domains'
+        ];
         $validator = customApiValidator($request->all(), [
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
