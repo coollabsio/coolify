@@ -10,6 +10,11 @@ REGISTRY_URL=${3:-ghcr.io}
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
 LOGFILE="/data/coolify/source/upgrade-${DATE}.log"
 
+PORT=$(grep "APP_PORT=" /data/coolify/source/.env | cut -d '=' -f2)
+if [ -z "$PORT" ]; then
+    PORT=8000
+fi
+
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
