@@ -20,8 +20,13 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_PORT=5432
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -29,7 +34,31 @@ services:
         - curl
         - "-f"
         - "http://localhost:3000"
-
+      interval: 10s
+      timeout: 10s
+      retries: 5
+  worker:
+    image: "ghcr.io/maybe-finance/maybe:latest"
+    command: "bundle exec sidekiq"
+    exclude_from_hc: true
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   postgres:
     image: postgres:16
     volumes:
@@ -43,3 +72,17 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+  redis:
+    image: redis:latest
+    command: redis-server --appendonly yes --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PORT=6379
+      - REDIS_DB=1
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
