@@ -325,6 +325,7 @@ class ServicesController extends Controller
             : $request->name;
         $servicePayload = [
             'name'               => $serviceName,
+            'description'        => $request->description ?? null,
             'docker_compose_raw' => base64_decode($oneClickService),
             'environment_id'     => $environment->id,
             'service_type'       => $oneClickServiceName,
