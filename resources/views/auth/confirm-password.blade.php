@@ -2,7 +2,25 @@
     <div class="flex items-center justify-center h-screen">
         <div>
             <div class="flex flex-col items-center pb-8">
-                <div class="text-5xl font-bold tracking-tight text-center dark:text-white">Coolify</div>
+                <div class="text-5xl font-bold tracking-tight text-center dark:text-white">
+                    Coolify
+                </div>
+                @use('App\Models\InstanceSettings')
+                @php
+                    $instanceSettings = instanceSettings();
+                    $name = null;
+
+                    if ($instanceSettings) {
+                        $displayName = $instanceSettings->getTitleDisplayName();
+
+                        if (strlen($displayName) > 0) {
+                            $name = $displayName;
+                        }
+                    }
+                @endphp
+                @if (strlen($name) > 0)
+                    <div class="text-sm font-medium tracking-wide dark:text-white">{{ $name }}</div>
+                @endif
                 {{-- <x-version /> --}}
             </div>
             <div class="w-96">
