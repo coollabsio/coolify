@@ -1,0 +1,4 @@
+#!/command/execlineb -P
+
+# Start Docker daemon
+/usr/bin/dockerd
