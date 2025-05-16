@@ -1,0 +1,46 @@
+# documentation: https://hackmd.io/c/codimd-documentation
+# slogan: Realtime collaborative markdown notes on all platforms
+# tags: markdown, md, editor, opensource, collaborative, realtime-collaboration, notes
+# logo: svgs/codimd.png
+# port: 3000
+
+services:
+  codimd:
+    image: nabo.codimd.dev/hackmdio/hackmd:latest
+    environment:
+      - SERVICE_FQDN_CODIMD_3000
+      - CMD_DOMAIN=${SERVICE_URL_CODIMD}
+      - CMD_PROTOCOL_USESSL=${CMD_PROTOCOL_USESSL:-false}
+      - CMD_SESSION_SECRET=${SERVICE_PASSWORD_SESSIONSECRET}
+      - CMD_USECDN=${CMD_USECDN:-false}
+      - CMD_DB_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-codimd-db}
+      - CMD_EMAIL=${CMD_EMAIL:-true}
+      - CMD_ALLOW_EMAIL_REGISTER=${CMD_ALLOW_EMAIL_REGISTER:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -f http://localhost:3000/ || exit 1"
+      interval: 5s
+      timeout: 20s
+      retries: 5
+    volumes:
+      - uploads_data:/home/hackmd/app/public/uploads
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - codimd_postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-codimd-db}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 20s
+      retries: 10

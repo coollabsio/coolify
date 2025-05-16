@@ -22,6 +22,8 @@ class ActivityMonitor extends Component
 
     protected $activity;
 
+    public static $eventDispatched = false;
+
     protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
 
     public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished')
@@ -51,15 +53,19 @@ class ActivityMonitor extends Component
                         $causer_id = data_get($this->activity, 'causer_id');
                         $user = User::find($causer_id);
                         if ($user) {
-                            foreach ($user->teams as $team) {
-                                $teamId = $team->id;
+                            $teamId = $user->currentTeam()->id;
+                            if (! self::$eventDispatched) {
                                 $this->eventToDispatch::dispatch($teamId);
+                                self::$eventDispatched = true;
                             }
                         }
 
                         return;
                     }
-                    $this->dispatch($this->eventToDispatch);
+                    if (! self::$eventDispatched) {
+                        $this->dispatch($this->eventToDispatch);
+                        self::$eventDispatched = true;
+                    }
                 }
             }
         }

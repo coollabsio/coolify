@@ -7,7 +7,7 @@
             <div class="flex items-center justify-center pb-6 text-center">
                 {{ __('auth.reset_password') }}
             </div>
-            <div class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
+            <div class="w-full bg-white shadow-sm md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
                     <form action="/reset-password" method="POST" class="flex flex-col gap-2">
                         @csrf

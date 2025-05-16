@@ -1,0 +1,54 @@
+# documentation: https://docs.observium.org/
+# slogan: Observium is a comprehensive network monitoring platform designed to deliver powerful monitoring capabilities, combined with an elegant and intuitive user interface.
+# tags: networking, monitoring
+# logo: svgs/observium.webp
+# port: 80
+
+services:
+  observium:
+    image: mbixtech/observium:latest
+    platform: linux/amd64
+    volumes:
+      - observium_logs:/opt/observium/logs
+      - observium_rrd:/opt/observium/rrd
+    environment:
+      - SERVICE_FQDN_OBSERVIUM=${SERVICE_FQDN_OBSERVIUM}
+      - OBSERVIUM_ADMIN_PASS=${SERVICE_PASSWORD_OBSERVIUMADMIN}
+      - OBSERVIUM_ADMIN_USER=${SERVICE_USER_OBSERVIUMADMIN}
+      - OBSERVIUM_DB_HOST=mariadb
+      - OBSERVIUM_DB_NAME=${OBSERVIUM_DB_NAME:-observium-db}
+      - OBSERVIUM_DB_PASS=${SERVICE_PASSWORD_MARIADB}
+      - OBSERVIUM_DB_USER=${SERVICE_USER_MARIADB}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://localhost/"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  mariadb:
+    image: mariadb:lts
+    volumes:
+      - observium_mariadb_data:/var/lib/mysql
+    environment:
+      - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
+      - MARIADB_USER=${SERVICE_USER_MARIADB}
+      - MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-observium-db}
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - "--connect"
+        - "--innodb_initialized"
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3

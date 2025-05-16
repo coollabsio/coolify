@@ -1,4 +1,4 @@
-<form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
+<form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
     <x-forms.input placeholder="Run cron" id="name" label="Name" />
     <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" />
     <x-forms.input placeholder="0 0 * * * or daily"
