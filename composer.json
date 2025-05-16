@@ -39,6 +39,7 @@
         "resend/resend-laravel": "^0.17.0",
         "sentry/sentry-laravel": "^4.13",
         "socialiteproviders/authentik": "^5.2",
+        "socialiteproviders/clerk": "^5.0",
         "socialiteproviders/google": "^4.1",
         "socialiteproviders/infomaniak": "^4.0",
         "socialiteproviders/microsoft-azure": "^5.2",

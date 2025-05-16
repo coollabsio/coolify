@@ -29,6 +29,17 @@ function get_socialite_provider(string $provider)
         return Socialite::driver('authentik')->setConfig($authentik_config);
     }
 
+    if ($provider == 'clerk') {
+        $clerk_config = new \SocialiteProviders\Manager\Config(
+            $oauth_setting->client_id,
+            $oauth_setting->client_secret,
+            $oauth_setting->redirect_uri,
+            ['base_url' => $oauth_setting->base_url],
+        );
+
+        return Socialite::driver('clerk')->setConfig($clerk_config);
+    }
+
     if ($provider == 'google') {
         $google_config = new \SocialiteProviders\Manager\Config(
             $oauth_setting->client_id,
