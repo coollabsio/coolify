@@ -1,4 +1,4 @@
-# documentation: https://chibisafe.moe/guides
+# documentation: https://chibisafe.app/docs/intro
 # slogan: A beautiful and performant vault to save all your files in the cloud.
 # tags: storage,file-sharing,upload,sharing
 # logo: svgs/chibisafe.svg
@@ -23,7 +23,14 @@ services:
       - uploads:/app/uploads:rw
       - logs:/app/logs:rw
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8000/api/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "--quiet",
+          "http://127.0.0.1:8000/api/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
