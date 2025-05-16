@@ -555,6 +555,10 @@ class ServicesController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
                             'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
+                            'domains' => [
+                                'type' => 'string',
+                                'description' => 'Optional: Comma-separated service domains to update.',
+                            ],
                         ],
                     )
                 ),
@@ -618,7 +622,11 @@ class ServicesController extends Controller
 
     private function upsert_service(Request $request, Service $service, string $teamId)
     {
-        $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
+        $allowedFields = [
+            'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid',
+            'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw',
+            'connect_to_docker_network', 'domains'
+        ];
         $validator = customApiValidator($request->all(), [
             'project_uuid' => 'string|required',
             'environment_name' => 'string|nullable',
@@ -630,6 +638,7 @@ class ServicesController extends Controller
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'docker_compose_raw' => 'string|required',
+            'domains' => 'string|nullable'
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -708,6 +717,18 @@ class ServicesController extends Controller
         $service->connect_to_docker_network = $connectToDockerNetwork;
         $service->save();
 
+        // Update domains if provided as a comma-separated string
+        if ($request->filled('domains')) {
+            $domains = array_map('trim', explode(',', $request->domains));
+            $applications = $service->applications()->get();
+            foreach ($applications as $index => $application) {
+                if (isset($domains[$index])) {
+                    $application->fqdn = $domains[$index];
+                    $application->save();
+                }
+            }
+        }
+
         $service->parse();
         if ($instantDeploy) {
             StartService::dispatch($service);
@@ -718,7 +739,6 @@ class ServicesController extends Controller
             if (count(explode(':', $domain)) > 2) {
                 return str($domain)->beforeLast(':')->value();
             }
-
             return $domain;
         })->values();
 
