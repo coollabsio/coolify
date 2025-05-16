@@ -239,150 +239,150 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-    $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw'];
-    $teamId = getTeamIdFromToken();
-    if (is_null($teamId)) {
-        return invalidTokenResponse();
-    }
-    if ($ret = validateIncomingRequest($request)) {
-        return $ret;
-    }
-    $validator = customApiValidator($request->all(), [
-        'type'              => 'string|required_without:docker_compose_raw',
-        'docker_compose_raw'=> 'string|required_without:type',
-        'project_uuid'      => 'string|required',
-        'environment_name'  => 'string|nullable',
-        'environment_uuid'  => 'string|nullable',
-        'server_uuid'       => 'string|required',
-        'destination_uuid'  => 'string|nullable',
-        'name'              => 'string|max:255',
-        'description'       => 'string|nullable',
-        'instant_deploy'    => 'boolean',
-    ]);
-    $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-    if ($validator->fails() || !empty($extraFields)) {
-        $errors = $validator->errors();
-        foreach ($extraFields as $field) {
-            $errors->add($field, 'This field is not allowed.');
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw'];
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($ret = validateIncomingRequest($request)) {
+            return $ret;
+        }
+        $validator = customApiValidator($request->all(), [
+            'type' => 'string|required_without:docker_compose_raw',
+            'docker_compose_raw' => 'string|required_without:type',
+            'project_uuid' => 'string|required',
+            'environment_name' => 'string|nullable',
+            'environment_uuid' => 'string|nullable',
+            'server_uuid' => 'string|required',
+            'destination_uuid' => 'string|nullable',
+            'name' => 'string|max:255',
+            'description' => 'string|nullable',
+            'instant_deploy' => 'boolean',
+        ]);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || !empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+        $environmentUuid = $request->environment_uuid;
+        $environmentName = $request->environment_name;
+        if (blank($environmentUuid) && blank($environmentName)) {
+            return response()->json([
+                'message' => 'You need to provide at least one of environment_name or environment_uuid.',
+            ], 422);
+        }
+        $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
+        if (!$project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+        $environment = $project->environments()->where('name', $environmentName)->first() ?? $project->environments()->where('uuid', $environmentUuid)->first();
+        if (!$environment) {
+            return response()->json(['message' => 'Environment not found.'], 404);
+        }
+        $server = Server::whereTeamId($teamId)->whereUuid($request->server_uuid)->first();
+        if (!$server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $destinations = $server->destinations();
+        if ($destinations->count() === 0) {
+            return response()->json(['message' => 'Server has no destinations.'], 400);
+        }
+        if ($destinations->count() > 1 && !$request->has('destination_uuid')) {
+            return response()->json([
+                'message' => 'Server has multiple destinations and you do not set destination_uuid.',
+            ], 400);
+        }
+        $destination = $destinations->first();
+        $instantDeploy = $request->instant_deploy ?? false;
+        if ($request->is_public && !$request->public_port) {
+            $request->offsetSet('is_public', false);
+        }
+        $services = get_service_templates();
+        $serviceKeys = $services->keys();
+        if ($serviceKeys->contains($request->type)) {
+            $oneClickServiceName = $request->type;
+            $oneClickService = data_get($services, "$oneClickServiceName.compose");
+            $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs");
+            if ($oneClickDotEnvs) {
+                $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))
+                    ->split('/\r\n|\r|\n/')
+                    ->filter(fn($v) => !empty($v));
+            }
+            if (!$oneClickService) {
+                return response()->json([
+                    'message' => 'Service not found.',
+                    'valid_service_types' => $serviceKeys,
+                ], 404);
+            }
+            $serviceName = blank($request->name)
+                ? "$oneClickServiceName-" . str()->random(10)
+                : $request->name;
+            $servicePayload = [
+                'name' => $serviceName,
+                'description' => $request->description ?? null,
+                'docker_compose_raw' => base64_decode($oneClickService),
+                'environment_id' => $environment->id,
+                'service_type' => $oneClickServiceName,
+                'server_id' => $server->id,
+                'destination_id' => $destination->id,
+                'destination_type' => $destination->getMorphClass(),
+            ];
+            if ($oneClickServiceName === 'cloudflared') {
+                $servicePayload['connect_to_docker_network'] = true;
+            }
+            $service = Service::create($servicePayload);
+            if (blank($request->name)) {
+                $service->name = "$oneClickServiceName-{$service->uuid}";
+                $service->save();
+            }
+            if ($oneClickDotEnvs?->count()) {
+                $oneClickDotEnvs->each(function ($value) use ($service) {
+                    $key = str()->before($value, '=');
+                    $value = str(str()->after($value, '='));
+                    $generatedValue = $value;
+                    if ($value->contains('SERVICE_')) {
+                        $command = $value->after('SERVICE_')->beforeLast('_');
+                        $generatedValue = generateEnvValue($command->value(), $service);
+                    }
+                    EnvironmentVariable::create([
+                        'key' => $key,
+                        'value' => $generatedValue,
+                        'resourceable_id' => $service->id,
+                        'resourceable_type' => $service->getMorphClass(),
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+                });
+            }
+            $service->parse(isNew: true);
+            if ($instantDeploy) {
+                StartService::dispatch($service);
+            }
+            $domains = $service->applications()->pluck('fqdn')->sort()->map(function ($domain) {
+                return count(explode(':', $domain)) > 2 ? str($domain)->beforeLast(':')->value() : $domain;
+            });
+
+            return response()->json([
+                'uuid' => $service->uuid,
+                'domains' => $domains,
+            ]);
+        }
+        if (filled($request->docker_compose_raw)) {
+            $service = new Service;
+            $result = $this->upsert_service($request, $service, $teamId);
+
+            return $result instanceof \Illuminate\Http\JsonResponse ? $result : response()->json(serializeApiResponse($result), 201);
         }
         return response()->json([
-            'message' => 'Validation failed.',
-            'errors'  => $errors,
-        ], 422);
-    }
-    $environmentUuid = $request->environment_uuid;
-    $environmentName = $request->environment_name;
-    if (blank($environmentUuid) && blank($environmentName)) {
-        return response()->json([
-            'message' => 'You need to provide at least one of environment_name or environment_uuid.',
-        ], 422);
-    }
-    $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
-    if (!$project) {
-        return response()->json(['message' => 'Project not found.'], 404);
-    }
-    $environment = $project->environments()->where('name', $environmentName)->first() ?? $project->environments()->where('uuid', $environmentUuid)->first();
-    if (!$environment) {
-        return response()->json(['message' => 'Environment not found.'], 404);
-    }
-    $server = Server::whereTeamId($teamId)->whereUuid($request->server_uuid)->first();
-    if (!$server) {
-        return response()->json(['message' => 'Server not found.'], 404);
-    }
-    $destinations = $server->destinations();
-    if ($destinations->count() === 0) {
-        return response()->json(['message' => 'Server has no destinations.'], 400);
-    }
-    if ($destinations->count() > 1 && !$request->has('destination_uuid')) {
-        return response()->json([
-            'message' => 'Server has multiple destinations and you do not set destination_uuid.',
+            'message' => 'No service type or docker_compose_raw provided.',
         ], 400);
     }
-    $destination   = $destinations->first();
-    $instantDeploy = $request->instant_deploy ?? false;
-    if ($request->is_public && !$request->public_port) {
-        $request->offsetSet('is_public', false);
-    }
-    $services    = get_service_templates();
-    $serviceKeys = $services->keys();
-    if ($serviceKeys->contains($request->type)) {
-        $oneClickServiceName = $request->type;
-        $oneClickService     = data_get($services, "$oneClickServiceName.compose");
-        $oneClickDotEnvs     = data_get($services, "$oneClickServiceName.envs");
-        if ($oneClickDotEnvs) {
-            $oneClickDotEnvs = str(base64_decode($oneClickDotEnvs))
-                ->split('/\r\n|\r|\n/')
-                ->filter(fn ($v) => !empty($v));
-        }
-        if (!$oneClickService) {
-            return response()->json([
-                'message'             => 'Service not found.',
-                'valid_service_types' => $serviceKeys,
-            ], 404);
-        }
-        $serviceName = blank($request->name)
-            ? "$oneClickServiceName-" . str()->random(10)
-            : $request->name;
-        $servicePayload = [
-            'name'               => $serviceName,
-            'description'        => $request->description ?? null,
-            'docker_compose_raw' => base64_decode($oneClickService),
-            'environment_id'     => $environment->id,
-            'service_type'       => $oneClickServiceName,
-            'server_id'          => $server->id,
-            'destination_id'     => $destination->id,
-            'destination_type'   => $destination->getMorphClass(),
-        ];
-        if ($oneClickServiceName === 'cloudflared') {
-            $servicePayload['connect_to_docker_network'] = true;
-        }
-        $service = Service::create($servicePayload);
-        if (blank($request->name)) {
-            $service->name = "$oneClickServiceName-{$service->uuid}";
-            $service->save();
-        }
-        if ($oneClickDotEnvs?->count()) {
-            $oneClickDotEnvs->each(function ($value) use ($service) {
-                $key   = str()->before($value, '=');
-                $value = str(str()->after($value, '='));
-                $generatedValue = $value;
-                if ($value->contains('SERVICE_')) {
-                    $command        = $value->after('SERVICE_')->beforeLast('_');
-                    $generatedValue = generateEnvValue($command->value(), $service);
-                }
-                EnvironmentVariable::create([
-                    'key'               => $key,
-                    'value'             => $generatedValue,
-                    'resourceable_id'   => $service->id,
-                    'resourceable_type' => $service->getMorphClass(),
-                    'is_build_time'     => false,
-                    'is_preview'        => false,
-                ]);
-            });
-        }
-        $service->parse(isNew: true);
-        if ($instantDeploy) {
-            StartService::dispatch($service);
-        }
-        $domains = $service->applications()->pluck('fqdn')->sort()->map(function ($domain) {
-            return count(explode(':', $domain)) > 2 ? str($domain)->beforeLast(':')->value() : $domain;
-        });
-
-        return response()->json([
-            'uuid'    => $service->uuid,
-            'domains' => $domains,
-        ]);
-    }
-    if (filled($request->docker_compose_raw)) {
-        $service = new Service;
-        $result  = $this->upsert_service($request, $service, $teamId);
-
-        return $result instanceof \Illuminate\Http\JsonResponse ? $result : response()->json(serializeApiResponse($result), 201);
-    }
-    return response()->json([
-        'message' => 'No service type or docker_compose_raw provided.',
-    ], 400);
-}
 
     #[OA\Get(
         summary: 'Get',
@@ -429,11 +429,11 @@ class ServicesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if (! $request->uuid) {
+        if (!$request->uuid) {
             return response()->json(['message' => 'UUID is required.'], 404);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -494,11 +494,11 @@ class ServicesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if (! $request->uuid) {
+        if (!$request->uuid) {
             return response()->json(['message' => 'UUID is required.'], 404);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -556,7 +556,7 @@ class ServicesController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the service should be deployed instantly.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'default' => false, 'description' => 'Connect the service to the predefined docker network.'],
                             'docker_compose_raw' => ['type' => 'string', 'description' => 'The Docker Compose raw content.'],
-                            'domains' => [
+                            'fqdn' => [
                                 'type' => 'string',
                                 'description' => 'Optional: Comma-separated service domains to update.',
                             ],
@@ -609,7 +609,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -624,14 +624,17 @@ class ServicesController extends Controller
     private function upsert_service(Request $request, Service $service, string $teamId)
     {
         $allowedFields = [
-            'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid',
-            'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw',
-            'connect_to_docker_network', 'domains'
-        ];
-        $allowedFields = [
-            'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid',
-            'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw',
-            'connect_to_docker_network', 'domains'
+            'name',
+            'description',
+            'project_uuid',
+            'environment_name',
+            'environment_uuid',
+            'server_uuid',
+            'destination_uuid',
+            'instant_deploy',
+            'docker_compose_raw',
+            'connect_to_docker_network',
+            'fqdn'
         ];
         $validator = customApiValidator($request->all(), [
             'project_uuid' => 'string|required',
@@ -644,13 +647,13 @@ class ServicesController extends Controller
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
             'docker_compose_raw' => 'string|required',
-            'domains' => 'string|nullable'
+            'fqdn' => 'string|nullable'
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        if ($validator->fails() || !empty($extraFields)) {
             $errors = $validator->errors();
-            if (! empty($extraFields)) {
+            if (!empty($extraFields)) {
                 foreach ($extraFields as $field) {
                     $errors->add($field, 'This field is not allowed.');
                 }
@@ -670,29 +673,29 @@ class ServicesController extends Controller
         $serverUuid = $request->server_uuid;
         $instantDeploy = $request->instant_deploy ?? false;
         $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
-        if (! $project) {
+        if (!$project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
         $environment = $project->environments()->where('name', $environmentName)->first();
-        if (! $environment) {
+        if (!$environment) {
             $environment = $project->environments()->where('uuid', $environmentUuid)->first();
         }
-        if (! $environment) {
+        if (!$environment) {
             return response()->json(['message' => 'Environment not found.'], 404);
         }
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
-        if (! $server) {
+        if (!$server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
             return response()->json(['message' => 'Server has no destinations.'], 400);
         }
-        if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
+        if ($destinations->count() > 1 && !$request->has('destination_uuid')) {
             return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
         }
         $destination = $destinations->first();
-        if (! isBase64Encoded($request->docker_compose_raw)) {
+        if (!isBase64Encoded($request->docker_compose_raw)) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => [
@@ -715,6 +718,12 @@ class ServicesController extends Controller
 
         $service->name = $request->name ?? null;
         $service->description = $request->description ?? null;
+        if ($request->has('fqdn')) {
+            foreach ($service->applications as $application) {
+                $application->fqdn = $request->fqdn;
+                $application->save();
+            }
+        }
         $service->docker_compose_raw = $dockerComposeRaw;
         $service->environment_id = $environment->id;
         $service->server_id = $server->id;
@@ -722,18 +731,6 @@ class ServicesController extends Controller
         $service->destination_type = $destination->getMorphClass();
         $service->connect_to_docker_network = $connectToDockerNetwork;
         $service->save();
-
-        // Update domains if provided as a comma-separated string
-        if ($request->filled('domains')) {
-            $domains = array_map('trim', explode(',', $request->domains));
-            $applications = $service->applications()->get();
-            foreach ($applications as $index => $application) {
-                if (isset($domains[$index])) {
-                    $application->fqdn = $domains[$index];
-                    $application->save();
-                }
-            }
-        }
 
         $service->parse();
         if ($instantDeploy) {
@@ -810,7 +807,7 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -914,7 +911,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -936,7 +933,7 @@ class ServicesController extends Controller
 
         $key = str($request->key)->trim()->replace(' ', '_')->value;
         $env = $service->environment_variables()->where('key', $key)->first();
-        if (! $env) {
+        if (!$env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
@@ -1035,12 +1032,12 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
         $bulk_data = $request->get('data');
-        if (! $bulk_data) {
+        if (!$bulk_data) {
             return response()->json(['message' => 'Bulk data is required.'], 400);
         }
 
@@ -1151,7 +1148,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -1253,7 +1250,7 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
@@ -1262,7 +1259,7 @@ class ServicesController extends Controller
             ->where('resourceable_id', $service->id)
             ->first();
 
-        if (! $env) {
+        if (!$env) {
             return response()->json(['message' => 'Environment variable not found.'], 404);
         }
 
@@ -1329,11 +1326,11 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
-        if (! $uuid) {
+        if (!$uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
         if (str($service->status)->contains('running')) {
@@ -1407,11 +1404,11 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
-        if (! $uuid) {
+        if (!$uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
         if (str($service->status)->contains('stopped') || str($service->status)->contains('exited')) {
@@ -1485,11 +1482,11 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
         $uuid = $request->route('uuid');
-        if (! $uuid) {
+        if (!$uuid) {
             return response()->json(['message' => 'UUID is required.'], 400);
         }
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-        if (! $service) {
+        if (!$service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
         RestartService::dispatch($service);
