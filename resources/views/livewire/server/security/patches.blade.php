@@ -14,15 +14,16 @@
         <x-server.sidebar-security :server="$server" :parameters="$parameters" />
         <form wire:submit='submit' class="w-full">
             <div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-row">
                     <h2>Server Patching</h2>
-                    <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">Manually
-                        Check</x-forms.button>
+                    <span class="text-xs text-neutral-500">(experimental)</span>
+                    <x-helper
+                        helper="Only available for apt, dnf and zypper package managers atm, more coming
+            soon. <br/> Also scheduled patching and notifications are coming soon..." />
+                    <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">
+                        Check Now</x-forms.button>
                 </div>
-                <div>Check if your server has updates available.</div>
-                <div class="text-xs pt-1">(only available for apt, dnf and zypper package managers atm, more coming
-                    soon as well as more features...)
-                </div>
+                <div>Update your servers automatically.</div>
                 <div>
                     <div class="flex flex-col gap-6 pt-4">
                         <div class="flex flex-col">
