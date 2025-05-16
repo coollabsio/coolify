@@ -9,9 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -103,6 +101,9 @@ use Visus\Cuid2\Cuid2;
         'deleted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'The date and time when the application was deleted.'],
         'compose_parsing_version' => ['type' => 'string', 'description' => 'How Coolify parse the compose file.'],
         'custom_nginx_configuration' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom Nginx configuration base64 encoded.'],
+        'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
+        'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
+        'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
     ]
 )]
 
@@ -116,7 +117,10 @@ class Application extends BaseModel
 
     protected $appends = ['server_status'];
 
-    protected $casts = ['custom_network_aliases' => 'array'];
+    protected $casts = [
+        'custom_network_aliases' => 'array',
+        'http_basic_auth_password' => 'encrypted',
+    ];
 
     public function customNetworkAliases(): Attribute
     {
@@ -264,51 +268,17 @@ class Application extends BaseModel
         return $containers->pluck('Names')->toArray();
     }
 
-    public function stopContainers(array $containerNames, $server, int $timeout = 600)
-    {
-        $processes = [];
-        foreach ($containerNames as $containerName) {
-            $processes[$containerName] = $this->stopContainer($containerName, $server, $timeout);
-        }
-
-        $startTime = time();
-        while (count($processes) > 0) {
-            $finishedProcesses = array_filter($processes, function ($process) {
-                return ! $process->running();
-            });
-            foreach ($finishedProcesses as $containerName => $process) {
-                unset($processes[$containerName]);
-                $this->removeContainer($containerName, $server);
-            }
-
-            if (time() - $startTime >= $timeout) {
-                $this->forceStopRemainingContainers(array_keys($processes), $server);
-                break;
-            }
-
-            usleep(100000);
-        }
-    }
-
-    public function stopContainer(string $containerName, $server, int $timeout): InvokedProcess
-    {
-        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-    }
-
-    public function removeContainer(string $containerName, $server)
-    {
-        instant_remote_process(command: ["docker rm -f $containerName"], server: $server, throwError: false);
-    }
-
-    public function forceStopRemainingContainers(array $containerNames, $server)
+    public function stopContainers(array $containerNames, $server, int $timeout = 30)
     {
         foreach ($containerNames as $containerName) {
-            instant_remote_process(command: ["docker kill $containerName"], server: $server, throwError: false);
-            $this->removeContainer($containerName, $server);
+            instant_remote_process(command: [
+                "docker stop --time=$timeout $containerName",
+                "docker rm -f $containerName",
+            ], server: $server, throwError: false);
         }
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -317,8 +287,9 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_volumes(?Collection $persistentStorages)
+    public function deleteVolumes()
     {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
             instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
@@ -333,8 +304,9 @@ class Application extends BaseModel
         }
     }
 
-    public function delete_connected_networks($uuid)
+    public function deleteConnectedNetworks()
     {
+        $uuid = $this->uuid;
         $server = data_get($this, 'destination.server');
         instant_remote_process(["docker network disconnect {$uuid} coolify-proxy"], $server, false);
         instant_remote_process(["docker network rm {$uuid}"], $server, false);
@@ -455,22 +427,23 @@ class Application extends BaseModel
     {
         return Attribute::make(
             get: function () {
+                $base_dir = $this->base_directory ?? '/';
                 if (! is_null($this->source?->html_url) && ! is_null($this->git_repository) && ! is_null($this->git_branch)) {
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}";
+                        return "{$this->source->html_url}/{$this->git_repository}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
+                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}{$base_dir}";
                 }
                 // Convert the SSH URL to HTTPS URL
                 if (strpos($this->git_repository, 'git@') === 0) {
                     $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
 
                     if (str($this->git_repository)->contains('bitbucket')) {
-                        return "https://{$git_repository}/src/{$this->git_branch}";
+                        return "https://{$git_repository}/src/{$this->git_branch}{$base_dir}";
                     }
 
-                    return "https://{$git_repository}/tree/{$this->git_branch}";
+                    return "https://{$git_repository}/tree/{$this->git_branch}{$base_dir}";
                 }
 
                 return $this->git_repository;
@@ -965,7 +938,7 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration);
+        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->custom_labels);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         } else {

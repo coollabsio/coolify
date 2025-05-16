@@ -2,21 +2,108 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.417] - 2025-05-07
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.416] - 2025-05-05
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.415] - 2025-04-29
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.413] - 2025-04-28
+
+### 💼 Other
+
+- Adjust Workflows for v5 (#5689)
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(workflows)* Adjust workflow for announcement
+
+## [4.0.0-beta.412] - 2025-04-23
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update coolify version to 4.0.0-beta.412 and nightly version to 4.0.0-beta.413 in configuration files
+
+## [4.0.0-beta.411] - 2025-04-23
 
 ### 🚀 Features
 
-- *(EnvironmentVariable)* Add handling for Redis credentials in the environment variable component
-- *(EnvironmentVariable)* Implement protection for critical environment variables and enhance deletion logic
-- *(Application)* Add networkAliases attribute for handling network aliases as JSON or comma-separated values
+- *(deployment)* Add repository_project_id handling for private GitHub apps and clean up unused Caddy label logic
+- *(api)* Enhance OpenAPI specifications with token variable and additional key attributes
+- *(docker)* Add HTTP Basic Authentication support and enhance hostname parsing in Docker run conversion
+- *(api)* Add HTTP Basic Authentication fields to OpenAPI specifications and enhance PrivateKey model descriptions
 
 ### 🐛 Bug Fixes
 
-- *(General)* Change redis_password property to nullable string
+- *(backup-edit)* Conditionally enable S3 checkbox based on available validated S3 storage
+- *(source)* Update no sources found message for clarity
+- *(api)* Correct middleware for service update route to ensure proper permissions
+- *(api)* Handle JSON response in service creation and update methods for improved error handling
+- Add 201 json code to servers validate api response
+- *(docker)* Ensure password hashing only occurs when HTTP Basic Authentication is enabled
+- *(docker)* Enhance hostname and GPU option validation in Docker run to compose conversion
 
 ### 🚜 Refactor
 
-- *(Application)* Rename network_aliases to custom_network_aliases across the application for clarity and consistency
+- *(jobs)* Comment out unused Caddy label handling in ApplicationDeploymentJob and simplify proxy path logic in Server model
+- *(database)* Simplify database type checks in ServiceDatabase and enhance image validation in Docker helper
+- *(shared)* Remove unused ray debugging statement from newParser function
+- *(applications)* Remove redundant error response in create_env method
+- *(api)* Restructure routes to include versioning and maintain existing feedback endpoint
+- *(api)* Remove token variable from OpenAPI specifications for clarity
+- *(environment-variables)* Remove protected variable checks from delete methods for cleaner logic
+- *(http-basic-auth)* Rename 'http_basic_auth_enable' to 'http_basic_auth_enabled' across application files for consistency
+- *(docker)* Remove debug statement and enhance hostname handling in Docker run conversion
+- *(server)* Simplify proxy path logic and remove unnecessary conditions
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update coolify version to 4.0.0-beta.411 and nightly version to 4.0.0-beta.412 in configuration files
+
+## [4.0.0-beta.410] - 2025-04-18
+
+### 🚀 Features
+
+- Add HTTP Basic Authentication
+- *(readme)* Add new sponsors Supadata AI and WZ-IT to the README
+- *(core)* Enable magic env variables for compose based applications
+
+### 🐛 Bug Fixes
+
+- *(application)* Append base directory to git branch URLs for improved path handling
+- *(templates)* Correct casing of "denokv" to "denoKV" in service templates JSON
+- *(navbar)* Update error message link to use route for environment variables navigation
+- Unsend template
+- Replace ports with expose
+- *(templates)* Update Unsend compose configuration for improved service integration
+
+### 🚜 Refactor
+
+- *(jobs)* Update WithoutOverlapping middleware to use expireAfter for better queue management
 
 ### 📚 Documentation
 
@@ -24,13 +111,82 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- *(versions)* Bump version to 407 and 408 for coolify and nightly
+- *(versions)* Bump coolify version to 4.0.0-beta.410 and update nightly version to 4.0.0-beta.411 in configuration files
+- *(templates)* Update plausible and clickhouse images to latest versions and remove mail service
+
+## [4.0.0-beta.409] - 2025-04-16
+
+### 🐛 Bug Fixes
+
+- *(parser)* Transform associative array labels into key=value format for better compatibility
+- *(redis)* Update username and password input handling to clarify database sync requirements
+- *(source)* Update connected source display to handle cases with no source connected
+
+### 🚜 Refactor
+
+- *(source)* Conditionally display connected source and change source options based on private key presence
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump coolify version to 4.0.0-beta.409 in configuration files
+
+## [4.0.0-beta.408] - 2025-04-14
+
+### 🚀 Features
+
+- *(OpenApi)* Enhance OpenAPI specifications by adding UUID parameters for application, project, and service updates; improve deployment listing with pagination parameters; update command signature for OpenApi generation
+- *(subscription)* Enhance subscription management with loading states and Stripe status checks
+
+### 🐛 Bug Fixes
+
+- *(pre-commit)* Correct input redirection for /dev/tty and add OpenAPI generation command
+- *(pricing-plans)* Adjust grid class for improved layout consistency in subscription pricing plans
+- *(migrations)* Make stripe_comment field nullable in subscriptions table
+- *(mongodb)* Also apply custom config when SSL is enabled
+- *(templates)* Correct casing of denoKV references in service templates and YAML files
+- *(deployment)* Handle missing destination in deployment process to prevent errors
+
+### 💼 Other
+
+- Add missing openapi items to PrivateKey
+
+### 🚜 Refactor
+
+- *(commands)* Reorganize OpenAPI and Services generation commands into a new namespace for better structure; remove old command files
+- *(Dockerfile)* Remove service generation command from the build process to streamline Dockerfile and improve build efficiency
+- *(navbar-delete-team)* Simplify modal confirmation layout and enhance button styling for better user experience
+- *(Server)* Remove debug logging from isReachableChanged method to clean up code and improve performance
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update nightly version to 4.0.0-beta.410
+- *(pre-commit)* Remove OpenAPI generation command from pre-commit hook
+- *(versions)* Update realtime version to 1.0.7 and bump dependencies in package.json
+
+## [4.0.0-beta.407] - 2025-04-09
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.406] - 2025-04-05
 
 ### 🚀 Features
 
 - *(Deploy)* Add info dispatch for proxy check initiation
+- *(EnvironmentVariable)* Add handling for Redis credentials in the environment variable component
+- *(EnvironmentVariable)* Implement protection for critical environment variables and enhance deletion logic
+- *(Application)* Add networkAliases attribute for handling network aliases as JSON or comma-separated values
+- *(GithubApp)* Update default events to include 'pull_request' and streamline event handling
+- *(CleanupDocker)* Add support for realtime image management in Docker cleanup process
+- *(Deployment)* Enhance queue_application_deployment to handle existing deployments and return appropriate status messages
+- *(SourceManagement)* Add functionality to change Git source and display current source in the application settings
 
 ### 🐛 Bug Fixes
 
@@ -40,20 +196,39 @@ All notable changes to this project will be documented in this file.
 - *(api)* Add back validateDataApplications (#5539)
 - *(CheckProxy, Status)* Prevent proxy checks when force_stop is active; remove debug statement in General
 - *(Status)* Conditionally check proxy status and refresh button based on force_stop state
+- *(General)* Change redis_password property to nullable string
+- *(DeployController)* Update request handling to use input method and enhance OpenAPI description for deployment endpoint
+
+### 💼 Other
+
+- Add missing UUID to openapi spec
 
 ### 🚜 Refactor
 
 - *(Server)* Use data_get for safer access to settings properties in isFunctional method
+- *(Application)* Rename network_aliases to custom_network_aliases across the application for clarity and consistency
+- *(ApplicationDeploymentJob)* Streamline environment variable handling by introducing generate_coolify_env_variables method and consolidating logic for pull request and main branch scenarios
+- *(ApplicationDeploymentJob, ApplicationDeploymentQueue)* Improve deployment status handling and log entry management with transaction support
+- *(SourceManagement)* Sort sources by name and improve UI for changing Git source with better error handling
+- *(Email)* Streamline SMTP and resend settings handling in copyFromInstanceSettings method
+- *(Email)* Enhance error handling in SMTP and resend methods by passing context to handleError function
+- *(DynamicConfigurations)* Improve handling of dynamic configuration content by ensuring fallback to empty string when content is null
+- *(ServicesGenerate)* Update command signature from 'services:generate' to 'generate:services' for consistency; update Dockerfile to run service generation during build; update Odoo image version to 18 and add extra addons volume in compose configuration
+- *(Dockerfile)* Streamline RUN commands for improved readability and maintainability by adding line continuations
+- *(Dockerfile)* Reintroduce service generation command in the build process for consistency and ensure proper asset compilation
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(versions)* Bump version to 406
+- *(versions)* Bump version to 407 and 408 for coolify and nightly
+- *(versions)* Bump version to 408 for coolify and 409 for nightly
 
 ## [4.0.0-beta.405] - 2025-04-04
 
 ### 🚀 Features
 
 - *(api)* Update OpenAPI spec for services (#5448)
+- *(proxy)* Enhance proxy handling and port conflict detection
 
 ### 🐛 Bug Fixes
 
@@ -71,6 +246,10 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
+- Update changelog
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -81,15 +260,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- *(proxy)* Enhance proxy handling and port conflict detection
 - *(lang)* Added Azerbaijani language updated turkish language. (#5497)
 - *(lang)* Added Portuguese from Brazil language (#5500)
 - *(lang)* Add Indonesian language translations (#5513)
 
 ### 🐛 Bug Fixes
 
-- *(database)* Custom config for MongoDB (#5471)
-- *(ui)* Instance Backup settings
 - *(docs)* Comment out execute for now
 - *(installation)* Mount the docker config
 - *(installation)* Path to config file for docker login
@@ -99,6 +275,7 @@ All notable changes to this project will be documented in this file.
 - *(docs)* Contribute service url (#5517)
 - *(proxy)* Proxy restart does not work on domain
 - *(ui)* Only show copy button on https
+- *(database)* Custom config for MongoDB (#5471)
 
 ### 📚 Documentation
 
@@ -106,17 +283,12 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - Update changelog
-- Update changelog
-- Update changelog
-- Update changelog
-- Update changelog
 
 ### ⚙️ Miscellaneous Tasks
 
-- *(versions)* Bump version to 403 (#5520)
-- *(versions)* Update coolify version numbers to 4.0.0-beta.403 and 4.0.0-beta.404
 - *(service)* Remove unused code in Bugsink service
 - *(versions)* Update version to 404
+- *(versions)* Bump version to 403 (#5520)
 - *(versions)* Bump version to 404
 
 ## [4.0.0-beta.402] - 2025-04-01
@@ -136,6 +308,7 @@ All notable changes to this project will be documented in this file.
 - *(DeployController)* Cast 'pr' query parameter to integer
 - *(deploy)* Validate team ID before deployment
 - *(wakapi)* Typo in env variables and add some useful variables to wakapi.yaml (#5424)
+- *(ui)* Instance Backup settings
 
 ### 🚜 Refactor
 
@@ -149,6 +322,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Add google variables to plausible.yaml (#5429)
 - *(service)* Update authentik.yaml versions (#5373)
 - *(core)* Remove redocs
+- *(versions)* Update coolify version numbers to 4.0.0-beta.403 and 4.0.0-beta.404
 
 ## [4.0.0-beta.401] - 2025-03-28
 

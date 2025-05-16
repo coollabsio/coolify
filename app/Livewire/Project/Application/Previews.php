@@ -5,10 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use Carbon\Carbon;
-use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Livewire\Component;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
@@ -159,13 +156,18 @@ class Previews extends Component
                     'pull_request_html_url' => $pull_request_html_url,
                 ]);
             }
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 application: $this->application,
                 deployment_uuid: $this->deployment_uuid,
                 force_rebuild: false,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
             );
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
 
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
@@ -188,13 +190,12 @@ class Previews extends Component
     {
         try {
             $server = $this->application->destination->server;
-            $timeout = 300;
 
             if ($this->application->destination->server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
-                $this->stopContainers($containers, $server, $timeout);
+                $this->stopContainers($containers, $server);
             }
 
             GetContainersStatus::run($server);
@@ -210,13 +211,12 @@ class Previews extends Component
     {
         try {
             $server = $this->application->destination->server;
-            $timeout = 300;
 
             if ($this->application->destination->server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
-                $this->stopContainers($containers, $server, $timeout);
+                $this->stopContainers($containers, $server);
             }
 
             ApplicationPreview::where('application_id', $this->application->id)
@@ -232,48 +232,14 @@ class Previews extends Component
         }
     }
 
-    private function stopContainers(array $containers, $server, int $timeout)
+    private function stopContainers(array $containers, $server, int $timeout = 30)
     {
-        $processes = [];
         foreach ($containers as $container) {
             $containerName = str_replace('/', '', $container['Names']);
-            $processes[$containerName] = $this->stopContainer($containerName, $timeout);
-        }
-
-        $startTime = Carbon::now()->getTimestamp();
-        while (count($processes) > 0) {
-            $finishedProcesses = array_filter($processes, function ($process) {
-                return ! $process->running();
-            });
-            foreach (array_keys($finishedProcesses) as $containerName) {
-                unset($processes[$containerName]);
-                $this->removeContainer($containerName, $server);
-            }
-
-            if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
-                $this->forceStopRemainingContainers(array_keys($processes), $server);
-                break;
-            }
-
-            usleep(100000);
-        }
-    }
-
-    private function stopContainer(string $containerName, int $timeout): InvokedProcess
-    {
-        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-    }
-
-    private function removeContainer(string $containerName, $server)
-    {
-        instant_remote_process(["docker rm -f $containerName"], $server, throwError: false);
-    }
-
-    private function forceStopRemainingContainers(array $containerNames, $server)
-    {
-        foreach ($containerNames as $containerName) {
-            instant_remote_process(["docker kill $containerName"], $server, throwError: false);
-            $this->removeContainer($containerName, $server);
+            instant_remote_process(command: [
+                "docker stop --time=$timeout $containerName",
+                "docker rm -f $containerName",
+            ], server: $server, throwError: false);
         }
     }
 }

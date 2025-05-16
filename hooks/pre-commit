@@ -1,7 +1,7 @@
 #!/bin/sh
 # Detect whether /dev/tty is available & functional
 if sh -c ": >/dev/tty" >/dev/null 2>/dev/null; then
-    exec < /dev/tty
+    exec </dev/tty
 fi
 
 # Get list of stashed PHP files

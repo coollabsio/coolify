@@ -82,6 +82,7 @@ class StackForm extends Component
             $this->service->refresh();
             $this->service->saveComposeConfigs();
             $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshServices');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
