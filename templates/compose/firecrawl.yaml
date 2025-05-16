@@ -1,0 +1,178 @@
+# documentation: https://docs.firecrawl.dev
+# slogan: Turn entire websites into LLM-ready markdown or structured data. Scrape, crawl and extract with a single API.
+# tags: scraper, web, worker, service
+# logo: svgs/firecrawl.png
+# port: 3002
+
+name: firecrawl
+x-common-service:
+  image: ghcr.io/mendableai/firecrawl
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  networks:
+    - backend
+  extra_hosts:
+    - 'host.docker.internal:host-gateway'
+x-common-env:
+  - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+  - REDIS_RATE_LIMIT_URL=${REDIS_URL:-redis://redis:6379}
+  - PLAYWRIGHT_MICROSERVICE_URL=${PLAYWRIGHT_MICROSERVICE_URL:-http://playwright-service:3000/scrape}
+  - USE_DB_AUTHENTICATION=${USE_DB_AUTHENTICATION}
+  - OPENAI_API_KEY=${OPENAI_API_KEY}
+  - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+  - MODEL_NAME=${MODEL_NAME}
+  - MODEL_EMBEDDING_NAME=${MODEL_EMBEDDING_NAME}
+  - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+  - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+  - BULL_AUTH_KEY=${BULL_AUTH_KEY:-SERVICE_FIRECRAWL_REALBASE64}
+  - TEST_API_KEY=${TEST_API_KEY}
+  - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+  - POSTHOG_HOST=${POSTHOG_HOST}
+  - SUPABASE_ANON_TOKEN=${SUPABASE_ANON_TOKEN}
+  - SUPABASE_URL=${SUPABASE_URL}
+  - SUPABASE_SERVICE_TOKEN=${SUPABASE_SERVICE_TOKEN}
+  - SELF_HOSTED_WEBHOOK_URL=${SELF_HOSTED_WEBHOOK_URL}
+  - SERPER_API_KEY=${SERPER_API_KEY}
+  - SEARCHAPI_API_KEY=${SEARCHAPI_API_KEY}
+  - LOGGING_LEVEL=${LOGGING_LEVEL:-INFO}
+  - PROXY_SERVER=${PROXY_SERVER}
+  - PROXY_USERNAME=${PROXY_USERNAME}
+  - PROXY_PASSWORD=${PROXY_PASSWORD}
+  - SEARXNG_ENDPOINT=${SEARXNG_ENDPOINT}
+  - SEARXNG_ENGINES=${SEARXNG_ENGINES}
+  - SEARXNG_CATEGORIES=${SEARXNG_CATEGORIES}
+services:
+  playwright-service:
+    image: mcr.microsoft.com/playwright:v1.52.0-noble
+    environment:
+      - PORT=3000
+      - PROXY_SERVER=${PROXY_SERVER}
+      - PROXY_USERNAME=${PROXY_USERNAME}
+      - PROXY_PASSWORD=${PROXY_PASSWORD}
+      - BLOCK_MEDIA=${BLOCK_MEDIA}
+    networks:
+      - backend
+  api:
+    image: ghcr.io/mendableai/firecrawl
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    networks:
+      - backend
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      - HOST=0.0.0.0
+      - PORT=${INTERNAL_PORT:-3002}
+      - FLY_PROCESS_GROUP=app
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_RATE_LIMIT_URL=${REDIS_URL:-redis://redis:6379}
+      - CACHE_REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - PLAYWRIGHT_MICROSERVICE_URL=${PLAYWRIGHT_MICROSERVICE_URL:-http://playwright-service:3000/scrape}
+      - USE_DB_AUTHENTICATION=${USE_DB_AUTHENTICATION}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - MODEL_NAME=${MODEL_NAME}
+      - MODEL_EMBEDDING_NAME=${MODEL_EMBEDDING_NAME}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - BULL_AUTH_KEY=${BULL_AUTH_KEY}
+      - TEST_API_KEY=${TEST_API_KEY}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - POSTHOG_HOST=${POSTHOG_HOST}
+      - SUPABASE_ANON_TOKEN=${SUPABASE_ANON_TOKEN}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_TOKEN=${SUPABASE_SERVICE_TOKEN}
+      - SUPABASE_REPLICA_URL=${SUPABASE_REPLICA_URL}
+      - SELF_HOSTED_WEBHOOK_URL=${SELF_HOSTED_WEBHOOK_URL}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+      - SEARCHAPI_API_KEY=${SEARCHAPI_API_KEY}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - PROXY_SERVER=${PROXY_SERVER}
+      - PROXY_USERNAME=${PROXY_USERNAME}
+      - PROXY_PASSWORD=${PROXY_PASSWORD}
+      - SEARXNG_ENDPOINT=${SEARXNG_ENDPOINT}
+      - SEARXNG_ENGINES=${SEARXNG_ENGINES}
+      - SEARXNG_CATEGORIES=${SEARXNG_CATEGORIES}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+      - FLY_MACHINE_ID=${FLY_MACHINE_ID}
+      - IS_PRODUCTION=${IS_PRODUCTION}
+      - SERVICE_FQDN_FIRECRAWL_3002
+    depends_on:
+      - redis
+      - playwright-service
+    ports:
+      - '${PORT:-3002}:${INTERNAL_PORT:-3002}'
+    command:
+      - pnpm
+      - run
+      - 'start:production'
+  worker:
+    image: ghcr.io/mendableai/firecrawl
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    networks:
+      - backend
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      - FLY_PROCESS_GROUP=worker
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_RATE_LIMIT_URL=${REDIS_URL:-redis://redis:6379}
+      - PLAYWRIGHT_MICROSERVICE_URL=${PLAYWRIGHT_MICROSERVICE_URL:-http://playwright-service:3000/scrape}
+      - USE_DB_AUTHENTICATION=${USE_DB_AUTHENTICATION}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - MODEL_NAME=${MODEL_NAME}
+      - MODEL_EMBEDDING_NAME=${MODEL_EMBEDDING_NAME}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - BULL_AUTH_KEY=${BULL_AUTH_KEY}
+      - TEST_API_KEY=${TEST_API_KEY}
+      - POSTHOG_API_KEY=${POSTHOG_API_KEY}
+      - POSTHOG_HOST=${POSTHOG_HOST}
+      - SUPABASE_ANON_TOKEN=${SUPABASE_ANON_TOKEN}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_TOKEN=${SUPABASE_SERVICE_TOKEN}
+      - SUPABASE_REPLICA_URL=${SUPABASE_REPLICA_URL}
+      - SELF_HOSTED_WEBHOOK_URL=${SELF_HOSTED_WEBHOOK_URL}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+      - SEARCHAPI_API_KEY=${SEARCHAPI_API_KEY}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - PROXY_SERVER=${PROXY_SERVER}
+      - PROXY_USERNAME=${PROXY_USERNAME}
+      - PROXY_PASSWORD=${PROXY_PASSWORD}
+      - SEARXNG_ENDPOINT=${SEARXNG_ENDPOINT}
+      - SEARXNG_ENGINES=${SEARXNG_ENGINES}
+      - SEARXNG_CATEGORIES=${SEARXNG_CATEGORIES}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT}
+      - FLY_MACHINE_ID=${FLY_MACHINE_ID}
+      - WORKER_LOCK_DURATION=${WORKER_LOCK_DURATION:-60000}
+      - WORKER_STALLED_CHECK_INTERVAL=${WORKER_STALLED_CHECK_INTERVAL:-30000}
+      - JOB_LOCK_EXTEND_INTERVAL=${JOB_LOCK_EXTEND_INTERVAL:-15000}
+      - JOB_LOCK_EXTENSION_TIME=${JOB_LOCK_EXTENSION_TIME:-60000}
+      - CANT_ACCEPT_CONNECTION_INTERVAL=${CANT_ACCEPT_CONNECTION_INTERVAL:-2000}
+      - CONNECTION_MONITOR_INTERVAL=${CONNECTION_MONITOR_INTERVAL:-10}
+    depends_on:
+      - redis
+      - playwright-service
+      - api
+    command:
+      - pnpm
+      - run
+      - workers
+  redis:
+    image: 'redis:alpine'
+    networks:
+      - backend
+    command: 'redis-server --bind 0.0.0.0'
+networks:
+  backend:
+    driver: bridge
