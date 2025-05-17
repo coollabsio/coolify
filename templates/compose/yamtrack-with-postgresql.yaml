@@ -23,8 +23,6 @@ services:
       - DB_USER=${SERVICE_USER_POSTGRESQL}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - DB_PORT=5432
-    volumes:
-      - "yamtrack_data:/yamtrack/db"
     healthcheck:
       test:
         [
@@ -70,4 +68,3 @@ services:
 volumes:
   redis_data: null
   postgres_data: null
-  yamtrack_data: null
