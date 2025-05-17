@@ -16,7 +16,7 @@ services:
       - SECRET=$SERVICE_PASSWORD_SECRET
       - REGISTRATION=${REGISTRATION_ENABLED:-true}
       - URLS=$SERVICE_FQDN_YAMTRACK
-      - 'REDIS_URL=redis://redis:6379'
+      - "REDIS_URL=redis://redis:6379"
 
       - DB_HOST=db
       - DB_NAME=${POSTGRESQL_DATABASE:-yamtrack}
@@ -24,9 +24,17 @@ services:
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - DB_PORT=5432
     volumes:
-      - 'yamtrack_data:/yamtrack/db'
+      - "yamtrack_data:/yamtrack/db"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8000/health/"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1:8000/health/",
+        ]
       interval: 5s
       timeout: 20s
       retries: 10
@@ -47,9 +55,9 @@ services:
       retries: 10
 
   redis:
-    image: 'redis:7-alpine'
+    image: "redis:7-alpine"
     volumes:
-      - 'redis_data:/data'
+      - "redis_data:/data"
     healthcheck:
       test:
         - CMD

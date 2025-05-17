@@ -16,9 +16,9 @@ services:
       - SECRET=$SERVICE_PASSWORD_SECRET
       - REGISTRATION=${REGISTRATION_ENABLED:-true}
       - URLS=$SERVICE_FQDN_YAMTRACK
-      - 'REDIS_URL=redis://redis:6379'
+      - "REDIS_URL=redis://redis:6379"
     volumes:
-      - 'yamtrack_data:/yamtrack/db'
+      - "yamtrack_data:/yamtrack/db"
     healthcheck:
       test:
         - CMD-SHELL
@@ -28,9 +28,9 @@ services:
       retries: 10
 
   redis:
-    image: 'redis:7-alpine'
+    image: "redis:7-alpine"
     volumes:
-      - 'redis_data:/data'
+      - "redis_data:/data"
     healthcheck:
       test:
         - CMD
