@@ -1,0 +1,25 @@
+# documentation: https://www.navidrome.org/docs/
+# slogan: Standalone server, that allows you to browse and listen to your music collection using a web browser or any Subsonic-compatible client.
+# tags: media, server, music, subsonic
+# logo: svgs/navidrome.svg
+# port: 4533
+
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_NAVIDROME_4533
+      - ND_BASEURL=${SERVICE_FQDN_NAVIDROME}
+      - ND_SCANSCHEDULE=${ND_SCANSCHEDULE:-1h}
+      - ND_LOGLEVEL=${ND_LOGLEVEL:-info}
+      - ND_SESSIONTIMEOUT=${ND_SESSIONTIMEOUT:-24h}
+      - ND_ENABLEINSIGHTSCOLLECTOR=${ND_ENABLEINSIGHTSCOLLECTOR:-false}
+    volumes:
+      - "./data:/data"
+      - "./music:/music:ro"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:4533/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
