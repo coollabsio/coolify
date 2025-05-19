@@ -6,6 +6,7 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
+use App\Events\DatabaseStatusChanged;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -69,13 +70,13 @@ class Heading extends Component
     public function restart()
     {
         $activity = RestartDatabase::run($this->database);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, DatabaseStatusChanged::class);
     }
 
     public function start()
     {
         $activity = StartDatabase::run($this->database);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, DatabaseStatusChanged::class);
     }
 
     public function render()
