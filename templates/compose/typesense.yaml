@@ -11,7 +11,7 @@ services:
       - SERVICE_FQDN_TYPESENSE_8108
       - TYPESENSE_ENABLE_CORS=${TYPESENSE_ENABLE_CORS:-true}
       - TYPESENSE_DATA_DIR=/data
-      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY:-xyz}
+      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY}
     volumes:
       - typesense_data:/data
     healthcheck:
