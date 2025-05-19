@@ -70,11 +70,11 @@
 }
 
 @utility badge {
-    @apply inline-block w-3 h-3 text-xs font-bold leading-none rounded-full border border-neutral-200 dark:border-black;
+    @apply inline-block w-3 h-3 text-xs font-bold rounded-full leading-none border border-neutral-200 dark:border-black;
 }
 
-@utility badge-absolute {
-    @apply absolute top-0 right-0 w-2 h-2 rounded-t-none rounded-r-none border-none;
+@utility badge-dashboard {
+    @apply absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
 }
 
 @utility badge-success {

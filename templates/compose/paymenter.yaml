@@ -5,53 +5,52 @@
 # port: 80
 
 services:
-  database:
-    image: mariadb:10.11
-    command: --default-authentication-plugin=mysql_native_password
-    volumes:
-      - "mysql:/var/lib/mysql"
-    healthcheck:
-      test:
-        ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized || exit 1"]
-      start_period: 10s
-      interval: 10s
-      timeout: 1s
-      retries: 3
-    environment:
-      MYSQL_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
-      MYSQL_ROOT_PASSWORD: ${SERVICE_PASSWORD_MYSQLROOT}
-      MYSQL_DATABASE: "paymenter"
-      MYSQL_USER: "paymenter"
-  cache:
-    image: redis:alpine
-    environment:
-      - 'REDIS_PASSWORD=${SERVICE_PASSWORD_64_REDIS}'    
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
-      interval: 10s
-      timeout: 1s
-      retries: 3
   paymenter:
     image: ghcr.io/paymenter/paymenter:latest
     volumes:
-      - "app_logs:/app/storage/logs"
-      - "app_public:/app/storage/public"
+      - app_logs:/app/storage/logs
+      - app_public:/app/storage/public
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 10s
       timeout: 1s
       retries: 3
     environment:
-      SERVICE_FQDN_PAYMENTER: '${SERVICE_FQDN_PAYMENTER}'
+      SERVICE_FQDN_PAYMENTER: ${SERVICE_FQDN_PAYMENTER_80}
+      DB_DATABASE: ${MYSQL_DATABASE:-paymenter-db}
       DB_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
+      DB_USERNAME: ${SERVICE_USER_MYSQL}
       APP_ENV: "production"
       CACHE_STORE: "redis"
       SESSION_DRIVER: "redis"
       QUEUE_CONNECTION: "redis"
-      REDIS_HOST: "cache"
+      REDIS_HOST: "redis"
       REDIS_USERNAME: default
-      REDIS_PASSWORD: '${SERVICE_PASSWORD_64_REDIS}'
+      REDIS_PASSWORD: "${SERVICE_PASSWORD_64_REDIS}"
       DB_CONNECTION: "mariadb"
-      DB_HOST: "database"
+      DB_HOST: "mariadb"
       DB_PORT: "3306"
       APP_KEY: ${SERVICE_BASE64_KEY}
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - paymenter_mariadb_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-paymenter-db}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
+      interval: 10s
+      timeout: 1s
+      retries: 3
