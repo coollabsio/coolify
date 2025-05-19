@@ -166,7 +166,7 @@
 }
 
 @utility bg-coollabs-gradient {
-    @apply bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent;
+    @apply from-purple-500 via-pink-500 to-red-500 bg-linear-to-r;
 }
 
 @utility text-helper {
