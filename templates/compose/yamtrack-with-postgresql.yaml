@@ -7,22 +7,23 @@
 services:
   yamtrack:
     image: ghcr.io/fuzzygrim/yamtrack
-    depends_on:
-      - db
-      - redis
     environment:
       - SERVICE_FQDN_YAMTRACK_8000
+      - URLS=${SERVICE_FQDN_YAMTRACK}
       - TZ=${TZ:-Europe/Berlin}
-      - SECRET=$SERVICE_PASSWORD_SECRET
+      - SECRET=${SERVICE_PASSWORD_SECRET}
       - REGISTRATION=${REGISTRATION_ENABLED:-true}
-      - URLS=$SERVICE_FQDN_YAMTRACK
-      - "REDIS_URL=redis://redis:6379"
-
-      - DB_HOST=db
-      - DB_NAME=${POSTGRESQL_DATABASE:-yamtrack}
+      - REDIS_URL=redis://redis:6379
+      - DB_HOST=postgres
+      - DB_NAME=${POSTGRESQL_DATABASE:-yamtrack-db}
       - DB_USER=${SERVICE_USER_POSTGRESQL}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - DB_PORT=5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -37,15 +38,14 @@ services:
       timeout: 20s
       retries: 10
 
-  db:
+  postgres:
     image: postgres:16-alpine
-    container_name: yamtrack-db
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
-      - POSTGRES_DB=${POSTGRESQL_DATABASE:-yamtrack}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-yamtrack-db}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - yamtrack_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -53,9 +53,9 @@ services:
       retries: 10
 
   redis:
-    image: "redis:7-alpine"
+    image: redis:7-alpine
     volumes:
-      - "redis_data:/data"
+      - yamtrack_redis_data:/data
     healthcheck:
       test:
         - CMD
@@ -64,7 +64,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
-volumes:
-  redis_data: null
-  postgres_data: null

@@ -7,18 +7,18 @@
 services:
   yamtrack:
     image: ghcr.io/fuzzygrim/yamtrack
+    environment:
+      - SERVICE_FQDN_YAMTRACK_8000
+      - URLS=${SERVICE_FQDN_YAMTRACK}
+      - TZ=${TZ:-Europe/Berlin}
+      - SECRET=${SERVICE_PASSWORD_SECRET}
+      - REGISTRATION=${REGISTRATION_ENABLED:-true}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - yamtrack_data:/yamtrack/db
     depends_on:
       redis:
         condition: service_healthy
-    environment:
-      - SERVICE_FQDN_YAMTRACK_8000
-      - TZ=${TZ:-Europe/Berlin}
-      - SECRET=$SERVICE_PASSWORD_SECRET
-      - REGISTRATION=${REGISTRATION_ENABLED:-true}
-      - URLS=$SERVICE_FQDN_YAMTRACK
-      - "REDIS_URL=redis://redis:6379"
-    volumes:
-      - "yamtrack_data:/yamtrack/db"
     healthcheck:
       test:
         - CMD-SHELL
@@ -28,9 +28,9 @@ services:
       retries: 10
 
   redis:
-    image: "redis:7-alpine"
+    image: redis:7-alpine
     volumes:
-      - "redis_data:/data"
+      - yamtrack_redis_data:/data
     healthcheck:
       test:
         - CMD
@@ -39,7 +39,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
-volumes:
-  redis_data: null
-  yamtrack_data: null
