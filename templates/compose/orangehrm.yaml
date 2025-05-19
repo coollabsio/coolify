@@ -7,6 +7,7 @@
 services:
   orangehrm:
     image: 'orangehrm/orangehrm:latest'
+    platform: linux/amd64
     environment:
       - SERVICE_FQDN_ORANGEHRM_80
       - ORANGEHRM_DATABASE_HOST=mariadb
