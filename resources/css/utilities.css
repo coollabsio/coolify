@@ -11,7 +11,7 @@
 }
 
 @utility input-sticky {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300;
 }
 
 @utility input-sticky-active {
@@ -20,12 +20,12 @@
 
 /* Focus */
 @utility input-focus {
-    @apply focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400;
+    @apply focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300;
 }
 
 /*  input, select before */
 @utility input-select {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent disabled:bg-neutral-200 disabled:text-neutral-500;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
 }
 
 /* Readonly */
@@ -62,11 +62,11 @@
 }
 
 @utility dropdown-item {
-    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-hidden data-disabled:pointer-events-none data-disabled:opacity-50;
+    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
 }
 
 @utility dropdown-item-no-padding {
-    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-hidden data-disabled:pointer-events-none data-disabled:opacity-50;
+    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
 }
 
 @utility badge {
@@ -110,7 +110,7 @@
 }
 
 @utility scrollbar {
-    @apply scrollbar-thumb-coollabs-100 dark:scrollbar-track-coolgray-200 scrollbar-track-neutral-200 scrollbar-thin;
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-track-coolgray-200 scrollbar-thin;
 }
 
 @utility main {
@@ -166,7 +166,7 @@
 }
 
 @utility bg-coollabs-gradient {
-    @apply text-transparent text-white from-purple-500 via-pink-500 to-red-500 bg-linear-to-r;
+    @apply bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 bg-clip-text text-transparent;
 }
 
 @utility text-helper {
@@ -198,7 +198,7 @@
 }
 
 @utility toast {
-    @apply z-1;
+    @apply z-[1];
 }
 
 @utility dz-button {
