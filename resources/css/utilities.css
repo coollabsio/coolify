@@ -194,7 +194,7 @@
 }
 
 @utility fullscreen {
-    @apply overflow-y-auto fixed top-0 left-0 w-full h-full bg-white z-9999 dark:bg-coolgray-100 scrollbar;
+    @apply overflow-y-auto fixed top-0 left-0 w-full h-full bg-white z-[9999] dark:bg-coolgray-100 scrollbar;
 }
 
 @utility toast {
