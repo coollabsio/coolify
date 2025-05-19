@@ -21,8 +21,10 @@ services:
         condition: service_healthy
     healthcheck:
       test:
-        - CMD-SHELL
-        - "wget --no-verbose --tries=1 --spider http://127.0.0.1:8000/health/ || exit 1"
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:8000/health/ || exit 1",
+        ]
       interval: 5s
       timeout: 20s
       retries: 10
