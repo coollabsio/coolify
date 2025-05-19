@@ -6,7 +6,7 @@
         <h1>Scheduled Task</h1>
         <livewire:project.application.heading :application="$resource" />
     @elseif ($type === 'service')
-        <livewire:project.service.navbar :service="$resource" :parameters="$parameters" />
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" />
     @endif
 
     <form wire:submit="submit" class="w-full">

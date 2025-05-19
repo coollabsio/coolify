@@ -87,7 +87,6 @@
             params.push(this.password);
         }
         params.push(this.selectedActions);
-
         return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {

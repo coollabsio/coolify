@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
-    <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
+    <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
 
     <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
@@ -36,7 +36,7 @@
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10000ms="check_status">
+                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500' => str(
