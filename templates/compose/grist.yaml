@@ -8,42 +8,42 @@ services:
   grist:
     image: gristlabs/grist
     environment:
-      - TZ=TZ
-      - GRIST_SUPPORT_ANON=false
-      - GRIST_FORCE_LOGIN=true
-      - COOKIE_MAX_AGE=86400000
-      - 'GRIST_PAGE_TITLE_SUFFIX= - Suffix'
-      - 'GRIST_HIDE_UI_ELEMENTS=billing,sendToDrive,supportGrist,multiAccounts,tutorials'
-      - 'GRIST_UI_FEATURES=helpCenter,billing,templates,createSite,multiSite,sendToDrive,tutorials,supportGrist'
-      - SERVICE_FQDN_GRIST
-      - GRIST_DOMAIN=domain.com
-      - 'APP_HOME_URL=$SERVICE_FQDN_GRIST'
-      - 'APP_DOC_URL=$SERVICE_FQDN_GRIST'
-      - GRIST_DEFAULT_EMAIL=super.user@email.com
-      - GRIST_ORG_IN_PATH=true
-      - 'GRIST_OIDC_SP_HOST=SERVICE_FQDN_GRIST'
-      - 'GRIST_OIDC_IDP_SCOPES=openid profile email'
-      - GRIST_OIDC_IDP_SKIP_END_SESSION_ENDPOINT=false
-      - 'GRIST_OIDC_IDP_ISSUER=$GRIST_OIDC_IDP_ISSUER'
-      - GRIST_OIDC_IDP_CLIENT_ID=$GRIST_OIDC_IDP_CLIENT_ID
-      - GRIST_OIDC_IDP_CLIENT_SECRET=$GRIST_OIDC_IDP_CLIENT_SECRET
-      - GRIST_SESSION_SECRET=$SERVICE_REALBASE64_128
-      - GRIST_HOME_INCLUDE_STATIC=true
-      - GRIST_SANDBOX_FLAVOR=gvisor
-      - ALLOWED_WEBHOOK_DOMAINS=n8n.domain.com
-      - COMMENTS=true
-      - TYPEORM_TYPE=postgres
-      - TYPEORM_DATABASE=postgres
-      - TYPEORM_USERNAME=postgres
-      - TYPEORM_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - TYPEORM_HOST=postgres
-      - TYPEORM_PORT=5432
-      - TYPEORM_LOGGING=false
-      - 'REDIS_URL=redis://redis:6379'
-      - GRIST_HELP_CENTER=$SERVICE_FQDN_GRIST/help
-      - GRIST_TERMS_OF_SERVICE_URL=$SERVICE_FQDN_GRIST/terms
-      - FREE_COACHING_CALL_URL=super.user@email.com
-      - GRIST_CONTACT_SUPPORT_URL=super.user@email.com
+      - TZ=${TZ:-UTC}
+      - GRIST_SUPPORT_ANON=${SUPPORT_ANON:-false}
+      - GRIST_FORCE_LOGIN=${FORCE_LOGIN:-true}
+      - COOKIE_MAX_AGE=${COOKIE_MAX_AGE:-86400000}
+      - GRIST_PAGE_TITLE_SUFFIX=${PAGE_TITLE_SUFFIX:- - Suffix}
+      - GRIST_HIDE_UI_ELEMENTS=${HIDE_UI_ELEMENTS:-billing,sendToDrive,supportGrist,multiAccounts,tutorials}
+      - GRIST_UI_FEATURES=${UI_FEATURES:-helpCenter,billing,templates,createSite,multiSite,sendToDrive,tutorials,supportGrist}
+      - SERVICE_FQDN_GRIST=${SERVICE_FQDN_GRIST}
+      - GRIST_DOMAIN=${DOMAIN:-domain.com}
+      - APP_HOME_URL=${SERVICE_FQDN_GRIST}
+      - APP_DOC_URL=${SERVICE_FQDN_GRIST}
+      - GRIST_DEFAULT_EMAIL=${DEFAULT_EMAIL:-super.user@email.com}
+      - GRIST_ORG_IN_PATH=${ORG_IN_PATH:-true}
+      - GRIST_OIDC_SP_HOST=${SERVICE_FQDN_GRIST}
+      - GRIST_OIDC_IDP_SCOPES=${OIDC_IDP_SCOPES:-openid profile email}
+      - GRIST_OIDC_IDP_SKIP_END_SESSION_ENDPOINT=${OIDC_IDP_SKIP_END_SESSION_ENDPOINT:-false}
+      - GRIST_OIDC_IDP_ISSUER=${OIDC_IDP_ISSUER:-https://auth.domain.com/application/o/grist/}
+      - GRIST_OIDC_IDP_CLIENT_ID=${OIDC_IDP_CLIENT_ID:-your-client-id}
+      - GRIST_OIDC_IDP_CLIENT_SECRET=${OIDC_IDP_CLIENT_SECRET:-your-client-secret}
+      - GRIST_SESSION_SECRET=${SESSION_SECRET:-$SERVICE_REALBASE64_128}
+      - GRIST_HOME_INCLUDE_STATIC=${HOME_INCLUDE_STATIC:-true}
+      - GRIST_SANDBOX_FLAVOR=${SANDBOX_FLAVOR:-gvisor}
+      - ALLOWED_WEBHOOK_DOMAINS=${ALLOWED_WEBHOOK_DOMAINS:-n8n.domain.com}
+      - COMMENTS=${COMMENTS:-true}
+      - TYPEORM_TYPE=${TYPEORM_TYPE:-postgres}
+      - TYPEORM_DATABASE=${POSTGRES_DATABASE:-postgres}
+      - TYPEORM_USERNAME=${POSTGRES_USERNAME:-postgres}
+      - TYPEORM_PASSWORD=${POSTGRES_PASSWORD:-$SERVICE_PASSWORD_POSTGRES}
+      - TYPEORM_HOST=${TYPEORM_HOST:-postgres}
+      - TYPEORM_PORT=${TYPEORM_PORT:-5432}
+      - TYPEORM_LOGGING=${TYPEORM_LOGGING:-false}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - GRIST_HELP_CENTER=${HELP_CENTER:-$SERVICE_FQDN_GRIST/help}
+      - GRIST_TERMS_OF_SERVICE_URL=${TERMS_OF_SERVICE_URL:-$SERVICE_FQDN_GRIST/terms}
+      - FREE_COACHING_CALL_URL=${FREE_COACHING_CALL_URL:-super.user@email.com}
+      - GRIST_CONTACT_SUPPORT_URL=${CONTACT_SUPPORT_URL:-super.user@email.com}
     volumes:
       - 'grist-data:/persist'
     depends_on:
@@ -64,9 +64,9 @@ services:
   postgres:
     image: 'postgres:16'
     environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DATABASE:-postgres}
+      - POSTGRES_USER=${POSTGRES_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-$SERVICE_PASSWORD_POSTGRES}
     volumes:
       - 'postgres-data:/var/lib/postgresql/data'
     healthcheck:
