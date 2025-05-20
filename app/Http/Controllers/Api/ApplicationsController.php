@@ -1015,7 +1015,6 @@ class ApplicationsController extends Controller
                         ],
                     ], 422);
                 }
-                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
                 $yaml = Yaml::parse($dockerComposeRaw);
                 $services = data_get($yaml, 'services');
                 $dockerComposeDomains = collect($request->docker_compose_domains);
