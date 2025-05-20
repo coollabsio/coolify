@@ -33,16 +33,13 @@ class Heading extends Component
     public function activityFinished()
     {
         try {
-            $this->database->update([
-                'started_at' => now(),
-            ]);
+            $this->database->started_at ??= now();
+            $this->database->save();
 
             if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
                 $this->database->isConfigurationChanged(true);
-                $this->dispatch('configurationChanged');
-            } else {
-                $this->dispatch('configurationChanged');
             }
+            $this->dispatch('configurationChanged');
         } catch (\Exception $e) {
             return handleError($e, $this);
         } finally {
