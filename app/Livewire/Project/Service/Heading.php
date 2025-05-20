@@ -64,10 +64,8 @@ class Heading extends Component
             });
             if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
                 $this->service->isConfigurationChanged(true);
-                $this->dispatch('configurationChanged');
-            } else {
-                $this->dispatch('configurationChanged');
             }
+            $this->dispatch('configurationChanged');
         } catch (\Exception $e) {
             return handleError($e, $this);
         } finally {
