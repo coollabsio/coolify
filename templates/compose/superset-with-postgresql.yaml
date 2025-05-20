@@ -15,7 +15,6 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-superset-db}
       - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
-      - PYTHONPATH=/etc/superset
     volumes:
       - type: bind
         source: ./superset/superset_config.py
