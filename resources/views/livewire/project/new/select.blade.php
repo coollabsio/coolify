@@ -110,7 +110,7 @@
                                     <x-slot:documentation>
                                         <template x-if="service.documentation">
                                             <div class="flex items-center px-2" title="Read the documentation.">
-                                                <a class="p-2 rounded hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
+                                                <a class="p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-coolgray-200 hover:no-underline dark:group-hover:text-white text-neutral-600"
                                                     onclick="event.stopPropagation()" :href="service.documentation"
                                                     target="_blank">
                                                     Docs
@@ -253,7 +253,7 @@
                 @foreach ($swarmDockers as $swarmDocker)
                     <div class="w-full box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:dark:text-white">
+                            <div class="font-bold dark:group-hover:text-white">
                                 Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
                             </div>
                         </div>
@@ -277,12 +277,12 @@
     @if ($current_step === 'select-postgresql-type')
         <h2>Select a Postgresql type</h2>
         <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select PostgreSQL
-            16 (default).</div>
+            17 (default).</div>
         <div class="flex flex-col gap-6 pt-8">
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
-                wire:click="setPostgresqlType('postgres:16-alpine')">
+                wire:click="setPostgresqlType('postgres:17-alpine')">
                 <div class="flex flex-col">
-                    <div class="box-title">PostgreSQL 16 (default)</div>
+                    <div class="box-title">PostgreSQL 17 (default)</div>
                     <div class="box-description">
                         PostgreSQL is a powerful, open-source object-relational database system (no extensions).
                     </div>
@@ -290,14 +290,14 @@
                 <div class="flex-1"></div>
 
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-6000"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
                         onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
                         Documentation
                     </a>
                 </div>
             </div>
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('supabase/postgres:15.6.1.113')">
+                wire:click="setPostgresqlType('supabase/postgres:17.4.1.032')">
                 <div class="flex flex-col">
                     <div class="box-title">Supabase PostgreSQL (with extensions)</div>
                     <div class="box-description">
@@ -306,7 +306,7 @@
                 </div>
                 <div class="flex-1"></div>
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
                         onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
                         target="_blank">
                         Documentation
@@ -314,16 +314,16 @@
                 </div>
             </div>
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('postgis/postgis')">
+                wire:click="setPostgresqlType('postgis/postgis:17-3.5-alpine')">
                 <div class="flex flex-col">
-                    <div class="box-title">PostGIS</div>
+                    <div class="box-title">PostGIS (AMD only)</div>
                     <div class="box-description">
                         PostGIS is a PostgreSQL extension for geographic objects.
                     </div>
                 </div>
                 <div class="flex-1"></div>
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
                         onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
                         target="_blank">
                         Documentation
@@ -331,9 +331,9 @@
                 </div>
             </div>
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('pgvector/pgvector:pg16')">
+                wire:click="setPostgresqlType('pgvector/pgvector:pg17')">
                 <div class="flex flex-col">
-                    <div class="box-title">PGVector (16)</div>
+                    <div class="box-title">PGVector (17)</div>
                     <div class="box-description">
                         PGVector is a PostgreSQL extension for vector data types.
                     </div>
@@ -341,7 +341,7 @@
                 <div class="flex-1"></div>
 
                 <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline group-hover:dark:text-white dark:text-white text-neutral-600"
+                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
                         onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
                         target="_blank">
                         Documentation

@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
-use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -28,7 +27,8 @@ class Heading extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'check_status',
+            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
             'compose_loaded' => '$refresh',
             'update_links' => '$refresh',
         ];
@@ -46,13 +46,12 @@ class Heading extends Component
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
     }
 
-    public function check_status($showNotification = false)
+    public function checkStatus()
     {
         if ($this->application->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->application->destination->server);
-        }
-        if ($showNotification) {
-            $this->dispatch('success', 'Success', 'Application status updated.');
+        } else {
+            $this->dispatch('error', 'Server is not functional.');
         }
     }
 
@@ -111,16 +110,8 @@ class Heading extends Component
 
     public function stop()
     {
-        StopApplication::run($this->application, false, $this->docker_cleanup);
-        $this->application->status = 'exited';
-        $this->application->save();
-        if ($this->application->additional_servers->count() > 0) {
-            $this->application->additional_servers->each(function ($server) {
-                $server->pivot->status = 'exited:unhealthy';
-                $server->pivot->save();
-            });
-        }
-        ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
+        $this->dispatch('info', 'Gracefully stopping application, it could take a while depending on the application.');
+        StopApplication::dispatch($this->application, false, $this->docker_cleanup);
     }
 
     public function restart()

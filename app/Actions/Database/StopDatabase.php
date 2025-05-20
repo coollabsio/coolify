@@ -3,6 +3,7 @@
 namespace App\Actions\Database;
 
 use App\Actions\Server\CleanupDocker;
+use App\Events\ServiceStatusChanged;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -19,23 +20,30 @@ class StopDatabase
 
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $isDeleteOperation = false, bool $dockerCleanup = true)
     {
-        $server = $database->destination->server;
-        if (! $server->isFunctional()) {
-            return 'Server is not functional';
-        }
-
-        $this->stopContainer($database, $database->uuid, 30);
-        if ($isDeleteOperation) {
-            if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, true);
+        try {
+            $server = $database->destination->server;
+            if (! $server->isFunctional()) {
+                return 'Server is not functional';
             }
+
+            $this->stopContainer($database, $database->uuid, 30);
+            if ($isDeleteOperation) {
+                if ($dockerCleanup) {
+                    CleanupDocker::dispatch($server, true);
+                }
+            }
+
+            if ($database->is_public) {
+                StopDatabaseProxy::run($database);
+            }
+
+            return 'Database stopped successfully';
+        } catch (\Exception $e) {
+            return 'Database stop failed: '.$e->getMessage();
+        } finally {
+            ServiceStatusChanged::dispatch($database->environment->project->team->id);
         }
 
-        if ($database->is_public) {
-            StopDatabaseProxy::run($database);
-        }
-
-        return 'Database stopped successfully';
     }
 
     private function stopContainer($database, string $containerName, int $timeout = 30): void

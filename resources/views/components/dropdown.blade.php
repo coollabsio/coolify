@@ -2,7 +2,7 @@
     dropdownOpen: false
 }" class="relative" @click.outside="dropdownOpen = false">
     <button @click="dropdownOpen=true"
-        class="inline-flex items-center justify-start pr-8 transition-colors focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
+        class="inline-flex items-center justify-start pr-8 transition-colors focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none">
         <span class="flex flex-col items-start h-full leading-none">
             {{ $title }}
         </span>
@@ -16,7 +16,7 @@
     <div x-show="dropdownOpen" @click.away="dropdownOpen=false" x-transition:enter="ease-out duration-200"
         x-transition:enter-start="-translate-y-2" x-transition:enter-end="translate-y-0"
         class="absolute top-0 z-50 mt-6 min-w-max" x-cloak>
-        <div class="p-1 mt-1 bg-white border rounded shadow dark:bg-coolgray-200 dark:border-black border-neutral-300">
+        <div class="p-1 mt-1 bg-white border rounded-sm shadow-sm dark:bg-coolgray-200 dark:border-black border-neutral-300">
             {{ $slot }}
         </div>
     </div>
