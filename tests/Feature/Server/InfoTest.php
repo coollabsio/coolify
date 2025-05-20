@@ -4,6 +4,7 @@ namespace Tests\Feature\Server;
 
 use App\Jobs\CollectServerInfoJob;
 use App\Livewire\Server\Info;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\Team;
@@ -19,11 +20,13 @@ class InfoTest extends TestCase
 
     public function test_info_component_renders_correctly()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Create a user and team
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $user->teams()->attach($team);
-        $user->switchTeam($team);
 
         // Create a server with settings
         $server = Server::factory()->create([
@@ -60,6 +63,9 @@ class InfoTest extends TestCase
 
     public function test_collect_server_info_dispatches_job()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Set up queue fake
         Queue::fake();
 
@@ -67,7 +73,6 @@ class InfoTest extends TestCase
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $user->teams()->attach($team);
-        $user->switchTeam($team);
 
         // Create a server with settings
         $server = Server::factory()->create([
@@ -95,11 +100,13 @@ class InfoTest extends TestCase
 
     public function test_refresh_method_updates_component()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Create a user and team
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $user->teams()->attach($team);
-        $user->switchTeam($team);
 
         // Create a server with settings
         $server = Server::factory()->create([
@@ -133,6 +140,9 @@ class InfoTest extends TestCase
 
     public function test_auto_collect_on_mount_if_no_info()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Set up queue fake
         Queue::fake();
 
@@ -140,7 +150,6 @@ class InfoTest extends TestCase
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $user->teams()->attach($team);
-        $user->switchTeam($team);
 
         // Create a server with settings
         $server = Server::factory()->create([
@@ -171,6 +180,9 @@ class InfoTest extends TestCase
 
     public function test_no_auto_collect_on_mount_if_info_exists()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Set up queue fake
         Queue::fake();
 
@@ -178,7 +190,6 @@ class InfoTest extends TestCase
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $user->teams()->attach($team);
-        $user->switchTeam($team);
 
         // Create a server with settings
         $server = Server::factory()->create([

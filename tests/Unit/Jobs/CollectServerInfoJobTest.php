@@ -5,6 +5,7 @@ namespace Tests\Unit\Jobs;
 use App\Actions\Server\CollectServerInfo;
 use App\Events\ServerInfoUpdated;
 use App\Jobs\CollectServerInfoJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\Team;
@@ -18,6 +19,9 @@ class CollectServerInfoJobTest extends TestCase
 
     public function test_job_calls_collect_server_info_action_and_dispatches_event()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Mock the CollectServerInfo action
         $this->mock(CollectServerInfo::class, function ($mock) {
             $mock->shouldReceive('run')->once()->andReturn(true);
@@ -50,6 +54,9 @@ class CollectServerInfoJobTest extends TestCase
 
     public function test_job_handles_exceptions_gracefully()
     {
+        // Create instance settings
+        InstanceSettings::factory()->create();
+
         // Mock the CollectServerInfo action to throw an exception
         $this->mock(CollectServerInfo::class, function ($mock) {
             $mock->shouldReceive('run')->once()->andThrow(new \Exception('Test exception'));

@@ -3,11 +3,45 @@
 namespace Tests\Unit\Actions\Server;
 
 use App\Actions\Server\CollectServerInfo;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+
+// Define a function in the same namespace to override the global one
+function instant_remote_process($command, $server, $throwError = true, $no_sudo = false)
+{
+    if (is_array($command) && count($command) > 0) {
+        if (str_contains($command[0], 'model name')) {
+            return 'Intel(R) Xeon(R) CPU @ 2.20GHz';
+        } elseif (str_contains($command[0], 'nproc')) {
+            return '4';
+        } elseif (str_contains($command[0], 'cpu MHz')) {
+            return '2200.000';
+        } elseif (str_contains($command[0], 'free -h') && str_contains($command[0], 'Mem:')) {
+            return '16G';
+        } elseif (str_contains($command[0], 'dmidecode')) {
+            return '2666 MHz';
+        } elseif (str_contains($command[0], 'free -h') && str_contains($command[0], 'Swap:')) {
+            return '4G';
+        } elseif (str_contains($command[0], 'df -h')) {
+            return '100G 45G 55G';
+        } elseif (str_contains($command[0], 'lspci')) {
+            return 'NVIDIA GeForce RTX 3080';
+        } elseif (str_contains($command[0], 'nvidia-smi')) {
+            return '10GB';
+        } elseif (str_contains($command[0], 'os-release')) {
+            return 'Ubuntu 22.04 LTS';
+        } elseif (str_contains($command[0], 'uname -r')) {
+            return '5.15.0-1031-aws';
+        } elseif (str_contains($command[0], 'uname -m')) {
+            return 'x86_64';
+        }
+    }
+    return null;
+}
 
 class CollectServerInfoTest extends TestCase
 {
@@ -15,42 +49,8 @@ class CollectServerInfoTest extends TestCase
 
     public function test_collect_server_info_updates_server_settings()
     {
-        // Define a helper function to mock instant_remote_process
-        function mockInstantRemoteProcess($command, $server, $throwError = true, $no_sudo = false) {
-            if (is_array($command) && count($command) > 0) {
-                if (str_contains($command[0], 'model name')) {
-                    return 'Intel(R) Xeon(R) CPU @ 2.20GHz';
-                } elseif (str_contains($command[0], 'nproc')) {
-                    return '4';
-                } elseif (str_contains($command[0], 'cpu MHz')) {
-                    return '2200.000';
-                } elseif (str_contains($command[0], 'free -h') && str_contains($command[0], 'Mem:')) {
-                    return '16G';
-                } elseif (str_contains($command[0], 'dmidecode')) {
-                    return '2666 MHz';
-                } elseif (str_contains($command[0], 'free -h') && str_contains($command[0], 'Swap:')) {
-                    return '4G';
-                } elseif (str_contains($command[0], 'df -h')) {
-                    return '100G 45G 55G';
-                } elseif (str_contains($command[0], 'lspci')) {
-                    return 'NVIDIA GeForce RTX 3080';
-                } elseif (str_contains($command[0], 'nvidia-smi')) {
-                    return '10GB';
-                } elseif (str_contains($command[0], 'os-release')) {
-                    return 'Ubuntu 22.04 LTS';
-                } elseif (str_contains($command[0], 'uname -r')) {
-                    return '5.15.0-1031-aws';
-                } elseif (str_contains($command[0], 'uname -m')) {
-                    return 'x86_64';
-                }
-            }
-            return null;
-        }
-
-        // Replace the global function with our mock
-        $this->app->bind('instant_remote_process', function() {
-            return 'mockInstantRemoteProcess';
-        });
+        // Create instance settings
+        InstanceSettings::factory()->create();
 
         // Create a team
         $team = Team::factory()->create();
@@ -94,15 +94,11 @@ class CollectServerInfoTest extends TestCase
 
     public function test_collect_server_info_handles_missing_data()
     {
-        // Define a helper function to mock instant_remote_process
-        function mockInstantRemoteProcessNull($command, $server, $throwError = true, $no_sudo = false) {
-            return null;
-        }
+        // Create instance settings
+        InstanceSettings::factory()->create();
 
-        // Replace the global function with our mock
-        $this->app->bind('instant_remote_process', function() {
-            return 'mockInstantRemoteProcessNull';
-        });
+        // The instant_remote_process function is already mocked at the namespace level
+        // and will return null for this test since we're not matching any command patterns
 
         // Create a team
         $team = Team::factory()->create();

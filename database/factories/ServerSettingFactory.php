@@ -22,7 +22,7 @@ class ServerSettingFactory extends Factory
     public function definition(): array
     {
         return [
-            'is_part_of_swarm' => false,
+            'is_swarm_manager' => false,
             'is_jump_server' => false,
             'is_build_server' => false,
             'is_reachable' => true,
