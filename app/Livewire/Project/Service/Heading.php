@@ -102,7 +102,11 @@ class Heading extends Component
     public function forceDeploy()
     {
         try {
-            $activities = Activity::where('properties->type_uuid', $this->service->uuid)->where('properties->status', ProcessStatus::IN_PROGRESS->value)->orWhere('properties->status', ProcessStatus::QUEUED->value)->get();
+            $activities = Activity::where('properties->type_uuid', $this->service->uuid)
+                ->where(function ($q) {
+                    $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
+                      ->orWhere('properties->status', ProcessStatus::QUEUED->value);
+                })->get();
             foreach ($activities as $activity) {
                 $activity->properties->status = ProcessStatus::ERROR->value;
                 $activity->save();
