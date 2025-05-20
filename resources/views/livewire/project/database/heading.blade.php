@@ -92,10 +92,6 @@
                             window.dispatchEvent(new CustomEvent('startdatabase'));
                             $wire.$call('start');
                         });
-                        $wire.$on('stopEvent', () => {
-                            $wire.$dispatch('info', 'Stopping database.');
-                            $wire.$call('stop');
-                        });
                         $wire.$on('restartEvent', () => {
                             $wire.$dispatch('info', 'Restarting database.');
                             window.dispatchEvent(new CustomEvent('startdatabase'));
