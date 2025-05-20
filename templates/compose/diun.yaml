@@ -1,0 +1,27 @@
+# documentation: https://crazymax.dev/diun/
+# slogan: Docker Image Update Notifier is a CLI application to receive notifications when a Docker image is updated on a Docker registry.
+# tags: docker, notifier, slack
+# logo: svgs/diun.svg
+
+services:
+  diun:
+    image: crazymax/diun:latest
+    command: serve
+    volumes:
+      - "diun_data:/data"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - TZ=${TIME_ZONE:-Europe/Vienna}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_JSON=${LOG_JSON:-false}
+      - DIUN_WATCH_WORKERS=${DIUN_WATCH_WORKERS:-20}
+      - DIUN_WATCH_SCHEDULE=${DIUN_WATCH_SCHEDULE:- * */6 * * *}
+      - DIUN_WATCH_JITTER=${DIUN_WATCH_JITTER:-30s}
+      - DIUN_PROVIDERS_DOCKER=${DIUN_PROVIDERS_DOCKER:-true}
+      - DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT=${DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT:-true}
+      - DIUN_NOTIF_SLACK_WEBHOOKURL=${SERVICE_WEBHOOK_URL_SLACK}
+    healthcheck:
+      test: ["CMD", "diun", "--version"]
+      interval: 5s
+      timeout: 20s
+      retries: 3

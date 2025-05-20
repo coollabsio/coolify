@@ -10,7 +10,7 @@
             </div>
         @endif
         <div
-            class="scrollbar flex flex-col-reverse w-full overflow-y-auto border border-solid rounded border-coolgray-300 max-h-[32rem] p-4 pt-6 text-xs dark:text-white">
+            class="scrollbar flex flex-col-reverse w-full overflow-y-auto border border-solid rounded-sm border-coolgray-300 max-h-[32rem] p-4 pt-6 text-xs dark:text-white">
 
             <pre class="font-mono whitespace-pre-wrap" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($this->activity) }}</pre>
         </div>
