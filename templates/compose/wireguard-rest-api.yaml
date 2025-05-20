@@ -1,0 +1,24 @@
+# documentation: https://github.com/leonovk/wg-rest-api
+# slogan: WireGuard VPN + Easy REST API in one package.
+# tags: wireguard,vpn,rest-api,vpn-manager
+# logo: svgs/wireguard.svg
+# port: 3000
+
+services:
+  wg-rest-api:
+    image: leonovk/wg-rest-api:latest
+    environment:
+      - SERVICE_FQDN_WIREGUARDRESTAPI_3000
+      - WG_HOST=${SERVICE_FQDN_WIREGUARDRESTAPI}
+      - WG_PORT=51820
+      - ENVIRONMENT=production
+    volumes:
+      - wg-rest-api:/etc/wireguard
+    ports:
+      - 51820:51820/udp
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
