@@ -478,7 +478,7 @@ function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
     $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
     if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment')->unsetRelation('destination');
+        return $postgresql->unsetRelation('environment');
     }
     $redis = StandaloneRedis::whereUuid($uuid)->first();
     if ($redis && $redis->team()->id == $teamId) {
