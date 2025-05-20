@@ -9,7 +9,7 @@ services:
     ports:
       - "${APP_PORT:-8000}:8080"
     environment:
-      AUTORUN_ENABLED: false
+      AUTORUN_ENABLED: "false"
       PUSHER_HOST: "${PUSHER_HOST}"
       PUSHER_PORT: "${PUSHER_PORT}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
@@ -20,9 +20,10 @@ services:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
+    image: postgres:latest
     pull_policy: always
     ports:
-      - "${FORWARD_DB_PORT:-5432}:5432"
+      - "${FORWARD_DB_PORT:-5433}:5432"
     env_file:
       - .env
     environment:
@@ -33,9 +34,10 @@ services:
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
   redis:
+    image: redis:latest
     pull_policy: always
     ports:
-      - "${FORWARD_REDIS_PORT:-6379}:6379"
+      - "${FORWARD_REDIS_PORT:-6380}:6379"
     env_file:
       - .env
     volumes:
@@ -109,6 +111,18 @@ services:
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
       - dev_minio_data:/data
+    networks:
+      - coolify
+  selenium:
+    image: selenium/standalone-chrome:latest
+    pull_policy: always
+    container_name: coolify-selenium
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    environment:
+      - SE_VNC_NO_PASSWORD=1
+      - SE_NODE_MAX_SESSIONS=5
     networks:
       - coolify
 

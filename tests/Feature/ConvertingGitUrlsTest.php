@@ -6,7 +6,7 @@ test('convertGitUrlsForDeployKeyAndGithubAppAndHttpUrl', function () {
     $githubApp = GithubApp::find(0);
     $result = convertGitUrl('andrasbacsai/coolify-examples.git', 'deploy_key', $githubApp);
     expect($result)->toBe([
-        'repository' => 'git@github.com:andrasbacsai/coolify-examples.git',
+        'repository' => 'andrasbacsai/coolify-examples.git',
         'port' => 22,
     ]);
 
