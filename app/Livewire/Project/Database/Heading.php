@@ -6,7 +6,7 @@ use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
-use Illuminate\Support\Facades\Auth;
+use App\Events\ServiceStatusChanged;
 use Livewire\Component;
 
 class Heading extends Component
@@ -19,36 +19,38 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $userId = Auth::id();
+        $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:user.{$userId},DatabaseStatusChanged" => 'activityFinished',
+            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
+            "echo-private:team.{$teamId},ServiceChecked" => 'activityFinished',
+            'refresh' => '$refresh',
+            'compose_loaded' => '$refresh',
+            'update_links' => '$refresh',
         ];
     }
 
     public function activityFinished()
     {
-        $this->database->update([
-            'started_at' => now(),
-        ]);
-        $this->check_status();
+        try {
+            $this->database->started_at ??= now();
+            $this->database->save();
 
-        if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
-            $this->database->isConfigurationChanged(true);
+            if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
+                $this->database->isConfigurationChanged(true);
+            }
             $this->dispatch('configurationChanged');
-        } else {
-            $this->dispatch('configurationChanged');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
         }
     }
 
-    public function check_status($showNotification = false)
+    public function checkStatus()
     {
         if ($this->database->destination->server->isFunctional()) {
-            GetContainersStatus::run($this->database->destination->server);
-        }
-
-        if ($showNotification) {
-            $this->dispatch('success', 'Database status updated.');
+            GetContainersStatus::dispatch($this->database->destination->server);
         }
     }
 
@@ -59,23 +61,24 @@ class Heading extends Component
 
     public function stop()
     {
-        StopDatabase::run($this->database, false, $this->docker_cleanup);
-        $this->database->status = 'exited';
-        $this->database->save();
-        $this->check_status();
-        $this->dispatch('refresh');
+        try {
+            $this->dispatch('info', 'Stopping database.');
+            StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function restart()
     {
         $activity = RestartDatabase::run($this->database);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function start()
     {
         $activity = StartDatabase::run($this->database);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function render()

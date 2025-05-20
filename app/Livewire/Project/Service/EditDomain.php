@@ -47,7 +47,6 @@ class EditDomain extends Component
             $this->application->service->parse();
             $this->dispatch('refresh');
             $this->dispatch('configurationChanged');
-            $this->dispatch('refreshStatus');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {

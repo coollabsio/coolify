@@ -989,7 +989,34 @@ class ApplicationsController extends Controller
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
-                $yaml = Yaml::parse($application->docker_compose_raw);
+                if (! $request->has('docker_compose_raw')) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => 'The base64 encoded docker_compose_raw is required.',
+                        ],
+                    ], 422);
+                }
+
+                if (! isBase64Encoded($request->docker_compose_raw)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                        ],
+                    ], 422);
+                }
+                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+                if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                        ],
+                    ], 422);
+                }
+                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+                $yaml = Yaml::parse($dockerComposeRaw);
                 $services = data_get($yaml, 'services');
                 $dockerComposeDomains = collect($request->docker_compose_domains);
                 if ($dockerComposeDomains->count() > 0) {
@@ -1095,7 +1122,34 @@ class ApplicationsController extends Controller
 
             $dockerComposeDomainsJson = collect();
             if ($request->has('docker_compose_domains')) {
-                $yaml = Yaml::parse($application->docker_compose_raw);
+                if (! $request->has('docker_compose_raw')) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => 'The base64 encoded docker_compose_raw is required.',
+                        ],
+                    ], 422);
+                }
+
+                if (! isBase64Encoded($request->docker_compose_raw)) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                        ],
+                    ], 422);
+                }
+                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+                if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                        ],
+                    ], 422);
+                }
+                $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+                $yaml = Yaml::parse($dockerComposeRaw);
                 $services = data_get($yaml, 'services');
                 $dockerComposeDomains = collect($request->docker_compose_domains);
                 if ($dockerComposeDomains->count() > 0) {
@@ -1918,7 +1972,34 @@ class ApplicationsController extends Controller
 
         $dockerComposeDomainsJson = collect();
         if ($request->has('docker_compose_domains')) {
-            $yaml = Yaml::parse($application->docker_compose_raw);
+            if (! $request->has('docker_compose_raw')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The base64 encoded docker_compose_raw is required.',
+                    ],
+                ], 422);
+            }
+
+            if (! isBase64Encoded($request->docker_compose_raw)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            $yaml = Yaml::parse($dockerComposeRaw);
             $services = data_get($yaml, 'services');
             $dockerComposeDomains = collect($request->docker_compose_domains);
             if ($dockerComposeDomains->count() > 0) {

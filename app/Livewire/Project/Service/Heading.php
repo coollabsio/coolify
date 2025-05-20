@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Enums\ProcessStatus;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
-class Navbar extends Component
+class Heading extends Component
 {
     public Service $service;
 
@@ -35,35 +36,42 @@ class Navbar extends Component
 
     public function getListeners()
     {
-        $userId = Auth::id();
+        $teamId = Auth::user()->currentTeam()->id;
 
         return [
-            "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
+            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
+            "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
+            'refresh' => '$refresh',
             'envsUpdated' => '$refresh',
-            'refreshStatus' => '$refresh',
         ];
     }
 
-    public function serviceStarted()
+    public function checkStatus()
     {
-        // $this->dispatch('success', 'Service status changed.');
-        if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
-            $this->service->isConfigurationChanged(true);
-            $this->dispatch('configurationChanged');
-        } else {
-            $this->dispatch('configurationChanged');
+        if ($this->service->server->isFunctional()) {
+            GetContainersStatus::dispatch($this->service->server);
         }
     }
 
-    public function check_status_without_notification()
+    public function serviceChecked()
     {
-        $this->dispatch('check_status');
-    }
+        try {
+            $this->service->applications->each(function ($application) {
+                $application->refresh();
+            });
+            $this->service->databases->each(function ($database) {
+                $database->refresh();
+            });
+            if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
+                $this->service->isConfigurationChanged(true);
+            }
+            $this->dispatch('configurationChanged');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh')->self();
+        }
 
-    public function check_status()
-    {
-        $this->dispatch('check_status');
-        $this->dispatch('success', 'Service status updated.');
     }
 
     public function checkDeployments()
@@ -86,34 +94,32 @@ class Navbar extends Component
     public function start()
     {
         $activity = StartService::run($this->service, pullLatestImages: true);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function forceDeploy()
     {
         try {
-            $activities = Activity::where('properties->type_uuid', $this->service->uuid)->where('properties->status', ProcessStatus::IN_PROGRESS->value)->orWhere('properties->status', ProcessStatus::QUEUED->value)->get();
+            $activities = Activity::where('properties->type_uuid', $this->service->uuid)
+                ->where(function ($q) {
+                    $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
+                      ->orWhere('properties->status', ProcessStatus::QUEUED->value);
+                })->get();
             foreach ($activities as $activity) {
                 $activity->properties->status = ProcessStatus::ERROR->value;
                 $activity->save();
             }
             $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
-            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
     }
 
-    public function stop($cleanupContainers = false)
+    public function stop()
     {
         try {
-            StopService::run($this->service, false, $this->docker_cleanup);
-            ServiceStatusChanged::dispatch();
-            if ($cleanupContainers) {
-                $this->dispatch('success', 'Containers cleaned up.');
-            } else {
-                $this->dispatch('success', 'Service stopped.');
-            }
+            StopService::dispatch($this->service, false, $this->docker_cleanup);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
@@ -128,7 +134,7 @@ class Navbar extends Component
             return;
         }
         $activity = StartService::run($this->service, stopBeforeStart: true);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function pullAndRestartEvent()
@@ -140,12 +146,12 @@ class Navbar extends Component
             return;
         }
         $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
-        $this->dispatch('activityMonitor', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function render()
     {
-        return view('livewire.project.service.navbar', [
+        return view('livewire.project.service.heading', [
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
             ],
