@@ -3,12 +3,14 @@
 namespace App\Jobs;
 
 use App\Actions\Server\CollectServerInfo;
+use App\Events\ServerInfoUpdated;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class CollectServerInfoJob implements ShouldQueue
 {
@@ -27,17 +29,17 @@ class CollectServerInfoJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(CollectServerInfo $collectServerInfo): void
     {
         try {
-            // Use the CollectServerInfo action to gather server information
-            CollectServerInfo::run($this->server);
+            // Use the injected instance instead of static call
+            $collectServerInfo->run($this->server);
 
             // Broadcast an event to notify the UI that the server info has been updated
-            event(new \App\Events\ServerInfoUpdated($this->server));
+            event(new ServerInfoUpdated($this->server));
         } catch (\Throwable $e) {
             // Log the error but don't rethrow it to prevent the job from retrying
-            \Illuminate\Support\Facades\Log::error('Error collecting server info: ' . $e->getMessage());
+            Log::error('Error collecting server info: '.$e->getMessage());
         }
     }
 }

@@ -9,6 +9,7 @@ use Livewire\Component;
 class Info extends Component
 {
     public Server $server;
+
     public bool $isCollecting = false;
 
     public function getListeners()
@@ -27,7 +28,7 @@ class Info extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
 
             // If server info hasn't been collected yet, collect it automatically
-            if (!$this->hasServerInfo()) {
+            if (! $this->hasServerInfo()) {
                 $this->collectServerInfo();
             }
         } catch (\Throwable $e) {
@@ -59,6 +60,7 @@ class Info extends Component
         $this->isCollecting = true;
 
         // Dispatch the job to collect server information
+        // No change is needed here as Laravel's dispatch helper handles both static and non-static jobs
         CollectServerInfoJob::dispatch($this->server);
 
         // Show a notification that the collection has started
@@ -72,9 +74,9 @@ class Info extends Component
     {
         // Check if any server info has been collected
         return $this->server->settings->cpu_model ||
-               $this->server->settings->memory_total ||
-               $this->server->settings->disk_total ||
-               $this->server->settings->os_name;
+            $this->server->settings->memory_total ||
+            $this->server->settings->disk_total ||
+            $this->server->settings->os_name;
     }
 
     public function render()

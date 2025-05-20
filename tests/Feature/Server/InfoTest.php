@@ -18,19 +18,42 @@ class InfoTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_info_component_renders_correctly()
+    protected function setUp(): void
     {
+        parent::setUp();
+
         // Create instance settings
         InstanceSettings::factory()->create();
 
         // Create a user and team
-        $user = User::factory()->create();
-        $team = Team::factory()->create();
-        $user->teams()->attach($team);
+        $this->user = User::factory()->create();
+        $this->team = Team::factory()->create();
 
+        // Attach the user to the team
+        $this->user->teams()->attach($this->team);
+
+        // Act as the user
+        $this->actingAs($this->user);
+    }
+
+    // Helper to mock the currentTeam method
+    protected function mockCurrentTeam()
+    {
+        // Mock the User model's currentTeam method to return our team
+        $this->user->shouldReceive('currentTeam')->andReturn($this->team);
+
+        // Or optionally, mock auth()->user()->currentTeam() directly
+        // This depends on how your application is structured
+        $this->mock('alias:Illuminate\Support\Facades\Auth', function ($mock) {
+            $mock->shouldReceive('user')->andReturn($this->user);
+        });
+    }
+
+    public function test_info_component_renders_correctly()
+    {
         // Create a server with settings
         $server = Server::factory()->create([
-            'team_id' => $team->id,
+            'team_id' => $this->team->id,
             'name' => 'Test Server',
         ]);
 
@@ -43,9 +66,6 @@ class InfoTest extends TestCase
             'disk_total' => '100G',
             'os_name' => 'Ubuntu',
         ]);
-
-        // Act as the user
-        $this->actingAs($user);
 
         // Test that the component renders correctly
         Livewire::test(Info::class, ['server_uuid' => $server->uuid])
@@ -63,20 +83,12 @@ class InfoTest extends TestCase
 
     public function test_collect_server_info_dispatches_job()
     {
-        // Create instance settings
-        InstanceSettings::factory()->create();
-
         // Set up queue fake
         Queue::fake();
 
-        // Create a user and team
-        $user = User::factory()->create();
-        $team = Team::factory()->create();
-        $user->teams()->attach($team);
-
         // Create a server with settings
         $server = Server::factory()->create([
-            'team_id' => $team->id,
+            'team_id' => $this->team->id,
             'name' => 'Test Server',
         ]);
 
@@ -84,9 +96,6 @@ class InfoTest extends TestCase
         ServerSetting::factory()->create([
             'server_id' => $server->id,
         ]);
-
-        // Act as the user
-        $this->actingAs($user);
 
         // Test that the collectServerInfo method dispatches the job
         Livewire::test(Info::class, ['server_uuid' => $server->uuid])
@@ -100,17 +109,9 @@ class InfoTest extends TestCase
 
     public function test_refresh_method_updates_component()
     {
-        // Create instance settings
-        InstanceSettings::factory()->create();
-
-        // Create a user and team
-        $user = User::factory()->create();
-        $team = Team::factory()->create();
-        $user->teams()->attach($team);
-
         // Create a server with settings
         $server = Server::factory()->create([
-            'team_id' => $team->id,
+            'team_id' => $this->team->id,
             'name' => 'Test Server',
         ]);
 
@@ -118,9 +119,6 @@ class InfoTest extends TestCase
         ServerSetting::factory()->create([
             'server_id' => $server->id,
         ]);
-
-        // Act as the user
-        $this->actingAs($user);
 
         // Test that the refresh method updates the component
         $component = Livewire::test(Info::class, ['server_uuid' => $server->uuid]);
@@ -140,20 +138,12 @@ class InfoTest extends TestCase
 
     public function test_auto_collect_on_mount_if_no_info()
     {
-        // Create instance settings
-        InstanceSettings::factory()->create();
-
         // Set up queue fake
         Queue::fake();
 
-        // Create a user and team
-        $user = User::factory()->create();
-        $team = Team::factory()->create();
-        $user->teams()->attach($team);
-
         // Create a server with settings
         $server = Server::factory()->create([
-            'team_id' => $team->id,
+            'team_id' => $this->team->id,
             'name' => 'Test Server',
         ]);
 
@@ -166,9 +156,6 @@ class InfoTest extends TestCase
             'os_name' => null,
         ]);
 
-        // Act as the user
-        $this->actingAs($user);
-
         // Mount the component
         Livewire::test(Info::class, ['server_uuid' => $server->uuid]);
 
@@ -180,20 +167,12 @@ class InfoTest extends TestCase
 
     public function test_no_auto_collect_on_mount_if_info_exists()
     {
-        // Create instance settings
-        InstanceSettings::factory()->create();
-
         // Set up queue fake
         Queue::fake();
 
-        // Create a user and team
-        $user = User::factory()->create();
-        $team = Team::factory()->create();
-        $user->teams()->attach($team);
-
         // Create a server with settings
         $server = Server::factory()->create([
-            'team_id' => $team->id,
+            'team_id' => $this->team->id,
             'name' => 'Test Server',
         ]);
 
@@ -205,9 +184,6 @@ class InfoTest extends TestCase
             'disk_total' => null,
             'os_name' => null,
         ]);
-
-        // Act as the user
-        $this->actingAs($user);
 
         // Mount the component
         Livewire::test(Info::class, ['server_uuid' => $server->uuid]);
