@@ -53,7 +53,7 @@ services:
       - firefly-mysql-data:/var/lib/mysql
   cron:
     image: alpine
-    entrypoint: ["/entrypoint.sh"]
+    command: ["/bin/sh", "-c", "chmod +x /entrypoint.sh && /entrypoint.sh"]
     volumes:
       - type: bind
         source: ./entrypoint.sh
@@ -61,7 +61,7 @@ services:
         content: |
           #!/bin/sh
           # Substitute the environment variable into the cron command
-          CRON_COMMAND="0 3 * * * wget -qO- http://firefly:8080/api/v1/cron/${STATIC_CRON_TOKEN}"
+          CRON_COMMAND="0 3 * ** wget -qO- http://firefly:8080/api/v1/cron/${STATIC_CRON_TOKEN}"
           # Add the cron command to the crontab
           echo "$CRON_COMMAND" | crontab -
           # Start the cron daemon in the foreground with logging to stdout
