@@ -20,24 +20,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: '3.8'
-
 services:
   kitsu:
-    container_name: cgwire-kitsu
     image: ghcr.io/emberlightvfx/kitsu-for-docker:latest
     depends_on:
-      - zou-app
-      - zou-event
-      - zou-jobs
+      zou-app:
+        condition: service_healthy
+      zou-event:
+        condition: service_healthy
+      zou-jobs:
+        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - cgwire
     environment:
       - SERVICE_FQDN_KITSU_80
       - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
       - TMP_DIR=${TMP_DIR:-/tmp/zou}
-      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - DOMAIN_NAME=${DOMAIN_NAME:-${SERVICE_FQDN_KITSU_80}}
       - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
       - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
@@ -60,24 +58,28 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_DEFAULT_SENDER=${MAIL_DEFAULT_SENDER}
       - MAIL_USE_TLS=${MAIL_USE_TLS}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   zou-app:
-    container_name: cgwire-zou-app
     image: ghcr.io/emberlightvfx/zou-for-docker:latest
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - 'previews:/opt/zou/previews'
       - 'tmp:/tmp/zou'
     restart: unless-stopped
-    networks:
-      - cgwire
     command: >
       sh -c "/init_zou.sh && /upgrade_zou.sh && gunicorn --error-logfile - --access-logfile - -w 3 -k gevent -b :5000 zou.app:app"
     environment:
       - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
       - TMP_DIR=${TMP_DIR:-/tmp/zou}
-      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - DOMAIN_NAME=${DOMAIN_NAME:-${SERVICE_FQDN_KITSU_80}}
       - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
       - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
@@ -91,24 +93,28 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   zou-event:
-    container_name: cgwire-zou-event
     image: ghcr.io/emberlightvfx/zou-for-docker:latest
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     volumes:
       - 'previews:/opt/zou/previews'
       - 'tmp:/tmp/zou'
     restart: unless-stopped
-    networks:
-      - cgwire
     command: >
       sh -c "gunicorn --error-logfile - --access-logfile - -w 1 -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -b :5001 zou.event_stream:app"
     environment:
       - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
       - TMP_DIR=${TMP_DIR:-/tmp/zou}
-      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - DOMAIN_NAME=${DOMAIN_NAME:-${SERVICE_FQDN_KITSU_80}}
       - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
       - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
@@ -122,22 +128,30 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5001"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   zou-jobs:
-    container_name: cgwire-zou-jobs
     image: ghcr.io/emberlightvfx/zou-for-docker:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - 'previews:/opt/zou/previews'
       - 'tmp:/tmp/zou'
     restart: unless-stopped
-    networks:
-      - cgwire
     command: >
       sh -c "rq worker -c zou.job_settings"
     environment:
       - PREVIEW_FOLDER=${PREVIEW_FOLDER:-/opt/zou/previews}
       - TMP_DIR=${TMP_DIR:-/tmp/zou}
-      - DOMAIN_NAME=${DOMAIN_NAME:-kitsu.domain.com}
+      - DOMAIN_NAME=${DOMAIN_NAME:-${SERVICE_FQDN_KITSU_80}}
       - EVENT_STREAM_HOST=${EVENT_STREAM_HOST:-zou-event}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
       - INDEXER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
@@ -151,55 +165,52 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "rq worker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   meilisearch:
-    container_name: cgwire-meilisearch
     image: getmeili/meilisearch:v1.3.1
     volumes:
       - 'meili_data:/meili_data'
     restart: unless-stopped
-    networks:
-      - cgwire
     environment:
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILIMASTERKEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   db:
-    container_name: cgwire-db-12
     image: postgres:12-alpine
     volumes:
       - 'db:/var/lib/postgresql/data'
       - ./db/pg_ctl.conf:/etc/postgresql/12/main/pg_ctl.conf:ro
     restart: unless-stopped
-    networks:
-      - cgwire
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-zoudb}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
-    container_name: cgwire-redis
     image: redis:alpine
     volumes:
       - 'redis:/data'
     restart: unless-stopped
-    networks:
-      - cgwire
-
-volumes:
-  db:
-    name: zou-db-12
-  redis:
-    name: cgwire-redis
-  meili_data:
-    name: cgwire-meili_data
-  previews:
-    name: cgwire-previews
-  tmp:
-    name: cgwire-tmp
-  kitsu:
-    name: cgwire-kitsu
-
-networks:
-  cgwire:
-    name: cgwire
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
