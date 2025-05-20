@@ -17,7 +17,15 @@ class Configuration extends Component
 
     public $servers;
 
-    protected $listeners = ['buildPackUpdated' => '$refresh'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+            'buildPackUpdated' => '$refresh',
+        ];
+    }
 
     public function mount()
     {
