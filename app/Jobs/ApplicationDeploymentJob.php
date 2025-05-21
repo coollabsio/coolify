@@ -1369,9 +1369,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $fqdn = $this->preview->fqdn;
         }
         if (isset($fqdn)) {
-            $this->coolify_variables .= "COOLIFY_URL={$fqdn} ";
-            $fqdn_without_protocol = str($fqdn)->replace('http://', '')->replace('https://', '');
-            $this->coolify_variables .= "COOLIFY_FQDN={$fqdn_without_protocol} ";
+            $this->coolify_variables .= "COOLIFY_FQDN={$fqdn} ";
+            $url = str($fqdn)->replace('http://', '')->replace('https://', '');
+            $this->coolify_variables .= "COOLIFY_URL={$url} ";
         }
         if (isset($this->application->git_branch)) {
             $this->coolify_variables .= "COOLIFY_BRANCH={$this->application->git_branch} ";
@@ -1594,13 +1594,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
-                $coolify_envs->put('COOLIFY_DOMAIN_URL', $this->preview->fqdn);
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_URL', $this->preview->fqdn);
+                } else {
+                    $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
+                }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
-                $coolify_envs->put('COOLIFY_URL', $url);
-                $coolify_envs->put('COOLIFY_DOMAIN_FQDN', $url);
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_FQDN', $url);
+                } else {
+                    $coolify_envs->put('COOLIFY_URL', $url);
+                }
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
