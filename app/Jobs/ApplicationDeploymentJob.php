@@ -1087,18 +1087,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function drain_old_containers()
     {
-        if ($this->application->custom_healthcheck_found) { // Not implemented yet for custom healthchecks
-            $this->application_deployment_queue->addLogEntry('Custom healthcheck found, skipping drain of old containers.');
-
+        if (! $this->application->settings->is_zero_downtime_deployment_enabled) {
             return;
         }
-        // First, mark containers as unhealthy (so the reverse proxy stops routing to them)
-        // Only do this if healthcheck is enabled
-        if ($this->application->isHealthcheckDisabled()) {
+        if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
             $this->application_deployment_queue->addLogEntry('Healthcheck is disabled, skipping drain of old containers.');
 
             return;
         }
+
         $max_wait_time = (int) $this->application->health_check_interval * (int) $this->application->health_check_retries * (int) $this->application->health_check_timeout + 1;
         $this->application_deployment_queue->addLogEntry("Draining old containers (max wait time: {$max_wait_time} seconds).");
 
