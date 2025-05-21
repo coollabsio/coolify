@@ -21,7 +21,7 @@
                     <span class="text-sm text-gray-500 block">{{ $name }}</span>
                 @endif
             </a>
-            <div class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
+            <div class="w-full bg-white shadow-sm md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
                 @if ($errors->any())
                     <div class="text-center text-error">
                         @foreach ($errors->all() as $error)

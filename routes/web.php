@@ -49,6 +49,7 @@ use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfiguration
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
+use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\SettingsBackup;
@@ -252,6 +253,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
+        Route::get('/security', fn () => redirect(route('dashboard')));
+        Route::get('/security/patches', Patches::class)->name('server.security.patches');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');

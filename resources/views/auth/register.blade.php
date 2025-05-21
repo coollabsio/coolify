@@ -30,7 +30,7 @@ $email = getOldOrLocal('email', 'test3@example.com');
                     <span class="text-sm text-gray-500 block">{{ $name }}</span>
                 @endif
             </a>
-            <div class="w-full bg-white rounded-lg shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base">
+            <div class="w-full bg-white rounded-lg shadow-sm md:mt-0 sm:max-w-md xl:p-0 dark:bg-base">
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
                     <div>
                         <h1
