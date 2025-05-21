@@ -1087,7 +1087,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function drain_old_containers()
     {
-        if (! $this->application->settings->is_zero_downtime_deployment_enabled) {
+        if (! $this->application->isZeroDowntimeDeploymentEnabled()) {
             return;
         }
         if ($this->application->isHealthcheckDisabled() && $this->application->custom_healthcheck_found === false) {
@@ -1142,10 +1142,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
 
                 $healthStatus = str($this->saved_outputs->get('container_health_status'))->replace('"', '')->value();
+                ray('healthStatus', $healthStatus);
                 // $this->application_deployment_queue->addLogEntry("Container {$containerName} health status: {$healthStatus}");
 
                 if ($healthStatus !== 'unhealthy') {
                     $allUnhealthy = false;
+                }
+                if (str($healthStatus)->contains('no entry for key Health')) {
+                    $allUnhealthy = true;
                 }
             }
 

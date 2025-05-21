@@ -13,9 +13,15 @@
                     helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" />
             @endif
-            <x-forms.checkbox
-                helper="When enabled, the application will be deployed without any downtime. <br><br>When the new version is healthy, the old version will be drained, so there could be a short period of time when both versions are receiving traffic."
-                instantSave id="isZeroDowntimeDeploymentEnabled" label="Zero Downtime Deployments" />
+            @if ($application->isHealthcheckEnabled())
+                <x-forms.checkbox
+                    helper="When enabled, the application will be deployed without any downtime. <br><br>When the new version is healthy, the old version will be drained, so there could be a short period of time when both versions are receiving traffic."
+                    instantSave id="isZeroDowntimeDeploymentEnabled" label="Zero Downtime Deployments" />
+            @else
+                <x-forms.checkbox
+                    helper="You can only enable this feature if your application is <a class='underline dark:text-white' href='{{ route('project.application.healthcheck', ['project_uuid' => $application->project()->uuid, 'environment_uuid' => $application->environment->uuid, 'application_uuid' => $application->uuid]) }}'>healthcheck enabled</a>."
+                    instantSave id="isZeroDowntimeDeploymentEnabled" label="Zero Downtime Deployments" disabled />
+            @endif
             <x-forms.checkbox helper="Disable Docker build cache on every deployment." instantSave
                 id="disableBuildCache" label="Disable Build Cache" />
 

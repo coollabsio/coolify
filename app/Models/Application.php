@@ -221,6 +221,11 @@ class Application extends BaseModel
                     $payload['custom_nginx_configuration'] = null;
                 }
             }
+            if ($application->isDirty('health_check_enabled')) {
+                if (! $application->health_check_enabled) {
+                    $application->settings->update(['is_zero_downtime_deployment_enabled' => false]);
+                }
+            }
             if (count($payload) > 0) {
                 $application->forceFill($payload);
             }
@@ -917,13 +922,19 @@ class Application extends BaseModel
         return true;
     }
 
+    public function isZeroDowntimeDeploymentEnabled(): bool
+    {
+        return data_get($this, 'settings.is_zero_downtime_deployment_enabled', false);
+    }
+
+    public function isHealthcheckEnabled(): bool
+    {
+        return data_get($this, 'health_check_enabled', false);
+    }
+
     public function isHealthcheckDisabled(): bool
     {
-        if (data_get($this, 'health_check_enabled') === false) {
-            return true;
-        }
-
-        return false;
+        return ! $this->isHealthcheckEnabled();
     }
 
     public function workdir()
