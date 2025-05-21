@@ -4,6 +4,14 @@
 # logo: svgs/espocrm.svg
 # port: 80
 
+# Custom Domains: Unlike many other Open Source CRMs that only use a Web App and Database, EspoCRM leverages a WebSocket and Daemon for 
+# real-time updates. If you wish to use custom domains, you need to create two domains: one for the Web App (e.g., https://yourdomain.com) 
+# and one for the WebSocket (e.g., https://ws.yourdomain.com). Ensure both domains have A records pointing to your server's IP address. 
+# First, deploy the template in Coolify and let everything set up with the auto-generated domains. Once everything is running, go to the 
+# Coolify GUI, update the Web App domain to https://yourdomain.com and the WebSocket domain to https://ws.yourdomain.com, 
+# save the changes, and restart the containers.
+
+
 services:
   espocrm-db:
     image: mariadb:latest
