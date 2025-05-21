@@ -50,6 +50,8 @@ class Heading extends Component
     {
         if ($this->service->server->isFunctional()) {
             GetContainersStatus::dispatch($this->service->server);
+        } else {
+            $this->dispatch('error', 'Server is not functional.');
         }
     }
 
@@ -103,7 +105,7 @@ class Heading extends Component
             $activities = Activity::where('properties->type_uuid', $this->service->uuid)
                 ->where(function ($q) {
                     $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
-                      ->orWhere('properties->status', ProcessStatus::QUEUED->value);
+                        ->orWhere('properties->status', ProcessStatus::QUEUED->value);
                 })->get();
             foreach ($activities as $activity) {
                 $activity->properties->status = ProcessStatus::ERROR->value;
@@ -119,6 +121,7 @@ class Heading extends Component
     public function stop()
     {
         try {
+            $this->dispatch('info', 'Gracefully stopping service, it could take a while depending on the service.');
             StopService::dispatch($this->service, false, $this->docker_cleanup);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());

@@ -51,6 +51,8 @@ class Heading extends Component
     {
         if ($this->database->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->database->destination->server);
+        } else {
+            $this->dispatch('error', 'Server is not functional.');
         }
     }
 
@@ -62,7 +64,7 @@ class Heading extends Component
     public function stop()
     {
         try {
-            $this->dispatch('info', 'Stopping database.');
+            $this->dispatch('info', 'Gracefully stopping database, it could take a while depending on the size of the database.');
             StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
