@@ -1,0 +1,97 @@
+# documentation: https://docs.espocrm.com/administration/docker/installation/
+# slogan: Espo CRM is a free, open-source CRM platform for managing customer relationships, leads, sales, and marketing with real-time updates in an intuitive interface
+# tags: crm,sales,marketing,customer,relationship,management,business
+# logo: svgs/espocrm.svg
+# port: 80
+
+# Custom Domains: Unlike many other Open Source CRMs that only use a Web App and Database, EspoCRM leverages a WebSocket and Daemon for 
+# real-time updates. If you wish to use custom domains, you need to create two domains: one for the Web App (e.g., https://yourdomain.com) 
+# and one for the WebSocket (e.g., https://ws.yourdomain.com). Ensure both domains have A records pointing to your server's IP address. 
+# First, deploy the template in Coolify and let everything set up with the auto-generated domains. Once everything is running, go to the 
+# Coolify GUI, update the Web App domain to https://yourdomain.com and the WebSocket domain to https://ws.yourdomain.com, 
+# save the changes, and restart the containers.
+
+
+services:
+  espocrm-db:
+    image: mariadb:latest
+    environment:
+      - MARIADB_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MARIADB_DATABASE=espocrm
+      - MARIADB_USER=espocrm
+      - MARIADB_PASSWORD=$SERVICE_PASSWORD_DB
+    volumes:
+      - espocrm-db:/var/lib/mysql
+    restart: always
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 20s
+      start_period: 10s
+      timeout: 10s
+      retries: 3
+
+  espocrm:
+    image: espocrm/espocrm:apache
+    environment:
+      - ESPOCRM_DATABASE_PLATFORM=Mysql
+      - ESPOCRM_DATABASE_HOST=espocrm-db
+      - ESPOCRM_DATABASE_USER=espocrm
+      - ESPOCRM_DATABASE_PASSWORD=$SERVICE_PASSWORD_DB
+      - ESPOCRM_ADMIN_USERNAME=admin
+      - ESPOCRM_ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMIN
+      - ESPOCRM_SITE_URL=https://$SERVICE_FQDN_ESPOCRM
+      - SERVICE_FQDN_ESPOCRM
+    volumes:
+      - espocrm:/var/www/html
+    restart: always
+    depends_on:
+      espocrm-db:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.espocrm.rule=Host(`$SERVICE_FQDN_ESPOCRM`)
+      - traefik.http.routers.espocrm.entryPoints=http
+      - traefik.http.services.espocrm.loadbalancer.server.port=80
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  espocrm-daemon:
+    image: espocrm/espocrm:apache
+    volumes:
+      - espocrm:/var/www/html
+    restart: always
+    entrypoint: docker-daemon.sh
+    depends_on:
+      - espocrm
+
+  espocrm-websocket:
+    image: espocrm/espocrm:apache
+    environment:
+      - ESPOCRM_CONFIG_USE_WEB_SOCKET=true
+      - ESPOCRM_CONFIG_WEB_SOCKET_URL=wss://$SERVICE_FQDN_SOCKET
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBSCRIBER_DSN=tcp://*:7777
+      - ESPOCRM_CONFIG_WEB_SOCKET_ZERO_M_Q_SUBMISSION_DSN=tcp://espocrm-websocket:7777
+      - SERVICE_FQDN_SOCKET
+    volumes:
+      - espocrm:/var/www/html
+    restart: always
+    entrypoint: docker-websocket.sh
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.espocrm-websocket.rule=Host(`$SERVICE_FQDN_SOCKET`)
+      - traefik.http.routers.espocrm-websocket.entryPoints=http
+      - traefik.http.services.espocrm-websocket.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  espocrm-db:
+  espocrm:
