@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
-use App\Events\ApplicationStatusChanged;
+use App\Events\ServiceStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -331,7 +331,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
             $this->graceful_shutdown_container($this->deployment_uuid);
 
-            ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
+            ServiceStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
 
@@ -507,7 +507,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->env_filename) {
                 $command .= " --env-file {$this->workdir}/{$this->env_filename}";
             }
-            $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+            if ($this->force_rebuild) {
+                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
+            } else {
+                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+            }
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
             );

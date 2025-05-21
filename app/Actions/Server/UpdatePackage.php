@@ -49,33 +49,4 @@ class UpdatePackage
             ];
         }
     }
-
-    private function parseAptOutput(string $output): array
-    {
-        $updates = [];
-        $lines = explode("\n", $output);
-
-        foreach ($lines as $line) {
-            // Skip the "Listing... Done" line and empty lines
-            if (empty($line) || str_contains($line, 'Listing...')) {
-                continue;
-            }
-
-            // Example line: package/stable 2.0-1 amd64 [upgradable from: 1.0-1]
-            if (preg_match('/^(.+?)\/(\S+)\s+(\S+)\s+(\S+)\s+\[upgradable from: (.+?)\]/', $line, $matches)) {
-                $updates[] = [
-                    'package' => $matches[1],
-                    'repository' => $matches[2],
-                    'new_version' => $matches[3],
-                    'architecture' => $matches[4],
-                    'current_version' => $matches[5],
-                ];
-            }
-        }
-
-        return [
-            'total_updates' => count($updates),
-            'updates' => $updates,
-        ];
-    }
 }

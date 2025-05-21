@@ -84,7 +84,7 @@ class CheckUpdates
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
                     $rebootRequired = instant_remote_process(['LANG=C dnf needs-restarting -r'], $server);
-                    $out['reboot_required'] = $rebootRequired === '0' ? true : false;
+                    $out['reboot_required'] = $rebootRequired !== '0';
 
                     return $out;
                 case 'apt':
