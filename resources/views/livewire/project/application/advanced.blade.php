@@ -13,8 +13,11 @@
                     helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
                     instantSave id="isPreviewDeploymentsEnabled" label="Preview Deployments" />
             @endif
-            <x-forms.checkbox helper="Disable Docker build cache on every deployment." instantSave id="disableBuildCache"
-                label="Disable Build Cache" />
+            <x-forms.checkbox
+                helper="When enabled, the application will be deployed without any downtime. <br><br>When the new version is healthy, the old version will be drained, so there could be a short period of time when both versions are receiving traffic."
+                instantSave id="isZeroDowntimeDeploymentEnabled" label="Zero Downtime Deployments" />
+            <x-forms.checkbox helper="Disable Docker build cache on every deployment." instantSave
+                id="disableBuildCache" label="Disable Build Cache" />
 
             @if ($application->settings->is_container_label_readonly_enabled)
                 <x-forms.checkbox
