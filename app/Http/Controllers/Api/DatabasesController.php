@@ -156,7 +156,7 @@ class DatabasesController extends Controller
 
         $backupConfig = ScheduledDatabaseBackup::with('executions')->where('database_id', $database->id)->get();
 
-        return response()->json($this->removeSensitiveData($backupConfig));
+        return response()->json($backupConfig);
     }
 
     #[OA\Get(
@@ -288,7 +288,6 @@ class DatabasesController extends Controller
                         'mysql_user' => ['type' => 'string', 'description' => 'MySQL user'],
                         'mysql_database' => ['type' => 'string', 'description' => 'MySQL database'],
                         'mysql_conf' => ['type' => 'string', 'description' => 'MySQL conf'],
-                        // WIP
                         'save_s3' => ['type' => 'boolean', 'description' => 'Weather data is saved in s3 or not'],
                         's3_storage_id' => ['type' => 'integer', 'description' => 'S3 storage id'],
                         'backup_now' => ['type' => 'boolean', 'description' => 'Weather to take a backup now or not'],
@@ -644,6 +643,156 @@ class DatabasesController extends Controller
 
         return response()->json([
             'message' => 'Database updated.',
+        ]);
+    }
+
+    #[OA\Patch(
+        summary: 'Update',
+        description: 'Update a specific backup configuration for a given database, identified by its UUID and the backup ID',
+        path: '/databases/{uuid}/backups/{backup_id}',
+        operationId: 'update-database-backup-config-by-uuid-and-backup-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the database.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+            new OA\Parameter(
+                name: 'backup_id',
+                in: 'path',
+                description: 'ID of the backup configuration.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Database backup configuration data',
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'save_s3' => ['type' => 'boolean', 'description' => 'Weather data is saved in s3 or not'],
+                        's3_storage_id' => ['type' => 'integer', 'description' => 'S3 storage id'],
+                        'backup_now' => ['type' => 'boolean', 'description' => 'Weather to take a backup now or not'],
+                        'enabled' => ['type' => 'boolean', 'description' => 'Weather the backup is enabled or not'],
+                        'databases_to_backup' => ['type' => 'string', 'description' => 'Comma separated list of databases to backup'],
+                        'dump_all' => ['type' => 'boolean', 'description' => 'Weather all databases are dumped or not'],
+                        'frequency' => ['type' => 'string', 'description' => 'Frequency of the backup'],
+                        'database_backup_retention_amount_locally' => ['type' => 'integer', 'description' => 'Retention amount of the backup locally'],
+                        'database_backup_retention_days_locally' => ['type' => 'integer', 'description' => 'Retention days of the backup locally'],
+                        'database_backup_retention_max_storage_locally' => ['type' => 'integer', 'description' => 'Max storage of the backup locally'],
+                        'database_backup_retention_amount_s3' => ['type' => 'integer', 'description' => 'Retention amount of the backup in s3'],
+                        'database_backup_retention_days_s3' => ['type' => 'integer', 'description' => 'Retention days of the backup in s3'],
+                        'database_backup_retention_max_storage_s3' => ['type' => 'integer', 'description' => 'Max storage of the backup locally'],
+                    ],
+                ),
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Database backup configuration updated',
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function update_backup_config_by_uuid_and_backup_id(Request $request)
+    {
+        $backupConfigFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_id'];
+
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        // this check if the request is a valid json
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+        $validator = customApiValidator($request->all(), [
+            'save_s3' => 'boolean',
+            'backup_now' => 'boolean|nullable',
+            'enabled' => 'boolean',
+            'dump_all' => 'boolean',
+            's3_storage_id' => 'integer|min:1|exists:s3_storages,id|nullable',
+            'databases_to_backup' => 'string',
+            'frequency' => 'string|in:every_minute,hourly,daily,weekly,monthly,yearly',
+            'database_backup_retention_amount_locally' => 'integer|min:0',
+            'database_backup_retention_days_locally' => 'integer|min:0',
+            'database_backup_retention_max_storage_locally' => 'integer|min:0',
+            'database_backup_retention_amount_s3' => 'integer|min:0',
+            'database_backup_retention_days_s3' => 'integer|min:0',
+            'database_backup_retention_max_storage_s3' => 'integer|min:0',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'UUID is required.'], 404);
+        }
+        $uuid = $request->uuid;
+        removeUnnecessaryFieldsFromRequest($request);
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $backupConfig = ScheduledDatabaseBackup::where('database_id', $database->id)
+            ->where('id', $request->backup_id)
+            ->first();
+        if (! $backupConfig) {
+            return response()->json(['message' => 'Backup config not found.'], 404);
+        }
+
+        $extraFields = array_diff(array_keys($request->all()), $backupConfigFields, ['backup_now']);
+        if (! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $backupConfig->update($request->only($backupConfigFields));
+
+        if ($request->backup_now) {
+            DatabaseBackupJob::dispatch($backupConfig);
+        }
+
+        return response()->json([
+            'message' => 'Database backup configuration updated',
         ]);
     }
 
