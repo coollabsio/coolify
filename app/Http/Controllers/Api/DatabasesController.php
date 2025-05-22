@@ -326,7 +326,6 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedBackupConfigsFields = ['save_s3', 'enabled', 'dump_all', 'frequency', 'databases_to_backup', 'database_backup_retention_amount_locally', 'database_backup_retention_days_locally', 'database_backup_retention_max_storage_locally', 'database_backup_retention_amount_s3', 'database_backup_retention_days_s3', 'database_backup_retention_max_storage_s3', 's3_storage_id'];
         $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -351,19 +350,6 @@ class DatabasesController extends Controller
             'limits_cpus' => 'string',
             'limits_cpuset' => 'string|nullable',
             'limits_cpu_shares' => 'numeric',
-            'save_s3' => 'boolean',
-            'backup_now' => 'boolean|nullable',
-            'enabled' => 'boolean',
-            'dump_all' => 'boolean',
-            's3_storage_id' => 'integer|min:1|exists:s3_storages,id|nullable',
-            'databases_to_backup' => 'string',
-            'frequency' => 'string|in:every_minute,hourly,daily,weekly,monthly,yearly',
-            'database_backup_retention_amount_locally' => 'integer|min:0',
-            'database_backup_retention_days_locally' => 'integer|min:0',
-            'database_backup_retention_max_storage_locally' => 'integer|min:0',
-            'database_backup_retention_amount_s3' => 'integer|min:0',
-            'database_backup_retention_days_s3' => 'integer|min:0',
-            'database_backup_retention_max_storage_s3' => 'integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -375,7 +361,6 @@ class DatabasesController extends Controller
         $uuid = $request->uuid;
         removeUnnecessaryFieldsFromRequest($request);
         $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
-        $backupConfig = ScheduledDatabaseBackup::where('database_id', $database->id)->first();
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
@@ -574,7 +559,7 @@ class DatabasesController extends Controller
                 }
                 break;
         }
-        $extraFields = array_diff(array_keys($request->all()), $allowedFields, $allowedBackupConfigsFields, ['backup_now']);
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {
             $errors = $validator->errors();
             if (! empty($extraFields)) {
@@ -596,44 +581,7 @@ class DatabasesController extends Controller
             $whatToDoWithDatabaseProxy = 'start';
         }
 
-        $backupPayload = $request->only($allowedBackupConfigsFields);
-        $databasePayload = $request->only($allowedFields);
-
-        if ($databasePayload) {
-            $database->update($databasePayload);
-        }
-
-        if ($backupPayload && $backupConfig) {
-            $backupConfig->update($backupPayload);
-
-            if ($request->backup_now) {
-                DatabaseBackupJob::dispatch($backupConfig);
-            }
-        }
-
-        if ($backupPayload && ! $backupConfig) {
-            if ($database->type() === 'standalone-postgresql') {
-                $backupPayload['databases_to_backup'] = $database->postgres_db;
-            } elseif ($database->type() === 'standalone-mysql') {
-                $backupPayload['databases_to_backup'] = $database->mysql_database;
-            } elseif ($database->type() === 'standalone-mariadb') {
-                $backupPayload['databases_to_backup'] = $database->mariadb_database;
-            } elseif ($database->type() === 'standalone-mongodbs') {
-                $backupPayload['databases_to_backup'] = $database->mongo_initdb_database;
-            }
-
-            $backupConfig = ScheduledDatabaseBackup::create([
-                'database_id' => $database->id,
-                'database_type' => $database->getMorphClass(),
-                'team_id' => $teamId,
-                's3_storage_id' => $backupPayload['s3_storage_id'] ?? 1,
-                ...$backupPayload,
-            ]);
-
-            if ($request->backup_now) {
-                DatabaseBackupJob::dispatch($backupConfig);
-            }
-        }
+        $database->update($request->all());
 
         if ($whatToDoWithDatabaseProxy === 'start') {
             StartDatabaseProxy::dispatch($database);
