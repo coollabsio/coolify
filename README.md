@@ -20,6 +20,10 @@ For more information, take a look at our landing page at [coolify.io](https://co
 ```bash
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
+If you want to customize the port for running Coolify, which is 8000 by default, you can specify it with the following command:
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s -- --port {{PORT_NUMBER}}
+```
 You can find the installation script source [here](./scripts/install.sh).
 
 > [!NOTE]
