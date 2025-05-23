@@ -6,7 +6,6 @@
 services:
   netbird-client:
     image: 'netbirdio/netbird:latest'
-    network_mode: host
     environment:
       - 'NB_SETUP_KEY=${NB_SETUP_KEY}'
       - 'NB_ENABLE_ROSENPASS=${NB_ENABLE_ROSENPASS:-false}'
@@ -25,5 +24,3 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-volumes:
-  netbird-client:
