@@ -18,7 +18,6 @@ services:
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
-      - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
     pull_policy: always
     ports:
@@ -31,7 +30,7 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
-      - dev_postgres_data:/var/lib/postgresql/data
+      - coolify_dev_postgres_data:/var/lib/postgresql/data
   redis:
     pull_policy: always
     ports:
@@ -39,7 +38,7 @@ services:
     env_file:
       - .env
     volumes:
-      - dev_redis_data:/data
+      - coolify_dev_redis_data:/data
   soketi:
     build:
       context: .
@@ -76,15 +75,15 @@ services:
     build:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
-    init: true
     container_name: coolify-testing-host
+    privileged: true
+    cgroup: host
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - dev_coolify_data:/data/coolify
-      - dev_backups_data:/data/coolify/backups
-      - dev_postgres_data:/data/coolify/_volumes/database
-      - dev_redis_data:/data/coolify/_volumes/redis
-      - dev_minio_data:/data/coolify/_volumes/minio
+      - coolify_dev_data:/data/coolify
+      - coolify_dev_docker_data:/var/lib/docker/volumes/
     networks:
       - coolify
   mailpit:
@@ -108,16 +107,21 @@ services:
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
-      - dev_minio_data:/data
+      - coolify_dev_minio_data:/data
     networks:
       - coolify
 
 volumes:
-  dev_backups_data:
-  dev_postgres_data:
-  dev_redis_data:
-  dev_coolify_data:
-  dev_minio_data:
+  coolify_dev_postgres_data:
+    name: coolify_dev_postgres_data
+  coolify_dev_redis_data:
+    name: coolify_dev_redis_data
+  coolify_dev_minio_data:
+    name: coolify_dev_minio_data
+  coolify_dev_data:
+    name: coolify_dev_data
+  coolify_dev_docker_data:
+    name: coolify_dev_docker_data
 
 networks:
   coolify:
