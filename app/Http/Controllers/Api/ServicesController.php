@@ -1428,6 +1428,16 @@ class ServicesController extends Controller
                     format: 'uuid',
                 )
             ),
+            new OA\Parameter(
+                name: 'latest',
+                in: 'query',
+                description: 'Pull latest images.',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: false,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1473,7 +1483,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        RestartService::dispatch($service);
+        $pullLatest = $request->boolean('latest');
+        RestartService::dispatch($service, $pullLatest);
 
         return response()->json(
             [
