@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 63.1 (92452) - https://sketch.com -->
+    <title>grist-logo-icon-transparent</title>
+    <desc>Created with Sketch.</desc>
+    <g id="grist-logo-icon-transparent" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group" transform="translate(2.000000, 2.000000)" fill-rule="nonzero">
+            <path d="M28,0 L23.6428184,0 C21.6322666,0 20,1.79548025 20,4.00705058 L20,8 L24.3914994,8 C26.3831172,8 28,6.22135696 28,4.03062271 L28,0 Z" id="Path" fill="#16B378"></path>
+            <path d="M18,0 L13.6428184,0 C11.6322666,0 10,1.79548025 10,4.00705058 L10,8 L14.3914994,8 C16.3831172,8 18,6.22135696 18,4.03062271 L18,0 Z" id="Path" fill="#16B378" transform="translate(14.000000, 4.000000) scale(-1, 1) translate(-14.000000, -4.000000) "></path>
+            <path d="M8,10 L3.64281839,10 C1.63226664,10 0,11.7954803 0,14.0070506 L0,18 L4.39149942,18 C6.38311718,18 8,16.221357 8,14.0306227 L8,10 Z" id="Path" fill="#F9AE41" transform="translate(4.000000, 14.000000) scale(-1, 1) translate(-4.000000, -14.000000) "></path>
+            <path d="M8,20 L3.64281839,20 C1.63226664,20 0,21.7954803 0,24.0070506 L0,28 L4.39149942,28 C6.38311718,28 8,26.221357 8,24.0306227 L8,20 Z" id="Path" fill="#F9AE41" transform="translate(4.000000, 24.000000) scale(-1, 1) translate(-4.000000, -24.000000) "></path>
+            <path d="M18,10 L13.6428184,10 C11.6322666,10 10,11.7954803 10,14.0070506 L10,18 L14.3914994,18 C16.3831172,18 18,16.221357 18,14.0306227 L18,10 Z" id="Path" fill="#D2D2D2" transform="translate(14.000000, 14.000000) scale(-1, 1) translate(-14.000000, -14.000000) "></path>
+            <path d="M28,10 L23.6428184,10 C21.6322666,10 20,11.7954803 20,14.0070506 L20,18 L24.3914994,18 C26.3831172,18 28,16.221357 28,14.0306227 L28,10 Z" id="Path" fill="#D2D2D2"></path>
+            <path d="M18,20 L13.6428184,20 C11.6322666,20 10,21.7954803 10,24.0070506 L10,28 L14.3914994,28 C16.3831172,28 18,26.221357 18,24.0306227 L18,20 Z" id="Path" fill="#D2D2D2" transform="translate(14.000000, 24.000000) scale(-1, 1) translate(-14.000000, -24.000000) "></path>
+            <path d="M28,20 L23.6428184,20 C21.6322666,20 20,21.7954803 20,24.0070506 L20,28 L24.3914994,28 C26.3831172,28 28,26.221357 28,24.0306227 L28,20 Z" id="Path" fill="#D2D2D2"></path>
+        </g>
+    </g>
+</svg>
