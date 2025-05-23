@@ -238,7 +238,7 @@ function generate_default_proxy_configuration(Server $server)
                         'host.docker.internal:host-gateway',
                     ],
                     'environment' => [
-                        'CADDY_DOCKER_POLLING_INTERVAL=5s',
+                        'CADDY_DOCKER_POLLING_INTERVAL=1s',
                         'CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile',
                     ],
                     'networks' => $networks->toArray(),

@@ -67,6 +67,9 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConnectToDockerNetworkEnabled = false;
 
+    #[Validate(['boolean'])]
+    public bool $isZeroDowntimeDeploymentEnabled = false;
+
     public function mount()
     {
         try {
@@ -98,6 +101,7 @@ class Advanced extends Component
             $this->application->settings->is_stripprefix_enabled = $this->isStripprefixEnabled;
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
             $this->application->settings->connect_to_docker_network = $this->isConnectToDockerNetworkEnabled;
+            $this->application->settings->is_zero_downtime_deployment_enabled = $this->isZeroDowntimeDeploymentEnabled;
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
             $this->application->settings->save();
         } else {
@@ -120,6 +124,7 @@ class Advanced extends Component
             $this->customInternalName = $this->application->settings->custom_internal_name;
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
+            $this->isZeroDowntimeDeploymentEnabled = $this->application->settings->is_zero_downtime_deployment_enabled;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
         }
     }

@@ -12,6 +12,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Auth;
 use Livewire\Component;
 
 class ConfigurationChecker extends Component
@@ -20,7 +21,15 @@ class ConfigurationChecker extends Component
 
     public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
 
-    protected $listeners = ['configurationChanged'];
+    public function getListeners()
+    {
+        $teamId = Auth::user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceStatusChanged" => 'configurationChanged',
+            'configurationChanged',
+        ];
+    }
 
     public function mount()
     {
