@@ -31,17 +31,9 @@ x-shared-env: &shared-api-env
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
   AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
   AWS_BUCKET: ${AWS_BUCKET}
-  JWT_TTL: ${JWT_TTL:-1440}
-  JWT_SECRET: ${SERVICE_PASSWORD_JWTSECRET}
-  JWT_SKIP_IP_UA_VALIDATION: ${JWT_SKIP_IP_UA_VALIDATION:-true}
   OPEN_AI_API_KEY: ${OPEN_AI_API_KEY}
-  H_CAPTCHA_SITE_KEY: ${H_CAPTCHA_SITE_KEY}
-  H_CAPTCHA_SECRET_KEY: ${H_CAPTCHA_SECRET_KEY}
-  RE_CAPTCHA_SITE_KEY: ${RE_CAPTCHA_SITE_KEY}
-  RE_CAPTCHA_SECRET_KEY: ${RE_CAPTCHA_SECRET_KEY}
   TELEGRAM_BOT_ID: ${TELEGRAM_BOT_ID}
   TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-  SHOW_OFFICIAL_TEMPLATES: ${SHOW_OFFICIAL_TEMPLATES:-true}
   REDIS_HOST: redis
   REDIS_PASSWORD: ${SERVICE_PASSWORD_64_REDIS}
   # Database settings
@@ -59,11 +51,19 @@ x-shared-env: &shared-api-env
 services:
   opnform-api:
     image: jhumanj/opnform-api:latest
-    volumes: &api-environment-volumes
-      - api-storage:/usr/share/nginx/html/storage:rw
+    volumes:
+      - api-storage:/usr/share/nginx/html/storage
     environment:
       # Use the shared environment variables.
       <<: *shared-api-env
+      JWT_TTL: ${JWT_TTL:-1440}
+      JWT_SECRET: ${SERVICE_PASSWORD_JWTSECRET}
+      JWT_SKIP_IP_UA_VALIDATION: ${JWT_SKIP_IP_UA_VALIDATION:-true}
+      H_CAPTCHA_SITE_KEY: ${H_CAPTCHA_SITE_KEY}
+      H_CAPTCHA_SECRET_KEY: ${H_CAPTCHA_SECRET_KEY}
+      RE_CAPTCHA_SITE_KEY: ${RE_CAPTCHA_SITE_KEY}
+      RE_CAPTCHA_SECRET_KEY: ${RE_CAPTCHA_SECRET_KEY}
+      SHOW_OFFICIAL_TEMPLATES: ${SHOW_OFFICIAL_TEMPLATES:-true}
     depends_on:
       postgresql:
         condition: service_healthy
@@ -78,7 +78,8 @@ services:
 
   api-worker:
     image: jhumanj/opnform-api:latest
-    volumes: *api-environment-volumes
+    volumes:
+      - api-storage:/usr/share/nginx/html/storage
     environment:
       # Use the shared environment variables.
       <<: *shared-api-env
@@ -97,7 +98,8 @@ services:
   
   api-scheduler:
     image: jhumanj/opnform-api:latest
-    volumes: *api-environment-volumes
+    volumes:
+      - api-storage:/usr/share/nginx/html/storage
     environment:
       # Use the shared environment variables.
       <<: *shared-api-env
@@ -222,11 +224,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-      
-volumes:
-  api-storage:
-    driver: local
-  opnform-postgresql-data:
-    driver: local
-  redis-data:
-    driver: local
