@@ -5,7 +5,7 @@
 # port: 5230
 
 services:
-  wg-easy:
+  memos:
     image: neosmemo/memos:stable
     volumes:
       - memos/:/var/opt/memos
