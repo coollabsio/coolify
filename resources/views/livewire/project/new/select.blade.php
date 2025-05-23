@@ -277,12 +277,12 @@
     @if ($current_step === 'select-postgresql-type')
         <h2>Select a Postgresql type</h2>
         <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select PostgreSQL
-            16 (default).</div>
+            17 (default).</div>
         <div class="flex flex-col gap-6 pt-8">
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
-                wire:click="setPostgresqlType('postgres:16-alpine')">
+                wire:click="setPostgresqlType('postgres:17-alpine')">
                 <div class="flex flex-col">
-                    <div class="box-title">PostgreSQL 16 (default)</div>
+                    <div class="box-title">PostgreSQL 17 (default)</div>
                     <div class="box-description">
                         PostgreSQL is a powerful, open-source object-relational database system (no extensions).
                     </div>
@@ -297,7 +297,7 @@
                 </div>
             </div>
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('supabase/postgres:15.6.1.113')">
+                wire:click="setPostgresqlType('supabase/postgres:17.4.1.032')">
                 <div class="flex flex-col">
                     <div class="box-title">Supabase PostgreSQL (with extensions)</div>
                     <div class="box-description">
@@ -314,9 +314,9 @@
                 </div>
             </div>
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('postgis/postgis')">
+                wire:click="setPostgresqlType('postgis/postgis:17-3.5-alpine')">
                 <div class="flex flex-col">
-                    <div class="box-title">PostGIS</div>
+                    <div class="box-title">PostGIS (AMD only)</div>
                     <div class="box-description">
                         PostGIS is a PostgreSQL extension for geographic objects.
                     </div>
@@ -331,9 +331,9 @@
                 </div>
             </div>
             <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('pgvector/pgvector:pg16')">
+                wire:click="setPostgresqlType('pgvector/pgvector:pg17')">
                 <div class="flex flex-col">
-                    <div class="box-title">PGVector (16)</div>
+                    <div class="box-title">PGVector (17)</div>
                     <div class="box-description">
                         PGVector is a PostgreSQL extension for vector data types.
                     </div>

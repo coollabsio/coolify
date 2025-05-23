@@ -6,6 +6,7 @@
     'buttonFullWidth' => false,
     'customButton' => null,
     'disabled' => false,
+    'dispatchAction' => false,
     'submitAction' => 'delete',
     'content' => null,
     'checkboxes' => [],
@@ -42,6 +43,7 @@
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
     confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
     submitAction: @js($submitAction),
+    dispatchAction: @js($dispatchAction),
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
@@ -72,6 +74,10 @@
                 return Promise.resolve(this.passwordError);
             }
         }
+        if (this.dispatchAction) {
+            $wire.dispatch(this.submitAction);
+            return true;
+        }
 
         const methodName = this.submitAction.split('(')[0];
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
@@ -81,7 +87,6 @@
             params.push(this.password);
         }
         params.push(this.selectedActions);
-
         return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {

@@ -7,6 +7,10 @@ function get_socialite_provider(string $provider)
 {
     $oauth_setting = OauthSetting::firstWhere('provider', $provider);
 
+    if (! filled($oauth_setting->redirect_uri)) {
+        $oauth_setting->update(['redirect_uri' => route('auth.callback', $provider)]);
+    }
+
     if ($provider === 'azure') {
         $azure_config = new \SocialiteProviders\Manager\Config(
             $oauth_setting->client_id,

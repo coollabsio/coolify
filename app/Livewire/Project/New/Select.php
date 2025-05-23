@@ -63,7 +63,7 @@ class Select extends Component
         }
         $projectUuid = data_get($this->parameters, 'project_uuid');
         $this->environments = Project::whereUuid($projectUuid)->first()->environments;
-        $this->selectedEnvironment = data_get($this->parameters, 'environment_uuid');
+        $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->first()->name;
     }
 
     public function render()
@@ -73,9 +73,11 @@ class Select extends Component
 
     public function updatedSelectedEnvironment()
     {
+        $environmentUuid = $this->environments->where('name', $this->selectedEnvironment)->first()->uuid;
+
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_uuid' => $this->selectedEnvironment,
+            'environment_uuid' => $environmentUuid,
         ]);
     }
 
