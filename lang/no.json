@@ -3,6 +3,7 @@
     "auth.login.authentik": "Logg inn med Authentik",
     "auth.login.azure": "Logg inn med Microsoft",
     "auth.login.bitbucket": "Logg inn med Bitbucket",
+    "auth.login.discord": "Logg inn med Discord",
     "auth.login.github": "Logg inn med GitHub",
     "auth.login.gitlab": "Logg inn med Gitlab",
     "auth.login.google": "Logg inn med Google",

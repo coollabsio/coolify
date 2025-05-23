@@ -2,6 +2,7 @@
     "auth.login": "Anmelden",
     "auth.login.azure": "Mit Microsoft anmelden",
     "auth.login.bitbucket": "Mit Bitbucket anmelden",
+    "auth.login.discord": "Mit Discord anmelden",
     "auth.login.github": "Mit GitHub anmelden",
     "auth.login.gitlab": "Mit GitLab anmelden",
     "auth.login.google": "Mit Google anmelden",

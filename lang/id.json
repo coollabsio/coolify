@@ -3,6 +3,7 @@
     "auth.login.authentik": "Masuk dengan Authentik",
     "auth.login.azure": "Masuk dengan Microsoft",
     "auth.login.bitbucket": "Masuk dengan Bitbucket",
+    "auth.login.discord": "Masuk dengan Discord",
     "auth.login.github": "Masuk dengan GitHub",
     "auth.login.gitlab": "Masuk dengan Gitlab",
     "auth.login.google": "Masuk dengan Google",

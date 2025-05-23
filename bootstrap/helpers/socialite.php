@@ -53,6 +53,7 @@ function get_socialite_provider(string $provider)
 
     $provider_class_map = [
         'bitbucket' => \Laravel\Socialite\Two\BitbucketProvider::class,
+        'discord' => \SocialiteProviders\Discord\Provider::class,
         'github' => \Laravel\Socialite\Two\GithubProvider::class,
         'gitlab' => \Laravel\Socialite\Two\GitlabProvider::class,
         'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
