@@ -53,4 +53,11 @@ return [
         'tenant' => env('GOOGLE_TENANT'),
     ],
 
+    'zitadel' => [
+        'client_id' => env('ZITADEL_CLIENT_ID'),
+        'client_secret' => env('ZITADEL_CLIENT_SECRET'),
+        'redirect' => env('ZITADEL_REDIRECT_URI'),
+        'base_url' => env('ZITADEL_BASE_URL'),
+    ]
+
 ];
