@@ -3,6 +3,83 @@
 
 [![Bounty Issues](https://img.shields.io/static/v1?labelColor=grey&color=6366f1&label=Algora&message=%F0%9F%92%8E+Bounty+issues&style=for-the-badge)](https://console.algora.io/org/coollabsio/bounties/new)
 
+# Setting up for Development and Testing
+
+To set up this project for development and testing, follow these steps:
+
+1. **Prerequisites**:
+   - Docker and Docker Compose
+   - PHP 8.4
+   - Composer
+   - Node.js and npm
+
+2. **Clone the repository**:
+   ```bash
+   git clone https://github.com/coollabsio/coolify.git
+   cd coolify
+   ```
+
+3. **Set up environment variables**:
+   ```bash
+   cp .env.development.example .env
+   ```
+
+4. **Start the development environment using Spin**:
+   ```bash
+   spin up
+   ```
+   If you don't have Spin installed, you can use Docker Compose directly:
+   ```bash
+   docker-compose -f docker-compose.dev.yml up -d
+   ```
+
+5. **Install PHP dependencies**:
+   ```bash
+   docker exec -it coolify composer install
+   ```
+
+6. **Generate application key**:
+   ```bash
+   docker exec -it coolify php artisan key:generate
+   ```
+
+7. **Run database migrations**:
+   ```bash
+   docker exec -it coolify php artisan migrate
+   ```
+
+8. **Seed the database**:
+   ```bash
+   docker exec -it coolify php artisan db:seed
+   ```
+
+9. **Install JavaScript dependencies and build assets**:
+   ```bash
+   docker exec -it coolify npm install
+   docker exec -it coolify npm run build
+   ```
+
+10. **Run tests**:
+    - For unit and feature tests:
+      ```bash
+      docker exec -it coolify php artisan test
+      ```
+      or using Pest:
+      ```bash
+      docker exec -it coolify ./vendor/bin/pest
+      ```
+    - For browser tests (Laravel Dusk):
+      ```bash
+      docker exec -it coolify php artisan dusk
+      ```
+
+11. **Access the application**:
+    - URL: `http://localhost:8000`
+    - Login: `test@example.com`
+    - Password: `password`
+
+For more detailed information, please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file.
+
 # About the Project
 
 Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc.

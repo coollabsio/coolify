@@ -2,6 +2,9 @@
     <a class="menu-item {{ $activeMenu === 'general' ? 'menu-item-active' : '' }}"
         href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}">General</a>
     @if ($server->isFunctional())
+        <a class="menu-item {{ $activeMenu === 'info' ? 'menu-item-active' : '' }}"
+            href="{{ route('server.info', ['server_uuid' => $server->uuid]) }}">Server Info
+        </a>
         <a class="menu-item {{ $activeMenu === 'advanced' ? 'menu-item-active' : '' }}"
             href="{{ route('server.advanced', ['server_uuid' => $server->uuid]) }}">Advanced
         </a>

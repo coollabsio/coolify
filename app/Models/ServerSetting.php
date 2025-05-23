@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
@@ -47,10 +48,26 @@ use OpenApi\Attributes as OA;
         'updated_at' => ['type' => 'string'],
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
+        'cpu_model' => ['type' => 'string', 'description' => 'The CPU model of the server.'],
+        'cpu_cores' => ['type' => 'integer', 'description' => 'The number of CPU cores of the server.'],
+        'cpu_speed' => ['type' => 'string', 'description' => 'The CPU speed of the server.'],
+        'memory_total' => ['type' => 'string', 'description' => 'The total memory of the server.'],
+        'memory_speed' => ['type' => 'string', 'description' => 'The memory speed of the server.'],
+        'swap_total' => ['type' => 'string', 'description' => 'The total swap memory of the server.'],
+        'disk_total' => ['type' => 'string', 'description' => 'The total disk space of the server.'],
+        'disk_used' => ['type' => 'string', 'description' => 'The used disk space of the server.'],
+        'disk_free' => ['type' => 'string', 'description' => 'The free disk space of the server.'],
+        'gpu_model' => ['type' => 'string', 'description' => 'The GPU model of the server.'],
+        'gpu_memory' => ['type' => 'string', 'description' => 'The GPU memory of the server.'],
+        'os_name' => ['type' => 'string', 'description' => 'The operating system name of the server.'],
+        'os_version' => ['type' => 'string', 'description' => 'The operating system version of the server.'],
+        'kernel_version' => ['type' => 'string', 'description' => 'The kernel version of the server.'],
+        'architecture' => ['type' => 'string', 'description' => 'The architecture of the server.'],
     ]
 )]
 class ServerSetting extends Model
 {
+    use HasFactory;
     protected $guarded = [];
 
     protected $casts = [

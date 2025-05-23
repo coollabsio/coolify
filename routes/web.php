@@ -42,6 +42,7 @@ use App\Livewire\Server\CloudflareTunnels;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\DockerCleanup;
+use App\Livewire\Server\Info;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
@@ -243,6 +244,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
+        Route::get('/info', Info::class)->name('server.info');
         Route::get('/cloudflare-tunnels', CloudflareTunnels::class)->name('server.cloudflare-tunnels');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
