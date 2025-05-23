@@ -35,6 +35,15 @@ class ExecuteContainerCommand extends Component
         'command' => 'required',
     ];
 
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
+
     public function mount()
     {
         if (! auth()->user()->isAdmin()) {
