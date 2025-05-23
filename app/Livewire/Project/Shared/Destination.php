@@ -119,17 +119,14 @@ class Destination extends Component
     public function refreshServers()
     {
         GetContainersStatus::run($this->resource->destination->server);
-        // ContainerStatusJob::dispatchSync($this->resource->destination->server);
         $this->loadData();
         $this->dispatch('refresh');
-        ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
 
     public function addServer(int $network_id, int $server_id)
     {
         $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
         $this->loadData();
-        ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
 
     public function removeServer(int $network_id, int $server_id, $password)

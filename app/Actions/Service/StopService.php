@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Actions\Server\CleanupDocker;
+use App\Events\ServiceStatusChanged;
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -31,6 +32,8 @@ class StopService
             }
         } catch (\Exception $e) {
             return $e->getMessage();
+        } finally {
+            ServiceStatusChanged::dispatch($service->environment->project->team->id);
         }
     }
 }
