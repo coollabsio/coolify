@@ -83,6 +83,7 @@ services:
     depends_on:
       - rybbit_backend
     restart: unless-stopped
+    exclude_from_hc: true
 
   rybbit_caddy:
     image: caddy:2-alpine
