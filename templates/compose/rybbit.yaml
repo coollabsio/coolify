@@ -1,0 +1,119 @@
+# documentation: https://www.rybbit.io/docs
+# slogan: An open-source vector database designed for high-performance similarity search and storage of embeddings.
+# tags: analytics, insights, privacy
+# logo: svgs/rybbit.png
+# port: 80
+
+services:
+  rybbit_clickhouse:
+    image: clickhouse/clickhouse-server:25.4.2
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_config:/etc/clickhouse-server/config.d
+    environment:
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8123/ping",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  rybbit_postgres:
+    image: postgres:17.4
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-analytics}
+      - POSTGRES_USER=${POSTGRES_USER:-frog}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  rybbit_backend:
+    image: ghcr.io/rybbit-io/rybbit-backend:latest
+    environment:
+      - NODE_ENV=production
+      - CLICKHOUSE_HOST=http://rybbit_clickhouse:8123
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_64_CLICKHOUSE}
+      - POSTGRES_HOST=rybbit_postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-analytics}
+      - POSTGRES_USER=${POSTGRES_USER:-frog}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_BETTERAUTH}
+      - BASE_URL=${SERVICE_FQDN_RYBBIT_80}
+      - DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
+    depends_on:
+      rybbit_clickhouse:
+        condition: service_healthy
+      rybbit_postgres:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  rybbit_client:
+    image: ghcr.io/rybbit-io/rybbit-client:latest
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BACKEND_URL=${BASE_URL}
+      - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP}
+    depends_on:
+      - rybbit_backend
+    restart: unless-stopped
+    exclude_from_hc: true
+
+  rybbit_caddy:
+    image: caddy:2-alpine
+    environment:
+      - SERVICE_FQDN_RYBBIT_80
+      - BASE_URL=":80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        content: |
+          {$BASE_URL} {
+            route {
+              @api path /api/*
+              uri @api strip_prefix /api
+              reverse_proxy @api http://rybbit_backend:3001 {
+                header_up Host {http.reverse_proxy.upstream.hostport}
+                header_up X-Real-IP {http.request.header.X-Real-IP}
+              }
+
+              reverse_proxy http://rybbit_client:3002 {
+                header_up Host {http.reverse_proxy.upstream.hostport}
+                header_up X-Real-IP {http.request.header.X-Real-IP}
+              }
+            }
+          }
