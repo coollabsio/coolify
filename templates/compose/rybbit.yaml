@@ -38,12 +38,12 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   rybbit_backend:
     image: ghcr.io/rybbit-io/rybbit-backend:latest
@@ -66,6 +66,12 @@ services:
         condition: service_healthy
       rybbit_postgres:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   rybbit_client:
@@ -83,13 +89,13 @@ services:
     environment:
       - SERVICE_FQDN_RYBBIT_80
       - BASE_URL=":80"
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
     volumes:
       - type: bind
         source: ./Caddyfile
