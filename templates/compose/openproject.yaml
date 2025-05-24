@@ -1,0 +1,132 @@
+# documentation: https://www.openproject.org/docs/
+# slogan: OpenProject is project management software for cloud and on-premises based companies with a focus on transparency and data sovereignty.
+# tags: project management
+# logo: svgs/openproject.svg
+# port: 80
+networks:
+  backend:
+    driver: bridge
+volumes:
+  pgdata: null
+  opdata: null
+services:
+  db:
+    image: "postgres:13"
+    restart: unless-stopped
+    stop_grace_period: 3s
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+    environment:
+      POSTGRES_PASSWORD: "${SERVICE_PASSWORD_PG:?}"
+      POSTGRES_DB: openproject
+    networks:
+      - backend
+  cache:
+    image: memcached
+    restart: unless-stopped
+    networks:
+      - backend
+  web:
+    image: "openproject/openproject:15-slim"
+    restart: unless-stopped
+    command: ./docker/prod/web
+    environment:
+      - SERVICE_FQDN_OP
+      - OPENPROJECT_HOST__NAME: ${SERVICE_FQDN_OP}
+      - OPENPROJECT_HTTPS: ${OPENPROJECT_HTTPS:-true}
+      - OPENPROJECT_HSTS: ${OPENPROJECT_HSTS:-true}
+      - RAILS_CACHE_STORE: memcache
+      - OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
+      - DATABASE_URL: "postgres://postgres:${SERVICE_PASSWORD_PG}@db/openproject?pool=20&encoding=unicode&reconnect=true"
+      - RAILS_MIN_THREADS: "4"
+      - RAILS_MAX_THREADS: "16"
+      - IMAP_ENABLED: "false"
+    volumes:
+      - "opdata:/var/openproject/assets"
+    networks:
+      - backend
+    depends_on:
+      - db
+      - cache
+      - seeder
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.openproject.rule=Host(`${SERVICE_FQDN_OP}`)
+      - traefik.http.routers.openproject.entrypoints=websecure
+      - traefik.http.routers.openproject.tls=true
+      - traefik.http.services.openproject.loadbalancer.server.port=8080
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://localhost:8080/health_checks/default"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+  worker:
+    image: "openproject/openproject:15-slim"
+    restart: unless-stopped
+    command: ./docker/prod/worker
+    environment:
+      OPENPROJECT_HOST__NAME: ${SERVICE_FQDN_OP}
+      OPENPROJECT_HTTPS: ${OPENPROJECT_HTTPS:-true}
+      OPENPROJECT_HSTS: ${OPENPROJECT_HSTS:-true}
+      RAILS_CACHE_STORE: memcache
+      OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
+      DATABASE_URL: "postgres://postgres:${SERVICE_PASSWORD_PG}@db/openproject?pool=20&encoding=unicode&reconnect=true"
+      RAILS_MIN_THREADS: "4"
+      RAILS_MAX_THREADS: "16"
+      IMAP_ENABLED: "false"
+    volumes:
+      - "opdata:/var/openproject/assets"
+    networks:
+      - backend
+    depends_on:
+      - db
+      - cache
+      - seeder
+  cron:
+    image: "openproject/openproject:15-slim"
+    restart: unless-stopped
+    command: ./docker/prod/cron
+    environment:
+      OPENPROJECT_HOST__NAME: ${SERVICE_FQDN_OP}
+      OPENPROJECT_HTTPS: ${OPENPROJECT_HTTPS:-true}
+      OPENPROJECT_HSTS: ${OPENPROJECT_HSTS:-true}
+      RAILS_CACHE_STORE: memcache
+      OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
+      DATABASE_URL: "postgres://postgres:${SERVICE_PASSWORD_PG}@db/openproject?pool=20&encoding=unicode&reconnect=true"
+      RAILS_MIN_THREADS: "4"
+      RAILS_MAX_THREADS: "16"
+      IMAP_ENABLED: "false"
+    volumes:
+      - "opdata:/var/openproject/assets"
+    networks:
+      - backend
+    depends_on:
+      - db
+      - cache
+      - seeder
+  seeder:
+    image: "openproject/openproject:15-slim"
+    restart: on-failure
+    command: ./docker/prod/seeder
+    environment:
+      OPENPROJECT_HOST__NAME: ${SERVICE_FQDN_OP}
+      OPENPROJECT_HTTPS: ${OPENPROJECT_HTTPS:-true}
+      OPENPROJECT_HSTS: ${OPENPROJECT_HSTS:-true}
+      RAILS_CACHE_STORE: memcache
+      OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
+      DATABASE_URL: "postgres://postgres:${SERVICE_PASSWORD_PG}@db/openproject?pool=20&encoding=unicode&reconnect=true"
+      RAILS_MIN_THREADS: "4"
+      RAILS_MAX_THREADS: "16"
+      IMAP_ENABLED: "false"
+    volumes:
+      - "opdata:/var/openproject/assets"
+    networks:
+      - backend
+    depends_on:
+      - db
+      - cache
