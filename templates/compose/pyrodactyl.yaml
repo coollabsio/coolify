@@ -5,11 +5,8 @@
 # port: 8080
 
 services:
-  pyrodactyl-panel:
+  pyrodactyl:
     image: 'ghcr.io/pyrohost/pyrodactyl:main'
-    restart: always
-    ports:
-      - '8080:80'
     volumes:
       - 'pyrovar:/app/var/'
       - 'pyronginx:/etc/nginx/http.d/'
@@ -34,12 +31,9 @@ services:
       - APP_TIMEZONE=${APP_TIMEZONE:-UTC}
       - APP_THEME=${APP_THEME:-pterodactyl}
       - SERVICE_FQDN_PYRODACTYL=${SERVICE_FQDN_PYRODACTYL}
-    networks:
-      - coolify
 
   database:
     image: 'mariadb:10.5'
-    restart: always
     environment:
       - MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_DATABASE_ROOT}
       - MARIADB_DATABASE=${DB_DATABASE:-pyrodactyl}
@@ -47,17 +41,9 @@ services:
       - MARIADB_PASSWORD=${SERVICE_PASSWORD_DATABASE}
     volumes:
       - 'database:/var/lib/mysql'
-    networks:
-      - coolify
 
   redis:
     image: 'redis:alpine'
     restart: always
     volumes:
       - 'redis:/data'
-    networks:
-      - coolify
-
-networks:
-  coolify:
-    external: true
