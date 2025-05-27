@@ -67,8 +67,18 @@ class Patches extends Component
 
     public function updateAllPackages()
     {
+        if (! $this->packageManager || ! $this->osId) {
+            $this->dispatch('error', message: 'Run “Check for updates” first.');
+            return;
+        }
+
         try {
-            $activity = UpdatePackage::run(server: $this->server, packageManager: $this->packageManager, osId: $this->osId, all: true);
+            $activity = UpdatePackage::run(
+                server: $this->server,
+                packageManager: $this->packageManager,
+                osId: $this->osId,
+                all: true
+            );
             $this->dispatch('activityMonitor', $activity->id, ServerPackageUpdated::class);
         } catch (\Exception $e) {
             $this->dispatch('error', message: $e->getMessage());

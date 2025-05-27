@@ -38,9 +38,9 @@
                         </svg>
                         Restart
                     </x-forms.button>
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Service">
+                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
+                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Stop Service">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -66,9 +66,9 @@
                         </svg>
                         Restart
                     </x-forms.button>
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Service">
+                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
+                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Stop Service">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -94,9 +94,9 @@
                         Deploy
                     </button>
                 @else
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Service">
+                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
+                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Stop Service">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"

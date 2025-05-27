@@ -5,7 +5,7 @@
         <div class="flex flex-col gap-2">
             <h3>Primary Server</h3>
             <div
-                class="relative flex flex-col bg-white border cursor-default dark:text-white box-without-bg dark:bg-coolgray-100 w-96 dark:border-black">
+                class="relative flex flex-col bg-white border cursor-default dark:text-white box-without-bg dark:bg-coolgray-100 dark:border-black">
                 @if (str($resource->realStatus())->startsWith('running'))
                     <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge ">
                     </div>
@@ -34,8 +34,9 @@
         @if ($resource?->additional_networks?->count() > 0 && data_get($resource, 'build_pack') !== 'dockercompose')
             <h3>Additional Server(s)</h3>
             @foreach ($resource->additional_networks as $destination)
-                <div class="flex flex-col gap-2">
-                    <div class="relative flex flex-col w-full box">
+                <div class="flex flex-col gap-2" wire:key="destination-{{ $destination->id }}">
+                    <div
+                        class="relative flex flex-col bg-white border cursor-default dark:text-white box-without-bg dark:bg-coolgray-100 dark:border-black">
                         @if (str(data_get($destination, 'pivot.status'))->startsWith('running'))
                             <div title="{{ data_get($destination, 'pivot.status') }}"
                                 class="absolute bg-success -top-1 -left-1 badge "></div>
@@ -75,25 +76,27 @@
         @endif
     </div>
     @if ($resource->getMorphClass() === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
-        @if (count($networks) > 0)
-            <h4>Choose another server</h4>
-            <div class="grid grid-cols-1 gap-4">
-                @foreach ($networks as $network)
-                    <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
-                        class="relative flex flex-col cursor-default dark:text-white box w-96 group">
-                        <div>
-                            <div class="box-title">
-                                Server: {{ data_get($network, 'server.name') }}
-                            </div>
-                            <div class="box-description">
-                                Network: {{ data_get($network, 'name') }}
+        <div class="flex flex-col gap-2">
+            @if (count($networks) > 0)
+                <h3>Add another server</h3>
+                <div class="grid grid-cols-1 gap-4">
+                    @foreach ($networks as $network)
+                        <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
+                            class="relative flex flex-col dark:text-white box group">
+                            <div>
+                                <div class="box-title">
+                                    Server: {{ data_get($network, 'server.name') }}
+                                </div>
+                                <div class="box-description">
+                                    Network: {{ data_get($network, 'name') }}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @endforeach
-            </div>
-        @else
-            <div>No additional servers available to attach.</div>
-        @endif
+                    @endforeach
+                </div>
+            @else
+                <div>No additional servers available to attach.</div>
+            @endif
+        </div>
     @endif
 </div>

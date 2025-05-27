@@ -50,6 +50,8 @@ class Heading extends Component
     {
         if ($this->application->destination->server->isFunctional()) {
             GetContainersStatus::dispatch($this->application->destination->server);
+        } else {
+            $this->dispatch('error', 'Server is not functional.');
         }
     }
 
@@ -108,6 +110,7 @@ class Heading extends Component
 
     public function stop()
     {
+        $this->dispatch('info', 'Gracefully stopping application, it could take a while depending on the application.');
         StopApplication::dispatch($this->application, false, $this->docker_cleanup);
     }
 

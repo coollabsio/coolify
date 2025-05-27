@@ -99,7 +99,7 @@ function format_docker_envs_to_json($rawOutput)
         $outputLines = json_decode($rawOutput, true, flags: JSON_THROW_ON_ERROR);
 
         return collect(data_get($outputLines[0], 'Config.Env', []))->mapWithKeys(function ($env) {
-            $env = explode('=', $env);
+            $env = explode('=', $env, 2);
 
             return [$env[0] => $env[1]];
         });

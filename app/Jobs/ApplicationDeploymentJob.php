@@ -507,7 +507,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->env_filename) {
                 $command .= " --env-file {$this->workdir}/{$this->env_filename}";
             }
-            $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+            if ($this->force_rebuild) {
+                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
+            } else {
+                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+            }
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
             );
@@ -1590,13 +1594,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
-                $coolify_envs->put('COOLIFY_DOMAIN_URL', $this->preview->fqdn);
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_URL', $this->preview->fqdn);
+                } else {
+                    $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
+                }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
-                $coolify_envs->put('COOLIFY_URL', $url);
-                $coolify_envs->put('COOLIFY_DOMAIN_FQDN', $url);
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_FQDN', $url);
+                } else {
+                    $coolify_envs->put('COOLIFY_URL', $url);
+                }
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {

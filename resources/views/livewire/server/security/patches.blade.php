@@ -23,7 +23,7 @@
                     <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">
                         Check Now</x-forms.button>
                 </div>
-                <div>Update your servers automatically.</div>
+                <div>Update your servers semi-automatically.</div>
                 <div>
                     <div class="flex flex-col gap-6 pt-4">
                         <div class="flex flex-col">
@@ -38,18 +38,20 @@
                                         <div class="text-green-500">Your server is up to date.</div>
                                     @endif
                                     @if (isset($updates) && count($updates) > 0)
-                                        <x-modal-confirmation title="Confirm package update?"
-                                            buttonTitle="Update All
+                                        <div class="pb-2">
+                                            <x-modal-confirmation title="Confirm package update?"
+                                                buttonTitle="Update All
                                             Packages"
-                                            isHighlightedButton submitAction="updateAllPackages" dispatchAction
-                                            :actions="[
-                                                'All packages will be updated to the latest version.',
-                                                'This action could restart your currently running containers if docker will be updated.',
-                                            ]" confirmationText="Update All Packages"
-                                            confirmationLabel="Please confirm the execution of the actions by entering the name below"
-                                            shortConfirmationLabel="Name" :confirmWithPassword=false
-                                            step2ButtonText="Update All
+                                                isHighlightedButton submitAction="updateAllPackages" dispatchAction
+                                                :actions="[
+                                                    'All packages will be updated to the latest version.',
+                                                    'This action could restart your currently running containers if docker will be updated.',
+                                                ]" confirmationText="Update All Packages"
+                                                confirmationLabel="Please confirm the execution of the actions by entering the name below"
+                                                shortConfirmationLabel="Name" :confirmWithPassword=false
+                                                step2ButtonText="Update All
                                             Packages" />
+                                        </div>
                                         <table>
                                             <thead>
                                                 <tr>
@@ -65,7 +67,7 @@
                                                 @foreach ($updates as $update)
                                                     <tr>
                                                         <td class="inline-flex gap-2 justify-center items-center">
-                                                            @if (data_get_str($update, 'package')->contains('docker'))
+                                                            @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel'))
                                                                 <x-helper :helper="'This package will restart your currently running containers'">
                                                                     <x-slot:icon>
                                                                         <svg class="w-4 h-4 text-red-500 block"
