@@ -290,8 +290,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/download/backup/{executionId}', function () {
         try {
             $team = auth()->user()->currentTeam();
+            $user = auth()->user();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if ($user->isAdminFromSession() === false) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();

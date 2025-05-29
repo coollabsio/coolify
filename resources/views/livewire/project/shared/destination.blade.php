@@ -63,13 +63,14 @@
                             <x-forms.button isError
                                 wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
                         @endif
-                        <x-modal-confirmation title="Confirm server removal?" isErrorButton buttonTitle="Remove Server"
+                        <x-modal-confirmation title="Confirm removing application from server?" isErrorButton
+                            buttonTitle="Remove from server"
                             submitAction="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
                             :actions="[
                                 'This will stop the all running applications on this server and remove it as a deployment destination.',
                             ]" confirmationText="{{ data_get($destination, 'server.name') }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                            shortConfirmationLabel="Server Name" step3ButtonText="Permanently Remove Server" />
+                            shortConfirmationLabel="Server Name" step3ButtonText="Remove application from server" />
                     </div>
                 </div>
             @endforeach
@@ -77,7 +78,24 @@
     </div>
     @if ($resource->getMorphClass() === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
         <div class="flex flex-col gap-2">
-            @if (count($networks) > 0)
+            @if ($resource->persistentStorages()->count() > 0)
+                <h3>Add another server</h3>
+                <div
+                    class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-900/20 dark:border-yellow-800">
+                    <div class="flex items-center">
+
+                        <div>
+                            <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cannot add additional
+                                servers</h4>
+                            <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                                This application has persistent storage volumes configured. Applications with persistent
+                                storage cannot be deployed to multiple servers as the storage would not be accessible
+                                across different servers.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @elseif (count($networks) > 0)
                 <h3>Add another server</h3>
                 <div class="grid grid-cols-1 gap-4">
                     @foreach ($networks as $network)
