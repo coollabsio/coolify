@@ -10,9 +10,9 @@ services:
     environment:
       - SERVICE_FQDN_MINIFLUX
       - PORT=8080
-      - RUN_MIGRATIONS=1
-      - CREATE_ADMIN=1
-      - ADMIN_USERNAME=admin
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-1}
+      - CREATE_ADMIN=${CREATE_ADMIN:-1}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${SERVICE_PASSWORD_64_ADMIN}
       - BASE_URL=$SERVICE_FQDN_MINIFLUX
       - DATABASE_URL=host=postgresql user=$SERVICE_USER_POSTGRES dbname=miniflux password=$SERVICE_PASSWORD_POSTGRES sslmode=disable
