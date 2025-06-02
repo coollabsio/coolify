@@ -91,8 +91,7 @@
                                 <div x-data="{ expanded: false }">
                                     <div class="flex items-center gap-2">
                                         <span class="font-medium">Commit:</span>
-                                        <a .prevent
-                                            href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
+                                        <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
                                             target="_blank" class="underline">
                                             {{ substr(data_get($deployment, 'commit'), 0, 7) }}
                                         </a>
@@ -117,8 +116,7 @@
                                         @endif
                                         @if ($deployment->commitMessage())
                                             <span class="text-gray-600 dark:text-gray-400">-</span>
-                                            <a .prevent
-                                                href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
+                                            <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
                                                 target="_blank"
                                                 class="text-gray-600 dark:text-gray-400 truncate max-w-md underline">
                                                 {{ Str::before($deployment->commitMessage(), "\n") }}

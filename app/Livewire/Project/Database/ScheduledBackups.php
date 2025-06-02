@@ -19,6 +19,8 @@ class ScheduledBackups extends Component
 
     public $s3s;
 
+    public string $custom_type = 'mysql';
+
     protected $listeners = ['refreshScheduledBackups'];
 
     protected $queryString = ['selectedBackupId'];
@@ -49,6 +51,14 @@ class ScheduledBackups extends Component
         }
     }
 
+    public function setCustomType()
+    {
+        $this->database->custom_type = $this->custom_type;
+        $this->database->save();
+        $this->dispatch('success', 'Database type set.');
+        $this->refreshScheduledBackups();
+    }
+
     public function delete($scheduled_backup_id): void
     {
         $this->database->scheduledBackups->find($scheduled_backup_id)->delete();
@@ -62,5 +72,6 @@ class ScheduledBackups extends Component
         if ($id) {
             $this->setSelectedBackup($id);
         }
+        $this->dispatch('refreshScheduledBackups');
     }
 }

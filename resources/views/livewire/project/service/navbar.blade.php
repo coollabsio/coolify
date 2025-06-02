@@ -138,7 +138,7 @@
     @script
         <script>
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info', 'Stopping service.');
+                $wire.$dispatch('info', 'Gracefully stopping service, it could take a while depending on the service.');
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', async () => {
