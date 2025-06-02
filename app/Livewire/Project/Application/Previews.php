@@ -237,7 +237,7 @@ class Previews extends Component
         foreach ($containers as $container) {
             $containerName = str_replace('/', '', $container['Names']);
             instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
+                "docker stop --timeout=$timeout $containerName",
                 "docker rm -f $containerName",
             ], server: $server, throwError: false);
         }

@@ -272,7 +272,7 @@ class Application extends BaseModel
     {
         foreach ($containerNames as $containerName) {
             instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
+                "docker stop --timeout=$timeout $containerName",
                 "docker rm -f $containerName",
             ], server: $server, throwError: false);
         }

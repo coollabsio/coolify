@@ -2249,7 +2249,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         try {
             $this->execute_remote_command(
-                ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                ["docker stop --timeout=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
                 ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
             );
         } catch (Exception $error) {
