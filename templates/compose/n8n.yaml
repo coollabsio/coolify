@@ -14,6 +14,8 @@ services:
       - N8N_HOST=${SERVICE_URL_N8N}
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Berlin}
       - TZ=${TZ:-Europe/Berlin}
+    labels:
+      - traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Origin=wss://${SERVICE_FQDN_N8N}
     volumes:
       - n8n-data:/home/node/.n8n
     healthcheck:

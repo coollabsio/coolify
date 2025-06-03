@@ -21,6 +21,8 @@ services:
       - DB_POSTGRESDB_USER=$SERVICE_USER_POSTGRES
       - DB_POSTGRESDB_SCHEMA=public
       - DB_POSTGRESDB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    labels:
+      - traefik.http.middlewares.websocket-headers.headers.customrequestheaders.Origin=wss://${SERVICE_FQDN_N8N}
     volumes:
       - n8n-data:/home/node/.n8n
     depends_on:
