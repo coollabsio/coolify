@@ -71,7 +71,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping('push-server-update-'.$this->server->uuid))->dontRelease()];
     }
 
     public function backoff(): int
@@ -317,13 +317,16 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         }
         if ($subType === 'application') {
             $application = $service->applications()->where('id', $subId)->first();
-            $application->status = $containerStatus;
-            $application->save();
+            if ($application) {
+                $application->status = $containerStatus;
+                $application->save();
+            }
         } elseif ($subType === 'database') {
             $database = $service->databases()->where('id', $subId)->first();
-            $database->status = $containerStatus;
-            $database->save();
-        } else {
+            if ($database) {
+                $database->status = $containerStatus;
+                $database->save();
+            }
         }
     }
 

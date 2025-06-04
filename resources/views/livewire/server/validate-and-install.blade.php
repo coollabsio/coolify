@@ -120,7 +120,7 @@
             @endif
 
         @endif
-        <livewire:new-activity-monitor header="Docker Installation Logs" />
+        <livewire:activity-monitor header="Docker Installation Logs" />
         @isset($error)
             <pre class="font-bold whitespace-pre-line text-error">{!! $error !!}</pre>
         @endisset

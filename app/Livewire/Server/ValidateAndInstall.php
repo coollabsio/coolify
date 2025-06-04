@@ -106,7 +106,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
-                        $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries);
                     }
 
                     return;

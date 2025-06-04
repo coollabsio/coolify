@@ -1289,7 +1289,7 @@ class Application extends BaseModel
         try {
             $yaml = Yaml::parse($this->docker_compose_raw);
         } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         }
         $services = data_get($yaml, 'services');
 

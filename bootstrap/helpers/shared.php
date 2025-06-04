@@ -599,7 +599,7 @@ function getTopLevelNetworks(Service|Application $resource)
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                throw new \RuntimeException($e->getMessage());
             }
             $services = data_get($yaml, 'services');
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
@@ -653,7 +653,7 @@ function getTopLevelNetworks(Service|Application $resource)
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         }
         $server = $resource->destination->server;
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
@@ -1435,7 +1435,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                throw new \RuntimeException($e->getMessage());
             }
             $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));

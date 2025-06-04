@@ -440,7 +440,9 @@ class EnvironmentVariable extends Model
     {
         $sensitivePatterns = [
             'PASSWORD', 'SECRET', 'KEY', 'TOKEN', 'API_KEY',
-            'DATABASE_URL', 'REDIS_URL', 'PRIVATE'
+            'DATABASE_URL', 'REDIS_URL', 'PRIVATE', 'CREDENTIAL',
+            'AUTH', 'CERTIFICATE', 'ENCRYPTION', 'SALT', 'HASH',
+            'OAUTH', 'JWT', 'BEARER', 'ACCESS', 'REFRESH'
         ];
         
         foreach ($sensitivePatterns as $pattern) {

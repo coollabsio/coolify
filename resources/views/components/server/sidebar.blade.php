@@ -9,6 +9,9 @@
     <a class="menu-item {{ $activeMenu === 'private-key' ? 'menu-item-active' : '' }}"
         href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">Private Key
     </a>
+    <a class="menu-item {{ $activeMenu === 'ca-certificate' ? 'menu-item-active' : '' }}"
+        href="{{ route('server.ca-certificate', ['server_uuid' => $server->uuid]) }}">CA Certificate
+    </a>
     @if (!$server->isLocalhost())
         <a class="menu-item {{ $activeMenu === 'cloudflare-tunnels' ? 'menu-item-active' : '' }}"
             href="{{ route('server.cloudflare-tunnels', ['server_uuid' => $server->uuid]) }}">Cloudflare

@@ -51,9 +51,11 @@
                 Tasks</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Webhooks</a>
-            <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Preview
-                Deployments</a>
+            @if ($application->deploymentType() !== 'deploy_key')
+                <a class="menu-item" wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Preview
+                    Deployments</a>
+            @endif
             @if ($application->build_pack !== 'dockercompose')
                 <a class="menu-item" wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Healthcheck</a>

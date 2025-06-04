@@ -57,13 +57,18 @@ class Select extends Component
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
-        if (isDev()) {
-            $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
+        try {
+            $this->parameters = get_route_parameters();
+            if (isDev()) {
+                $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
+            }
+            $projectUuid = data_get($this->parameters, 'project_uuid');
+            $project = Project::whereUuid($projectUuid)->firstOrFail();
+            $this->environments = $project->environments;
+            $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
+        } catch (\Exception $e) {
+            return handleError($e, $this);
         }
-        $projectUuid = data_get($this->parameters, 'project_uuid');
-        $this->environments = Project::whereUuid($projectUuid)->first()->environments;
-        $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->first()->name;
     }
 
     public function render()

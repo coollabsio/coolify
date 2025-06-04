@@ -10,7 +10,7 @@
         </x-slot:content>
     </x-slide-over>
 
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row" x-init="$wire.checkForUpdates()">
         <x-server.sidebar-security :server="$server" :parameters="$parameters" />
         <form wire:submit='submit' class="w-full">
             <div>
@@ -19,7 +19,7 @@
                     <span class="text-xs text-neutral-500">(experimental)</span>
                     <x-helper
                         helper="Only available for apt, dnf and zypper package managers atm, more coming
-            soon. <br/> Also scheduled patching and notifications are coming soon..." />
+            soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}'>notification settings</a>." />
                     <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">
                         Check Now</x-forms.button>
                 </div>

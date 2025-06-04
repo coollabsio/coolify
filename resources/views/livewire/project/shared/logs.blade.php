@@ -6,7 +6,7 @@
     @if ($type === 'application')
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
-        <div class="pt-4">
+        <div class="pt-2">
             <div class="subtitle">Here you can see the logs of the application.</div>
             <div class="pt-2" wire:loading wire:target="loadContainers">
                 Loading containers...

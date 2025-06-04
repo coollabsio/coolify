@@ -952,6 +952,11 @@ $schema://$host {
         }
     }
 
+    public function isTerminalEnabled()
+    {
+        return $this->settings->is_terminal_enabled ?? false;
+    }
+
     public function isSwarm()
     {
         return data_get($this, 'settings.is_swarm_manager') || data_get($this, 'settings.is_swarm_worker');

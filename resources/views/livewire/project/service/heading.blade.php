@@ -135,7 +135,8 @@
     @script
         <script>
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info', 'Gracefully stopping service, it could take a while depending on the service.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping service.<br/>It could take a while depending on the service.');
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', async () => {
@@ -161,7 +162,8 @@
                     );
                     return;
                 }
-                $wire.$dispatch('info', 'Service restart in progress.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping service.<br/>It could take a while depending on the service.');
                 window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('restart');
             });

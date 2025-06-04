@@ -121,7 +121,6 @@ class Heading extends Component
     public function stop()
     {
         try {
-            $this->dispatch('info', 'Gracefully stopping service, it could take a while depending on the service.');
             StopService::dispatch($this->service, false, $this->docker_cleanup);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());

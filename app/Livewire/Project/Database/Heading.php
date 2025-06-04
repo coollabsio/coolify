@@ -64,7 +64,7 @@ class Heading extends Component
     public function stop()
     {
         try {
-            $this->dispatch('info', 'Gracefully stopping database, it could take a while depending on the size of the database.');
+            $this->dispatch('info', 'Gracefully stopping database.<br/>It could take a while depending on the size of the database.');
             StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
