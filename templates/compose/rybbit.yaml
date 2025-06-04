@@ -6,10 +6,9 @@
 
 services:
   rybbit_clickhouse:
-    image: clickhouse/clickhouse-server:25.4.2
+    image: clickhouse/clickhouse-server:25.5.1
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - clickhouse_config:/etc/clickhouse-server/config.d
     environment:
       - CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
@@ -31,7 +30,7 @@ services:
     restart: unless-stopped
 
   rybbit_postgres:
-    image: postgres:17.4
+    image: postgres:17.5
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-analytics}
       - POSTGRES_USER=${POSTGRES_USER:-frog}
@@ -46,7 +45,7 @@ services:
     restart: unless-stopped
 
   rybbit_backend:
-    image: ghcr.io/rybbit-io/rybbit-backend:latest
+    image: ghcr.io/rybbit-io/rybbit-backend:v1.0.0
     environment:
       - NODE_ENV=production
       - CLICKHOUSE_HOST=http://rybbit_clickhouse:8123
@@ -67,7 +66,7 @@ services:
       rybbit_postgres:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -75,10 +74,10 @@ services:
     restart: unless-stopped
 
   rybbit_client:
-    image: ghcr.io/rybbit-io/rybbit-client:latest
+    image: ghcr.io/rybbit-io/rybbit-client:v1.0.0
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_BACKEND_URL=${BASE_URL}
+      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_RYBBIT_80}
       - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP}
     depends_on:
       - rybbit_backend
@@ -89,28 +88,19 @@ services:
     image: caddy:2-alpine
     environment:
       - SERVICE_FQDN_RYBBIT_80
-      - BASE_URL=":80"
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     restart: unless-stopped
+    exclude_from_hc: true
     volumes:
       - type: bind
         source: ./Caddyfile
         target: /etc/caddy/Caddyfile
         content: |
-          {$BASE_URL} {
+          :80 {
             route {
-              @api path /api/*
-              uri @api strip_prefix /api
-              reverse_proxy @api http://rybbit_backend:3001 {
+              reverse_proxy /api/* http://rybbit_backend:3001 {
                 header_up Host {http.reverse_proxy.upstream.hostport}
                 header_up X-Real-IP {http.request.header.X-Real-IP}
               }
-
               reverse_proxy http://rybbit_client:3002 {
                 header_up Host {http.reverse_proxy.upstream.hostport}
                 header_up X-Real-IP {http.request.header.X-Real-IP}
