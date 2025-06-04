@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="check_status">
+<nav wire:poll.10000ms="checkStatus">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
@@ -81,8 +81,7 @@
                                 'This application will be stopped.',
                                 'All non-persistent data of this application will be deleted.',
                             ]" :confirmWithText="false" :confirmWithPassword="false"
-                            step1ButtonText="Continue" step2ButtonText="Confirm" :dispatchEvent="true"
-                            dispatchEventType="stopEvent">
+                            step1ButtonText="Continue" step2ButtonText="Confirm">
                             <x-slot:button-title>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                     stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -112,15 +111,5 @@
                 </div>
             @endif
         </div>
-
     </div>
-    @script
-        <script>
-            $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info',
-                    'Gracefully stopping application, it could take a while depending on the application.');
-                $wire.$call('stop');
-            });
-        </script>
-    @endscript
 </nav>

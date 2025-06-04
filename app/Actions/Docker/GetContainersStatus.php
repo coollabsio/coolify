@@ -4,6 +4,7 @@ namespace App\Actions\Docker;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
@@ -341,5 +342,6 @@ class GetContainersStatus
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
+        ServiceChecked::dispatch($this->server->team->id);
     }
 }

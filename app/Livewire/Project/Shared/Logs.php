@@ -37,6 +37,15 @@ class Logs extends Component
 
     public $cpu;
 
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
+
     public function loadContainers($server_id)
     {
         try {

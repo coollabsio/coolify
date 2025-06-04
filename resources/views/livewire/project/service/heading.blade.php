@@ -1,4 +1,4 @@
-<div>
+<div wire:poll.10000ms="checkStatus">
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
@@ -38,10 +38,9 @@
                         </svg>
                         Restart
                     </x-forms.button>
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Service" :dispatchEvent="true"
-                        dispatchEventType="stopEvent">
+                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
+                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Stop Service">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -67,10 +66,9 @@
                         </svg>
                         Restart
                     </x-forms.button>
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Service" :dispatchEvent="true"
-                        dispatchEventType="stopEvent">
+                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
+                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Stop Service">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -96,10 +94,9 @@
                         Deploy
                     </button>
                 @else
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Service" :dispatchEvent="true"
-                        dispatchEventType="stopEvent">
+                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
+                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Stop Service">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -138,7 +135,8 @@
     @script
         <script>
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info', 'Gracefully stopping service, it could take a while depending on the service.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping service.<br/>It could take a while depending on the service.');
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', async () => {
@@ -164,7 +162,8 @@
                     );
                     return;
                 }
-                $wire.$dispatch('info', 'Service restart in progress.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping service.<br/>It could take a while depending on the service.');
                 window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('restart');
             });

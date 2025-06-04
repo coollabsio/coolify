@@ -6,7 +6,7 @@
     @if ($type === 'application')
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
-        <div class="pt-4">
+        <div class="pt-2">
             <div class="subtitle">Here you can see the logs of the application.</div>
             <div class="pt-2" wire:loading wire:target="loadContainers">
                 Loading containers...
@@ -42,7 +42,7 @@
             @endforelse
         </div>
     @elseif ($type === 'service')
-        <livewire:project.service.navbar :service="$resource" :parameters="$parameters" :query="$query" title="Logs" />
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" :query="$query" title="Logs" />
         <div class="pt-4">
             <div class="subtitle">Here you can see the logs of the service.</div>
             @forelse ($containers as $container)

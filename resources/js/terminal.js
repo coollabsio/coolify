@@ -17,16 +17,32 @@ export function initializeTerminalComponent() {
             MAX_PENDING_WRITES: 5,
             keepAliveInterval: null,
             reconnectInterval: null,
+            // Enhanced connection management
+            connectionState: 'disconnected', // 'connecting', 'connected', 'disconnected', 'reconnecting'
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 10,
+            baseReconnectDelay: 1000,
+            maxReconnectDelay: 30000,
+            connectionTimeout: 10000,
+            connectionTimeoutId: null,
+            lastPingTime: null,
+            pingTimeout: 35000, // 5 seconds longer than ping interval
+            pingTimeoutId: null,
+            heartbeatMissed: 0,
+            maxHeartbeatMisses: 3,
 
             init() {
                 this.setupTerminal();
-                this.initializeWebSocket();
+
+                // Add a small delay for initial connection to ensure everything is ready
+                setTimeout(() => {
+                    this.initializeWebSocket();
+                }, 100);
+
                 this.setupTerminalEventListeners();
 
                 this.$wire.on('send-back-command', (command) => {
-                    this.socket.send(JSON.stringify({
-                        command: command
-                    }));
+                    this.sendMessage({ command: command });
                 });
 
                 this.keepAliveInterval = setInterval(this.keepAlive.bind(this), 30000);
@@ -47,19 +63,33 @@ export function initializeTerminalComponent() {
 
                 ['livewire:navigated', 'beforeunload'].forEach((event) => {
                     document.addEventListener(event, () => {
-                        this.checkIfProcessIsRunningAndKillIt();
-                        clearInterval(this.keepAliveInterval);
-                        if (this.reconnectInterval) {
-                            clearInterval(this.reconnectInterval);
-                        }
+                        this.cleanup();
                     }, { once: true });
                 });
 
                 window.onresize = () => {
                     this.resizeTerminal()
                 };
-
             },
+
+            cleanup() {
+                this.checkIfProcessIsRunningAndKillIt();
+                this.clearAllTimers();
+                this.connectionState = 'disconnected';
+                if (this.socket) {
+                    this.socket.close(1000, 'Client cleanup');
+                }
+            },
+
+            clearAllTimers() {
+                [this.keepAliveInterval, this.reconnectInterval, this.connectionTimeoutId, this.pingTimeoutId]
+                    .forEach(timer => timer && clearInterval(timer));
+                this.keepAliveInterval = null;
+                this.reconnectInterval = null;
+                this.connectionTimeoutId = null;
+                this.pingTimeoutId = null;
+            },
+
             resetTerminal() {
                 if (this.term) {
                     this.$wire.dispatch('error', 'Terminal websocket connection lost.');
@@ -76,6 +106,7 @@ export function initializeTerminalComponent() {
                     });
                 }
             },
+
             setupTerminal() {
                 const terminalElement = document.getElementById('terminal');
                 if (terminalElement) {
@@ -97,66 +128,164 @@ export function initializeTerminalComponent() {
             },
 
             initializeWebSocket() {
-                if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
-                    const predefined = window.terminalConfig
-                    const connectionString = {
-                        protocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
-                        host: window.location.hostname,
-                        port: ":6002",
-                        path: '/terminal/ws'
-                    }
-                    if (!window.location.port) {
-                        connectionString.port = ''
-                    }
-                    if (predefined.host) {
-                        connectionString.host = predefined.host
-                    }
-                    if (predefined.port) {
-                        connectionString.port = `:${predefined.port}`
-                    }
-                    if (predefined.protocol) {
-                        connectionString.protocol = predefined.protocol
-                    }
+                if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+                    console.log('[Terminal] WebSocket already connecting/connected, skipping');
+                    return; // Already connecting or connected
+                }
 
-                    const url =
-                        `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
+                this.connectionState = 'connecting';
+                this.clearAllTimers();
+
+                // Ensure terminal config is available
+                if (!window.terminalConfig) {
+                    console.warn('[Terminal] Terminal config not available, using defaults');
+                    window.terminalConfig = {};
+                }
+
+                const predefined = window.terminalConfig
+                const connectionString = {
+                    protocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
+                    host: window.location.hostname,
+                    port: ":6002",
+                    path: '/terminal/ws'
+                }
+
+                if (!window.location.port) {
+                    connectionString.port = ''
+                }
+                if (predefined.host) {
+                    connectionString.host = predefined.host
+                }
+                if (predefined.port) {
+                    connectionString.port = `:${predefined.port}`
+                }
+                if (predefined.protocol) {
+                    connectionString.protocol = predefined.protocol
+                }
+
+                const url = `${connectionString.protocol}://${connectionString.host}${connectionString.port}${connectionString.path}`
+                console.log(`[Terminal] Attempting connection to: ${url}`);
+
+                try {
                     this.socket = new WebSocket(url);
 
-                    this.socket.onopen = () => {
-                        console.log('[Terminal] WebSocket connection established. Cool cool cool cool cool cool.');
-                    };
+                    // Set connection timeout - increased for initial connection
+                    const timeoutMs = this.reconnectAttempts === 0 ? 15000 : this.connectionTimeout;
+                    this.connectionTimeoutId = setTimeout(() => {
+                        if (this.connectionState === 'connecting') {
+                            console.error(`[Terminal] Connection timeout after ${timeoutMs}ms`);
+                            this.socket.close();
+                            this.handleConnectionError('Connection timeout');
+                        }
+                    }, timeoutMs);
 
+                    this.socket.onopen = this.handleSocketOpen.bind(this);
                     this.socket.onmessage = this.handleSocketMessage.bind(this);
-                    this.socket.onerror = (e) => {
-                        console.error('[Terminal] WebSocket error.');
-                    };
-                    this.socket.onclose = () => {
-                        console.warn('[Terminal] WebSocket connection closed.');
+                    this.socket.onerror = this.handleSocketError.bind(this);
+                    this.socket.onclose = this.handleSocketClose.bind(this);
+
+                } catch (error) {
+                    console.error('[Terminal] Failed to create WebSocket:', error);
+                    this.handleConnectionError(`Failed to create WebSocket connection: ${error.message}`);
+                }
+            },
+
+            handleSocketOpen() {
+                console.log('[Terminal] WebSocket connection established. Cool cool cool cool cool cool.');
+                this.connectionState = 'connected';
+                this.reconnectAttempts = 0;
+                this.heartbeatMissed = 0;
+                this.lastPingTime = Date.now();
+
+                // Clear connection timeout
+                if (this.connectionTimeoutId) {
+                    clearTimeout(this.connectionTimeoutId);
+                    this.connectionTimeoutId = null;
+                }
+
+                // Start ping timeout monitoring
+                this.resetPingTimeout();
+            },
+
+            handleSocketError(error) {
+                console.error('[Terminal] WebSocket error:', error);
+                console.error('[Terminal] WebSocket state:', this.socket ? this.socket.readyState : 'No socket');
+                console.error('[Terminal] Connection attempt:', this.reconnectAttempts + 1);
+                this.handleConnectionError('WebSocket error occurred');
+            },
+
+            handleSocketClose(event) {
+                console.warn(`[Terminal] WebSocket connection closed. Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`);
+                console.log('[Terminal] Was clean close:', event.code === 1000);
+                console.log('[Terminal] Connection attempt:', this.reconnectAttempts + 1);
+
+                this.connectionState = 'disconnected';
+                this.clearAllTimers();
+
+                // Only reset terminal and reconnect if it wasn't a clean close
+                if (event.code !== 1000) {
+                    // Don't show terminal reset message on first connection attempt
+                    if (this.reconnectAttempts > 0) {
                         this.resetTerminal();
                         this.message = '(connection closed)';
                         this.terminalActive = false;
-                        this.reconnect();
-                    };
+                    }
+                    this.scheduleReconnect();
                 }
             },
 
-            reconnect() {
-                if (this.reconnectInterval) {
-                    clearInterval(this.reconnectInterval);
-                }
-                this.reconnectInterval = setInterval(() => {
-                    console.warn('[Terminal] Attempting to reconnect...');
-                    this.initializeWebSocket();
-                    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                        console.log('[Terminal] Reconnected successfully');
-                        clearInterval(this.reconnectInterval);
-                        this.reconnectInterval = null;
+            handleConnectionError(reason) {
+                console.error(`[Terminal] Connection error: ${reason} (attempt ${this.reconnectAttempts + 1})`);
+                this.connectionState = 'disconnected';
 
-                    }
-                }, 2000);
+                // Only dispatch error to UI after a few failed attempts to avoid immediate error on page load
+                if (this.reconnectAttempts >= 2) {
+                    this.$wire.dispatch('error', `Terminal connection error: ${reason}`);
+                }
+
+                this.scheduleReconnect();
+            },
+
+            scheduleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.error('[Terminal] Max reconnection attempts reached');
+                    this.message = '(connection failed - max retries exceeded)';
+                    return;
+                }
+
+                this.connectionState = 'reconnecting';
+
+                // Exponential backoff with jitter
+                const delay = Math.min(
+                    this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts) + Math.random() * 1000,
+                    this.maxReconnectDelay
+                );
+
+                console.warn(`[Terminal] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
+
+                this.reconnectInterval = setTimeout(() => {
+                    this.reconnectAttempts++;
+                    this.initializeWebSocket();
+                }, delay);
+            },
+
+            sendMessage(message) {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify(message));
+                } else {
+                    console.warn('[Terminal] WebSocket not ready, message not sent:', message);
+                }
             },
 
             handleSocketMessage(event) {
+                // Handle pong responses
+                if (event.data === 'pong') {
+                    this.heartbeatMissed = 0;
+                    this.lastPingTime = Date.now();
+                    this.resetPingTimeout();
+                    return;
+                }
+
                 if (event.data === 'pty-ready') {
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
@@ -187,20 +316,22 @@ export function initializeTerminalComponent() {
                         });
                     } catch (error) {
                         console.error('[Terminal] Write operation failed:', error);
+                        this.pendingWrites = Math.max(0, this.pendingWrites - 1);
                     }
                 }
             },
 
             flowControlCallback() {
-                this.pendingWrites--;
+                this.pendingWrites = Math.max(0, this.pendingWrites - 1);
+
                 if (this.pendingWrites > this.MAX_PENDING_WRITES && !this.paused) {
                     this.paused = true;
-                    this.socket.send(JSON.stringify({ pause: true }));
+                    this.sendMessage({ pause: true });
                     return;
                 }
-                if (this.pendingWrites <= this.MAX_PENDING_WRITES && this.paused) {
+                if (this.pendingWrites <= Math.floor(this.MAX_PENDING_WRITES / 2) && this.paused) {
                     this.paused = false;
-                    this.socket.send(JSON.stringify({ resume: true }));
+                    this.sendMessage({ resume: true });
                     return;
                 }
             },
@@ -209,15 +340,11 @@ export function initializeTerminalComponent() {
                 if (!this.term) return;
 
                 this.term.onData((data) => {
-                    if (this.socket.readyState === WebSocket.OPEN) {
-                        this.socket.send(JSON.stringify({ message: data }));
-                        if (data === '\r') {
-                            this.commandBuffer = '';
-                        } else {
-                            this.commandBuffer += data;
-                        }
+                    this.sendMessage({ message: data });
+                    if (data === '\r') {
+                        this.commandBuffer = '';
                     } else {
-                        console.warn('[Terminal] WebSocket not ready, data not sent');
+                        this.commandBuffer += data;
                     }
                 });
 
@@ -240,14 +367,31 @@ export function initializeTerminalComponent() {
 
             keepAlive() {
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                    this.socket.send(JSON.stringify({ ping: true }));
+                    this.sendMessage({ ping: true });
+                } else if (this.connectionState === 'disconnected') {
+                    // Attempt to reconnect if we're disconnected
+                    this.initializeWebSocket();
                 }
             },
 
-            checkIfProcessIsRunningAndKillIt() {
-                if (this.socket && this.socket.readyState == WebSocket.OPEN) {
-                    this.socket.send(JSON.stringify({ checkActive: 'force' }));
+            resetPingTimeout() {
+                if (this.pingTimeoutId) {
+                    clearTimeout(this.pingTimeoutId);
                 }
+
+                this.pingTimeoutId = setTimeout(() => {
+                    this.heartbeatMissed++;
+                    console.warn(`[Terminal] Ping timeout - missed ${this.heartbeatMissed}/${this.maxHeartbeatMisses}`);
+
+                    if (this.heartbeatMissed >= this.maxHeartbeatMisses) {
+                        console.error('[Terminal] Too many missed heartbeats, closing connection');
+                        this.socket.close(1001, 'Heartbeat timeout');
+                    }
+                }, this.pingTimeout);
+            },
+
+            checkIfProcessIsRunningAndKillIt() {
+                this.sendMessage({ checkActive: 'force' });
             },
 
             makeFullscreen() {
@@ -260,18 +404,44 @@ export function initializeTerminalComponent() {
             resizeTerminal() {
                 if (!this.terminalActive || !this.term || !this.fitAddon) return;
 
-                this.fitAddon.fit();
-                const height = this.$refs.terminalWrapper.clientHeight;
-                const width = this.$refs.terminalWrapper.clientWidth;
-                const rows = Math.floor(height / this.term._core._renderService._charSizeService.height) - 1;
-                const cols = Math.floor(width / this.term._core._renderService._charSizeService.width) - 1;
-                const termWidth = cols;
-                const termHeight = rows;
-                this.term.resize(termWidth, termHeight);
-                this.socket.send(JSON.stringify({
-                    resize: { cols: termWidth, rows: termHeight }
-                }));
+                try {
+                    this.fitAddon.fit();
+                    const height = this.$refs.terminalWrapper.clientHeight;
+                    const width = this.$refs.terminalWrapper.clientWidth;
+                    const charSize = this.term._core._renderService._charSizeService;
+
+                    if (!charSize.height || !charSize.width) {
+                        // Fallback values if char size not available yet
+                        setTimeout(() => this.resizeTerminal(), 100);
+                        return;
+                    }
+
+                    const rows = Math.floor(height / charSize.height) - 1;
+                    const cols = Math.floor(width / charSize.width) - 1;
+
+                    if (rows > 0 && cols > 0) {
+                        this.term.resize(cols, rows);
+                        this.sendMessage({
+                            resize: { cols: cols, rows: rows }
+                        });
+                    }
+                } catch (error) {
+                    console.error('[Terminal] Resize error:', error);
+                }
             },
+
+            // Utility method to get connection status for debugging
+            getConnectionStatus() {
+                return {
+                    state: this.connectionState,
+                    readyState: this.socket ? this.socket.readyState : 'No socket',
+                    reconnectAttempts: this.reconnectAttempts,
+                    pendingWrites: this.pendingWrites,
+                    paused: this.paused,
+                    lastPingTime: this.lastPingTime,
+                    heartbeatMissed: this.heartbeatMissed
+                };
+            }
         };
     }
 

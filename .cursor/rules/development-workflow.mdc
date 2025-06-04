@@ -1,0 +1,653 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Development Workflow
+
+## Development Environment Setup
+
+### Prerequisites
+- **PHP 8.4+** - Latest PHP version for modern features
+- **Node.js 18+** - For frontend asset compilation
+- **Docker & Docker Compose** - Container orchestration
+- **PostgreSQL 15** - Primary database
+- **Redis 7** - Caching and queues
+
+### Local Development Setup
+
+#### Using Docker (Recommended)
+```bash
+# Clone the repository
+git clone https://github.com/coollabsio/coolify.git
+cd coolify
+
+# Copy environment configuration
+cp .env.example .env
+
+# Start development environment
+docker-compose -f docker-compose.dev.yml up -d
+
+# Install PHP dependencies
+docker-compose exec app composer install
+
+# Install Node.js dependencies
+docker-compose exec app npm install
+
+# Generate application key
+docker-compose exec app php artisan key:generate
+
+# Run database migrations
+docker-compose exec app php artisan migrate
+
+# Seed development data
+docker-compose exec app php artisan db:seed
+```
+
+#### Native Development
+```bash
+# Install PHP dependencies
+composer install
+
+# Install Node.js dependencies
+npm install
+
+# Setup environment
+cp .env.example .env
+php artisan key:generate
+
+# Setup database
+createdb coolify_dev
+php artisan migrate
+php artisan db:seed
+
+# Start development servers
+php artisan serve &
+npm run dev &
+php artisan queue:work &
+```
+
+## Development Tools & Configuration
+
+### Code Quality Tools
+- **[Laravel Pint](mdc:pint.json)** - PHP code style fixer
+- **[Rector](mdc:rector.php)** - PHP automated refactoring (989B, 35 lines)
+- **PHPStan** - Static analysis for type safety
+- **ESLint** - JavaScript code quality
+
+### Development Configuration Files
+- **[docker-compose.dev.yml](mdc:docker-compose.dev.yml)** - Development Docker setup (3.4KB, 126 lines)
+- **[vite.config.js](mdc:vite.config.js)** - Frontend build configuration (1.0KB, 42 lines)
+- **[.editorconfig](mdc:.editorconfig)** - Code formatting standards (258B, 19 lines)
+
+### Git Configuration
+- **[.gitignore](mdc:.gitignore)** - Version control exclusions (522B, 40 lines)
+- **[.gitattributes](mdc:.gitattributes)** - Git file handling (185B, 11 lines)
+
+## Development Workflow Process
+
+### 1. Feature Development
+```bash
+# Create feature branch
+git checkout -b feature/new-deployment-strategy
+
+# Make changes following coding standards
+# Run code quality checks
+./vendor/bin/pint
+./vendor/bin/rector process --dry-run
+./vendor/bin/phpstan analyse
+
+# Run tests
+./vendor/bin/pest
+./vendor/bin/pest --coverage
+
+# Commit changes
+git add .
+git commit -m "feat: implement blue-green deployment strategy"
+```
+
+### 2. Code Review Process
+```bash
+# Push feature branch
+git push origin feature/new-deployment-strategy
+
+# Create pull request with:
+# - Clear description of changes
+# - Screenshots for UI changes
+# - Test coverage information
+# - Breaking change documentation
+```
+
+### 3. Testing Requirements
+- **Unit tests** for new models and services
+- **Feature tests** for API endpoints
+- **Browser tests** for UI changes
+- **Integration tests** for deployment workflows
+
+## Coding Standards & Conventions
+
+### PHP Coding Standards
+```php
+// Follow PSR-12 coding standards
+class ApplicationDeploymentService
+{
+    public function __construct(
+        private readonly DockerService $dockerService,
+        private readonly ConfigurationGenerator $configGenerator
+    ) {}
+    
+    public function deploy(Application $application): ApplicationDeploymentQueue
+    {
+        return DB::transaction(function () use ($application) {
+            $deployment = $application->deployments()->create([
+                'status' => 'queued',
+                'commit_sha' => $application->getLatestCommitSha(),
+            ]);
+            
+            DeployApplicationJob::dispatch($deployment);
+            
+            return $deployment;
+        });
+    }
+}
+```
+
+### Laravel Best Practices
+```php
+// Use Laravel conventions
+class Application extends Model
+{
+    // Mass assignment protection
+    protected $fillable = [
+        'name', 'git_repository', 'git_branch', 'fqdn'
+    ];
+    
+    // Type casting
+    protected $casts = [
+        'environment_variables' => 'array',
+        'build_pack' => BuildPack::class,
+        'created_at' => 'datetime',
+    ];
+    
+    // Relationships
+    public function server(): BelongsTo
+    {
+        return $this->belongsTo(Server::class);
+    }
+    
+    public function deployments(): HasMany
+    {
+        return $this->hasMany(ApplicationDeploymentQueue::class);
+    }
+}
+```
+
+### Frontend Standards
+```javascript
+// Alpine.js component structure
+document.addEventListener('alpine:init', () => {
+    Alpine.data('deploymentMonitor', () => ({
+        status: 'idle',
+        logs: [],
+        
+        init() {
+            this.connectWebSocket();
+        },
+        
+        connectWebSocket() {
+            Echo.private(`application.${this.applicationId}`)
+                .listen('DeploymentStarted', (e) => {
+                    this.status = 'deploying';
+                })
+                .listen('DeploymentCompleted', (e) => {
+                    this.status = 'completed';
+                });
+        }
+    }));
+});
+```
+
+### CSS/Tailwind Standards
+```html
+<!-- Use semantic class names and consistent spacing -->
+<div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Application Status
+        </h3>
+        <div class="space-y-3">
+            <!-- Content with consistent spacing -->
+        </div>
+    </div>
+</div>
+```
+
+## Database Development
+
+### Migration Best Practices
+```php
+// Create descriptive migration files
+class CreateApplicationDeploymentQueuesTable extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('application_deployment_queues', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('application_id')->constrained()->cascadeOnDelete();
+            $table->string('status')->default('queued');
+            $table->string('commit_sha')->nullable();
+            $table->text('build_logs')->nullable();
+            $table->text('deployment_logs')->nullable();
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('finished_at')->nullable();
+            $table->timestamps();
+            
+            $table->index(['application_id', 'status']);
+            $table->index('created_at');
+        });
+    }
+    
+    public function down(): void
+    {
+        Schema::dropIfExists('application_deployment_queues');
+    }
+}
+```
+
+### Model Factory Development
+```php
+// Create comprehensive factories for testing
+class ApplicationFactory extends Factory
+{
+    protected $model = Application::class;
+    
+    public function definition(): array
+    {
+        return [
+            'name' => $this->faker->words(2, true),
+            'fqdn' => $this->faker->domainName,
+            'git_repository' => 'https://github.com/' . $this->faker->userName . '/' . $this->faker->word . '.git',
+            'git_branch' => 'main',
+            'build_pack' => BuildPack::NIXPACKS,
+            'server_id' => Server::factory(),
+            'environment_id' => Environment::factory(),
+        ];
+    }
+    
+    public function withCustomDomain(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'fqdn' => $this->faker->domainName,
+        ]);
+    }
+}
+```
+
+## API Development
+
+### Controller Standards
+```php
+class ApplicationController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum');
+        $this->middleware('team.access');
+    }
+    
+    public function index(Request $request): AnonymousResourceCollection
+    {
+        $applications = $request->user()
+            ->currentTeam
+            ->applications()
+            ->with(['server', 'environment', 'latestDeployment'])
+            ->paginate();
+            
+        return ApplicationResource::collection($applications);
+    }
+    
+    public function store(StoreApplicationRequest $request): ApplicationResource
+    {
+        $application = $request->user()
+            ->currentTeam
+            ->applications()
+            ->create($request->validated());
+            
+        return new ApplicationResource($application);
+    }
+    
+    public function deploy(Application $application): JsonResponse
+    {
+        $this->authorize('deploy', $application);
+        
+        $deployment = app(ApplicationDeploymentService::class)
+            ->deploy($application);
+            
+        return response()->json([
+            'message' => 'Deployment started successfully',
+            'deployment_id' => $deployment->id,
+        ]);
+    }
+}
+```
+
+### API Resource Development
+```php
+class ApplicationResource extends JsonResource
+{
+    public function toArray($request): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'fqdn' => $this->fqdn,
+            'status' => $this->status,
+            'git_repository' => $this->git_repository,
+            'git_branch' => $this->git_branch,
+            'build_pack' => $this->build_pack,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            
+            // Conditional relationships
+            'server' => new ServerResource($this->whenLoaded('server')),
+            'environment' => new EnvironmentResource($this->whenLoaded('environment')),
+            'latest_deployment' => new DeploymentResource($this->whenLoaded('latestDeployment')),
+            
+            // Computed attributes
+            'deployment_url' => $this->getDeploymentUrl(),
+            'can_deploy' => $this->canDeploy(),
+        ];
+    }
+}
+```
+
+## Livewire Component Development
+
+### Component Structure
+```php
+class ApplicationShow extends Component
+{
+    public Application $application;
+    public bool $showLogs = false;
+    
+    protected $listeners = [
+        'deployment.started' => 'refreshDeploymentStatus',
+        'deployment.completed' => 'refreshDeploymentStatus',
+    ];
+    
+    public function mount(Application $application): void
+    {
+        $this->authorize('view', $application);
+        $this->application = $application;
+    }
+    
+    public function deploy(): void
+    {
+        $this->authorize('deploy', $this->application);
+        
+        try {
+            app(ApplicationDeploymentService::class)->deploy($this->application);
+            
+            $this->dispatch('deployment.started', [
+                'application_id' => $this->application->id
+            ]);
+            
+            session()->flash('success', 'Deployment started successfully');
+        } catch (Exception $e) {
+            session()->flash('error', 'Failed to start deployment: ' . $e->getMessage());
+        }
+    }
+    
+    public function refreshDeploymentStatus(): void
+    {
+        $this->application->refresh();
+    }
+    
+    public function render(): View
+    {
+        return view('livewire.application.show', [
+            'deployments' => $this->application
+                ->deployments()
+                ->latest()
+                ->limit(10)
+                ->get()
+        ]);
+    }
+}
+```
+
+## Queue Job Development
+
+### Job Structure
+```php
+class DeployApplicationJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    
+    public int $tries = 3;
+    public int $maxExceptions = 1;
+    
+    public function __construct(
+        public ApplicationDeploymentQueue $deployment
+    ) {}
+    
+    public function handle(
+        DockerService $dockerService,
+        ConfigurationGenerator $configGenerator
+    ): void {
+        $this->deployment->update(['status' => 'running', 'started_at' => now()]);
+        
+        try {
+            // Generate configuration
+            $config = $configGenerator->generateDockerCompose($this->deployment->application);
+            
+            // Build and deploy
+            $imageTag = $dockerService->buildImage($this->deployment->application);
+            $dockerService->deployContainer($this->deployment->application, $imageTag);
+            
+            $this->deployment->update([
+                'status' => 'success',
+                'finished_at' => now()
+            ]);
+            
+            // Broadcast success
+            broadcast(new DeploymentCompleted($this->deployment));
+            
+        } catch (Exception $e) {
+            $this->deployment->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+                'finished_at' => now()
+            ]);
+            
+            broadcast(new DeploymentFailed($this->deployment));
+            
+            throw $e;
+        }
+    }
+    
+    public function backoff(): array
+    {
+        return [1, 5, 10];
+    }
+    
+    public function failed(Throwable $exception): void
+    {
+        $this->deployment->update([
+            'status' => 'failed',
+            'error_message' => $exception->getMessage(),
+            'finished_at' => now()
+        ]);
+    }
+}
+```
+
+## Testing Development
+
+### Test Structure
+```php
+// Feature test example
+test('user can deploy application via API', function () {
+    $user = User::factory()->create();
+    $application = Application::factory()->create([
+        'team_id' => $user->currentTeam->id
+    ]);
+    
+    // Mock external services
+    $this->mock(DockerService::class, function ($mock) {
+        $mock->shouldReceive('buildImage')->andReturn('app:latest');
+        $mock->shouldReceive('deployContainer')->andReturn(true);
+    });
+    
+    $response = $this->actingAs($user)
+        ->postJson("/api/v1/applications/{$application->id}/deploy");
+    
+    $response->assertStatus(200)
+        ->assertJson([
+            'message' => 'Deployment started successfully'
+        ]);
+    
+    expect($application->deployments()->count())->toBe(1);
+    expect($application->deployments()->first()->status)->toBe('queued');
+});
+```
+
+## Documentation Standards
+
+### Code Documentation
+```php
+/**
+ * Deploy an application to the specified server.
+ * 
+ * This method creates a new deployment queue entry and dispatches
+ * a background job to handle the actual deployment process.
+ * 
+ * @param Application $application The application to deploy
+ * @param array $options Additional deployment options
+ * @return ApplicationDeploymentQueue The created deployment queue entry
+ * 
+ * @throws DeploymentException When deployment cannot be started
+ * @throws ServerConnectionException When server is unreachable
+ */
+public function deploy(Application $application, array $options = []): ApplicationDeploymentQueue
+{
+    // Implementation
+}
+```
+
+### API Documentation
+```php
+/**
+ * @OA\Post(
+ *     path="/api/v1/applications/{application}/deploy",
+ *     summary="Deploy an application",
+ *     description="Triggers a new deployment for the specified application",
+ *     operationId="deployApplication",
+ *     tags={"Applications"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(
+ *         name="application",
+ *         in="path",
+ *         required=true,
+ *         @OA\Schema(type="integer"),
+ *         description="Application ID"
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Deployment started successfully",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="message", type="string"),
+ *             @OA\Property(property="deployment_id", type="integer")
+ *         )
+ *     )
+ * )
+ */
+```
+
+## Performance Optimization
+
+### Database Optimization
+```php
+// Use eager loading to prevent N+1 queries
+$applications = Application::with([
+    'server:id,name,ip',
+    'environment:id,name',
+    'latestDeployment:id,application_id,status,created_at'
+])->get();
+
+// Use database transactions for consistency
+DB::transaction(function () use ($application) {
+    $deployment = $application->deployments()->create(['status' => 'queued']);
+    $application->update(['last_deployment_at' => now()]);
+    DeployApplicationJob::dispatch($deployment);
+});
+```
+
+### Caching Strategies
+```php
+// Cache expensive operations
+public function getServerMetrics(Server $server): array
+{
+    return Cache::remember(
+        "server.{$server->id}.metrics",
+        now()->addMinutes(5),
+        fn () => $this->fetchServerMetrics($server)
+    );
+}
+```
+
+## Deployment & Release Process
+
+### Version Management
+- **[versions.json](mdc:versions.json)** - Version tracking (355B, 19 lines)
+- **[CHANGELOG.md](mdc:CHANGELOG.md)** - Release notes (187KB, 7411 lines)
+- **[cliff.toml](mdc:cliff.toml)** - Changelog generation (3.2KB, 85 lines)
+
+### Release Workflow
+```bash
+# Create release branch
+git checkout -b release/v4.1.0
+
+# Update version numbers
+# Update CHANGELOG.md
+# Run full test suite
+./vendor/bin/pest
+npm run test
+
+# Create release commit
+git commit -m "chore: release v4.1.0"
+
+# Create and push tag
+git tag v4.1.0
+git push origin v4.1.0
+
+# Merge to main
+git checkout main
+git merge release/v4.1.0
+```
+
+## Contributing Guidelines
+
+### Pull Request Process
+1. **Fork** the repository
+2. **Create** feature branch from `main`
+3. **Implement** changes with tests
+4. **Run** code quality checks
+5. **Submit** pull request with clear description
+6. **Address** review feedback
+7. **Merge** after approval
+
+### Code Review Checklist
+- [ ] Code follows project standards
+- [ ] Tests cover new functionality
+- [ ] Documentation is updated
+- [ ] No breaking changes without migration
+- [ ] Performance impact considered
+- [ ] Security implications reviewed
+
+### Issue Reporting
+- Use issue templates
+- Provide reproduction steps
+- Include environment details
+- Add relevant logs/screenshots
+- Label appropriately

@@ -45,6 +45,12 @@
                 ]) }}">
                 <button>Terminal</button>
             </a>
+            <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
+                href="{{ route('server.security.patches', [
+                    'server_uuid' => data_get($server, 'uuid'),
+                ]) }}">
+                <button>Security</button>
+            </a>
         </nav>
         <div class="order-first sm:order-last">
             <livewire:server.proxy.deploy :server="$server" />

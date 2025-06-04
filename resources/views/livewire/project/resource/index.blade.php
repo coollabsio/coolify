@@ -67,16 +67,16 @@
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
+                                        <div title="running" class="bg-success badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
+                                        <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
+                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
@@ -113,16 +113,16 @@
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
+                                        <div title="running" class="bg-success badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
+                                        <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
+                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
@@ -159,16 +159,16 @@
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
+                                        <div title="running" class="bg-success badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
+                                        <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
+                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
