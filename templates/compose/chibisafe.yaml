@@ -40,7 +40,6 @@ services:
     image: caddy:2-alpine
     environment:
       - SERVICE_FQDN_CHIBISAFE_80
-      - BASE_URL=":80"
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:80"]
       interval: 30s
@@ -55,7 +54,7 @@ services:
         content: |
           # chibisafe/Caddyfile
           # https://chibisafe.moe/guides/running-with-docker
-          {$BASE_URL} {
+          :80 {
             route {
               file_server * {
                   root /app/uploads
