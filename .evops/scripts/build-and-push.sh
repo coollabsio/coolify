@@ -37,7 +37,11 @@ for serviceMapping in "${serviceToDirMapping[@]}"; do
 
   echo "Building Docker image for $service in directory $serviceDir - version $imageVersion"
   # Build the Docker image
-  docker build -f "docker/${serviceDir}/Dockerfile" . -t "${registry}/${project}/${service}:${imageVersion}" --platform linux/amd64
+  docker build \
+    -f "docker/${serviceDir}/Dockerfile" . \
+    -t "${registry}/${project}/${service}:${imageVersion}" \
+    --progress plain \
+    --platform linux/amd64
 
   # Push the Docker image to the registry
   docker push "${registry}/${project}/${service}:${imageVersion}"
