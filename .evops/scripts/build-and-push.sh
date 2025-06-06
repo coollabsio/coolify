@@ -41,7 +41,8 @@ for serviceMapping in "${serviceToDirMapping[@]}"; do
     -f "docker/${serviceDir}/Dockerfile" . \
     -t "${registry}/${project}/${service}:${imageVersion}" \
     --progress plain \
-    --platform linux/amd64
+    --platform linux/amd64 \
+    --label "coolify.managed=true"
 
   # Push the Docker image to the registry
   docker push "${registry}/${project}/${service}:${imageVersion}"
