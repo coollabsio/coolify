@@ -9,7 +9,6 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
-use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -122,7 +121,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         $this->allApplicationsWithAdditionalServers = $this->applications->filter(function ($application) {
             return $application->additional_servers->count() > 0;
         });
-        $this->allApplicationPreviewsIds = $this->previews->pluck('id');
+        $this->allApplicationPreviewsIds = $this->previews->map(function ($preview) {
+            return $preview->application_id.':'.$preview->pull_request_id;
+        });
         $this->allDatabaseUuids = $this->databases->pluck('uuid');
         $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
         $this->services->each(function ($service) {
@@ -147,7 +148,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 if ($labels->has('coolify.applicationId')) {
                     $applicationId = $labels->get('coolify.applicationId');
-                    $pullRequestId = data_get($labels, 'coolify.pullRequestId', '0');
+                    $pullRequestId = $labels->get('coolify.pullRequestId', '0');
                     try {
                         if ($pullRequestId === '0') {
                             if ($this->allApplicationIds->contains($applicationId) && $this->isRunning($containerStatus)) {
@@ -155,10 +156,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                             }
                             $this->updateApplicationStatus($applicationId, $containerStatus);
                         } else {
-                            if ($this->allApplicationPreviewsIds->contains($applicationId) && $this->isRunning($containerStatus)) {
-                                $this->foundApplicationPreviewsIds->push($applicationId);
+                            $previewKey = $applicationId.':'.$pullRequestId;
+                            if ($this->allApplicationPreviewsIds->contains($previewKey) && $this->isRunning($containerStatus)) {
+                                $this->foundApplicationPreviewsIds->push($previewKey);
                             }
-                            $this->updateApplicationPreviewStatus($applicationId, $containerStatus);
+                            $this->updateApplicationPreviewStatus($applicationId, $pullRequestId, $containerStatus);
                         }
                     } catch (\Exception $e) {
                     }
@@ -215,14 +217,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         $application->save();
     }
 
-    private function updateApplicationPreviewStatus(string $applicationId, string $containerStatus)
+    private function updateApplicationPreviewStatus(string $applicationId, string $pullRequestId, string $containerStatus)
     {
-        $application = $this->previews->where('id', $applicationId)->first();
+        $application = $this->previews->where('application_id', $applicationId)
+            ->where('pull_request_id', $pullRequestId)
+            ->first();
         if (! $application) {
             return;
         }
-        $application->status = $containerStatus;
-        $application->save();
+        if ($application->status !== $containerStatus) {
+            $application->status = $containerStatus;
+            $application->save();
+        }
     }
 
     private function updateNotFoundApplicationStatus()
@@ -232,6 +238,17 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             $notFoundApplicationIds->each(function ($applicationId) {
                 $application = Application::find($applicationId);
                 if ($application) {
+                    // Don't mark as exited if already exited
+                    if (str($application->status)->startsWith('exited')) {
+                        return;
+                    }
+
+                    // Only protection: Verify we received any container data at all
+                    // If containers collection is completely empty, Sentinel might have failed
+                    if ($this->containers->isEmpty()) {
+                        return;
+                    }
+
                     $application->status = 'exited';
                     $application->save();
                 }
@@ -243,9 +260,32 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
     {
         $notFoundApplicationPreviewsIds = $this->allApplicationPreviewsIds->diff($this->foundApplicationPreviewsIds);
         if ($notFoundApplicationPreviewsIds->isNotEmpty()) {
-            $notFoundApplicationPreviewsIds->each(function ($applicationPreviewId) {
-                $applicationPreview = ApplicationPreview::find($applicationPreviewId);
+            $notFoundApplicationPreviewsIds->each(function ($previewKey) {
+                // Parse the previewKey format "application_id:pull_request_id"
+                $parts = explode(':', $previewKey);
+                if (count($parts) !== 2) {
+                    return;
+                }
+
+                $applicationId = $parts[0];
+                $pullRequestId = $parts[1];
+
+                $applicationPreview = $this->previews->where('application_id', $applicationId)
+                    ->where('pull_request_id', $pullRequestId)
+                    ->first();
+
                 if ($applicationPreview) {
+                    // Don't mark as exited if already exited
+                    if (str($applicationPreview->status)->startsWith('exited')) {
+                        return;
+                    }
+
+                    // Only protection: Verify we received any container data at all
+                    // If containers collection is completely empty, Sentinel might have failed
+                    if ($this->containers->isEmpty()) {
+
+                        return;
+                    }
                     $applicationPreview->status = 'exited';
                     $applicationPreview->save();
                 }

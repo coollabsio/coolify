@@ -25,6 +25,8 @@ class Logs extends Component
 
     public Collection $containers;
 
+    public array $serverContainers = [];
+
     public $container = [];
 
     public $parameters;
@@ -37,6 +39,8 @@ class Logs extends Component
 
     public $cpu;
 
+    public bool $containersLoaded = false;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -46,25 +50,77 @@ class Logs extends Component
         ];
     }
 
-    public function loadContainers($server_id)
+    public function loadAllContainers()
     {
         try {
-            $server = $this->servers->firstWhere('id', $server_id);
-            if (! $server->isFunctional()) {
-                return;
+            foreach ($this->servers as $server) {
+                $this->serverContainers[$server->id] = $this->getContainersForServer($server);
             }
+            $this->containersLoaded = true;
+        } catch (\Exception $e) {
+            $this->containersLoaded = true; // Set to true to stop loading spinner
+
+            return handleError($e, $this);
+        }
+    }
+
+    private function getContainersForServer($server)
+    {
+        if (! $server->isFunctional()) {
+            return [];
+        }
+
+        try {
             if ($server->isSwarm()) {
                 $containers = collect([
                     [
+                        'ID' => $this->resource->uuid,
                         'Names' => $this->resource->uuid.'_'.$this->resource->uuid,
                     ],
                 ]);
+
+                return $containers->toArray();
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
+                if ($containers && $containers->count() > 0) {
+                    return $containers->sort()->toArray();
+                }
+
+                return [];
             }
-            $server->containers = $containers->sort();
         } catch (\Exception $e) {
-            return handleError($e, $this);
+            // Log error but don't fail the entire operation
+            ray("Error loading containers for server {$server->name}: ".$e->getMessage());
+
+            return [];
+        }
+    }
+
+    public function getServerContainers($serverId)
+    {
+        return $this->serverContainers[$serverId] ?? [];
+    }
+
+    public function hasContainersForServer($serverId)
+    {
+        return isset($this->serverContainers[$serverId]) && count($this->serverContainers[$serverId]) > 0;
+    }
+
+    public function debugContainers()
+    {
+        ray([
+            'containersLoaded' => $this->containersLoaded,
+            'serversCount' => $this->servers->count(),
+            'serverContainers' => $this->serverContainers,
+            'servers' => $this->servers->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'functional' => $s->isFunctional()])->toArray(),
+        ]);
+    }
+
+    public function loadContainers($server_id = null)
+    {
+        // Keep for backward compatibility, but redirect to loadAllContainers
+        if (! $this->containersLoaded) {
+            $this->loadAllContainers();
         }
     }
 
@@ -73,6 +129,7 @@ class Logs extends Component
         try {
             $this->containers = collect();
             $this->servers = collect();
+            $this->serverContainers = [];
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             if (data_get($this->parameters, 'application_uuid')) {
@@ -80,7 +137,8 @@ class Logs extends Component
                 $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
                 $this->status = $this->resource->status;
                 if ($this->resource->destination->server->isFunctional()) {
-                    $this->servers = $this->servers->push($this->resource->destination->server);
+                    $server = $this->resource->destination->server;
+                    $this->servers = $this->servers->push($server);
                 }
                 foreach ($this->resource->additional_servers as $server) {
                     if ($server->isFunctional()) {
@@ -96,7 +154,8 @@ class Logs extends Component
                 $this->resource = $resource;
                 $this->status = $this->resource->status;
                 if ($this->resource->destination->server->isFunctional()) {
-                    $this->servers = $this->servers->push($this->resource->destination->server);
+                    $server = $this->resource->destination->server;
+                    $this->servers = $this->servers->push($server);
                 }
                 $this->container = $this->resource->uuid;
                 $this->containers->push($this->container);
@@ -110,7 +169,8 @@ class Logs extends Component
                     $this->containers->push(data_get($database, 'name').'-'.data_get($this->resource, 'uuid'));
                 });
                 if ($this->resource->server->isFunctional()) {
-                    $this->servers = $this->servers->push($this->resource->server);
+                    $server = $this->resource->server;
+                    $this->servers = $this->servers->push($server);
                 }
             }
             $this->containers = $this->containers->sort();

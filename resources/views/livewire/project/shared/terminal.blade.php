@@ -1,14 +1,16 @@
 <div id="terminal-container" x-data="terminalData()">
-    @if(!$hasShell)
+    @if (!$hasShell)
         <div class="flex pt-4 items-center justify-center w-full py-4 mx-auto">
             <div class="p-4 w-full rounded-sm border dark:bg-coolgray-100 dark:border-coolgray-300">
                 <div class="flex flex-col items-center justify-center space-y-4">
                     <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <div class="text-center">
                         <h3 class="text-lg font-medium">Terminal Not Available</h3>
-                        <p class="mt-2 text-sm text-gray-500">No shell (bash/sh) is available in this container. Please ensure either bash or sh is installed to use the terminal.</p>
+                        <p class="mt-2 text-sm text-gray-500">No shell (bash/sh) is available in this container. Please
+                            ensure either bash or sh is installed to use the terminal.</p>
                     </div>
                 </div>
             </div>
@@ -17,8 +19,9 @@
         <div x-ref="terminalWrapper"
             :class="fullscreen ? 'fullscreen' : 'relative w-full h-full py-4 mx-auto max-h-[510px]'">
             <div id="terminal" wire:ignore></div>
-            <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-6 text-white" x-on:click="makeFullscreen"><svg
-                    class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-6 text-white"
+                x-on:click="makeFullscreen"><svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                         stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                 </svg></button>

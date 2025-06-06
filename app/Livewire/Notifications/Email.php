@@ -325,7 +325,7 @@ class Email extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress, 'email'));
+                    $this->team?->notifyNow(new Test($this->testEmailAddress, 'email'));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,

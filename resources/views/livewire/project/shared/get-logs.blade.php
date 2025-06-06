@@ -37,7 +37,7 @@
             @if ($resource?->type() === 'application' || str($resource?->type())->startsWith('standalone'))
                 <h4>{{ $container }}</h4>
             @else
-                <h3>{{ str($container)->beforeLast('-')->headline() }}</h3>
+                <h4>{{ str($container)->beforeLast('-')->headline() }}</h4>
             @endif
             @if ($pull_request)
                 <div>({{ $pull_request }})</div>
