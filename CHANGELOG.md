@@ -3879,6 +3879,7 @@ All notable changes to this project will be documented in this file.
 - *(http-basic-auth)* Rename 'http_basic_auth_enable' to 'http_basic_auth_enabled' across application files for consistency
 - *(docker)* Remove debug statement and enhance hostname handling in Docker run conversion
 - *(server)* Simplify proxy path logic and remove unnecessary conditions
+- Improve docker build command formatting for readability
 
 ### 📚 Documentation
 
@@ -3907,6 +3908,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(CONTRIBUTING)* Add note about Laravel Horizon accessibility
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
