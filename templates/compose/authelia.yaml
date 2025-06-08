@@ -71,7 +71,6 @@ services:
         target: /config/notification.txt
         content: |
           # Authelia file notification will appear in this file
-    restart: "unless-stopped"
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,7 +99,6 @@ services:
     command: valkey-server --requirepass ${SERVICE_PASSWORD_REDIS} --save 60 1 --loglevel warning
     volumes:
       - "valkey_data:/data"
-    restart: "unless-stopped"
     healthcheck:
       test: ["CMD", "valkey-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
       interval: 10s
@@ -112,7 +110,6 @@ services:
     exclude_from_hc: true
     image: "traefik/whoami"
     container_name: "test"
-    restart: "unless-stopped"
     environment:
       - SERVICE_FQDN_AUTHTEST
     labels:
