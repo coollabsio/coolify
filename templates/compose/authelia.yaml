@@ -5,8 +5,6 @@
 # port: 9091
 
 services:
-  # See setup guide at https://coolify.io/docs/services/authelia
-  #
   # Main Authelia service
   authelia:
     image: "authelia/authelia:latest"
@@ -39,7 +37,6 @@ services:
           authentication_backend:
             file:
               path: '/config/users.yml'
-          # Setup access control - https://www.authelia.com/configuration/security/access-control/
           access_control:
             default_policy: 'one_factor'
           session:
@@ -48,7 +45,6 @@ services:
                 # CHANGE THIS - should match your root/wildcard domain
                 domain: 'example.com'
                 authelia_url: '{{ env "MAIN_AUTHELIA_URL" }}'
-          # Setup SMTP notifications - https://www.authelia.com/configuration/notifications/smtp/
           notifier:
             filesystem:
               filename: '/config/notification.txt'
@@ -105,7 +101,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Testing app to check if Authelia is working correctly
+  # Test app to check if Authelia is working correctly
   test:
     exclude_from_hc: true
     image: "traefik/whoami"
