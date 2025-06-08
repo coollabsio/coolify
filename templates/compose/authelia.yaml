@@ -1,0 +1,119 @@
+# documentation: https://www.authelia.com/integration/prologue/get-started/
+# slogan: A fast, lightweight authentication and authorization server, supporting SSO, 2FA, and OIDC flows.
+# tags: auth,sso,oidc,oauth,mfa,2fa,ldap,authentication,authorization
+# logo: svgs/authelia.svg
+# port: 9091
+
+services:
+  # See setup guide at https://coolify.io/docs/services/authelia
+  #
+  # Main Authelia service
+  authelia:
+    image: "authelia/authelia:latest"
+    container_name: "authelia"
+    environment:
+      - SERVICE_FQDN_AUTHELIA_9091
+      - MAIN_AUTHELIA_URL=${SERVICE_FQDN_AUTHELIA}
+      - AUTHELIA_SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}
+      - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET=${SERVICE_PASSWORD_64_RESET}
+      - AUTHELIA_STORAGE_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_STORAGE}
+      - AUTHELIA_STORAGE_POSTGRES_ADDRESS=${POSTGRES_ADDRESS:-tcp://postgres:5432}
+      - AUTHELIA_STORAGE_POSTGRES_DATABASE=${POSTGRES_DB:-authelia}
+      - AUTHELIA_STORAGE_POSTGRES_USERNAME=${SERVICE_USER_POSTGRES}
+      - AUTHELIA_STORAGE_POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - AUTHELIA_SESSION_REDIS_HOST=${REDIS_HOST:-valkey}
+      - AUTHELIA_SESSION_REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - X_AUTHELIA_CONFIG_FILTERS=template
+    volumes:
+      - type: bind
+        source: ./authelia/configuration.yml
+        target: /config/configuration.yml
+        content: |
+          # Authelia configuration file
+          # Coolify setup guide: https://coolify.io/docs/services/authelia
+          # Authelia docs: https://www.authelia.com/configuration/prologue/introduction/
+          server:
+            address: 'tcp://:9091'
+          log:
+            level: 'debug'
+          authentication_backend:
+            file:
+              path: '/config/users.yml'
+          # Setup access control - https://www.authelia.com/configuration/security/access-control/
+          access_control:
+            default_policy: 'one_factor'
+          session:
+            cookies:
+              - name: 'authelia_session'
+                # CHANGE THIS - should match your root/wildcard domain
+                domain: 'example.com'
+                authelia_url: '{{ env "MAIN_AUTHELIA_URL" }}'
+          # Setup SMTP notifications - https://www.authelia.com/configuration/notifications/smtp/
+          notifier:
+            filesystem:
+              filename: '/config/notification.txt'
+      - type: bind
+        source: ./authelia/users.yml
+        target: /config/users.yml
+        content: |
+          # Authelia user database file
+          # See https://www.authelia.com/reference/guides/passwords
+          users:
+            # CHANGE THIS - set username, hashed password, display name, etc.
+            authelia:
+              password: 'change-me-to-hashed-password'
+              displayname: 'Authelia Admin'
+              email: 'authelia@authelia.com'
+              groups:
+                - 'admin'
+      - type: bind
+        source: ./authelia/notification.txt
+        target: /config/notification.txt
+        content: |
+          # Authelia file notification will appear in this file
+    restart: "unless-stopped"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  # Postgres service for Authelia storage
+  postgres:
+    image: postgres:17-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-authelia}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  # Valkey service for Authelia sessions
+  valkey:
+    image: "valkey/valkey:7-alpine"
+    container_name: "valkey"
+    command: valkey-server --requirepass ${SERVICE_PASSWORD_REDIS} --save 60 1 --loglevel warning
+    volumes:
+      - "valkey_data:/data"
+    restart: "unless-stopped"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Testing app to check if Authelia is working correctly
+  test:
+    exclude_from_hc: true
+    image: "traefik/whoami"
+    container_name: "test"
+    restart: "unless-stopped"
+    environment:
+      - SERVICE_FQDN_AUTHTEST
+    labels:
+      - traefik.http.middlewares.authelia@file # Traefik label that adds Authelia middleware
