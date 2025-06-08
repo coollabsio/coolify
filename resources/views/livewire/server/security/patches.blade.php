@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Security | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <x-slide-over closeWithX fullScreen @startupdate.window="slideOverOpen = true">
         <x-slot:title>Updating Packages</x-slot:title>
         <x-slot:content>
@@ -28,7 +28,7 @@
                     <div class="flex flex-col gap-6 pt-4">
                         <div class="flex flex-col">
                             <div>
-                                <div wire:target="checkForUpdates" wire:loading>
+                                <div class="pb-2" wire:target="checkForUpdates" wire:loading>
                                     Checking for updates. It may take a few minutes. <x-loading />
                                 </div>
                                 @if ($error)

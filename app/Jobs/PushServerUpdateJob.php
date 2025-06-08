@@ -213,8 +213,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         if (! $application) {
             return;
         }
-        $application->status = $containerStatus;
-        $application->save();
+        if ($application->status !== $containerStatus) {
+            $application->status = $containerStatus;
+            $application->save();
+        }
     }
 
     private function updateApplicationPreviewStatus(string $applicationId, string $pullRequestId, string $containerStatus)
@@ -249,8 +251,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                         return;
                     }
 
-                    $application->status = 'exited';
-                    $application->save();
+                    if ($application->status !== 'exited') {
+                        $application->status = 'exited';
+                        $application->save();
+                    }
                 }
             });
         }
@@ -286,8 +290,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
                         return;
                     }
-                    $applicationPreview->status = 'exited';
-                    $applicationPreview->save();
+                    if ($applicationPreview->status !== 'exited') {
+                        $applicationPreview->status = 'exited';
+                        $applicationPreview->save();
+                    }
                 }
             });
         }
@@ -318,8 +324,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         if (! $database) {
             return;
         }
-        $database->status = $containerStatus;
-        $database->save();
+        if ($database->status !== $containerStatus) {
+            $database->status = $containerStatus;
+            $database->save();
+        }
         if ($this->isRunning($containerStatus) && $tcpProxy) {
             $tcpProxyContainerFound = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
                 return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
@@ -339,8 +347,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             $notFoundDatabaseUuids->each(function ($databaseUuid) {
                 $database = $this->databases->where('uuid', $databaseUuid)->first();
                 if ($database) {
-                    $database->status = 'exited';
-                    $database->save();
+                    if ($database->status !== 'exited') {
+                        $database->status = 'exited';
+                        $database->save();
+                    }
                     if ($database->is_public) {
                         StopDatabaseProxy::dispatch($database);
                     }
@@ -358,14 +368,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         if ($subType === 'application') {
             $application = $service->applications()->where('id', $subId)->first();
             if ($application) {
-                $application->status = $containerStatus;
-                $application->save();
+                if ($application->status !== $containerStatus) {
+                    $application->status = $containerStatus;
+                    $application->save();
+                }
             }
         } elseif ($subType === 'database') {
             $database = $service->databases()->where('id', $subId)->first();
             if ($database) {
-                $database->status = $containerStatus;
-                $database->save();
+                if ($database->status !== $containerStatus) {
+                    $database->status = $containerStatus;
+                    $database->save();
+                }
             }
         }
     }
@@ -378,8 +392,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             $notFoundServiceApplicationIds->each(function ($serviceApplicationId) {
                 $application = ServiceApplication::find($serviceApplicationId);
                 if ($application) {
-                    $application->status = 'exited';
-                    $application->save();
+                    if ($application->status !== 'exited') {
+                        $application->status = 'exited';
+                        $application->save();
+                    }
                 }
             });
         }
@@ -387,8 +403,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
             $notFoundServiceDatabaseIds->each(function ($serviceDatabaseId) {
                 $database = ServiceDatabase::find($serviceDatabaseId);
                 if ($database) {
-                    $database->status = 'exited';
-                    $database->save();
+                    if ($database->status !== 'exited') {
+                        $database->status = 'exited';
+                        $database->save();
+                    }
                 }
             });
         }

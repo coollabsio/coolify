@@ -2,12 +2,12 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > CA Certificate | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="ca-certificate" />
         <div class="flex flex-col gap-4">
             <div class="flex items-center gap-2">
-                <h3>CA SSL Certificate</h3>
+                <h2>CA Certificate</h2>
                 <div class="flex gap-2">
                     <x-modal-confirmation title="Confirm changing of CA Certificate?" buttonTitle="Save"
                         submitAction="saveCaCertificate" :actions="[

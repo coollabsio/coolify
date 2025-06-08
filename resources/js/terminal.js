@@ -30,6 +30,9 @@ export function initializeTerminalComponent() {
             pingTimeoutId: null,
             heartbeatMissed: 0,
             maxHeartbeatMisses: 3,
+            // Resize handling
+            resizeObserver: null,
+            resizeTimeout: null,
 
             init() {
                 this.setupTerminal();
@@ -42,7 +45,7 @@ export function initializeTerminalComponent() {
                 this.setupTerminalEventListeners();
 
                 this.$wire.on('send-back-command', (command) => {
-                    this.sendMessage({ command: command });
+                    this.sendCommandWhenReady({ command: command });
                 });
 
                 this.keepAliveInterval = setInterval(this.keepAlive.bind(this), 30000);
@@ -55,8 +58,18 @@ export function initializeTerminalComponent() {
                         if (active) {
                             this.$refs.terminalWrapper.style.display = 'block';
                             this.resizeTerminal();
+
+                            // Start observing terminal wrapper for resize changes
+                            if (this.resizeObserver && this.$refs.terminalWrapper) {
+                                this.resizeObserver.observe(this.$refs.terminalWrapper);
+                            }
                         } else {
                             this.$refs.terminalWrapper.style.display = 'none';
+
+                            // Stop observing when terminal is inactive
+                            if (this.resizeObserver) {
+                                this.resizeObserver.disconnect();
+                            }
                         }
                     });
                 });
@@ -70,6 +83,17 @@ export function initializeTerminalComponent() {
                 window.onresize = () => {
                     this.resizeTerminal()
                 };
+
+                // Set up ResizeObserver for more reliable terminal resizing
+                if (window.ResizeObserver) {
+                    this.resizeObserver = new ResizeObserver(() => {
+                        // Debounce resize calls to avoid performance issues
+                        clearTimeout(this.resizeTimeout);
+                        this.resizeTimeout = setTimeout(() => {
+                            this.resizeTerminal();
+                        }, 50);
+                    });
+                }
             },
 
             cleanup() {
@@ -79,15 +103,27 @@ export function initializeTerminalComponent() {
                 if (this.socket) {
                     this.socket.close(1000, 'Client cleanup');
                 }
+
+                // Clean up resize observer
+                if (this.resizeObserver) {
+                    this.resizeObserver.disconnect();
+                    this.resizeObserver = null;
+                }
+
+                // Clear resize timeout
+                if (this.resizeTimeout) {
+                    clearTimeout(this.resizeTimeout);
+                }
             },
 
             clearAllTimers() {
-                [this.keepAliveInterval, this.reconnectInterval, this.connectionTimeoutId, this.pingTimeoutId]
+                [this.keepAliveInterval, this.reconnectInterval, this.connectionTimeoutId, this.pingTimeoutId, this.resizeTimeout]
                     .forEach(timer => timer && clearInterval(timer));
                 this.keepAliveInterval = null;
                 this.reconnectInterval = null;
                 this.connectionTimeoutId = null;
                 this.pingTimeoutId = null;
+                this.resizeTimeout = null;
             },
 
             resetTerminal() {
@@ -98,6 +134,9 @@ export function initializeTerminalComponent() {
                     this.pendingWrites = 0;
                     this.paused = false;
                     this.commandBuffer = '';
+
+                    // Notify parent component that terminal disconnected
+                    this.$wire.dispatch('terminalDisconnected');
 
                     // Force a refresh
                     this.$nextTick(() => {
@@ -205,6 +244,9 @@ export function initializeTerminalComponent() {
 
                 // Start ping timeout monitoring
                 this.resetPingTimeout();
+
+                // Notify that WebSocket is ready for auto-connection
+                this.dispatchEvent('terminal-websocket-ready');
             },
 
             handleSocketError(error) {
@@ -277,6 +319,12 @@ export function initializeTerminalComponent() {
                 }
             },
 
+            sendCommandWhenReady(message) {
+                if (this.isWebSocketReady()) {
+                    this.sendMessage(message);
+                }
+            },
+
             handleSocketMessage(event) {
                 // Handle pong responses
                 if (event.data === 'pong') {
@@ -296,15 +344,31 @@ export function initializeTerminalComponent() {
                     this.terminalActive = true;
                     this.term.focus();
                     document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
+
+                    // Initial resize after terminal is ready
                     this.resizeTerminal();
+
+                    // Additional resize after a short delay to ensure proper sizing
+                    setTimeout(() => {
+                        this.resizeTerminal();
+                    }, 200);
+
+                    // Notify parent component that terminal is connected
+                    this.$wire.dispatch('terminalConnected');
                 } else if (event.data === 'unprocessable') {
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
                     this.message = '(sorry, something went wrong, please try again)';
+
+                    // Notify parent component that terminal connection failed
+                    this.$wire.dispatch('terminalDisconnected');
                 } else if (event.data === 'pty-exited') {
                     this.terminalActive = false;
                     this.term.reset();
                     this.commandBuffer = '';
+
+                    // Notify parent component that terminal disconnected
+                    this.$wire.dispatch('terminalDisconnected');
                 } else {
                     try {
                         this.pendingWrites++;
@@ -397,7 +461,13 @@ export function initializeTerminalComponent() {
             makeFullscreen() {
                 this.fullscreen = !this.fullscreen;
                 this.$nextTick(() => {
-                    this.resizeTerminal();
+                    // Force a layout reflow to ensure DOM changes are applied
+                    this.$refs.terminalWrapper.offsetHeight;
+
+                    // Add a small delay to ensure CSS transitions complete
+                    setTimeout(() => {
+                        this.resizeTerminal();
+                    }, 100);
                 });
             },
 
@@ -405,25 +475,53 @@ export function initializeTerminalComponent() {
                 if (!this.terminalActive || !this.term || !this.fitAddon) return;
 
                 try {
+                    // Force a refresh of the fit addon dimensions
                     this.fitAddon.fit();
-                    const height = this.$refs.terminalWrapper.clientHeight;
-                    const width = this.$refs.terminalWrapper.clientWidth;
-                    const charSize = this.term._core._renderService._charSizeService;
 
-                    if (!charSize.height || !charSize.width) {
-                        // Fallback values if char size not available yet
+                    // Get fresh dimensions after fit
+                    const wrapperHeight = this.$refs.terminalWrapper.clientHeight;
+                    const wrapperWidth = this.$refs.terminalWrapper.clientWidth;
+
+                    // Account for terminal container padding (px-2 py-1 = 8px left/right, 4px top/bottom)
+                    const horizontalPadding = 16; // 8px * 2 (left + right)
+                    const verticalPadding = 8; // 4px * 2 (top + bottom)
+                    const height = wrapperHeight - verticalPadding;
+                    const width = wrapperWidth - horizontalPadding;
+
+                    // Check if dimensions are valid
+                    if (height <= 0 || width <= 0) {
+                        console.warn('[Terminal] Invalid wrapper dimensions, retrying...', { height, width });
                         setTimeout(() => this.resizeTerminal(), 100);
                         return;
                     }
 
+                    const charSize = this.term._core._renderService._charSizeService;
+
+                    if (!charSize.height || !charSize.width) {
+                        // Fallback values if char size not available yet
+                        console.warn('[Terminal] Character size not available, retrying...');
+                        setTimeout(() => this.resizeTerminal(), 100);
+                        return;
+                    }
+
+                    // Calculate new dimensions with padding considerations
                     const rows = Math.floor(height / charSize.height) - 1;
                     const cols = Math.floor(width / charSize.width) - 1;
 
                     if (rows > 0 && cols > 0) {
-                        this.term.resize(cols, rows);
-                        this.sendMessage({
-                            resize: { cols: cols, rows: rows }
-                        });
+                        // Check if dimensions actually changed to avoid unnecessary resizes
+                        const currentCols = this.term.cols;
+                        const currentRows = this.term.rows;
+
+                        if (cols !== currentCols || rows !== currentRows) {
+                            console.log(`[Terminal] Resizing terminal: ${currentCols}x${currentRows} -> ${cols}x${rows}`);
+                            this.term.resize(cols, rows);
+                            this.sendMessage({
+                                resize: { cols: cols, rows: rows }
+                            });
+                        }
+                    } else {
+                        console.warn('[Terminal] Invalid calculated dimensions:', { rows, cols, height, width, charSize });
                     }
                 } catch (error) {
                     console.error('[Terminal] Resize error:', error);
@@ -441,6 +539,22 @@ export function initializeTerminalComponent() {
                     lastPingTime: this.lastPingTime,
                     heartbeatMissed: this.heartbeatMissed
                 };
+            },
+
+            // Helper method to dispatch custom events
+            dispatchEvent(eventName, detail = null) {
+                const event = new CustomEvent(eventName, {
+                    detail: detail,
+                    bubbles: true
+                });
+                this.$el.dispatchEvent(event);
+            },
+
+            // Check if WebSocket is ready for commands
+            isWebSocketReady() {
+                return this.connectionState === 'connected' &&
+                    this.socket &&
+                    this.socket.readyState === WebSocket.OPEN;
             }
         };
     }

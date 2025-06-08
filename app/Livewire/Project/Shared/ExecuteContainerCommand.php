@@ -29,6 +29,16 @@ class ExecuteContainerCommand extends Component
 
     public bool $hasShell = true;
 
+    public bool $containersLoaded = false;
+
+    public bool $autoConnectAttempted = false;
+
+    public bool $isConnecting = false;
+
+    public bool $isConnected = false;
+
+    public string $connectionStatus = 'Loading containers...';
+
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
@@ -87,6 +97,8 @@ class ExecuteContainerCommand extends Component
             $this->type = 'server';
             $this->resource = Server::ownedByCurrentTeam()->whereUuid($this->parameters['server_uuid'])->firstOrFail();
             $this->server = $this->resource;
+            $this->containersLoaded = true; // Server doesn't need container loading
+            $this->connectionStatus = 'Waiting for terminal to be ready...';
         }
     }
 
@@ -151,6 +163,66 @@ class ExecuteContainerCommand extends Component
         if ($this->containers->count() === 1) {
             $this->selected_container = data_get($this->containers->first(), 'container.Names');
         }
+
+        $this->containersLoaded = true;
+        $this->connectionStatus = 'Waiting for terminal to be ready...';
+    }
+
+    public function initializeTerminalConnection()
+    {
+        try {
+            // Only auto-connect if containers are loaded and we haven't attempted before
+            if (! $this->containersLoaded || $this->autoConnectAttempted || $this->isConnecting) {
+                return;
+            }
+
+            $this->autoConnectAttempted = true;
+
+            // Ensure component is in a stable state before proceeding
+            $this->skipRender();
+
+            $this->isConnecting = true;
+
+            if ($this->type === 'server') {
+                $this->connectionStatus = 'Establishing connection to server terminal...';
+                $this->connectToServer();
+            } elseif ($this->containers->count() === 1) {
+                $this->connectionStatus = 'Establishing connection to container terminal...';
+                $this->connectToContainer();
+            } else {
+                $this->isConnecting = false;
+                $this->connectionStatus = '';
+            }
+        } catch (\Throwable $e) {
+            // Log the error but don't let it bubble up to cause snapshot issues
+            logger()->error('Terminal auto-connection failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'component_id' => $this->getId(),
+            ]);
+
+            // Reset state to allow manual connection
+            $this->autoConnectAttempted = false;
+            $this->isConnecting = false;
+            $this->connectionStatus = 'Auto-connection failed. Please use the reconnect button.';
+        }
+    }
+
+    #[On('terminalConnected')]
+    public function terminalConnected()
+    {
+        $this->isConnected = true;
+        $this->isConnecting = false;
+        $this->connectionStatus = '';
+    }
+
+    #[On('terminalDisconnected')]
+    public function terminalDisconnected()
+    {
+        $this->isConnected = false;
+        $this->isConnecting = false;
+        $this->autoConnectAttempted = false;
+        $this->connectionStatus = 'Connection lost. Click Reconnect to try again.';
     }
 
     private function checkShellAvailability(Server $server, string $container): bool
@@ -179,6 +251,8 @@ class ExecuteContainerCommand extends Component
                 throw new \RuntimeException('Terminal access is disabled on this server.');
             }
             $this->hasShell = true;
+            $this->isConnecting = true;
+            $this->connectionStatus = 'Establishing connection to server terminal...';
             $this->dispatch(
                 'send-terminal-command',
                 false,
@@ -186,6 +260,9 @@ class ExecuteContainerCommand extends Component
                 data_get($this->server, 'uuid')
             );
         } catch (\Throwable $e) {
+            $this->isConnecting = false;
+            $this->connectionStatus = 'Connection failed.';
+
             return handleError($e, $this);
         }
     }
@@ -234,9 +311,14 @@ class ExecuteContainerCommand extends Component
 
             $this->hasShell = $this->checkShellAvailability($server, data_get($container, 'container.Names'));
             if (! $this->hasShell) {
+                $this->isConnecting = false;
+                $this->connectionStatus = 'Shell not available in container.';
+
                 return;
             }
 
+            $this->isConnecting = true;
+            $this->connectionStatus = 'Establishing connection to container terminal...';
             $this->dispatch(
                 'send-terminal-command',
                 true,
@@ -244,6 +326,9 @@ class ExecuteContainerCommand extends Component
                 data_get($container, 'server.uuid')
             );
         } catch (\Throwable $e) {
+            $this->isConnecting = false;
+            $this->connectionStatus = 'Connection failed.';
+
             return handleError($e, $this);
         }
     }
