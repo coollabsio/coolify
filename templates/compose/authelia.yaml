@@ -12,6 +12,7 @@ services:
     environment:
       - SERVICE_FQDN_AUTHELIA_9091
       - MAIN_AUTHELIA_URL=${SERVICE_FQDN_AUTHELIA}
+      - BASE_DOMAIN=${BASE_DOMAIN:-example.com}
       - AUTHELIA_SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}
       - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET=${SERVICE_PASSWORD_64_RESET}
       - AUTHELIA_STORAGE_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_STORAGE}
@@ -37,13 +38,14 @@ services:
           authentication_backend:
             file:
               path: '/config/users.yml'
+          totp:
+            issuer: '{{ env "BASE_DOMAIN" }}'
           access_control:
             default_policy: 'one_factor'
           session:
             cookies:
               - name: 'authelia_session'
-                # CHANGE THIS - should match your root/wildcard domain
-                domain: 'example.com'
+                domain: '{{ env "BASE_DOMAIN" }}'
                 authelia_url: '{{ env "MAIN_AUTHELIA_URL" }}'
           notifier:
             filesystem:
@@ -101,12 +103,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # Test app to check if Authelia is working correctly
-  test:
+  # Whoami service, adds the Authelia middleware to Traefik
+  middleware:
     exclude_from_hc: true
     image: "traefik/whoami"
-    container_name: "test"
+    container_name: "middleware"
     environment:
-      - SERVICE_FQDN_AUTHTEST
+      - SERVICE_FQDN_WHOAMI # exposes the whoami service, protected by Authelia
     labels:
-      - traefik.http.middlewares.authelia@file # Traefik label that adds the Authelia middleware
+      - traefik.http.middlewares.authelia.forwardAuth.address: 'http://authelia:9091/api/authz/forward-auth'
+      - traefik.http.middlewares.authelia.forwardAuth.trustForwardHeader: 'true'
+      - traefik.http.middlewares.authelia.forwardAuth.authResponseHeaders: 'Remote-User,Remote-Groups,Remote-Email,Remote-Name'
