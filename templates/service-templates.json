@@ -2341,6 +2341,22 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "operon-one": {
+        "documentation": "https://github.com/neooriginal/Operon.one/blob/main/README.md",
+        "slogan": "Manus-inspired self hosted action-ai",
+        "compose": "c2VydmljZXM6CiAgb3Blbi13ZWJ1aToKICAgIGltYWdlOiAnZ2hjci5pby9vcGVuLXdlYnVpL29wZW4td2VidWk6bWFpbicKICAgIHZvbHVtZXM6CiAgICAgIC0gJ29wZW4td2VidWk6L2FwcC9iYWNrZW5kL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fT1BFTldFQlVJXzgwODAKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MDgwJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMzBzCiAgICAgIHJldHJpZXM6IDEwCnZvbHVtZXM6CiAgb3Blbi13ZWJ1aTogbnVsbAo=",
+        "tags": [
+            "ai",
+            "models",
+            "deployment",
+            "operon-one",
+            "manus",
+            "integration"
+        ],
+        "logo": "svgs/operonone.svg",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "organizr": {
         "documentation": "https://docs.organizr.app/?utm_source=coolify.io",
         "slogan": "Homelab Services Organizer",
