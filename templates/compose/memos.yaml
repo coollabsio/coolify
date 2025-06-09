@@ -1,0 +1,13 @@
+# documentation: https://github.com/usememos/memos
+# slogan: An open-source, lightweight note-taking solution. The pain-less way to create your meaningful notes. Your Notes, Your Way.
+# tags: note-taking,microblog,social-network,markdown
+# logo: svgs/memos.png
+# port: 5230
+
+services:
+  memos:
+    image: neosmemo/memos:stable
+    volumes:
+      - memos/:/var/opt/memos
+    environment:
+      - SERVICE_FQDN_MEMOS_5230

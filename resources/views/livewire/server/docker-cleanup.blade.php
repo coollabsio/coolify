@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Docker Cleanup | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="docker-cleanup" />
         <div class="w-full">
@@ -34,8 +34,8 @@
                             label="Docker cleanup frequency" required
                             helper="Cron expression for Docker Cleanup.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every night at midnight." />
                         @if (!$forceDockerCleanup)
-                        <x-forms.input id="dockerCleanupThreshold" label="Docker cleanup threshold (%)" required
-                            helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
+                            <x-forms.input id="dockerCleanupThreshold" label="Docker cleanup threshold (%)" required
+                                helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
                         @endif
                         <div class="w-96">
                             <x-forms.checkbox
@@ -77,7 +77,8 @@
             </form>
 
             <div class="mt-8">
-                <h3 class="mb-4">Recent executions <span class="text-xs text-neutral-500">(click to check output)</span></h3>
+                <h3 class="mb-4">Recent executions <span class="text-xs text-neutral-500">(click to check
+                        output)</span></h3>
                 <livewire:server.docker-cleanup-executions :server="$server" />
             </div>
         </div>

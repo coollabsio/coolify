@@ -178,16 +178,6 @@ class All extends Component
             }
         }
 
-        // Debug information
-        \Log::info('Environment variables update status', [
-            'deletedCount' => $deletedCount,
-            'updatedCount' => $updatedCount,
-            'deletedPreviewCount' => $deletedPreviewCount ?? 0,
-            'updatedPreviewCount' => $updatedPreviewCount ?? 0,
-            'changesMade' => $changesMade,
-            'errorOccurred' => $errorOccurred,
-        ]);
-
         // Only show success message if changes were actually made and no errors occurred
         if ($changesMade && ! $errorOccurred) {
             $this->dispatch('success', 'Environment variables updated.');

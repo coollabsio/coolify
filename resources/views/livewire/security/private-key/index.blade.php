@@ -19,9 +19,8 @@
                     </div>
                     <div class="box-description">
                         {{ $key->description }}
-                        @if (!$key->isInUse())
-                            <span
-                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-400 text-black">Unused</span>
+                         @if (!$key->isInUse())
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-yellow-400 text-black">Unused</span>
                         @endif
                     </div>
 

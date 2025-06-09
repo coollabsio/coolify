@@ -1,0 +1,161 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Project Overview
+
+## What is Coolify?
+
+Coolify is an **open-source & self-hostable alternative to Heroku / Netlify / Vercel**. It's a comprehensive deployment platform that helps you manage servers, applications, and databases on your own hardware with just an SSH connection.
+
+## Core Mission
+
+**"Imagine having the ease of a cloud but with your own servers. That is Coolify."**
+
+- **No vendor lock-in** - All configurations saved to your servers
+- **Self-hosted** - Complete control over your infrastructure  
+- **SSH-only requirement** - Works with VPS, Bare Metal, Raspberry PIs, anything
+- **Docker-first** - Container-based deployment architecture
+
+## Key Features
+
+### 🚀 **Application Deployment**
+- Git-based deployments (GitHub, GitLab, Bitbucket, Gitea)
+- Docker & Docker Compose support
+- Preview deployments for pull requests
+- Zero-downtime deployments
+- Build cache optimization
+
+### 🖥️ **Server Management**
+- Multi-server orchestration
+- Real-time monitoring and logs
+- SSH key management
+- Proxy configuration (Traefik/Caddy)
+- Resource usage tracking
+
+### 🗄️ **Database Management**
+- PostgreSQL, MySQL, MariaDB, MongoDB
+- Redis, KeyDB, Dragonfly, ClickHouse
+- Automated backups with S3 integration
+- Database clustering support
+
+### 🔧 **Infrastructure as Code**
+- Docker Compose generation
+- Environment variable management
+- SSL certificate automation
+- Custom domain configuration
+
+### 👥 **Team Collaboration**
+- Multi-tenant team organization
+- Role-based access control
+- Project and environment isolation
+- Team-wide resource sharing
+
+### 📊 **Monitoring & Observability**
+- Real-time application logs
+- Server resource monitoring
+- Deployment status tracking
+- Webhook integrations
+- Notification systems (Email, Discord, Slack, Telegram)
+
+## Target Users
+
+### **DevOps Engineers**
+- Infrastructure automation
+- Multi-environment management
+- CI/CD pipeline integration
+
+### **Developers**
+- Easy application deployment
+- Development environment provisioning
+- Preview deployments for testing
+
+### **Small to Medium Businesses**
+- Cost-effective Heroku alternative
+- Self-hosted control and privacy
+- Scalable infrastructure management
+
+### **Agencies & Consultants**
+- Client project isolation
+- Multi-tenant management
+- White-label deployment solutions
+
+## Business Model
+
+### **Open Source (Free)**
+- Complete feature set
+- Self-hosted deployment
+- Community support
+- No feature restrictions
+
+### **Cloud Version (Paid)**
+- Managed Coolify instance
+- High availability
+- Premium support
+- Email notifications included
+- Same price as self-hosted server (~$4-5/month)
+
+## Architecture Philosophy
+
+### **Server-Side First**
+- Laravel backend with Livewire frontend
+- Minimal JavaScript footprint
+- Real-time updates via WebSockets
+- Progressive enhancement approach
+
+### **Docker-Native**
+- Container-first deployment strategy
+- Docker Compose orchestration
+- Image building and registry integration
+- Volume and network management
+
+### **Security-Focused**
+- SSH-based server communication
+- Environment variable encryption
+- Team-based access isolation
+- Audit logging and activity tracking
+
+## Project Structure
+
+```
+coolify/
+├── app/                    # Laravel application core
+│   ├── Models/            # Domain models (Application, Server, Service)
+│   ├── Livewire/          # Frontend components
+│   ├── Actions/           # Business logic actions
+│   └── Jobs/              # Background job processing
+├── resources/             # Frontend assets and views
+├── database/              # Migrations and seeders
+├── docker/                # Docker configuration
+├── scripts/               # Installation and utility scripts
+└── tests/                 # Test suites (Pest, Dusk)
+```
+
+## Key Differentiators
+
+### **vs. Heroku**
+- ✅ Self-hosted (no vendor lock-in)
+- ✅ Multi-server support
+- ✅ No usage-based pricing
+- ✅ Full infrastructure control
+
+### **vs. Vercel/Netlify**
+- ✅ Backend application support
+- ✅ Database management included
+- ✅ Multi-environment workflows
+- ✅ Custom server infrastructure
+
+### **vs. Docker Swarm/Kubernetes**
+- ✅ User-friendly web interface
+- ✅ Git-based deployment workflows
+- ✅ Integrated monitoring and logging
+- ✅ No complex YAML configuration
+
+## Development Principles
+
+- **Simplicity over complexity**
+- **Convention over configuration**
+- **Security by default**
+- **Developer experience focused**
+- **Community-driven development**

@@ -1,6 +1,6 @@
 <div>
     <dialog id="newInitScript" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='save_new_init_script'>
+        <form method="dialog" class="flex flex-col gap-2 rounded-sm modal-box" wire:submit='save_new_init_script'>
             <h3 class="text-lg font-bold">Add Init Script</h3>
             <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
             <x-forms.textarea placeholder="CREATE DATABASE test;" id="new_content" label="Content" required />
@@ -181,7 +181,7 @@
             <div class="flex items-center gap-2 pb-2">
                 <h3>Initialization scripts</h3>
                 <x-modal-input buttonTitle="+ Add" title="New Init Script">
-                    <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
+                    <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='save_new_init_script'>
                         <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename"
                             required />
                         <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"

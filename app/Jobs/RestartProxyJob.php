@@ -6,6 +6,7 @@ use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
 use App\Models\Server;
+use App\Services\ProxyDashboardCacheService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -24,7 +25,7 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping('restart-proxy-'.$this->server->uuid))->dontRelease()];
     }
 
     public function __construct(public Server $server) {}
@@ -36,9 +37,13 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->server->proxy->force_stop = false;
             $this->server->save();
+
             StartProxy::run($this->server, force: true);
 
-            CheckProxy::run($this->server, true);
+            // Clear Traefik dashboard cache after proxy restart
+            ProxyDashboardCacheService::clearCache($this->server);
+
+            // CheckProxy::run($this->server, true);
         } catch (\Throwable $e) {
             return handleError($e);
         }

@@ -2,8 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Proxy\CheckProxy;
-use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -39,7 +37,6 @@ class ValidateAndInstall extends Component
         'validateOS',
         'validateDockerEngine',
         'validateDockerVersion',
-        'startProxy',
         'refresh' => '$refresh',
     ];
 
@@ -62,25 +59,6 @@ class ValidateAndInstall extends Component
     {
         $this->ask = false;
         $this->init();
-    }
-
-    public function startProxy()
-    {
-        try {
-            $shouldStart = CheckProxy::run($this->server);
-            if ($shouldStart) {
-                $proxy = StartProxy::run($this->server, false);
-                if ($proxy === 'OK') {
-                    $this->proxy_started = true;
-                } else {
-                    throw new \Exception('Proxy could not be started.');
-                }
-            } else {
-                $this->proxy_started = true;
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
     }
 
     public function validateConnection()
@@ -128,7 +106,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
-                        $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries);
                     }
 
                     return;
@@ -172,7 +150,6 @@ class ValidateAndInstall extends Component
         if ($this->server->isBuildServer()) {
             return;
         }
-        $this->dispatch('startProxy');
     }
 
     public function render()

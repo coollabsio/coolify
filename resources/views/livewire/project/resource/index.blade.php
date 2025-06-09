@@ -67,16 +67,16 @@
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
+                                        <div title="running" class="bg-success badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
+                                        <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
+                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
@@ -88,7 +88,7 @@
                             </div>
                         </a>
                         <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>
@@ -113,16 +113,16 @@
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
+                                        <div title="running" class="bg-success badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
+                                        <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
+                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
@@ -134,7 +134,7 @@
                             </div>
                         </a>
                         <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>
@@ -159,16 +159,16 @@
                                     <div class="pb-2 truncate box-title" x-text="item.name"></div>
                                     <div class="flex-1"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
+                                        <div title="running" class="bg-success badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
+                                        <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
+                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
@@ -180,7 +180,7 @@
                             </div>
                         </a>
                         <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
+                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
                                 </a>

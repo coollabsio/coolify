@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\ProxyStarted;
+use App\Events\ProxyStatusChanged;
 use App\Models\Server;
 
 class ProxyStartedNotification
@@ -18,5 +19,6 @@ class ProxyStartedNotification
         $this->server->setupDynamicProxyConfiguration();
         $this->server->proxy->force_stop = false;
         $this->server->save();
+        // ProxyStatusChanged::dispatch( $this->server->id);
     }
 }

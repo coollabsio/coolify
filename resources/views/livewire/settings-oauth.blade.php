@@ -26,7 +26,7 @@
                             label="Client ID" />
                         <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.client_secret"
                             type="password" label="Client Secret" autocomplete="new-password" />
-                        <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.redirect_uri"
+                        <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.redirect_uri" placeholder="{{ route('auth.callback', $oauth_setting->provider) }}"
                             label="Redirect URI" />
                         @if ($oauth_setting->provider == 'azure')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting->provider }}.tenant"

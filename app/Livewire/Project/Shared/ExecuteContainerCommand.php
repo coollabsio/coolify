@@ -29,28 +29,48 @@ class ExecuteContainerCommand extends Component
 
     public bool $hasShell = true;
 
+    public bool $containersLoaded = false;
+
+    public bool $autoConnectAttempted = false;
+
+    public bool $isConnecting = false;
+
+    public bool $isConnected = false;
+
+    public string $connectionStatus = 'Loading containers...';
+
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
         'command' => 'required',
     ];
 
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
+
     public function mount()
     {
         if (! auth()->user()->isAdmin()) {
             abort(403);
         }
+
         $this->parameters = get_route_parameters();
         $this->containers = collect();
         $this->servers = collect();
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
-            $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
-            if ($this->resource->destination->server->isFunctional()) {
+            $this->resource = Application::whereUuid($this->parameters['application_uuid'])->firstOrFail();
+            if ($this->resource->destination->server->isFunctional() && $this->resource->destination->server->isTerminalEnabled()) {
                 $this->servers = $this->servers->push($this->resource->destination->server);
             }
             foreach ($this->resource->additional_servers as $server) {
-                if ($server->isFunctional()) {
+                if ($server->isFunctional() && $server->isTerminalEnabled()) {
                     $this->servers = $this->servers->push($server);
                 }
             }
@@ -62,21 +82,23 @@ class ExecuteContainerCommand extends Component
                 abort(404);
             }
             $this->resource = $resource;
-            if ($this->resource->destination->server->isFunctional()) {
+            if ($this->resource->destination->server->isFunctional() && $this->resource->destination->server->isTerminalEnabled()) {
                 $this->servers = $this->servers->push($this->resource->destination->server);
             }
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
-            $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
-            if ($this->resource->server->isFunctional()) {
+            $this->resource = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
+            if ($this->resource->server->isFunctional() && $this->resource->server->isTerminalEnabled()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
             $this->loadContainers();
         } elseif (data_get($this->parameters, 'server_uuid')) {
             $this->type = 'server';
-            $this->resource = Server::where('uuid', $this->parameters['server_uuid'])->firstOrFail();
+            $this->resource = Server::ownedByCurrentTeam()->whereUuid($this->parameters['server_uuid'])->firstOrFail();
             $this->server = $this->resource;
+            $this->containersLoaded = true; // Server doesn't need container loading
+            $this->connectionStatus = 'Waiting for terminal to be ready...';
         }
     }
 
@@ -141,6 +163,66 @@ class ExecuteContainerCommand extends Component
         if ($this->containers->count() === 1) {
             $this->selected_container = data_get($this->containers->first(), 'container.Names');
         }
+
+        $this->containersLoaded = true;
+        $this->connectionStatus = 'Waiting for terminal to be ready...';
+    }
+
+    public function initializeTerminalConnection()
+    {
+        try {
+            // Only auto-connect if containers are loaded and we haven't attempted before
+            if (! $this->containersLoaded || $this->autoConnectAttempted || $this->isConnecting) {
+                return;
+            }
+
+            $this->autoConnectAttempted = true;
+
+            // Ensure component is in a stable state before proceeding
+            $this->skipRender();
+
+            $this->isConnecting = true;
+
+            if ($this->type === 'server') {
+                $this->connectionStatus = 'Establishing connection to server terminal...';
+                $this->connectToServer();
+            } elseif ($this->containers->count() === 1) {
+                $this->connectionStatus = 'Establishing connection to container terminal...';
+                $this->connectToContainer();
+            } else {
+                $this->isConnecting = false;
+                $this->connectionStatus = '';
+            }
+        } catch (\Throwable $e) {
+            // Log the error but don't let it bubble up to cause snapshot issues
+            logger()->error('Terminal auto-connection failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'component_id' => $this->getId(),
+            ]);
+
+            // Reset state to allow manual connection
+            $this->autoConnectAttempted = false;
+            $this->isConnecting = false;
+            $this->connectionStatus = 'Auto-connection failed. Please use the reconnect button.';
+        }
+    }
+
+    #[On('terminalConnected')]
+    public function terminalConnected()
+    {
+        $this->isConnected = true;
+        $this->isConnecting = false;
+        $this->connectionStatus = '';
+    }
+
+    #[On('terminalDisconnected')]
+    public function terminalDisconnected()
+    {
+        $this->isConnected = false;
+        $this->isConnecting = false;
+        $this->autoConnectAttempted = false;
+        $this->connectionStatus = 'Connection lost. Click Reconnect to try again.';
     }
 
     private function checkShellAvailability(Server $server, string $container): bool
@@ -165,7 +247,12 @@ class ExecuteContainerCommand extends Component
             if ($this->server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
+            if (! $this->server->isTerminalEnabled()) {
+                throw new \RuntimeException('Terminal access is disabled on this server.');
+            }
             $this->hasShell = true;
+            $this->isConnecting = true;
+            $this->connectionStatus = 'Establishing connection to server terminal...';
             $this->dispatch(
                 'send-terminal-command',
                 false,
@@ -173,6 +260,9 @@ class ExecuteContainerCommand extends Component
                 data_get($this->server, 'uuid')
             );
         } catch (\Throwable $e) {
+            $this->isConnecting = false;
+            $this->connectionStatus = 'Connection failed.';
+
             return handleError($e, $this);
         }
     }
@@ -221,9 +311,14 @@ class ExecuteContainerCommand extends Component
 
             $this->hasShell = $this->checkShellAvailability($server, data_get($container, 'container.Names'));
             if (! $this->hasShell) {
+                $this->isConnecting = false;
+                $this->connectionStatus = 'Shell not available in container.';
+
                 return;
             }
 
+            $this->isConnecting = true;
+            $this->connectionStatus = 'Establishing connection to container terminal...';
             $this->dispatch(
                 'send-terminal-command',
                 true,
@@ -231,6 +326,9 @@ class ExecuteContainerCommand extends Component
                 data_get($container, 'server.uuid')
             );
         } catch (\Throwable $e) {
+            $this->isConnecting = false;
+            $this->connectionStatus = 'Connection failed.';
+
             return handleError($e, $this);
         }
     }

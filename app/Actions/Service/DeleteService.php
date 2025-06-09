@@ -53,7 +53,7 @@ class DeleteService
 
             instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
         } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         } finally {
             if ($deleteConfigurations) {
                 $service->deleteConfigurations();

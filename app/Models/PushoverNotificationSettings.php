@@ -29,6 +29,7 @@ class PushoverNotificationSettings extends Model
         'server_disk_usage_pushover_notifications',
         'server_reachable_pushover_notifications',
         'server_unreachable_pushover_notifications',
+        'server_patch_pushover_notifications',
     ];
 
     protected $casts = [
@@ -47,6 +48,7 @@ class PushoverNotificationSettings extends Model
         'server_disk_usage_pushover_notifications' => 'boolean',
         'server_reachable_pushover_notifications' => 'boolean',
         'server_unreachable_pushover_notifications' => 'boolean',
+        'server_patch_pushover_notifications' => 'boolean',
     ];
 
     public function team()
