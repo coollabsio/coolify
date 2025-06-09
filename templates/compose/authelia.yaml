@@ -1,5 +1,5 @@
 # documentation: https://www.authelia.com/integration/prologue/get-started/
-# slogan: A fast, lightweight authentication and authorization server, supporting SSO, 2FA, and OIDC flows.
+# slogan: A fast, lightweight authentication and authorization server, supporting SSO, 2FA, and OIDC.
 # tags: auth,sso,oidc,oauth,mfa,2fa,ldap,authentication,authorization
 # logo: svgs/authelia.svg
 # port: 9091
@@ -109,4 +109,4 @@ services:
     environment:
       - SERVICE_FQDN_AUTHTEST
     labels:
-      - traefik.http.middlewares.authelia@file # Traefik label that adds Authelia middleware
+      - traefik.http.middlewares.authelia@file # Traefik label that adds the Authelia middleware
