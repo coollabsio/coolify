@@ -18,7 +18,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4}
       - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-this}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - operonone_data:/app/data
