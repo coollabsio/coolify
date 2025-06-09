@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  operonone:
+    image: ghcr.io/neooriginal/operonone:latest
+    container_name: operonone-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+      - TRUST_PROXY=true
+      - PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
+      - HTTP_TIMEOUT=60000
+      - KEEP_ALIVE_TIMEOUT=65000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-this}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - operonone_data:/app/data
+      - operonone_output:/app/output
+    user: "0:0"
+    networks:
+      - operonone-network
+
+volumes:
+  operonone_data:
+    driver: local
+  operonone_output:
+    driver: local
+
+networks:
+  operonone-network:
+    driver: bridge
