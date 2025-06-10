@@ -3856,7 +3856,7 @@ All notable changes to this project will be documented in this file.
 - Bitbucket manual deployments
 - Webhooks for multiple apps
 - Unhealthy deployments should be failed
-- Add env variables for wordpress template without database
+- Add env variables for WordPress template without database
 - Service deletion function
 - Service deletion fix
 - Dns validation + duplicated fqdns
@@ -4365,7 +4365,7 @@ All notable changes to this project will be documented in this file.
 
 ### 💼 Other
 
-- Wordpress
+- WordPress
 
 ## [4.0.0-beta.89] - 2023-10-17
 
@@ -6280,7 +6280,7 @@ All notable changes to this project will be documented in this file.
 - Gitpod updates
 - Gitpod
 - Gitpod
-- Wordpress FTP permission issues
+- WordPress FTP permission issues
 - GitLab search fields
 - GitHub App button
 - GitLab loop on misconfigured source
@@ -6644,7 +6644,7 @@ All notable changes to this project will be documented in this file.
 
 - Switch from bitnami/redis to normal redis
 - Use redis-alpine
-- Wordpress extra config
+- WordPress extra config
 - Stop sFTP connection on wp stop
 - Change user's id in sftp wp instance
 - Use arm based certbot on arm
@@ -6789,7 +6789,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- Wordpress on-demand SFTP
+- WordPress on-demand SFTP
 - Finalize on-demand sftp for wp
 - PHP Composer support
 - Working on-demand sftp to wp data
