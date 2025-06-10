@@ -3627,7 +3627,7 @@
     },
     "wordpress-with-mariadb": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
-        "slogan": "Wordpress is open source software you can use to create a beautiful website, blog, or app.",
+        "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",
         "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fV09SRFBSRVNTCiAgICAgIC0gV09SRFBSRVNTX0RCX0hPU1Q9bWFyaWFkYgogICAgICAtIFdPUkRQUkVTU19EQl9VU0VSPSRTRVJWSUNFX1VTRVJfV09SRFBSRVNTCiAgICAgIC0gV09SRFBSRVNTX0RCX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgICAtIFdPUkRQUkVTU19EQl9OQU1FPXdvcmRwcmVzcwogICAgZGVwZW5kc19vbjoKICAgICAgLSBtYXJpYWRiCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTAKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgdm9sdW1lczoKICAgICAgLSAnbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTVlTUUxfUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9ST09UCiAgICAgIC0gTVlTUUxfREFUQUJBU0U9d29yZHByZXNzCiAgICAgIC0gTVlTUUxfVVNFUj0kU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICAtIE1ZU1FMX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGhlYWx0aGNoZWNrLnNoCiAgICAgICAgLSAnLS1jb25uZWN0JwogICAgICAgIC0gJy0taW5ub2RiX2luaXRpYWxpemVkJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": [
             "cms",
@@ -3641,7 +3641,7 @@
     },
     "wordpress-with-mysql": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
-        "slogan": "Wordpress is open source software you can use to create a beautiful website, blog, or app.",
+        "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",
         "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fV09SRFBSRVNTCiAgICAgIC0gV09SRFBSRVNTX0RCX0hPU1Q9bXlzcWwKICAgICAgLSBXT1JEUFJFU1NfREJfVVNFUj0kU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICAtIFdPUkRQUkVTU19EQl9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9XT1JEUFJFU1MKICAgICAgLSBXT1JEUFJFU1NfREJfTkFNRT13b3JkcHJlc3MKICAgIGRlcGVuZHNfb246CiAgICAgIC0gbXlzcWwKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAogIG15c3FsOgogICAgaW1hZ2U6ICdteXNxbDo4JwogICAgdm9sdW1lczoKICAgICAgLSAnbXlzcWwtZGF0YTovdmFyL2xpYi9teXNxbCcKICAgIGVudmlyb25tZW50OgogICAgICAtIE1ZU1FMX1JPT1RfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUk9PVAogICAgICAtIE1ZU1FMX0RBVEFCQVNFPXdvcmRwcmVzcwogICAgICAtIE1ZU1FMX1VTRVI9JFNFUlZJQ0VfVVNFUl9XT1JEUFJFU1MKICAgICAgLSBNWVNRTF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9XT1JEUFJFU1MKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBteXNxbGFkbWluCiAgICAgICAgLSBwaW5nCiAgICAgICAgLSAnLWgnCiAgICAgICAgLSAxMjcuMC4wLjEKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
         "tags": [
             "cms",
@@ -3655,7 +3655,7 @@
     },
     "wordpress-without-database": {
         "documentation": "https://wordpress.org?utm_source=coolify.io",
-        "slogan": "Wordpress is open source software you can use to create a beautiful website, blog, or app.",
+        "slogan": "WordPress is open source software you can use to create a beautiful website, blog, or app.",
         "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fV09SRFBSRVNTCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTAK",
         "tags": [
             "cms",
