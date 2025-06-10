@@ -109,8 +109,8 @@ services:
     image: "traefik/whoami"
     container_name: "middleware"
     environment:
-      - SERVICE_FQDN_WHOAMI # exposes the whoami service, protected by Authelia
+      - SERVICE_FQDN_WHOAMI
     labels:
-      - traefik.http.middlewares.authelia.forwardAuth.address: 'http://authelia:9091/api/authz/forward-auth'
-      - traefik.http.middlewares.authelia.forwardAuth.trustForwardHeader: 'true'
-      - traefik.http.middlewares.authelia.forwardAuth.authResponseHeaders: 'Remote-User,Remote-Groups,Remote-Email,Remote-Name'
+      - 'traefik.http.middlewares.authelia.forwardAuth.address=http://authelia:9091/api/authz/forward-auth'
+      - 'traefik.http.middlewares.authelia.forwardAuth.trustForwardHeader=true'
+      - 'traefik.http.middlewares.authelia.forwardAuth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Email,Remote-Name'
