@@ -69,6 +69,10 @@ services:
         target: /config/notification.txt
         content: |
           # Authelia file notification will appear in this file
+      - type: bind
+        source: ./authelia/secrets
+        target: /config/secrets
+        is_directory: true
     depends_on:
       postgres:
         condition: service_healthy
