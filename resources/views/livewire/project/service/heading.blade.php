@@ -3,7 +3,7 @@
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" showWaiting fullHeight />
+            <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
     </x-slide-over>
     <h1>{{ $title }}</h1>

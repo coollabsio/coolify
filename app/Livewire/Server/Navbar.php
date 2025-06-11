@@ -22,11 +22,14 @@ class Navbar extends Component
 
     public ?string $serverIp = null;
 
+    public ?string $proxyStatus = 'unknown';
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
+            'refreshServerShow' => '$refresh',
             "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
         ];
     }
@@ -36,13 +39,16 @@ class Navbar extends Component
         $this->server = $server;
         $this->currentRoute = request()->route()->getName();
         $this->serverIp = $this->server->id === 0 ? base_ip() : $this->server->ip;
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
         $this->loadProxyConfiguration();
     }
 
     public function loadProxyConfiguration()
     {
         try {
-            $this->traefikDashboardAvailable = ProxyDashboardCacheService::isTraefikDashboardAvailable($this->server);
+            if ($this->proxyStatus === 'running') {
+                $this->traefikDashboardAvailable = ProxyDashboardCacheService::isTraefikDashboardAvailableFromCache($this->server);
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -51,8 +57,6 @@ class Navbar extends Component
     public function restart()
     {
         try {
-            // Clear cache before restarting proxy
-            ProxyDashboardCacheService::clearCache($this->server);
             RestartProxyJob::dispatch($this->server);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -97,37 +101,42 @@ class Navbar extends Component
         try {
             $this->isChecking = true;
             CheckProxy::run($this->server, true);
-            $this->showNotification();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->isChecking = false;
+            $this->showNotification();
         }
     }
 
     public function showNotification()
     {
-        $status = $this->server->proxy->status ?? 'unknown';
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
         $forceStop = $this->server->proxy->force_stop ?? false;
 
-        switch ($status) {
+        switch ($this->proxyStatus) {
             case 'running':
-                $this->dispatch('success', 'Proxy is running.');
+                // $this->dispatch('success', 'Proxy is running.');
+                $this->loadProxyConfiguration();
                 break;
             case 'restarting':
                 $this->dispatch('info', 'Initiating proxy restart.');
                 break;
-            case 'exited':
-                if ($forceStop) {
-                    $this->dispatch('info', 'Proxy is stopped manually.');
-                } else {
-                    $this->dispatch('info', 'Proxy is stopped manually.<br>Starting in a moment.');
-                }
+                // case 'exited':
+                //     if (! $forceStop) {
+                //         $this->dispatch('info', 'Proxy is stopped manually.<br>Starting in a moment.');
+                //     }
+                //     break;
+            case 'starting':
+                // do nothing
+                break;
+            case 'stopping':
+                // do nothing
                 break;
             default:
-                $this->dispatch('warning', 'Proxy is not running.');
                 break;
         }
+
     }
 
     public function render()

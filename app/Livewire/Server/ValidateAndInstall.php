@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Proxy\CheckProxy;
+use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -25,8 +27,6 @@ class ValidateAndInstall extends Component
 
     public $docker_version = null;
 
-    public $proxy_started = false;
-
     public $error = null;
 
     public bool $ask = false;
@@ -47,7 +47,6 @@ class ValidateAndInstall extends Component
         $this->docker_installed = null;
         $this->docker_version = null;
         $this->docker_compose_installed = null;
-        $this->proxy_started = null;
         $this->error = null;
         $this->number_of_tries = $data;
         if (! $this->ask) {
@@ -135,7 +134,12 @@ class ValidateAndInstall extends Component
             if ($this->docker_version) {
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
-                $this->dispatch('success', 'Server validated.');
+                $this->dispatch('success', 'Server validated, proxy is starting in a moment.');
+                $proxyShouldRun = CheckProxy::run($this->server, true);
+                if (! $proxyShouldRun) {
+                    return;
+                }
+                StartProxy::dispatch($this->server);
             } else {
                 $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
                 $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not instaled. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';

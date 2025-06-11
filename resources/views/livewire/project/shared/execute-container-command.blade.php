@@ -14,7 +14,7 @@
         <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
     @elseif ($type === 'server')
-        <livewire:server.navbar :server="$server" :parameters="$parameters" />
+        <livewire:server.navbar :server="$server" />
     @endif
 
     @if (!$hasShell)

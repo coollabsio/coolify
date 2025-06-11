@@ -184,7 +184,6 @@ class Show extends Component
     public function refresh()
     {
         $this->syncData();
-        $this->dispatch('$refresh');
     }
 
     public function validateServer($install = true)
