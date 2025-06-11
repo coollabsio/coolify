@@ -85,7 +85,7 @@ services:
     restart: unless-stopped
 
   rybbit_clickhouse:
-    image: clickhouse/clickhouse-server:25.5.1
+    image: clickhouse/clickhouse-server:25.5
     environment:
       - CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
