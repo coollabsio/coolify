@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'throttle' => env('API_THROTTLE', 5),
+    'throttle' => env('API_THROTTLE', 200),
 ];
