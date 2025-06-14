@@ -5,7 +5,7 @@
 # port: 3000
 
 services:
-  maybe:
+  web:
     image: ghcr.io/maybe-finance/maybe:latest
     volumes:
       - app_storage:/rails/storage
@@ -14,14 +14,18 @@ services:
       - SELF_HOSTED=true
       - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
       - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
-      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
       - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
-      - DB_HOST=postgres
-      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_production}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     depends_on:
-      postgres:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -30,16 +34,56 @@ services:
         - "-f"
         - "http://localhost:3000"
 
-  postgres:
+  worker:
+    image: ghcr.io/maybe-finance/maybe:latest
+    command: bundle exec sidekiq
+    restart: unless-stopped
+    environment:
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_production}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bundle", "exec", "rails", "runner", "puts 'OK'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s      
+  db:
     image: postgres:16
+    restart: unless-stopped
     volumes:
       - maybe_postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DB:-maybe_db}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe_production}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
-      timeout: 20s
-      retries: 10
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - maybe_redis_data:/data
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    healthcheck:
+      test: ["CMD", "redis-cli", "auth", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
