@@ -1,0 +1,96 @@
+# documentation: https://snipe-it.readme.io/docs/overview
+# slogan: Snipe-IT is a free, open source IT asset management system written in PHP.
+# tags: asset management, snipe-it, laravel, php, open source, IT asset management, license management
+# logo: svgs/snipe-it.png
+
+services:
+  snipeit:
+    image: 'snipe/snipe-it:${SNIPEIT_VERSION:-latest}'
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_SNIPEIT_80
+      - DB_CONNECTION=mysql
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - 'DB_DATABASE=${SERVICE_USER_MARIADB}'
+      - 'DB_USERNAME=${SERVICE_USER_MARIADB}'
+      - 'DB_PASSWORD=${SERVICE_PASSWORD_MARIADB}'
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}'
+      - DB_PREFIX=null
+      - DB_DUMP_PATH=/usr/bin
+      - DB_DUMP_SKIP_SSL=true
+      - DB_CHARSET=utf8mb4
+      - DB_COLLATION=utf8mb4_unicode_ci
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=false
+      - 'APP_KEY=${APP_KEY:-latest}'
+      - 'APP_URL=${SERVICE_FQDN_SNIPEIT}'
+      - 'APP_TIMEZONE=America/Jamaica'
+      - APP_LOCALE=en-US
+      - MAX_RESULTS=500
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=${MAIL_HOST:-smtp.server.net}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USERNAME=${MAIL_USERNAME:-username}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-password}
+      - MAIL_TLS_VERIFY_PEER=false
+      - MAIL_FROM_ADDR=${MAIL_FROM_ADDR:-name@email.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-Sender Name}
+      - MAIL_REPLYTO_ADDR=${MAIL_REPLYTO_ADDR:-name@email.com}
+      - MAIL_REPLYTO_NAME=${MAIL_REPLYTO_NAME:-Reply Name}
+      - 'MAIL_AUTO_EMBED_METHOD=attachment'
+      - IMAGE_LIB=gd
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - 'snipeit-data:/var/lib/snipeit'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1/health'
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    depends_on:
+      redis:
+        condition: service_healthy
+        
+  mariadb:
+    image: 'mariadb:${MARIADB_VERSION:-11.4}'
+    restart: unless-stopped
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+    environment:
+      - 'MYSQL_DATABASE=${SERVICE_USER_MARIADB}'
+      - 'MYSQL_USER=${SERVICE_USER_MARIADB}'
+      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}'
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}'
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      interval: 5s
+      timeout: 1s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 20s
+      retries: 10
