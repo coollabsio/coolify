@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  operonone:
+    image: ghcr.io/neooriginal/operonone:latest
+    container_name: operonone-app
+    restart: unless-stopped
+    expose:
+      - "3000"
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=operonone"
+      - "coolify.http.port=3000"
+      - "coolify.domains.0.domain=${DOMAIN:-}"
+      - "coolify.domains.0.path=/"
+    environment:
+      # Essential environment variables - these need to be set
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-operon-default-jwt-secret-change-in-production}
+      
+      # Application configuration with sensible defaults
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - DATA_DIR=/app/data
+      - TRUST_PROXY=${TRUST_PROXY:-true}
+      - HTTP_TIMEOUT=${HTTP_TIMEOUT:-60000}
+      - KEEP_ALIVE_TIMEOUT=${KEEP_ALIVE_TIMEOUT:-65000}
+      
+      # Playwright configuration
+      - PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - operonone_data:/app/data
+    user: "0:0"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  operonone_data:
+    driver: local

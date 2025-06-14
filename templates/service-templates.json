@@ -2483,6 +2483,22 @@
         "minversion": "0.0.0",
         "port": "8080"
     },
+    "operon-one": {
+        "documentation": "https://github.com/neooriginal/Operon.one/blob/main/README.md",
+        "slogan": "Manus-inspired self hosted action-ai",
+        "compose": "dmVyc2lvbjogIjMuOCIKCnNlcnZpY2VzOgogIG9wZXJvbm9uZToKICAgIGltYWdlOiBnaGNyLmlvL25lb29yaWdpbmFsL29wZXJvbm9uZTpsYXRlc3QKICAgIGNvbnRhaW5lcl9uYW1lOiBvcGVyb25vbmUtYXBwCiAgICByZXN0YXJ0OiB1bmxlc3Mtc3RvcHBlZAogICAgZXhwb3NlOgogICAgICAtICIzMDAwIgogICAgbGFiZWxzOgogICAgICAtICJjb29saWZ5Lm1hbmFnZWQ9dHJ1ZSIKICAgICAgLSAiY29vbGlmeS5uYW1lPW9wZXJvbm9uZSIKICAgICAgLSAiY29vbGlmeS5odHRwLnBvcnQ9MzAwMCIKICAgICAgLSAiY29vbGlmeS5kb21haW5zLjAuZG9tYWluPSR7RE9NQUlOOi19IgogICAgICAtICJjb29saWZ5LmRvbWFpbnMuMC5wYXRoPS8iCiAgICBlbnZpcm9ubWVudDoKICAgICAgIyBFc3NlbnRpYWwgZW52aXJvbm1lbnQgdmFyaWFibGVzIC0gdGhlc2UgbmVlZCB0byBiZSBzZXQKICAgICAgLSBPUEVOUk9VVEVSX0FQSV9LRVk9JHtPUEVOUk9VVEVSX0FQSV9LRVk6LX0KICAgICAgLSBKV1RfU0VDUkVUPSR7SldUX1NFQ1JFVDotb3Blcm9uLWRlZmF1bHQtand0LXNlY3JldC1jaGFuZ2UtaW4tcHJvZHVjdGlvbn0KICAgICAgCiAgICAgICMgQXBwbGljYXRpb24gY29uZmlndXJhdGlvbiB3aXRoIHNlbnNpYmxlIGRlZmF1bHRzCiAgICAgIC0gTk9ERV9FTlY9JHtOT0RFX0VOVjotcHJvZHVjdGlvbn0KICAgICAgLSBQT1JUPTMwMDAKICAgICAgLSBEQVRBX0RJUj0vYXBwL2RhdGEKICAgICAgLSBUUlVTVF9QUk9YWT0ke1RSVVNUX1BST1hZOi10cnVlfQogICAgICAtIEhUVFBfVElNRU9VVD0ke0hUVFBfVElNRU9VVDotNjAwMDB9CiAgICAgIC0gS0VFUF9BTElWRV9USU1FT1VUPSR7S0VFUF9BTElWRV9USU1FT1VUOi02NTAwMH0KICAgICAgCiAgICAgICMgUGxheXdyaWdodCBjb25maWd1cmF0aW9uCiAgICAgIC0gUExBWVdSSUdIVF9CUk9XU0VSU19QQVRIPS9hcHAvLnBsYXl3cmlnaHQtYnJvd3NlcnMKICAgICAgLSBQTEFZV1JJR0hUX0NIUk9NSVVNX0VYRUNVVEFCTEVfUEFUSD0vdXNyL2Jpbi9jaHJvbWl1bQogICAgdm9sdW1lczoKICAgICAgLSAvdmFyL3J1bi9kb2NrZXIuc29jazovdmFyL3J1bi9kb2NrZXIuc29jazpydwogICAgICAtIG9wZXJvbm9uZV9kYXRhOi9hcHAvZGF0YQogICAgdXNlcjogIjA6MCIKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJub2RlIiwgIi1lIiwgInJlcXVpcmUoJ2h0dHAnKS5nZXQoJ2h0dHA6Ly9sb2NhbGhvc3Q6MzAwMCcsIChyZXMpID0+IHByb2Nlc3MuZXhpdChyZXMuc3RhdHVzQ29kZSA9PT0gMjAwID8gMCA6IDEpKSJdCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHN0YXJ0X3BlcmlvZDogNDBzCiAgICAgIHJldHJpZXM6IDMKICAgIGxvZ2dpbmc6CiAgICAgIGRyaXZlcjogImpzb24tZmlsZSIKICAgICAgb3B0aW9uczoKICAgICAgICBtYXgtc2l6ZTogIjEwbSIKICAgICAgICBtYXgtZmlsZTogIjMiCgp2b2x1bWVzOgogIG9wZXJvbm9uZV9kYXRhOgogICAgZHJpdmVyOiBsb2NhbAo=",
+        "tags": [
+            "ai",
+            "models",
+            "deployment",
+            "operon-one",
+            "manus",
+            "integration"
+        ],
+        "logo": "svgs/operonone.png",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "orangehrm": {
         "documentation": "https://starterhelp.orangehrm.com/hc/en-us?utm_source=coolify.io",
         "slogan": "OrangeHRM open source HR management software.",
