@@ -19,33 +19,30 @@
                     @elseif ($proxyStatus === 'starting')
                         <x-status.restarting status="Proxy Starting" noLoading />
                     @elseif (data_get($server, 'proxy.force_stop'))
-                        <x-status.stopped status="Proxy Stopped (Force Stop)" noLoading />
-                        <div wire:loading wire:target="checkProxy" class="badge badge-warning"></div>
-                        <div wire:loading wire:target="checkProxy"
-                            class="pl-2 pr-1 text-xs font-bold tracking-wider text-warning">
-                            Checking Ports Availability...
+                        <div wire:loading.remove wire:target="checkProxy">
+                            <x-status.stopped status="Proxy Stopped (Force Stop)" noLoading />
                         </div>
                     @elseif ($proxyStatus === 'exited')
-                        <x-status.stopped status="Proxy Exited" noLoading />
-                    @endif
-
-                    @if ($proxyStatus !== 'exited')
-                        <div wire:loading>
-                            <div class="flex items-center">
-                                <svg class="w-4 h-4 mx-1 ml-3 text-coollabs dark:text-warning animate-spin"
-                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10"
-                                        stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                    </path>
-                                </svg>
-                            </div>
+                        <div wire:loading.remove wire:target="checkProxy">
+                            <x-status.stopped status="Proxy Exited" noLoading />
                         </div>
-
-                        <button title="Refresh Status" wire:click='checkProxyStatus'
+                    @endif
+                    <div wire:loading wire:target="checkProxy" class="badge badge-warning"></div>
+                    <div wire:loading wire:target="checkProxy"
+                        class="pl-2 pr-1 text-xs font-bold tracking-wider text-warning">
+                        Checking Ports Availability...
+                    </div>
+                    @if ($proxyStatus !== 'exited')
+                        <button wire:loading.remove title="Refresh Status" wire:click='checkProxyStatus'
                             class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
+                            </svg>
+                        </button>
+                        <button wire:loading title="Refreshing Status" wire:click='checkProxyStatus'
+                            class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
+                            <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path
                                     d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
                             </svg>
