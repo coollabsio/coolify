@@ -19,7 +19,8 @@
                     <x-forms.input id="fqdn" label="Instance's Domain"
                         helper="Enter the full domain name (FQDN) of the instance, including 'https://' if you want to secure the dashboard with HTTPS. Setting this will make the dashboard accessible via this domain, secured by HTTPS, instead of just the IP address."
                         placeholder="https://coolify.yourdomain.com" />
-                    <x-forms.input id="instance_name" label="Instance's Name" placeholder="Coolify" />
+                    <x-forms.input id="instance_name" label="Instance's Name" placeholder="Coolify"
+                        wire:model="instance_name" />
                     <div class="w-full" x-data="{
                         open: false,
                         search: '{{ $settings->instance_timezone ?: '' }}',
@@ -153,5 +154,10 @@
                     the risk of accidental actions. This is not recommended for production servers.</p>
             </div>
         @endif
+
+        <h4 class="pt-6">Support</h4>
+        <div class="md:w-96 pb-2">
+            <x-forms.checkbox id="contact_support_enabled" label="Enable Contact Support in Emails" wire:model="settings.contact_support_enabled" />
+        </div>
     </form>
 </div>

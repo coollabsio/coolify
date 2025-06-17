@@ -21,19 +21,10 @@
     <meta property="og:image" content="https://cdn.coollabs.io/assets/coolify/og-image.png" />
     @use('App\Models\InstanceSettings')
     @php
-
         $instanceSettings = instanceSettings();
-        $name = null;
-
-        if ($instanceSettings) {
-            $displayName = $instanceSettings->getTitleDisplayName();
-
-            if (strlen($displayName) > 0) {
-                $name = $displayName . ' ';
-            }
-        }
+        $name = $instanceSettings->instance_name ?? 'Coolify';
     @endphp
-    <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
+    <title>{{ $name }}{{ $title ?? '' }}</title>
     @env('local')
     <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/x-icon" />
 @else
