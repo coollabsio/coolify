@@ -223,8 +223,6 @@ services:
         max-file: "3"
     command:
       - --config=/root/config/prometheus.yml
-      - --use-logs-new-schema=true
-      - --use-trace-new-schema=true
     volumes:
       - type: bind
         source: ./prometheus.yml
