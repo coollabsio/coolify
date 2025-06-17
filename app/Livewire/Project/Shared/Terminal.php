@@ -45,7 +45,7 @@ class Terminal extends Component
     {
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
         if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
-            throw new \RuntimeException('Terminal access is disabled on this server.');
+            abort(403, 'Terminal access is disabled on this server.');
         }
 
         if ($isContainer) {

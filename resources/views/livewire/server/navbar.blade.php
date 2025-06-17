@@ -55,7 +55,7 @@
     <div class="subtitle">{{ data_get($server, 'name') }}</div>
     <div class="navbar-main">
         <nav
-            class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
+            class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.show', [
                     'server_uuid' => data_get($server, 'uuid'),
