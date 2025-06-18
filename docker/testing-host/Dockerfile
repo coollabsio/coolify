@@ -2,7 +2,7 @@
 # https://hub.docker.com/_/debian/
 ARG BASE_OS_VERSION=12-slim
 # https://github.com/moby/moby
-ARG DOCKER_VERSION=28.1.1
+ARG DOCKER_VERSION=28.2.2
 # https://github.com/just-containers/s6-overlay/releases
 ARG S6_OVERLAY_VERSION=3.2.1.0
 
@@ -18,13 +18,19 @@ RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
     ca-certificates \
     curl \
     xz-utils \
+    && apt-get clean \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     /usr/share/doc/* \
     /usr/share/man/* \
+    /usr/share/info/* \
+    /usr/share/locale/* \
     /var/cache/apt/* \
+    /var/cache/debconf/* \
     /var/log/* \
     /tmp/* \
-    /var/tmp/*
+    /var/tmp/* \
+    /root/.cache
 
 # Add S6-overlay
 RUN mkdir -p /s6/downloads /s6/extracted && \
@@ -68,13 +74,18 @@ RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends \
     openssl \
     qemu-user-static \
     && apt-get clean \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     /usr/share/doc/* \
     /usr/share/man/* \
+    /usr/share/info/* \
+    /usr/share/locale/* \
     /var/cache/apt/* \
+    /var/cache/debconf/* \
     /var/log/* \
     /tmp/* \
-    /var/tmp/*
+    /var/tmp/* \
+    /root/.cache
 
 # Add Docker's official GPG key
 RUN apt-get update -qq && \
@@ -98,13 +109,18 @@ RUN VERSION_STRING="5:${DOCKER_VERSION}-1~debian.12~bookworm" \
     docker-buildx-plugin \
     docker-compose-plugin \
     && apt-get clean \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     /usr/share/doc/* \
     /usr/share/man/* \
+    /usr/share/info/* \
+    /usr/share/locale/* \
     /var/cache/apt/* \
+    /var/cache/debconf/* \
     /var/log/* \
     /tmp/* \
-    /var/tmp/*
+    /var/tmp/* \
+    /root/.cache
 
 # Create SSH directories
 RUN mkdir -p /run/sshd \
