@@ -27,7 +27,6 @@ services:
 
   postgres:
     image: 'postgres:17-alpine'
-    platform: linux/amd64
     volumes:
       - 'postgresql-data:/var/lib/postgresql/data'
     environment:

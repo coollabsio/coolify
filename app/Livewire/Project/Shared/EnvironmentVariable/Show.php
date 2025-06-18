@@ -178,13 +178,6 @@ class Show extends Component
     public function delete()
     {
         try {
-            // Check if the variable is protected
-            if ($this->isProtectedEnvironmentVariable($this->env->key)) {
-                $this->dispatch('error', "Cannot delete system environment variable '{$this->env->key}'.");
-
-                return;
-            }
-
             // Check if the variable is used in Docker Compose
             if ($this->type === 'service' || $this->type === 'application' && $this->env->resource()?->docker_compose) {
                 [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resource()?->docker_compose);

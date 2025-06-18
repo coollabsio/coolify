@@ -27,8 +27,6 @@ class ValidateAndInstall extends Component
 
     public $docker_version = null;
 
-    public $proxy_started = false;
-
     public $error = null;
 
     public bool $ask = false;
@@ -39,7 +37,6 @@ class ValidateAndInstall extends Component
         'validateOS',
         'validateDockerEngine',
         'validateDockerVersion',
-        'startProxy',
         'refresh' => '$refresh',
     ];
 
@@ -50,7 +47,6 @@ class ValidateAndInstall extends Component
         $this->docker_installed = null;
         $this->docker_version = null;
         $this->docker_compose_installed = null;
-        $this->proxy_started = null;
         $this->error = null;
         $this->number_of_tries = $data;
         if (! $this->ask) {
@@ -62,25 +58,6 @@ class ValidateAndInstall extends Component
     {
         $this->ask = false;
         $this->init();
-    }
-
-    public function startProxy()
-    {
-        try {
-            $shouldStart = CheckProxy::run($this->server);
-            if ($shouldStart) {
-                $proxy = StartProxy::run($this->server, false);
-                if ($proxy === 'OK') {
-                    $this->proxy_started = true;
-                } else {
-                    throw new \Exception('Proxy could not be started.');
-                }
-            } else {
-                $this->proxy_started = true;
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
     }
 
     public function validateConnection()
@@ -128,7 +105,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
-                        $this->dispatch('newActivityMonitor', $activity->id, 'init', $this->number_of_tries);
+                        $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries);
                     }
 
                     return;
@@ -157,7 +134,12 @@ class ValidateAndInstall extends Component
             if ($this->docker_version) {
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
-                $this->dispatch('success', 'Server validated.');
+                $this->dispatch('success', 'Server validated, proxy is starting in a moment.');
+                $proxyShouldRun = CheckProxy::run($this->server, true);
+                if (! $proxyShouldRun) {
+                    return;
+                }
+                StartProxy::dispatch($this->server);
             } else {
                 $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
                 $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not instaled. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
@@ -172,7 +154,6 @@ class ValidateAndInstall extends Component
         if ($this->server->isBuildServer()) {
             return;
         }
-        $this->dispatch('startProxy');
     }
 
     public function render()

@@ -26,6 +26,8 @@ class Destination extends Component
 
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
+            "echo-private:team.{$teamId},ServiceStatusChanged" => 'mount',
+            'refresh' => 'mount',
         ];
     }
 
@@ -79,7 +81,7 @@ class Destination extends Component
             $deployment_uuid = new Cuid2;
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $destination = $server->standaloneDockers->where('id', $network_id)->firstOrFail();
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 deployment_uuid: $deployment_uuid,
                 application: $this->resource,
                 server: $server,
@@ -87,6 +89,11 @@ class Destination extends Component
                 only_this_server: true,
                 no_questions_asked: true,
             );
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
 
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => data_get($this->resource, 'environment.project.uuid'),
@@ -109,22 +116,20 @@ class Destination extends Component
         $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
         $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
         $this->refreshServers();
+        $this->resource->refresh();
     }
 
     public function refreshServers()
     {
         GetContainersStatus::run($this->resource->destination->server);
-        // ContainerStatusJob::dispatchSync($this->resource->destination->server);
         $this->loadData();
         $this->dispatch('refresh');
-        ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
 
     public function addServer(int $network_id, int $server_id)
     {
         $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
-        $this->loadData();
-        ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
+        $this->dispatch('refresh');
     }
 
     public function removeServer(int $network_id, int $server_id, $password)
@@ -139,7 +144,7 @@ class Destination extends Component
             }
 
             if ($this->resource->destination->server->id == $server_id && $this->resource->destination->id == $network_id) {
-                $this->dispatch('error', 'You cannot remove this destination server.', 'You are trying to remove the main server.');
+                $this->dispatch('error', 'You are trying to remove the main server.');
 
                 return;
             }
@@ -147,6 +152,7 @@ class Destination extends Component
             StopApplicationOneServer::run($this->resource, $server);
             $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
             $this->loadData();
+            $this->dispatch('refresh');
             ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
         } catch (\Exception $e) {
             return handleError($e, $this);

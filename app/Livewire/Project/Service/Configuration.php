@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Service;
 
-use App\Actions\Docker\GetContainersStatus;
 use App\Models\Service;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -27,12 +26,10 @@ class Configuration extends Component
 
     public function getListeners()
     {
-        $userId = Auth::id();
+        $teamId = Auth::user()->currentTeam()->id;
 
         return [
-            "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
-            'check_status',
-            'refreshStatus' => '$refresh',
+            "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
         ];
     }
 
@@ -63,6 +60,13 @@ class Configuration extends Component
         $this->databases = $this->service->databases->sort();
     }
 
+    public function refreshServices()
+    {
+        $this->service->refresh();
+        $this->applications = $this->service->applications->sort();
+        $this->databases = $this->service->databases->sort();
+    }
+
     public function restartApplication($id)
     {
         try {
@@ -89,19 +93,15 @@ class Configuration extends Component
         }
     }
 
-    public function check_status()
+    public function serviceChecked()
     {
         try {
-            if ($this->service->server->isFunctional()) {
-                GetContainersStatus::dispatch($this->service->server);
-            }
             $this->service->applications->each(function ($application) {
                 $application->refresh();
             });
             $this->service->databases->each(function ($database) {
                 $database->refresh();
             });
-            $this->dispatch('refreshStatus');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

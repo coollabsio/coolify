@@ -78,6 +78,8 @@
                     label="Server Reachable" />
                 <x-forms.checkbox instantSave="saveModel" id="serverUnreachableDiscordNotifications"
                     label="Server Unreachable" />
+                <x-forms.checkbox instantSave="saveModel" id="serverPatchDiscordNotifications"
+                    label="Server Patching" />
             </div>
         </div>
     </div>

@@ -178,16 +178,6 @@ class All extends Component
             }
         }
 
-        // Debug information
-        \Log::info('Environment variables update status', [
-            'deletedCount' => $deletedCount,
-            'updatedCount' => $updatedCount,
-            'deletedPreviewCount' => $deletedPreviewCount ?? 0,
-            'updatedPreviewCount' => $updatedPreviewCount ?? 0,
-            'changesMade' => $changesMade,
-            'errorOccurred' => $errorOccurred,
-        ]);
-
         // Only show success message if changes were actually made and no errors occurred
         if ($changesMade && ! $errorOccurred) {
             $this->dispatch('success', 'Environment variables updated.');
@@ -234,15 +224,6 @@ class All extends Component
         // If there are no variables to delete, return 0
         if ($variablesToDelete->isEmpty()) {
             return 0;
-        }
-
-        // Check for system variables that shouldn't be deleted
-        foreach ($variablesToDelete as $envVar) {
-            if ($this->isProtectedEnvironmentVariable($envVar->key)) {
-                $this->dispatch('error', "Cannot delete system environment variable '{$envVar->key}'.");
-
-                return 0;
-            }
         }
 
         // Check if any of these variables are used in Docker Compose

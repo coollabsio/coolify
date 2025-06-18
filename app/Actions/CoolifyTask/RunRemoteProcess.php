@@ -85,7 +85,6 @@ class RunRemoteProcess
         ]);
 
         $processResult = $process->wait();
-        // $processResult = Process::timeout($timeout)->run($this->getCommand(), $this->handleOutput(...));
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {
@@ -105,14 +104,11 @@ class RunRemoteProcess
         $this->activity->save();
         if ($this->call_event_on_finish) {
             try {
-                if ($this->call_event_data) {
-                    event(resolve("App\\Events\\$this->call_event_on_finish", [
-                        'data' => $this->call_event_data,
-                    ]));
+                $eventClass = "App\\Events\\$this->call_event_on_finish";
+                if (! is_null($this->call_event_data)) {
+                    event(new $eventClass($this->call_event_data));
                 } else {
-                    event(resolve("App\\Events\\$this->call_event_on_finish", [
-                        'userId' => $this->activity->causer_id,
-                    ]));
+                    event(new $eventClass($this->activity->causer_id));
                 }
             } catch (\Throwable $e) {
                 Log::error('Error calling event: '.$e->getMessage());

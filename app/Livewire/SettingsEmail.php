@@ -177,7 +177,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -207,7 +207,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->resendEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -225,7 +225,7 @@ class SettingsEmail extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress));
+                    $this->team?->notifyNow(new Test($this->testEmailAddress));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
