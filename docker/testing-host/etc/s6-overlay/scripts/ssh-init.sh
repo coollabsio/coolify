@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-set -euo pipefail
+set -eu
 
 main() {
     ssh-keygen -A
