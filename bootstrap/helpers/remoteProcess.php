@@ -252,7 +252,7 @@ function remove_iip($text)
  * @param  string|null  $text  The text to sanitize
  * @return string Valid UTF-8 encoded text
  */
-function sanitize_utf8_text($text): string
+function sanitize_utf8_text(?string $text): string
 {
     if (empty($text)) {
         return '';

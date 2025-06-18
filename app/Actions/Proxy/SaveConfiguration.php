@@ -3,7 +3,6 @@
 namespace App\Actions\Proxy;
 
 use App\Models\Server;
-use App\Services\ProxyDashboardCacheService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class SaveConfiguration
@@ -20,9 +19,6 @@ class SaveConfiguration
 
         $server->proxy->last_saved_settings = str($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
-
-        // Clear Traefik dashboard cache when configuration is saved
-        ProxyDashboardCacheService::clearCache($server);
 
         return instant_remote_process([
             "mkdir -p $proxy_path",

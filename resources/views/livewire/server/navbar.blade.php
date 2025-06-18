@@ -1,47 +1,61 @@
 <div class="pb-6">
-    <x-modal modalId="startProxy">
-        <x-slot:modalBody>
-            <livewire:activity-monitor header="Proxy Startup Logs" />
-        </x-slot:modalBody>
-        <x-slot:modalSubmit>
-            <x-forms.button onclick="startProxy.close()" type="submit">
-                Close
-            </x-forms.button>
-        </x-slot:modalSubmit>
-    </x-modal>
+    <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen>
+        <x-slot:title>Proxy Startup Logs</x-slot:title>
+        <x-slot:content>
+            <livewire:activity-monitor header="Logs" fullHeight />
+        </x-slot:content>
+    </x-slide-over>
     <div class="flex items-center gap-2">
         <h1>Server</h1>
         @if ($server->proxySet())
-            <div class="flex gap-2">
-                @if (data_get($server, 'proxy.force_stop', false) === false)
-                    <x-forms.button wire:click='checkProxyStatus()' :disabled="$isChecking" wire:loading.attr="disabled"
-                        wire:target="checkProxyStatus">
-                        <span wire:loading.remove wire:target="checkProxyStatus">Refresh</span>
-                        <span wire:loading wire:target="checkProxyStatus">Checking...</span>
-                    </x-forms.button>
-                @endif
-
-                <div wire:loading.remove wire:target="checkProxyStatus" class="flex items-center gap-2">
-                    @if (data_get($server, 'proxy.status') === 'running')
-                        <x-status.running status="Proxy Running" />
-                    @elseif (data_get($server, 'proxy.status') === 'restarting')
-                        <x-status.restarting status="Proxy Restarting" />
+            <div class="flex">
+                <div class="flex items-center">
+                    @if ($proxyStatus === 'running')
+                        <x-status.running status="Proxy Running" noLoading />
+                    @elseif ($proxyStatus === 'restarting')
+                        <x-status.restarting status="Proxy Restarting" noLoading />
+                    @elseif ($proxyStatus === 'stopping')
+                        <x-status.restarting status="Proxy Stopping" noLoading />
+                    @elseif ($proxyStatus === 'starting')
+                        <x-status.restarting status="Proxy Starting" noLoading />
                     @elseif (data_get($server, 'proxy.force_stop'))
-                        <x-status.stopped status="Proxy Stopped" />
-                    @elseif (data_get($server, 'proxy.status') === 'exited')
-                        <x-status.stopped status="Proxy Exited" />
-                    @else
-                        <x-status.stopped status="Proxy Not Running" />
+                        <div wire:loading.remove wire:target="checkProxy">
+                            <x-status.stopped status="Proxy Stopped (Force Stop)" noLoading />
+                        </div>
+                    @elseif ($proxyStatus === 'exited')
+                        <div wire:loading.remove wire:target="checkProxy">
+                            <x-status.stopped status="Proxy Exited" noLoading />
+                        </div>
+                    @endif
+                    <div wire:loading wire:target="checkProxy" class="badge badge-warning"></div>
+                    <div wire:loading wire:target="checkProxy"
+                        class="pl-2 pr-1 text-xs font-bold tracking-wider text-warning">
+                        Checking Ports Availability...
+                    </div>
+                    @if ($proxyStatus !== 'exited')
+                        <button wire:loading.remove title="Refresh Status" wire:click='checkProxyStatus'
+                            class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
+                            </svg>
+                        </button>
+                        <button wire:loading title="Refreshing Status" wire:click='checkProxyStatus'
+                            class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
+                            <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
+                            </svg>
+                        </button>
                     @endif
                 </div>
             </div>
-
         @endif
     </div>
     <div class="subtitle">{{ data_get($server, 'name') }}</div>
     <div class="navbar-main">
         <nav
-            class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap">
+            class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.show', [
                     'server_uuid' => data_get($server, 'uuid'),
@@ -77,7 +91,6 @@
             </a>
         </nav>
         <div class="order-first sm:order-last">
-            @php use App\Enums\ProxyTypes; @endphp
             <div>
                 @if ($server->proxySet())
                     <x-slide-over fullScreen @startproxy.window="slideOverOpen = true">
@@ -86,7 +99,7 @@
                             <livewire:activity-monitor header="Logs" />
                         </x-slot:content>
                     </x-slide-over>
-                    @if (data_get($server, 'proxy.status') === 'running')
+                    @if ($proxyStatus === 'running')
                         <div class="flex gap-2">
                             <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
                                 <x-loading text="Checking Traefik dashboard" />
@@ -155,8 +168,12 @@
                 @script
                     <script>
                         $wire.$on('checkProxyEvent', () => {
-                            $wire.$dispatch('info', 'Checking if the required ports are not used by other services.');
-                            $wire.$call('checkProxy');
+                            try {
+                                $wire.$call('checkProxy');
+                            } catch (error) {
+                                console.error(error);
+                                $wire.$dispatch('error', 'Failed to check proxy status. Please try again.');
+                            }
                         });
                         $wire.$on('restartEvent', () => {
                             $wire.$dispatch('info', 'Initiating proxy restart.');
@@ -167,7 +184,6 @@
                             $wire.$call('startProxy');
                         });
                         $wire.$on('stopEvent', () => {
-                            $wire.$dispatch('info', 'Stopping proxy.');
                             $wire.$call('stop');
                         });
                     </script>

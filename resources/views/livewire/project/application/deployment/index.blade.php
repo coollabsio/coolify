@@ -5,7 +5,7 @@
     <livewire:project.application.heading :application="$application" />
     <div class="flex flex-col gap-2 pb-10"
         @if (!$skip) wire:poll.5000ms='reload_deployments' @endif>
-        <div class="flex items-end gap-2 pt-4">
+        <div class="flex items-end gap-2">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
             @if ($deployments_count > 0)
                 <x-forms.button disabled="{{ !$show_prev }}" wire:click="previous_page('{{ $default_take }}')">

@@ -4,8 +4,8 @@ namespace App\Actions\Proxy;
 
 use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
+use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
-use App\Services\ProxyDashboardCacheService;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
 
@@ -29,9 +29,6 @@ class StartProxy
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
         $server->save();
-
-        // Clear Traefik dashboard cache when proxy configuration changes
-        ProxyDashboardCacheService::clearCache($server);
 
         if ($server->isSwarmManager()) {
             $commands = $commands->merge([
@@ -62,11 +59,14 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
                 "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --wait',
+                'docker compose up -d --wait --remove-orphans',
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));
         }
+        $server->proxy->set('status', 'starting');
+        $server->save();
+        ProxyStatusChangedUI::dispatch($server->team_id);
 
         if ($async) {
             return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id);

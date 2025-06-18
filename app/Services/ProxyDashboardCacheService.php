@@ -16,33 +16,24 @@ class ProxyDashboardCacheService
     }
 
     /**
+     * Check if Traefik dashboard is available from configuration
+     */
+    public static function isTraefikDashboardAvailableFromConfiguration(Server $server, string $proxy_configuration): void
+    {
+        $cacheKey = static::getCacheKey($server);
+        $dashboardAvailable = str($proxy_configuration)->contains('--api.dashboard=true') &&
+        str($proxy_configuration)->contains('--api.insecure=true');
+        Cache::forever($cacheKey, $dashboardAvailable);
+    }
+
+    /**
      * Check if Traefik dashboard is available (from cache or compute)
      */
-    public static function isTraefikDashboardAvailable(Server $server): bool
+    public static function isTraefikDashboardAvailableFromCache(Server $server): bool
     {
         $cacheKey = static::getCacheKey($server);
 
-        // Try to get from cache first
-        $cachedValue = Cache::get($cacheKey);
-
-        if ($cachedValue !== null) {
-            return $cachedValue;
-        }
-
-        // If not in cache, compute the value
-        try {
-            $proxy_settings = \App\Actions\Proxy\CheckConfiguration::run($server);
-            $dashboardAvailable = str($proxy_settings)->contains('--api.dashboard=true') &&
-                                str($proxy_settings)->contains('--api.insecure=true');
-
-            // Cache the result (cache indefinitely until proxy restart)
-            Cache::forever($cacheKey, $dashboardAvailable);
-
-            return $dashboardAvailable;
-        } catch (\Throwable $e) {
-            // If there's an error checking configuration, default to false and don't cache
-            return false;
-        }
+        return Cache::get($cacheKey) ?? false;
     }
 
     /**
@@ -50,8 +41,7 @@ class ProxyDashboardCacheService
      */
     public static function clearCache(Server $server): void
     {
-        $cacheKey = static::getCacheKey($server);
-        Cache::forget($cacheKey);
+        Cache::forget(static::getCacheKey($server));
     }
 
     /**

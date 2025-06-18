@@ -255,7 +255,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
-        Route::get('/security', fn () => redirect(route('dashboard')));
+        Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security');
         Route::get('/security/patches', Patches::class)->name('server.security.patches');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
@@ -291,8 +291,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            $team = auth()->user()->currentTeam();
             $user = auth()->user();
+            $team = $user->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }

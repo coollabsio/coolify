@@ -96,34 +96,6 @@ class Logs extends Component
         }
     }
 
-    public function getServerContainers($serverId)
-    {
-        return $this->serverContainers[$serverId] ?? [];
-    }
-
-    public function hasContainersForServer($serverId)
-    {
-        return isset($this->serverContainers[$serverId]) && count($this->serverContainers[$serverId]) > 0;
-    }
-
-    public function debugContainers()
-    {
-        ray([
-            'containersLoaded' => $this->containersLoaded,
-            'serversCount' => $this->servers->count(),
-            'serverContainers' => $this->serverContainers,
-            'servers' => $this->servers->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'functional' => $s->isFunctional()])->toArray(),
-        ]);
-    }
-
-    public function loadContainers($server_id = null)
-    {
-        // Keep for backward compatibility, but redirect to loadAllContainers
-        if (! $this->containersLoaded) {
-            $this->loadAllContainers();
-        }
-    }
-
     public function mount()
     {
         try {

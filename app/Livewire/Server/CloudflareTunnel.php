@@ -31,7 +31,8 @@ class CloudflareTunnel extends Component
 
     public function refresh()
     {
-        $this->mount($this->server->uuid);
+        $this->server->refresh();
+        $this->isCloudflareTunnelsEnabled = $this->server->settings->is_cloudflare_tunnel;
     }
 
     public function mount(string $server_uuid)
@@ -58,7 +59,7 @@ class CloudflareTunnel extends Component
                 $this->server->update(['ip' => $this->server->ip_previous]);
                 $this->dispatch('success', 'Cloudflare Tunnel disabled.<br><br>Manually updated the server IP address to its previous IP address.');
             } else {
-                $this->dispatch('success', 'Cloudflare Tunnel disabled. Please update the server IP address to its real IP address in the server settings.');
+                $this->dispatch('warning', 'Cloudflare Tunnel disabled. Action required: Update the server IP address to its real IP address in the Advanced settings.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

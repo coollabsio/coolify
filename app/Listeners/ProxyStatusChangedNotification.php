@@ -14,7 +14,10 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
     public function handle(ProxyStatusChanged $event)
     {
         $serverId = $event->data;
-        $server = Server::find($serverId);
+        if (is_null($serverId)) {
+            return;
+        }
+        $server = Server::where('id', $serverId)->first();
         if (is_null($server)) {
             return;
         }
@@ -23,12 +26,17 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
         $server->proxy->set('status', $status);
         $server->save();
 
+        ProxyStatusChangedUI::dispatch($server->team_id);
         if ($status === 'running') {
             $server->setupDefaultRedirect();
             $server->setupDynamicProxyConfiguration();
             $server->proxy->force_stop = false;
             $server->save();
         }
-        ProxyStatusChangedUI::dispatch($server->team_id);
+        if ($status === 'created') {
+            instant_remote_process([
+                'docker rm -f coolify-proxy',
+            ], $server);
+        }
     }
 }
