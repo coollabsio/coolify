@@ -353,6 +353,10 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -701,6 +705,10 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -1049,6 +1057,10 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -1326,6 +1338,10 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -1586,6 +1602,10 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Password for HTTP Basic Authentication"
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -1685,6 +1705,10 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -2147,6 +2171,10 @@
                                         "type": "boolean",
                                         "nullable": true,
                                         "description": "Use build server."
+                                    },
+                                    "connect_to_docker_network": {
+                                        "type": "boolean",
+                                        "description": "The flag to connect the service to the predefined Docker network."
                                     }
                                 },
                                 "type": "object"
@@ -7016,6 +7044,15 @@
                         "schema": {
                             "type": "string",
                             "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "latest",
+                        "in": "query",
+                        "description": "Pull latest images.",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],

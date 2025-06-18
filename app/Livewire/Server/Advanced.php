@@ -2,25 +2,16 @@
 
 namespace App\Livewire\Server;
 
-use App\Helpers\SslHelper;
-use App\Jobs\RegenerateSslCertJob;
+use App\Models\InstanceSettings;
 use App\Models\Server;
-use App\Models\SslCertificate;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
 {
     public Server $server;
-
-    public ?SslCertificate $caCertificate = null;
-
-    public $showCertificate = false;
-
-    public $certificateContent = '';
-
-    public ?Carbon $certificateValidUntil = null;
 
     public array $parameters = [];
 
@@ -36,103 +27,50 @@ class Advanced extends Component
     #[Validate(['integer', 'min:1'])]
     public int $dynamicTimeout = 1;
 
+    #[Validate(['boolean'])]
+    public bool $isTerminalEnabled = false;
+
     public function mount(string $server_uuid)
     {
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->parameters = get_route_parameters();
             $this->syncData();
-            $this->loadCaCertificate();
+
         } catch (\Throwable) {
             return redirect()->route('server.index');
         }
     }
 
-    public function loadCaCertificate()
-    {
-        $this->caCertificate = SslCertificate::where('server_id', $this->server->id)->where('is_ca_certificate', true)->first();
-
-        if ($this->caCertificate) {
-            $this->certificateContent = $this->caCertificate->ssl_certificate;
-            $this->certificateValidUntil = $this->caCertificate->valid_until;
-        }
-    }
-
-    public function toggleCertificate()
-    {
-        $this->showCertificate = ! $this->showCertificate;
-    }
-
-    public function saveCaCertificate()
+    public function toggleTerminal($password)
     {
         try {
-            if (! $this->certificateContent) {
-                throw new \Exception('Certificate content cannot be empty.');
+            // Check if user is admin or owner
+            if (! auth()->user()->isAdmin()) {
+                throw new \Exception('Only team administrators and owners can modify terminal access.');
             }
 
-            if (! openssl_x509_read($this->certificateContent)) {
-                throw new \Exception('Invalid certificate format.');
+            // Verify password unless two-step confirmation is disabled
+            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+                if (! Hash::check($password, Auth::user()->password)) {
+                    $this->addError('password', 'The provided password is incorrect.');
+
+                    return;
+                }
             }
 
-            if ($this->caCertificate) {
-                $this->caCertificate->ssl_certificate = $this->certificateContent;
-                $this->caCertificate->save();
+            // Toggle the terminal setting
+            $this->server->settings->is_terminal_enabled = ! $this->server->settings->is_terminal_enabled;
+            $this->server->settings->save();
 
-                $this->loadCaCertificate();
+            // Update the local property
+            $this->isTerminalEnabled = $this->server->settings->is_terminal_enabled;
 
-                $this->writeCertificateToServer();
-
-                dispatch(new RegenerateSslCertJob(
-                    server_id: $this->server->id,
-                    force_regeneration: true
-                ));
-            }
-            $this->dispatch('success', 'CA Certificate saved successfully.');
+            $status = $this->isTerminalEnabled ? 'enabled' : 'disabled';
+            $this->dispatch('success', "Terminal access has been {$status}.");
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    public function regenerateCaCertificate()
-    {
-        try {
-            SslHelper::generateSslCertificate(
-                commonName: 'Coolify CA Certificate',
-                serverId: $this->server->id,
-                isCaCertificate: true,
-                validityDays: 10 * 365
-            );
-
-            $this->loadCaCertificate();
-
-            $this->writeCertificateToServer();
-
-            dispatch(new RegenerateSslCertJob(
-                server_id: $this->server->id,
-                force_regeneration: true
-            ));
-
-            $this->loadCaCertificate();
-            $this->dispatch('success', 'CA Certificate regenerated successfully.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    private function writeCertificateToServer()
-    {
-        $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
-
-        $commands = collect([
-            "mkdir -p $caCertPath",
-            "chown -R 9999:root $caCertPath",
-            "chmod -R 700 $caCertPath",
-            "rm -rf $caCertPath/coolify-ca.crt",
-            "echo '{$this->certificateContent}' > $caCertPath/coolify-ca.crt",
-            "chmod 644 $caCertPath/coolify-ca.crt",
-        ]);
-
-        remote_process($commands, $this->server);
     }
 
     public function syncData(bool $toModel = false)
@@ -149,6 +87,7 @@ class Advanced extends Component
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
             $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
+            $this->isTerminalEnabled = $this->server->settings->is_terminal_enabled;
         }
     }
 

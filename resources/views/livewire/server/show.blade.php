@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > General | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full">
@@ -180,7 +180,9 @@
             @if ($server->isFunctional() && !$server->isSwarm() && !$server->isBuildServer())
                 <form wire:submit.prevent='submit'>
                     <div class="flex gap-2 items-center pt-4 pb-2">
-                        <h3>Sentinel</h3>
+                        <h3>Sentinel
+                        </h3>
+                        <x-helper helper="Sentinel reports your server's & container's health and collects metrics." />
                         @if ($server->isSentinelEnabled())
                             <div class="flex gap-2 items-center">
                                 @if ($server->isSentinelLive())
@@ -197,19 +199,22 @@
                         @endif
                     </div>
                     <div class="flex flex-col gap-2">
-                        <div class="flex gap-2">Experimental feature <x-helper
-                                helper="Sentinel reports your server's & container's health and collects metrics." />
-                        </div>
-                        <div class="w-64">
+
+                        <div class="w-96">
                             <x-forms.checkbox wire:model.live="isSentinelEnabled" label="Enable Sentinel" />
                             @if ($server->isSentinelEnabled())
-                                <x-forms.checkbox id="isSentinelDebugEnabled" label="Enable Sentinel Debug"
-                                    instantSave />
+                                @if (isDev())
+                                    <x-forms.checkbox id="isSentinelDebugEnabled" label="Enable Sentinel (with debug)"
+                                        instantSave />
+                                @endif
                                 <x-forms.checkbox instantSave id="isMetricsEnabled" label="Enable Metrics" />
                             @else
-                                <x-forms.checkbox id="isSentinelDebugEnabled" label="Enable Sentinel Debug" disabled
-                                    instantSave />
-                                <x-forms.checkbox instantSave disabled id="isMetricsEnabled" label="Enable Metrics" />
+                                @if (isDev())
+                                    <x-forms.checkbox id="isSentinelDebugEnabled" label="Enable Sentinel (with debug)"
+                                        disabled instantSave />
+                                @endif
+                                <x-forms.checkbox instantSave disabled id="isMetricsEnabled"
+                                    label="Enable Metrics (enable Sentinel first)" />
                             @endif
                         </div>
                         @if ($server->isSentinelEnabled())

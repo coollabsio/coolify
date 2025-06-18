@@ -1,0 +1,292 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Cursor Rules - Complete Guide
+
+## Overview
+
+This comprehensive set of Cursor Rules provides deep insights into **Coolify**, an open-source self-hostable alternative to Heroku/Netlify/Vercel. These rules will help you understand, navigate, and contribute to this complex Laravel-based deployment platform.
+
+## Rule Categories
+
+### 🏗️ Architecture & Foundation
+- **[project-overview.mdc](mdc:.cursor/rules/project-overview.mdc)** - What Coolify is and its core mission
+- **[technology-stack.mdc](mdc:.cursor/rules/technology-stack.mdc)** - Complete technology stack and dependencies
+- **[application-architecture.mdc](mdc:.cursor/rules/application-architecture.mdc)** - Laravel application structure and patterns
+
+### 🎨 Frontend Development
+- **[frontend-patterns.mdc](mdc:.cursor/rules/frontend-patterns.mdc)** - Livewire + Alpine.js + Tailwind architecture
+
+### 🗄️ Data & Backend
+- **[database-patterns.mdc](mdc:.cursor/rules/database-patterns.mdc)** - Database architecture, models, and data management
+- **[deployment-architecture.mdc](mdc:.cursor/rules/deployment-architecture.mdc)** - Docker orchestration and deployment workflows
+
+### 🌐 API & Communication
+- **[api-and-routing.mdc](mdc:.cursor/rules/api-and-routing.mdc)** - RESTful APIs, webhooks, and routing patterns
+
+### 🧪 Quality Assurance
+- **[testing-patterns.mdc](mdc:.cursor/rules/testing-patterns.mdc)** - Testing strategies with Pest PHP and Laravel Dusk
+
+### 🔧 Development Process
+- **[development-workflow.mdc](mdc:.cursor/rules/development-workflow.mdc)** - Development setup, coding standards, and contribution guidelines
+
+### 🔒 Security
+- **[security-patterns.mdc](mdc:.cursor/rules/security-patterns.mdc)** - Security architecture, authentication, and best practices
+
+## Quick Navigation
+
+### Core Application Files
+- **[app/Models/Application.php](mdc:app/Models/Application.php)** - Main application entity (74KB, highly complex)
+- **[app/Models/Server.php](mdc:app/Models/Server.php)** - Server management (46KB, complex)
+- **[app/Models/Service.php](mdc:app/Models/Service.php)** - Service definitions (58KB, complex)
+- **[app/Models/Team.php](mdc:app/Models/Team.php)** - Multi-tenant structure (8.9KB)
+
+### Configuration Files
+- **[composer.json](mdc:composer.json)** - PHP dependencies and Laravel setup
+- **[package.json](mdc:package.json)** - Frontend dependencies and build scripts
+- **[vite.config.js](mdc:vite.config.js)** - Frontend build configuration
+- **[docker-compose.dev.yml](mdc:docker-compose.dev.yml)** - Development environment
+
+### API Documentation
+- **[openapi.json](mdc:openapi.json)** - Complete API documentation (373KB)
+- **[routes/api.php](mdc:routes/api.php)** - API endpoint definitions (13KB)
+- **[routes/web.php](mdc:routes/web.php)** - Web application routes (21KB)
+
+## Key Concepts to Understand
+
+### 1. Multi-Tenant Architecture
+Coolify uses a **team-based multi-tenancy** model where:
+- Users belong to multiple teams
+- Resources are scoped to teams
+- Access control is team-based
+- Data isolation is enforced at the database level
+
+### 2. Deployment Philosophy
+- **Docker-first** approach for all deployments
+- **Zero-downtime** deployments with health checks
+- **Git-based** workflows with webhook integration
+- **Multi-server** support with SSH connections
+
+### 3. Technology Stack
+- **Backend**: Laravel 11 + PHP 8.4
+- **Frontend**: Livewire 3.5 + Alpine.js + Tailwind CSS 4.1
+- **Database**: PostgreSQL 15 + Redis 7
+- **Containerization**: Docker + Docker Compose
+- **Testing**: Pest PHP 3.8 + Laravel Dusk
+
+### 4. Security Model
+- **Defense-in-depth** security architecture
+- **OAuth integration** with multiple providers
+- **API token** authentication with Sanctum
+- **Encrypted storage** for sensitive data
+- **SSH key** management for server access
+
+## Development Quick Start
+
+### Local Setup
+```bash
+# Clone and setup
+git clone https://github.com/coollabsio/coolify.git
+cd coolify
+cp .env.example .env
+
+# Docker development (recommended)
+docker-compose -f docker-compose.dev.yml up -d
+docker-compose exec app composer install
+docker-compose exec app npm install
+docker-compose exec app php artisan migrate
+```
+
+### Code Quality
+```bash
+# PHP code style
+./vendor/bin/pint
+
+# Static analysis
+./vendor/bin/phpstan analyse
+
+# Run tests
+./vendor/bin/pest
+```
+
+## Common Patterns
+
+### Livewire Components
+```php
+class ApplicationShow extends Component
+{
+    public Application $application;
+    
+    protected $listeners = [
+        'deployment.started' => 'refresh',
+        'deployment.completed' => 'refresh',
+    ];
+    
+    public function deploy(): void
+    {
+        $this->authorize('deploy', $this->application);
+        app(ApplicationDeploymentService::class)->deploy($this->application);
+    }
+}
+```
+
+### API Controllers
+```php
+class ApplicationController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum');
+        $this->middleware('team.access');
+    }
+    
+    public function deploy(Application $application): JsonResponse
+    {
+        $this->authorize('deploy', $application);
+        $deployment = app(ApplicationDeploymentService::class)->deploy($application);
+        return response()->json(['deployment_id' => $deployment->id]);
+    }
+}
+```
+
+### Queue Jobs
+```php
+class DeployApplicationJob implements ShouldQueue
+{
+    public function handle(DockerService $dockerService): void
+    {
+        $this->deployment->update(['status' => 'running']);
+        
+        try {
+            $dockerService->deployContainer($this->deployment->application);
+            $this->deployment->update(['status' => 'success']);
+        } catch (Exception $e) {
+            $this->deployment->update(['status' => 'failed']);
+            throw $e;
+        }
+    }
+}
+```
+
+## Testing Patterns
+
+### Feature Tests
+```php
+test('user can deploy application via API', function () {
+    $user = User::factory()->create();
+    $application = Application::factory()->create(['team_id' => $user->currentTeam->id]);
+    
+    $response = $this->actingAs($user)
+        ->postJson("/api/v1/applications/{$application->id}/deploy");
+    
+    $response->assertStatus(200);
+    expect($application->deployments()->count())->toBe(1);
+});
+```
+
+### Browser Tests
+```php
+test('user can create application through UI', function () {
+    $user = User::factory()->create();
+    
+    $this->browse(function (Browser $browser) use ($user) {
+        $browser->loginAs($user)
+            ->visit('/applications/create')
+            ->type('name', 'Test App')
+            ->press('Create Application')
+            ->assertSee('Application created successfully');
+    });
+});
+```
+
+## Security Considerations
+
+### Authentication
+- Multi-provider OAuth support
+- API token authentication
+- Team-based access control
+- Session management
+
+### Data Protection
+- Encrypted environment variables
+- Secure SSH key storage
+- Input validation and sanitization
+- SQL injection prevention
+
+### Container Security
+- Non-root container users
+- Minimal capabilities
+- Read-only filesystems
+- Network isolation
+
+## Performance Optimization
+
+### Database
+- Eager loading relationships
+- Query optimization
+- Connection pooling
+- Caching strategies
+
+### Frontend
+- Lazy loading components
+- Asset optimization
+- CDN integration
+- Real-time updates via WebSockets
+
+## Contributing Guidelines
+
+### Code Standards
+- PSR-12 PHP coding standards
+- Laravel best practices
+- Comprehensive test coverage
+- Security-first approach
+
+### Pull Request Process
+1. Fork repository
+2. Create feature branch
+3. Implement with tests
+4. Run quality checks
+5. Submit PR with clear description
+
+## Useful Commands
+
+### Development
+```bash
+# Start development environment
+docker-compose -f docker-compose.dev.yml up -d
+
+# Run tests
+./vendor/bin/pest
+
+# Code formatting
+./vendor/bin/pint
+
+# Frontend development
+npm run dev
+```
+
+### Production
+```bash
+# Install Coolify
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+
+# Update Coolify
+./scripts/upgrade.sh
+```
+
+## Resources
+
+### Documentation
+- **[README.md](mdc:README.md)** - Project overview and installation
+- **[CONTRIBUTING.md](mdc:CONTRIBUTING.md)** - Contribution guidelines
+- **[CHANGELOG.md](mdc:CHANGELOG.md)** - Release history
+- **[TECH_STACK.md](mdc:TECH_STACK.md)** - Technology overview
+
+### Configuration
+- **[config/](mdc:config)** - Laravel configuration files
+- **[database/migrations/](mdc:database/migrations)** - Database schema
+- **[tests/](mdc:tests)** - Test suite
+
+This comprehensive rule set provides everything needed to understand, develop, and contribute to the Coolify project effectively. Each rule focuses on specific aspects while maintaining connections to the broader architecture.

@@ -11,7 +11,7 @@
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
         <div>Environment variables (secrets) for this resource. </div>
-        @if ($this->resourceClass === 'App\Models\Application' && data_get($this->resource, 'build_pack') !== 'dockercompose')
+        @if ($resourceClass === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
             <div class="w-64 pt-2">
                 <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
                     helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."

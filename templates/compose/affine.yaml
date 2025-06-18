@@ -7,10 +7,6 @@
 services:
   affine:
     image: ghcr.io/toeverything/affine-graphql:stable
-    command:
-      - sh
-      - '-c'
-      - 'node ./scripts/self-host-predeploy && node ./dist/index.js'
     depends_on:
       redis:
         condition: service_healthy  
@@ -25,7 +21,6 @@ services:
         max-size: 1000m
     environment:
       - SERVICE_FQDN_AFFINE_3010
-      - NODE_OPTIONS=--import=./scripts/register.js
       - AFFINE_CONFIG_PATH=/root/.affine/config
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-affine}
@@ -45,6 +40,24 @@ services:
       interval: 5s
       timeout: 20s
       retries: 3
+
+  affine_migration:
+    exclude_from_hc: true
+    image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
+    restart: on-failure
+    volumes:
+      - affine-storage:/root/.affine/storage
+      - affine-config:/root/.affine/config
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    environment:
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-affine}
+      - AFFINE_INDEXER_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis

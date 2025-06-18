@@ -99,7 +99,7 @@ function format_docker_envs_to_json($rawOutput)
         $outputLines = json_decode($rawOutput, true, flags: JSON_THROW_ON_ERROR);
 
         return collect(data_get($outputLines[0], 'Config.Env', []))->mapWithKeys(function ($env) {
-            $env = explode('=', $env);
+            $env = explode('=', $env, 2);
 
             return [$env[0] => $env[1]];
         });
@@ -724,11 +724,12 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     return $labels->all();
 }
 
-function isDatabaseImage(?string $image = null)
+function isDatabaseImage(?string $image = null, ?array $serviceConfig = null)
 {
     if (is_null($image)) {
         return false;
     }
+
     $image = str($image);
     if ($image->contains(':')) {
         $image = str($image);
@@ -736,13 +737,170 @@ function isDatabaseImage(?string $image = null)
         $image = str($image)->append(':latest');
     }
     $imageName = $image->before(':');
+
+    // First check if it's a known database image
+    $isKnownDatabase = false;
     foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
         if (str($imageName)->contains($database_docker_image)) {
-            return true;
+            $isKnownDatabase = true;
+            break;
         }
     }
 
-    return false;
+    // If no database pattern found, it's definitely not a database
+    if (! $isKnownDatabase) {
+        return false;
+    }
+
+    // If we have service configuration, use additional context to make better decisions
+    if (! is_null($serviceConfig)) {
+        return isDatabaseImageWithContext($imageName, $serviceConfig);
+    }
+
+    // Fallback to original behavior for backward compatibility
+    return $isKnownDatabase;
+}
+
+function isDatabaseImageWithContext(string $imageName, array $serviceConfig): bool
+{
+    // Known application images that contain database names but are not databases
+    $knownApplicationPatterns = [
+        // SuperTokens authentication
+        'supertokens/supertokens-mysql',
+        'supertokens/supertokens-postgresql',
+        'supertokens/supertokens-mongodb',
+        'registry.supertokens.io/supertokens/supertokens-mysql',
+        'registry.supertokens.io/supertokens/supertokens-postgresql',
+        'registry.supertokens.io/supertokens/supertokens-mongodb',
+        'registry.supertokens.io/supertokens',
+
+        // Analytics and BI tools
+        'metabase/metabase', // Uses databases but is not a database
+        'amancevice/superset', // Uses databases but is not a database
+        'nocodb/nocodb', // Uses databases but is not a database
+        'ghcr.io/umami-software/umami', // Web analytics with postgresql variant
+
+        // Secret management
+        'infisical/infisical', // Secret management with postgres variant
+
+        // Development tools
+        'postgrest/postgrest', // REST API for PostgreSQL
+        'supabase/postgres-meta', // PostgreSQL metadata API
+        'bluewaveuptime/uptime_redis', // Uptime monitoring with Redis
+    ];
+
+    foreach ($knownApplicationPatterns as $pattern) {
+        if (str($imageName)->contains($pattern)) {
+            return false;
+        }
+    }
+
+    // Check for database-like ports (common database ports indicate it's likely a database)
+    $databasePorts = ['3306', '5432', '27017', '6379', '8086', '9200', '7687', '8123'];
+    $ports = data_get($serviceConfig, 'ports', []);
+    $hasStandardDbPort = false;
+
+    if (is_array($ports)) {
+        foreach ($ports as $port) {
+            $portStr = is_string($port) ? $port : (string) $port;
+            foreach ($databasePorts as $dbPort) {
+                if (str($portStr)->contains($dbPort)) {
+                    $hasStandardDbPort = true;
+                    break 2;
+                }
+            }
+        }
+    }
+
+    // Check environment variables for database-specific patterns
+    $environment = data_get($serviceConfig, 'environment', []);
+    $hasDbEnvVars = false;
+    $hasAppEnvVars = false;
+
+    if (is_array($environment)) {
+        foreach ($environment as $env) {
+            $envStr = is_string($env) ? $env : (string) $env;
+            $envUpper = strtoupper($envStr);
+
+            // Database-specific environment variables
+            if (str($envUpper)->contains(['MYSQL_ROOT_PASSWORD', 'POSTGRES_PASSWORD', 'MONGO_INITDB_ROOT_PASSWORD', 'REDIS_PASSWORD'])) {
+                $hasDbEnvVars = true;
+            }
+
+            // Application-specific environment variables
+            if (str($envUpper)->contains(['SERVICE_FQDN', 'API_KEYS', 'APP_', 'APPLICATION_'])) {
+                $hasAppEnvVars = true;
+            }
+        }
+    }
+
+    // Check healthcheck patterns
+    $healthcheck = data_get($serviceConfig, 'healthcheck.test', []);
+    $hasDbHealthcheck = false;
+    $hasAppHealthcheck = false;
+
+    if (is_array($healthcheck)) {
+        $healthcheckStr = implode(' ', $healthcheck);
+    } else {
+        $healthcheckStr = is_string($healthcheck) ? $healthcheck : '';
+    }
+
+    if (! empty($healthcheckStr)) {
+        $healthcheckUpper = strtoupper($healthcheckStr);
+
+        // Database-specific healthcheck patterns
+        if (str($healthcheckUpper)->contains(['PG_ISREADY', 'MYSQLADMIN PING', 'MONGO', 'REDIS-CLI PING'])) {
+            $hasDbHealthcheck = true;
+        }
+
+        // Application-specific healthcheck patterns (HTTP endpoints)
+        if (str($healthcheckUpper)->contains(['CURL', 'WGET', 'HTTP://', 'HTTPS://', '/HEALTH', '/API/', '/HELLO'])) {
+            $hasAppHealthcheck = true;
+        }
+    }
+
+    // Check if service depends on other database services
+    $dependsOn = data_get($serviceConfig, 'depends_on', []);
+    $dependsOnDatabases = false;
+
+    if (is_array($dependsOn)) {
+        foreach ($dependsOn as $serviceName => $config) {
+            $serviceNameStr = is_string($serviceName) ? $serviceName : (string) $serviceName;
+            if (str($serviceNameStr)->contains(['mysql', 'postgres', 'mongo', 'redis', 'mariadb'])) {
+                $dependsOnDatabases = true;
+                break;
+            }
+        }
+    }
+
+    // Decision logic:
+    // 1. If it has app-specific patterns and depends on databases, it's likely an application
+    if ($hasAppEnvVars && $dependsOnDatabases) {
+        return false;
+    }
+
+    // 2. If it has HTTP healthchecks, it's likely an application
+    if ($hasAppHealthcheck) {
+        return false;
+    }
+
+    // 3. If it has standard database ports AND database healthchecks, it's likely a database
+    if ($hasStandardDbPort && $hasDbHealthcheck) {
+        return true;
+    }
+
+    // 4. If it has database environment variables, it's likely a database
+    if ($hasDbEnvVars) {
+        return true;
+    }
+
+    // 5. Default: if it depends on databases but doesn't have database characteristics, it's an application
+    if ($dependsOnDatabases) {
+        return false;
+    }
+
+    // 6. Fallback: assume it's a database if we can't determine otherwise
+    return true;
 }
 
 function convertDockerRunToCompose(?string $custom_docker_run_options = null)

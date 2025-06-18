@@ -98,6 +98,9 @@ class Email extends Component
     #[Validate(['boolean'])]
     public bool $serverUnreachableEmailNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $serverPatchEmailNotifications = false;
+
     #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
 
@@ -146,6 +149,7 @@ class Email extends Component
             $this->settings->server_disk_usage_email_notifications = $this->serverDiskUsageEmailNotifications;
             $this->settings->server_reachable_email_notifications = $this->serverReachableEmailNotifications;
             $this->settings->server_unreachable_email_notifications = $this->serverUnreachableEmailNotifications;
+            $this->settings->server_patch_email_notifications = $this->serverPatchEmailNotifications;
             $this->settings->save();
 
         } else {
@@ -177,6 +181,7 @@ class Email extends Component
             $this->serverDiskUsageEmailNotifications = $this->settings->server_disk_usage_email_notifications;
             $this->serverReachableEmailNotifications = $this->settings->server_reachable_email_notifications;
             $this->serverUnreachableEmailNotifications = $this->settings->server_unreachable_email_notifications;
+            $this->serverPatchEmailNotifications = $this->settings->server_patch_email_notifications;
         }
     }
 
@@ -320,7 +325,7 @@ class Email extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress, 'email'));
+                    $this->team?->notifyNow(new Test($this->testEmailAddress, 'email'));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
