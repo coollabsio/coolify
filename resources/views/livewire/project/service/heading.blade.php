@@ -1,4 +1,4 @@
-<div wire:poll.10000ms="checkStatus">
+<div wire:poll.10000ms="checkStatus" class="pb-6">
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
@@ -10,7 +10,7 @@
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a wire:navigate class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>

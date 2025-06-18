@@ -6,7 +6,7 @@
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
 
-    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">General</a>

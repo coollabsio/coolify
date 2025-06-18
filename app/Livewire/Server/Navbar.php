@@ -116,22 +116,10 @@ class Navbar extends Component
 
         switch ($this->proxyStatus) {
             case 'running':
-                // $this->dispatch('success', 'Proxy is running.');
                 $this->loadProxyConfiguration();
                 break;
             case 'restarting':
                 $this->dispatch('info', 'Initiating proxy restart.');
-                break;
-                // case 'exited':
-                //     if (! $forceStop) {
-                //         $this->dispatch('info', 'Proxy is stopped manually.<br>Starting in a moment.');
-                //     }
-                //     break;
-            case 'starting':
-                // do nothing
-                break;
-            case 'stopping':
-                // do nothing
                 break;
             default:
                 break;
