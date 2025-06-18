@@ -44,6 +44,9 @@ class StartDatabaseProxy
         };
 
         $configuration_dir = database_proxy_dir($database->uuid);
+        if (isDev()) {
+            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+        }
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -60,18 +63,9 @@ class StartDatabaseProxy
        }
     }
     EOF;
-        $dockerfile = <<< 'EOF'
-    FROM nginx:stable-alpine
-
-    COPY nginx.conf /etc/nginx/nginx.conf
-    EOF;
         $docker_compose = [
             'services' => [
                 $proxyContainerName => [
-                    'build' => [
-                        'context' => $configuration_dir,
-                        'dockerfile' => 'Dockerfile',
-                    ],
                     'image' => 'nginx:stable-alpine',
                     'container_name' => $proxyContainerName,
                     'restart' => RESTART_MODE,
@@ -80,6 +74,13 @@ class StartDatabaseProxy
                     ],
                     'networks' => [
                         $network,
+                    ],
+                    'volumes' => [
+                        [
+                            'type' => 'bind',
+                            'source' => "$configuration_dir/nginx.conf",
+                            'target' => '/etc/nginx/nginx.conf',
+                        ],
                     ],
                     'healthcheck' => [
                         'test' => [
@@ -103,15 +104,13 @@ class StartDatabaseProxy
         ];
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);
-        $dockerfile_base64 = base64_encode($dockerfile);
         instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
         instant_remote_process([
             "mkdir -p $configuration_dir",
-            "echo '{$dockerfile_base64}' | base64 -d | tee $configuration_dir/Dockerfile > /dev/null",
             "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
             "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
             "docker compose --project-directory {$configuration_dir} pull",
-            "docker compose --project-directory {$configuration_dir} up --build -d",
+            "docker compose --project-directory {$configuration_dir} up -d",
         ], $server);
     }
 }

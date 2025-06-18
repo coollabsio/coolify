@@ -1,0 +1,310 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Deployment Architecture
+
+## Deployment Philosophy
+
+Coolify orchestrates **Docker-based deployments** across multiple servers with automated configuration generation, zero-downtime deployments, and comprehensive monitoring.
+
+## Core Deployment Components
+
+### Deployment Models
+- **[Application.php](mdc:app/Models/Application.php)** - Main application entity with deployment configurations
+- **[ApplicationDeploymentQueue.php](mdc:app/Models/ApplicationDeploymentQueue.php)** - Deployment job orchestration
+- **[Service.php](mdc:app/Models/Service.php)** - Multi-container service definitions
+- **[Server.php](mdc:app/Models/Server.php)** - Target deployment infrastructure
+
+### Infrastructure Management
+- **[PrivateKey.php](mdc:app/Models/PrivateKey.php)** - SSH key management for secure server access
+- **[StandaloneDocker.php](mdc:app/Models/StandaloneDocker.php)** - Single container deployments
+- **[SwarmDocker.php](mdc:app/Models/SwarmDocker.php)** - Docker Swarm orchestration
+
+## Deployment Workflow
+
+### 1. Source Code Integration
+```
+Git Repository → Webhook → Coolify → Build & Deploy
+```
+
+#### Source Control Models
+- **[GithubApp.php](mdc:app/Models/GithubApp.php)** - GitHub integration and webhooks
+- **[GitlabApp.php](mdc:app/Models/GitlabApp.php)** - GitLab CI/CD integration
+
+#### Deployment Triggers
+- **Git push** to configured branches
+- **Manual deployment** via UI
+- **Scheduled deployments** via cron
+- **API-triggered** deployments
+
+### 2. Build Process
+```
+Source Code → Docker Build → Image Registry → Deployment
+```
+
+#### Build Configurations
+- **Dockerfile detection** and custom Dockerfile support
+- **Buildpack integration** for framework detection
+- **Multi-stage builds** for optimization
+- **Cache layer** management for faster builds
+
+### 3. Deployment Orchestration
+```
+Queue Job → Configuration Generation → Container Deployment → Health Checks
+```
+
+## Deployment Actions
+
+### Location: [app/Actions/](mdc:app/Actions)
+
+#### Application Deployment Actions
+- **Application/** - Core application deployment logic
+- **Docker/** - Docker container management
+- **Service/** - Multi-container service orchestration
+- **Proxy/** - Reverse proxy configuration
+
+#### Database Actions
+- **Database/** - Database deployment and management
+- Automated backup scheduling
+- Connection management and health checks
+
+#### Server Management Actions
+- **Server/** - Server provisioning and configuration
+- SSH connection establishment
+- Docker daemon management
+
+## Configuration Generation
+
+### Dynamic Configuration
+- **[ConfigurationGenerator.php](mdc:app/Services/ConfigurationGenerator.php)** - Generates deployment configurations
+- **[ConfigurationRepository.php](mdc:app/Services/ConfigurationRepository.php)** - Configuration management
+
+### Generated Configurations
+#### Docker Compose Files
+```yaml
+# Generated docker-compose.yml structure
+version: '3.8'
+services:
+  app:
+    image: ${APP_IMAGE}
+    environment:
+      - ${ENV_VARIABLES}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`${FQDN}`)
+    volumes:
+      - ${VOLUME_MAPPINGS}
+    networks:
+      - coolify
+```
+
+#### Nginx Configurations
+- **Reverse proxy** setup
+- **SSL termination** with automatic certificates
+- **Load balancing** for multiple instances
+- **Custom headers** and routing rules
+
+## Container Orchestration
+
+### Docker Integration
+- **[DockerImageParser.php](mdc:app/Services/DockerImageParser.php)** - Parse and validate Docker images
+- **Container lifecycle** management
+- **Resource allocation** and limits
+- **Network isolation** and communication
+
+### Volume Management
+- **[LocalFileVolume.php](mdc:app/Models/LocalFileVolume.php)** - Persistent file storage
+- **[LocalPersistentVolume.php](mdc:app/Models/LocalPersistentVolume.php)** - Data persistence
+- **Backup integration** for volume data
+
+### Network Configuration
+- **Custom Docker networks** for isolation
+- **Service discovery** between containers
+- **Port mapping** and exposure
+- **SSL/TLS termination**
+
+## Environment Management
+
+### Environment Isolation
+- **[Environment.php](mdc:app/Models/Environment.php)** - Development, staging, production environments
+- **[EnvironmentVariable.php](mdc:app/Models/EnvironmentVariable.php)** - Application-specific variables
+- **[SharedEnvironmentVariable.php](mdc:app/Models/SharedEnvironmentVariable.php)** - Cross-application variables
+
+### Configuration Hierarchy
+```
+Instance Settings → Server Settings → Project Settings → Application Settings
+```
+
+## Preview Environments
+
+### Git-Based Previews
+- **[ApplicationPreview.php](mdc:app/Models/ApplicationPreview.php)** - Preview environment management
+- **Automatic PR/MR previews** for feature branches
+- **Isolated environments** for testing
+- **Automatic cleanup** after merge/close
+
+### Preview Workflow
+```
+Feature Branch → Auto-Deploy → Preview URL → Review → Cleanup
+```
+
+## SSL & Security
+
+### Certificate Management
+- **[SslCertificate.php](mdc:app/Models/SslCertificate.php)** - SSL certificate automation
+- **Let's Encrypt** integration for free certificates
+- **Custom certificate** upload support
+- **Automatic renewal** and monitoring
+
+### Security Patterns
+- **Private Docker networks** for container isolation
+- **SSH key-based** server authentication
+- **Environment variable** encryption
+- **Access control** via team permissions
+
+## Backup & Recovery
+
+### Database Backups
+- **[ScheduledDatabaseBackup.php](mdc:app/Models/ScheduledDatabaseBackup.php)** - Automated database backups
+- **[ScheduledDatabaseBackupExecution.php](mdc:app/Models/ScheduledDatabaseBackupExecution.php)** - Backup execution tracking
+- **S3-compatible storage** for backup destinations
+
+### Application Backups
+- **Volume snapshots** for persistent data
+- **Configuration export** for disaster recovery
+- **Cross-region replication** for high availability
+
+## Monitoring & Logging
+
+### Real-Time Monitoring
+- **[ActivityMonitor.php](mdc:app/Livewire/ActivityMonitor.php)** - Live deployment monitoring
+- **WebSocket-based** log streaming
+- **Container health checks** and alerts
+- **Resource usage** tracking
+
+### Deployment Logs
+- **Build process** logging
+- **Container startup** logs
+- **Application runtime** logs
+- **Error tracking** and alerting
+
+## Queue System
+
+### Background Jobs
+Location: [app/Jobs/](mdc:app/Jobs)
+- **Deployment jobs** for async processing
+- **Server monitoring** jobs
+- **Backup scheduling** jobs
+- **Notification delivery** jobs
+
+### Queue Processing
+- **Redis-backed** job queues
+- **Laravel Horizon** for queue monitoring
+- **Failed job** retry mechanisms
+- **Queue worker** auto-scaling
+
+## Multi-Server Deployment
+
+### Server Types
+- **Standalone servers** - Single Docker host
+- **Docker Swarm** - Multi-node orchestration
+- **Remote servers** - SSH-based deployment
+- **Local development** - Docker Desktop integration
+
+### Load Balancing
+- **Traefik integration** for automatic load balancing
+- **Health check** based routing
+- **Blue-green deployments** for zero downtime
+- **Rolling updates** with configurable strategies
+
+## Deployment Strategies
+
+### Zero-Downtime Deployment
+```
+Old Container → New Container Build → Health Check → Traffic Switch → Old Container Cleanup
+```
+
+### Blue-Green Deployment
+- **Parallel environments** for safe deployments
+- **Instant rollback** capability
+- **Database migration** handling
+- **Configuration synchronization**
+
+### Rolling Updates
+- **Gradual instance** replacement
+- **Configurable update** strategy
+- **Automatic rollback** on failure
+- **Health check** validation
+
+## API Integration
+
+### Deployment API
+Routes: [routes/api.php](mdc:routes/api.php)
+- **RESTful endpoints** for deployment management
+- **Webhook receivers** for CI/CD integration
+- **Status reporting** endpoints
+- **Deployment triggering** via API
+
+### Authentication
+- **Laravel Sanctum** API tokens
+- **Team-based** access control
+- **Rate limiting** for API calls
+- **Audit logging** for API usage
+
+## Error Handling & Recovery
+
+### Deployment Failure Recovery
+- **Automatic rollback** on deployment failure
+- **Health check** failure handling
+- **Container crash** recovery
+- **Resource exhaustion** protection
+
+### Monitoring & Alerting
+- **Failed deployment** notifications
+- **Resource threshold** alerts
+- **SSL certificate** expiry warnings
+- **Backup failure** notifications
+
+## Performance Optimization
+
+### Build Optimization
+- **Docker layer** caching
+- **Multi-stage builds** for smaller images
+- **Build artifact** reuse
+- **Parallel build** processing
+
+### Runtime Optimization
+- **Container resource** limits
+- **Auto-scaling** based on metrics
+- **Connection pooling** for databases
+- **CDN integration** for static assets
+
+## Compliance & Governance
+
+### Audit Trail
+- **Deployment history** tracking
+- **Configuration changes** logging
+- **User action** auditing
+- **Resource access** monitoring
+
+### Backup Compliance
+- **Retention policies** for backups
+- **Encryption at rest** for sensitive data
+- **Cross-region** backup replication
+- **Recovery testing** automation
+
+## Integration Patterns
+
+### CI/CD Integration
+- **GitHub Actions** compatibility
+- **GitLab CI** pipeline integration
+- **Custom webhook** endpoints
+- **Build status** reporting
+
+### External Services
+- **S3-compatible** storage integration
+- **External database** connections
+- **Third-party monitoring** tools
+- **Custom notification** channels

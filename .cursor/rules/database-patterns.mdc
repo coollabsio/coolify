@@ -1,0 +1,306 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Database Architecture & Patterns
+
+## Database Strategy
+
+Coolify uses **PostgreSQL 15** as the primary database with **Redis 7** for caching and real-time features. The architecture supports managing multiple external databases across different servers.
+
+## Primary Database (PostgreSQL)
+
+### Core Tables & Models
+
+#### User & Team Management
+- **[User.php](mdc:app/Models/User.php)** - User authentication and profiles
+- **[Team.php](mdc:app/Models/Team.php)** - Multi-tenant organization structure
+- **[TeamInvitation.php](mdc:app/Models/TeamInvitation.php)** - Team collaboration invitations
+- **[PersonalAccessToken.php](mdc:app/Models/PersonalAccessToken.php)** - API token management
+
+#### Infrastructure Management
+- **[Server.php](mdc:app/Models/Server.php)** - Physical/virtual server definitions (46KB, complex)
+- **[PrivateKey.php](mdc:app/Models/PrivateKey.php)** - SSH key management
+- **[ServerSetting.php](mdc:app/Models/ServerSetting.php)** - Server-specific configurations
+
+#### Project Organization
+- **[Project.php](mdc:app/Models/Project.php)** - Project containers for applications
+- **[Environment.php](mdc:app/Models/Environment.php)** - Environment isolation (staging, production, etc.)
+- **[ProjectSetting.php](mdc:app/Models/ProjectSetting.php)** - Project-specific settings
+
+#### Application Deployment
+- **[Application.php](mdc:app/Models/Application.php)** - Main application entity (74KB, highly complex)
+- **[ApplicationSetting.php](mdc:app/Models/ApplicationSetting.php)** - Application configurations
+- **[ApplicationDeploymentQueue.php](mdc:app/Models/ApplicationDeploymentQueue.php)** - Deployment orchestration
+- **[ApplicationPreview.php](mdc:app/Models/ApplicationPreview.php)** - Preview environment management
+
+#### Service Management
+- **[Service.php](mdc:app/Models/Service.php)** - Service definitions (58KB, complex)
+- **[ServiceApplication.php](mdc:app/Models/ServiceApplication.php)** - Service components
+- **[ServiceDatabase.php](mdc:app/Models/ServiceDatabase.php)** - Service-attached databases
+
+## Database Type Support
+
+### Standalone Database Models
+Each database type has its own dedicated model with specific configurations:
+
+#### SQL Databases
+- **[StandalonePostgresql.php](mdc:app/Models/StandalonePostgresql.php)** - PostgreSQL instances
+- **[StandaloneMysql.php](mdc:app/Models/StandaloneMysql.php)** - MySQL instances  
+- **[StandaloneMariadb.php](mdc:app/Models/StandaloneMariadb.php)** - MariaDB instances
+
+#### NoSQL & Analytics
+- **[StandaloneMongodb.php](mdc:app/Models/StandaloneMongodb.php)** - MongoDB instances
+- **[StandaloneClickhouse.php](mdc:app/Models/StandaloneClickhouse.php)** - ClickHouse analytics
+
+#### Caching & In-Memory
+- **[StandaloneRedis.php](mdc:app/Models/StandaloneRedis.php)** - Redis instances
+- **[StandaloneKeydb.php](mdc:app/Models/StandaloneKeydb.php)** - KeyDB instances
+- **[StandaloneDragonfly.php](mdc:app/Models/StandaloneDragonfly.php)** - Dragonfly instances
+
+## Configuration Management
+
+### Environment Variables
+- **[EnvironmentVariable.php](mdc:app/Models/EnvironmentVariable.php)** - Application-specific environment variables
+- **[SharedEnvironmentVariable.php](mdc:app/Models/SharedEnvironmentVariable.php)** - Shared across applications
+
+### Settings Hierarchy
+- **[InstanceSettings.php](mdc:app/Models/InstanceSettings.php)** - Global Coolify instance settings
+- **[ServerSetting.php](mdc:app/Models/ServerSetting.php)** - Server-specific settings
+- **[ProjectSetting.php](mdc:app/Models/ProjectSetting.php)** - Project-level settings
+- **[ApplicationSetting.php](mdc:app/Models/ApplicationSetting.php)** - Application settings
+
+## Storage & Backup Systems
+
+### Storage Management
+- **[S3Storage.php](mdc:app/Models/S3Storage.php)** - S3-compatible storage configurations
+- **[LocalFileVolume.php](mdc:app/Models/LocalFileVolume.php)** - Local filesystem volumes
+- **[LocalPersistentVolume.php](mdc:app/Models/LocalPersistentVolume.php)** - Persistent volume management
+
+### Backup Infrastructure
+- **[ScheduledDatabaseBackup.php](mdc:app/Models/ScheduledDatabaseBackup.php)** - Automated backup scheduling
+- **[ScheduledDatabaseBackupExecution.php](mdc:app/Models/ScheduledDatabaseBackupExecution.php)** - Backup execution tracking
+
+### Task Scheduling
+- **[ScheduledTask.php](mdc:app/Models/ScheduledTask.php)** - Cron job management
+- **[ScheduledTaskExecution.php](mdc:app/Models/ScheduledTaskExecution.php)** - Task execution history
+
+## Notification & Integration Models
+
+### Notification Channels
+- **[EmailNotificationSettings.php](mdc:app/Models/EmailNotificationSettings.php)** - Email notifications
+- **[DiscordNotificationSettings.php](mdc:app/Models/DiscordNotificationSettings.php)** - Discord integration
+- **[SlackNotificationSettings.php](mdc:app/Models/SlackNotificationSettings.php)** - Slack integration
+- **[TelegramNotificationSettings.php](mdc:app/Models/TelegramNotificationSettings.php)** - Telegram bot
+- **[PushoverNotificationSettings.php](mdc:app/Models/PushoverNotificationSettings.php)** - Pushover notifications
+
+### Source Control Integration
+- **[GithubApp.php](mdc:app/Models/GithubApp.php)** - GitHub App integration
+- **[GitlabApp.php](mdc:app/Models/GitlabApp.php)** - GitLab integration
+
+### OAuth & Authentication
+- **[OauthSetting.php](mdc:app/Models/OauthSetting.php)** - OAuth provider configurations
+
+## Docker & Container Management
+
+### Container Orchestration
+- **[StandaloneDocker.php](mdc:app/Models/StandaloneDocker.php)** - Standalone Docker containers
+- **[SwarmDocker.php](mdc:app/Models/SwarmDocker.php)** - Docker Swarm management
+
+### SSL & Security
+- **[SslCertificate.php](mdc:app/Models/SslCertificate.php)** - SSL certificate management
+
+## Database Migration Strategy
+
+### Migration Location: [database/migrations/](mdc:database/migrations)
+
+#### Migration Patterns
+```php
+// Typical Coolify migration structure
+Schema::create('applications', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->string('fqdn')->nullable();
+    $table->json('environment_variables')->nullable();
+    $table->foreignId('destination_id');
+    $table->foreignId('source_id');
+    $table->timestamps();
+});
+```
+
+### Schema Versioning
+- **Incremental migrations** for database evolution
+- **Data migrations** for complex transformations
+- **Rollback support** for deployment safety
+
+## Eloquent Model Patterns
+
+### Base Model Structure
+- **[BaseModel.php](mdc:app/Models/BaseModel.php)** - Common model functionality
+- **UUID primary keys** for distributed systems
+- **Soft deletes** for audit trails
+- **Activity logging** with Spatie package
+
+### Relationship Patterns
+```php
+// Typical relationship structure in Application model
+class Application extends Model
+{
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
+    }
+    
+    public function environment()
+    {
+        return $this->belongsTo(Environment::class);
+    }
+    
+    public function deployments()
+    {
+        return $this->hasMany(ApplicationDeploymentQueue::class);
+    }
+    
+    public function environmentVariables()
+    {
+        return $this->hasMany(EnvironmentVariable::class);
+    }
+}
+```
+
+### Model Traits
+```php
+// Common traits used across models
+use SoftDeletes;
+use LogsActivity;
+use HasFactory;
+use HasUuids;
+```
+
+## Caching Strategy (Redis)
+
+### Cache Usage Patterns
+- **Session storage** - User authentication sessions
+- **Queue backend** - Background job processing
+- **Model caching** - Expensive query results
+- **Real-time data** - WebSocket state management
+
+### Cache Keys Structure
+```
+coolify:session:{session_id}
+coolify:server:{server_id}:status
+coolify:deployment:{deployment_id}:logs
+coolify:user:{user_id}:teams
+```
+
+## Query Optimization Patterns
+
+### Eager Loading
+```php
+// Optimized queries with relationships
+$applications = Application::with([
+    'server',
+    'environment.project',
+    'environmentVariables',
+    'deployments' => function ($query) {
+        $query->latest()->limit(5);
+    }
+])->get();
+```
+
+### Chunking for Large Datasets
+```php
+// Processing large datasets efficiently
+Server::chunk(100, function ($servers) {
+    foreach ($servers as $server) {
+        // Process server monitoring
+    }
+});
+```
+
+### Database Indexes
+- **Primary keys** on all tables
+- **Foreign key indexes** for relationships
+- **Composite indexes** for common queries
+- **Unique constraints** for business rules
+
+## Data Consistency Patterns
+
+### Database Transactions
+```php
+// Atomic operations for deployment
+DB::transaction(function () {
+    $application = Application::create($data);
+    $application->environmentVariables()->createMany($envVars);
+    $application->deployments()->create(['status' => 'queued']);
+});
+```
+
+### Model Events
+```php
+// Automatic cleanup on model deletion
+class Application extends Model
+{
+    protected static function booted()
+    {
+        static::deleting(function ($application) {
+            $application->environmentVariables()->delete();
+            $application->deployments()->delete();
+        });
+    }
+}
+```
+
+## Backup & Recovery
+
+### Database Backup Strategy
+- **Automated PostgreSQL backups** via scheduled tasks
+- **Point-in-time recovery** capability
+- **Cross-region backup** replication
+- **Backup verification** and testing
+
+### Data Export/Import
+- **Application configurations** export/import
+- **Environment variable** bulk operations
+- **Server configurations** backup and restore
+
+## Performance Monitoring
+
+### Query Performance
+- **Laravel Telescope** for development debugging
+- **Slow query logging** in production
+- **Database connection** pooling
+- **Read replica** support for scaling
+
+### Metrics Collection
+- **Database size** monitoring
+- **Connection count** tracking
+- **Query execution time** analysis
+- **Cache hit rates** monitoring
+
+## Multi-Tenancy Pattern
+
+### Team-Based Isolation
+```php
+// Global scope for team-based filtering
+class Application extends Model
+{
+    protected static function booted()
+    {
+        static::addGlobalScope('team', function (Builder $builder) {
+            if (auth()->user()) {
+                $builder->whereHas('environment.project', function ($query) {
+                    $query->where('team_id', auth()->user()->currentTeam->id);
+                });
+            }
+        });
+    }
+}
+```
+
+### Data Separation
+- **Team-scoped queries** by default
+- **Cross-team access** controls
+- **Admin access** patterns
+- **Data isolation** guarantees

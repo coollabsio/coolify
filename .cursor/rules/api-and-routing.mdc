@@ -1,0 +1,474 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify API & Routing Architecture
+
+## Routing Structure
+
+Coolify implements **multi-layered routing** with web interfaces, RESTful APIs, webhook endpoints, and real-time communication channels.
+
+## Route Files
+
+### Core Route Definitions
+- **[routes/web.php](mdc:routes/web.php)** - Web application routes (21KB, 362 lines)
+- **[routes/api.php](mdc:routes/api.php)** - RESTful API endpoints (13KB, 185 lines)
+- **[routes/webhooks.php](mdc:routes/webhooks.php)** - Webhook receivers (815B, 22 lines)
+- **[routes/channels.php](mdc:routes/channels.php)** - WebSocket channel definitions (829B, 33 lines)
+- **[routes/console.php](mdc:routes/console.php)** - Artisan command routes (592B, 20 lines)
+
+## Web Application Routing
+
+### Authentication Routes
+```php
+// Laravel Fortify authentication
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'login']);
+    Route::get('/register', [AuthController::class, 'register']);
+    Route::get('/forgot-password', [AuthController::class, 'forgotPassword']);
+});
+```
+
+### Dashboard & Core Features
+```php
+// Main application routes
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', Dashboard::class)->name('dashboard');
+    Route::get('/projects', ProjectIndex::class)->name('projects');
+    Route::get('/servers', ServerIndex::class)->name('servers');
+    Route::get('/teams', TeamIndex::class)->name('teams');
+});
+```
+
+### Resource Management Routes
+```php
+// Server management
+Route::prefix('servers')->group(function () {
+    Route::get('/{server}', ServerShow::class)->name('server.show');
+    Route::get('/{server}/edit', ServerEdit::class)->name('server.edit');
+    Route::get('/{server}/logs', ServerLogs::class)->name('server.logs');
+});
+
+// Application management
+Route::prefix('applications')->group(function () {
+    Route::get('/{application}', ApplicationShow::class)->name('application.show');
+    Route::get('/{application}/deployments', ApplicationDeployments::class);
+    Route::get('/{application}/environment-variables', ApplicationEnvironmentVariables::class);
+    Route::get('/{application}/logs', ApplicationLogs::class);
+});
+```
+
+## RESTful API Architecture
+
+### API Versioning
+```php
+// API route structure
+Route::prefix('v1')->group(function () {
+    // Application endpoints
+    Route::apiResource('applications', ApplicationController::class);
+    Route::apiResource('servers', ServerController::class);
+    Route::apiResource('teams', TeamController::class);
+});
+```
+
+### Authentication & Authorization
+```php
+// Sanctum API authentication
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+    
+    // Team-scoped resources
+    Route::middleware('team.access')->group(function () {
+        Route::apiResource('applications', ApplicationController::class);
+    });
+});
+```
+
+### Application Management API
+```php
+// Application CRUD operations
+Route::prefix('applications')->group(function () {
+    Route::get('/', [ApplicationController::class, 'index']);
+    Route::post('/', [ApplicationController::class, 'store']);
+    Route::get('/{application}', [ApplicationController::class, 'show']);
+    Route::patch('/{application}', [ApplicationController::class, 'update']);
+    Route::delete('/{application}', [ApplicationController::class, 'destroy']);
+    
+    // Deployment operations
+    Route::post('/{application}/deploy', [ApplicationController::class, 'deploy']);
+    Route::post('/{application}/restart', [ApplicationController::class, 'restart']);
+    Route::post('/{application}/stop', [ApplicationController::class, 'stop']);
+    Route::get('/{application}/logs', [ApplicationController::class, 'logs']);
+});
+```
+
+### Server Management API
+```php
+// Server operations
+Route::prefix('servers')->group(function () {
+    Route::get('/', [ServerController::class, 'index']);
+    Route::post('/', [ServerController::class, 'store']);
+    Route::get('/{server}', [ServerController::class, 'show']);
+    Route::patch('/{server}', [ServerController::class, 'update']);
+    Route::delete('/{server}', [ServerController::class, 'destroy']);
+    
+    // Server actions
+    Route::post('/{server}/validate', [ServerController::class, 'validate']);
+    Route::get('/{server}/usage', [ServerController::class, 'usage']);
+    Route::post('/{server}/cleanup', [ServerController::class, 'cleanup']);
+});
+```
+
+### Database Management API
+```php
+// Database operations
+Route::prefix('databases')->group(function () {
+    Route::get('/', [DatabaseController::class, 'index']);
+    Route::post('/', [DatabaseController::class, 'store']);
+    Route::get('/{database}', [DatabaseController::class, 'show']);
+    Route::patch('/{database}', [DatabaseController::class, 'update']);
+    Route::delete('/{database}', [DatabaseController::class, 'destroy']);
+    
+    // Database actions
+    Route::post('/{database}/backup', [DatabaseController::class, 'backup']);
+    Route::post('/{database}/restore', [DatabaseController::class, 'restore']);
+    Route::get('/{database}/logs', [DatabaseController::class, 'logs']);
+});
+```
+
+## Webhook Architecture
+
+### Git Integration Webhooks
+```php
+// GitHub webhook endpoints
+Route::post('/webhooks/github/{application}', [GitHubWebhookController::class, 'handle'])
+    ->name('webhooks.github');
+
+// GitLab webhook endpoints
+Route::post('/webhooks/gitlab/{application}', [GitLabWebhookController::class, 'handle'])
+    ->name('webhooks.gitlab');
+
+// Generic Git webhooks
+Route::post('/webhooks/git/{application}', [GitWebhookController::class, 'handle'])
+    ->name('webhooks.git');
+```
+
+### Deployment Webhooks
+```php
+// Deployment status webhooks
+Route::post('/webhooks/deployment/{deployment}/success', [DeploymentWebhookController::class, 'success']);
+Route::post('/webhooks/deployment/{deployment}/failure', [DeploymentWebhookController::class, 'failure']);
+Route::post('/webhooks/deployment/{deployment}/progress', [DeploymentWebhookController::class, 'progress']);
+```
+
+### Third-Party Integration Webhooks
+```php
+// Monitoring webhooks
+Route::post('/webhooks/monitoring/{server}', [MonitoringWebhookController::class, 'handle']);
+
+// Backup status webhooks
+Route::post('/webhooks/backup/{backup}', [BackupWebhookController::class, 'handle']);
+
+// SSL certificate webhooks
+Route::post('/webhooks/ssl/{certificate}', [SslWebhookController::class, 'handle']);
+```
+
+## WebSocket Channel Definitions
+
+### Real-Time Channels
+```php
+// Private channels for team members
+Broadcast::channel('team.{teamId}', function ($user, $teamId) {
+    return $user->teams->contains('id', $teamId);
+});
+
+// Application deployment channels
+Broadcast::channel('application.{applicationId}', function ($user, $applicationId) {
+    return $user->hasAccessToApplication($applicationId);
+});
+
+// Server monitoring channels
+Broadcast::channel('server.{serverId}', function ($user, $serverId) {
+    return $user->hasAccessToServer($serverId);
+});
+```
+
+### Presence Channels
+```php
+// Team collaboration presence
+Broadcast::channel('team.{teamId}.presence', function ($user, $teamId) {
+    if ($user->teams->contains('id', $teamId)) {
+        return ['id' => $user->id, 'name' => $user->name];
+    }
+});
+```
+
+## API Controllers
+
+### Location: [app/Http/Controllers/Api/](mdc:app/Http/Controllers)
+
+#### Resource Controllers
+```php
+class ApplicationController extends Controller
+{
+    public function index(Request $request)
+    {
+        return ApplicationResource::collection(
+            $request->user()->currentTeam->applications()
+                ->with(['server', 'environment'])
+                ->paginate()
+        );
+    }
+    
+    public function store(StoreApplicationRequest $request)
+    {
+        $application = $request->user()->currentTeam
+            ->applications()
+            ->create($request->validated());
+            
+        return new ApplicationResource($application);
+    }
+    
+    public function deploy(Application $application)
+    {
+        $deployment = $application->deploy();
+        
+        return response()->json([
+            'message' => 'Deployment started',
+            'deployment_id' => $deployment->id
+        ]);
+    }
+}
+```
+
+### API Responses & Resources
+```php
+// API Resource classes
+class ApplicationResource extends JsonResource
+{
+    public function toArray($request)
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'fqdn' => $this->fqdn,
+            'status' => $this->status,
+            'git_repository' => $this->git_repository,
+            'git_branch' => $this->git_branch,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            'server' => new ServerResource($this->whenLoaded('server')),
+            'environment' => new EnvironmentResource($this->whenLoaded('environment')),
+        ];
+    }
+}
+```
+
+## API Authentication
+
+### Sanctum Token Authentication
+```php
+// API token generation
+Route::post('/auth/tokens', function (Request $request) {
+    $request->validate([
+        'name' => 'required|string',
+        'abilities' => 'array'
+    ]);
+    
+    $token = $request->user()->createToken(
+        $request->name,
+        $request->abilities ?? []
+    );
+    
+    return response()->json([
+        'token' => $token->plainTextToken,
+        'abilities' => $token->accessToken->abilities
+    ]);
+});
+```
+
+### Team-Based Authorization
+```php
+// Team access middleware
+class EnsureTeamAccess
+{
+    public function handle($request, Closure $next)
+    {
+        $teamId = $request->route('team');
+        
+        if (!$request->user()->teams->contains('id', $teamId)) {
+            abort(403, 'Access denied to team resources');
+        }
+        
+        return $next($request);
+    }
+}
+```
+
+## Rate Limiting
+
+### API Rate Limits
+```php
+// API throttling configuration
+RateLimiter::for('api', function (Request $request) {
+    return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+});
+
+// Deployment rate limiting
+RateLimiter::for('deployments', function (Request $request) {
+    return Limit::perMinute(10)->by($request->user()->id);
+});
+```
+
+### Webhook Rate Limiting
+```php
+// Webhook throttling
+RateLimiter::for('webhooks', function (Request $request) {
+    return Limit::perMinute(100)->by($request->ip());
+});
+```
+
+## Route Model Binding
+
+### Custom Route Bindings
+```php
+// Custom model binding for applications
+Route::bind('application', function ($value) {
+    return Application::where('uuid', $value)
+        ->orWhere('id', $value)
+        ->firstOrFail();
+});
+
+// Team-scoped model binding
+Route::bind('team_application', function ($value, $route) {
+    $teamId = $route->parameter('team');
+    return Application::whereHas('environment.project', function ($query) use ($teamId) {
+        $query->where('team_id', $teamId);
+    })->findOrFail($value);
+});
+```
+
+## API Documentation
+
+### OpenAPI Specification
+- **[openapi.json](mdc:openapi.json)** - API documentation (373KB, 8316 lines)
+- **[openapi.yaml](mdc:openapi.yaml)** - YAML format documentation (184KB, 5579 lines)
+
+### Documentation Generation
+```php
+// Swagger/OpenAPI annotations
+/**
+ * @OA\Get(
+ *     path="/api/v1/applications",
+ *     summary="List applications",
+ *     tags={"Applications"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Response(
+ *         response=200,
+ *         description="List of applications",
+ *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Application"))
+ *     )
+ * )
+ */
+```
+
+## Error Handling
+
+### API Error Responses
+```php
+// Standardized error response format
+class ApiExceptionHandler
+{
+    public function render($request, Throwable $exception)
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'error_code' => $this->getErrorCode($exception),
+                'timestamp' => now()->toISOString()
+            ], $this->getStatusCode($exception));
+        }
+        
+        return parent::render($request, $exception);
+    }
+}
+```
+
+### Validation Error Handling
+```php
+// Form request validation
+class StoreApplicationRequest extends FormRequest
+{
+    public function rules()
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'git_repository' => 'required|url',
+            'git_branch' => 'required|string',
+            'server_id' => 'required|exists:servers,id',
+            'environment_id' => 'required|exists:environments,id'
+        ];
+    }
+    
+    public function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(
+            response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422)
+        );
+    }
+}
+```
+
+## Real-Time API Integration
+
+### WebSocket Events
+```php
+// Broadcasting deployment events
+class DeploymentStarted implements ShouldBroadcast
+{
+    public $application;
+    public $deployment;
+    
+    public function broadcastOn()
+    {
+        return [
+            new PrivateChannel("application.{$this->application->id}"),
+            new PrivateChannel("team.{$this->application->team->id}")
+        ];
+    }
+    
+    public function broadcastWith()
+    {
+        return [
+            'deployment_id' => $this->deployment->id,
+            'status' => 'started',
+            'timestamp' => now()
+        ];
+    }
+}
+```
+
+### API Event Streaming
+```php
+// Server-Sent Events for real-time updates
+Route::get('/api/v1/applications/{application}/events', function (Application $application) {
+    return response()->stream(function () use ($application) {
+        while (true) {
+            $events = $application->getRecentEvents();
+            foreach ($events as $event) {
+                echo "data: " . json_encode($event) . "\n\n";
+            }
+            usleep(1000000); // 1 second
+        }
+    }, 200, [
+        'Content-Type' => 'text/event-stream',
+        'Cache-Control' => 'no-cache',
+    ]);
+});
+```

@@ -6,7 +6,7 @@
             <x-forms.input required label="Name" id="name" />
             <x-forms.input label="Description" id="description" />
         </div>
-        <x-forms.input required type="url" label="Endpoint" wire:model.blur="endpoint" />
+        <x-forms.input required type="url" label="Endpoint" wire:model.blur-sm="endpoint" />
         <div class="flex gap-2">
             <x-forms.input required label="Bucket" id="bucket" />
             <x-forms.input required helper="Region only required for AWS. Leave it as-is for other providers."

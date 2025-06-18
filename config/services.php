@@ -46,6 +46,13 @@ return [
         'redirect' => env('AUTHENTIK_REDIRECT_URI'),
     ],
 
+    'clerk' => [
+        'client_id' => env('CLERK_CLIENT_ID'),
+        'client_secret' => env('CLERK_CLIENT_SECRET'),
+        'redirect' => env('CLERK_REDIRECT_URI'),
+        'base_url' => env('CLERK_BASE_URL'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
