@@ -44,9 +44,6 @@ class StartDatabaseProxy
         };
 
         $configuration_dir = database_proxy_dir($database->uuid);
-        if (isDev()) {
-            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
-        }
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
