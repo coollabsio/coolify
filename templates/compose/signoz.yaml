@@ -27,9 +27,9 @@ services:
         max-size: 50m
         max-file: "3"
 
-  zookeeper-1:
+  zookeeper:
     image: bitnami/zookeeper:3.7.1
-    container_name: signoz-zookeeper-1
+    container_name: signoz-zookeeper
     user: root
     healthcheck:
       test:
@@ -44,13 +44,12 @@ services:
         max-size: 50m
         max-file: "3"
     volumes:
-      - zookeeper-1:/bitnami/zookeeper
+      - zookeeper:/bitnami/zookeeper
     environment:
-      - ZOO_SERVER_ID=1
-      - ALLOW_ANONYMOUS_LOGIN=yes
-      - ZOO_AUTOPURGE_INTERVAL=1
-      - ZOO_ENABLE_PROMETHEUS_METRICS=yes
-      - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=9141
+      - ALLOW_ANONYMOUS_LOGIN=${ZOO_ALLOW_ANONYMOUS_LOGIN:-yes}
+      - ZOO_AUTOPURGE_INTERVAL=${ZOO_AUTOPURGE_INTERVAL:-1}
+      - ZOO_ENABLE_PROMETHEUS_METRICS=${ZOO_ENABLE_PROMETHEUS_METRICS:-yes}
+      - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=${ZOO_PROMETHEUS_METRICS_PORT_NUMBER:-9141}
 
   clickhouse:
     # addding non LTS version due to this fix https://github.com/ClickHouse/ClickHouse/commit/32caf8716352f45c1b617274c7508c86b7d1afab
@@ -60,7 +59,7 @@ services:
     depends_on:
       init-clickhouse:
         condition: service_completed_successfully
-      zookeeper-1:
+      zookeeper:
         condition: service_healthy
     healthcheck:
       test:
@@ -129,7 +128,6 @@ services:
         source: ./clickhouse/cluster.xml
         target: /etc/clickhouse-server/config.d/cluster.xml
         content: |
-          <?xml version="1.0"?>
           <clickhouse>
               <!-- ZooKeeper is used to store metadata about replicas, when using Replicated tables.
                   Optional. If you don't use replicated tables, you could omit that.
@@ -138,17 +136,9 @@ services:
                 -->
               <zookeeper>
                   <node index="1">
-                      <host>zookeeper-1</host>
+                      <host>zookeeper</host>
                       <port>2181</port>
                   </node>
-                  <!-- <node index="2">
-                      <host>zookeeper-2</host>
-                      <port>2181</port>
-                  </node>
-                  <node index="3">
-                      <host>zookeeper-3</host>
-                      <port>2181</port>
-                  </node> -->
               </zookeeper>
 
               <!-- Configuration of clusters that could be used in Distributed tables.
