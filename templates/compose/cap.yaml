@@ -1,0 +1,67 @@
+# documentation: https://cap.so
+# slogan: Cap is the open source alternative to Loom. Lightweight, powerful, and cross-platform. Record and share in seconds.
+# tags: cap,loom,open,source,low,code
+# logo: svgs/cap.svg
+# port: 5679
+
+
+services:
+  cap-web:
+    container_name: cap-web
+    image: ghcr.io/capsoftware/cap-web:latest
+    platform: linux/amd64 # <--- since the image is not available for arm64
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_CAPWEB_5679
+      - DATABASE_URL=mysql://root:${SERVICE_PASSWORD_MYSQL}@ps-mysql:3306/planetscale?ssl={"rejectUnauthorized":false}
+      - WEB_URL=$SERVICE_URL_CAPWEB
+      - NEXTAUTH_URL=$SERVICE_URL_CAPWEB
+      - DATABASE_ENCRYPTION_KEY=${SERVICE_BASE64_DATABASEENCRYPTIONKEY}
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_NEXTAUTHSECRET}
+      - CAP_AWS_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - CAP_AWS_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - CAP_AWS_BUCKET=capso
+      - CAP_AWS_REGION=us-east-1
+      - CAP_AWS_ENDPOINT=http://minio:3902
+    ports:
+      - "5679:3000" # inside the container, the port is 3000, but we want to expose it to the host on port 5679
+
+  ps-mysql:
+    container_name: cap-primary-db
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=planetscale
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    command:
+      [
+        "--max_connections=1000",
+        "--default-authentication-plugin=mysql_native_password",
+      ]
+    ports:
+      - "3306:3306"
+    volumes:
+      - ps-mysql:/var/lib/mysql
+
+  # Local S3 Strorage
+  minio:
+    container_name: cap-minio-storage
+    image: "bitnami/minio:latest"
+    restart: unless-stopped
+    ports:
+      - "3902:3902"
+      - "3903:3903"
+    environment:
+      - MINIO_API_PORT_NUMBER=3902
+      - MINIO_CONSOLE_PORT_NUMBER=3903
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - minio-data:/bitnami/minio/data
+      - minio-certs:/certs
+volumes:
+  ps-mysql:
+  # REMOVE THESE IF YOU ARE NOT USING MINIO VIA THIS DOCKER COMPOSE FILE
+  minio-data:
+  minio-certs:
