@@ -87,7 +87,7 @@
                         <x-slide-over @automated.window="slideOverOpen = true" fullScreen>
                             <x-slot:title>Cloudflare Tunnel Configuration</x-slot:title>
                             <x-slot:content>
-                                <livewire:activity-monitor header="Logs" showWaiting fullHeight />
+                                <livewire:activity-monitor header="Logs" fullHeight />
                             </x-slot:content>
                         </x-slide-over>
                         <form @submit.prevent="$wire.dispatch('automatedCloudflareConfig')"
@@ -101,8 +101,12 @@
                     @script
                         <script>
                             $wire.$on('automatedCloudflareConfig', () => {
-                                window.dispatchEvent(new CustomEvent('automated'));
-                                $wire.$call('automatedCloudflareConfig');
+                                try {
+                                    window.dispatchEvent(new CustomEvent('automated'));
+                                    $wire.$call('automatedCloudflareConfig');
+                                } catch (error) {
+                                    console.error(error);
+                                }
                             });
                         </script>
                     @endscript
@@ -121,5 +125,4 @@
             @endif
         </div>
     </div>
-</div>
 </div>

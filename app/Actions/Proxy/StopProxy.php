@@ -3,6 +3,7 @@
 namespace App\Actions\Proxy;
 
 use App\Events\ProxyStatusChanged;
+use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -15,6 +16,9 @@ class StopProxy
     {
         try {
             $containerName = $server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
+            $server->proxy->status = 'stopping';
+            $server->save();
+            ProxyStatusChangedUI::dispatch($server->team_id);
 
             instant_remote_process(command: [
                 "docker stop --time=$timeout $containerName",
@@ -24,12 +28,10 @@ class StopProxy
             $server->proxy->force_stop = $forceStop;
             $server->proxy->status = 'exited';
             $server->save();
-
-            // Clear Traefik dashboard cache when proxy stops
-            ProxyDashboardCacheService::clearCache($server);
         } catch (\Throwable $e) {
             return handleError($e);
         } finally {
+            ProxyDashboardCacheService::clearCache($server);
             ProxyStatusChanged::dispatch($server->id);
         }
     }

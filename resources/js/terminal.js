@@ -514,7 +514,6 @@ export function initializeTerminalComponent() {
                         const currentRows = this.term.rows;
 
                         if (cols !== currentCols || rows !== currentRows) {
-                            console.log(`[Terminal] Resizing terminal: ${currentCols}x${currentRows} -> ${cols}x${rows}`);
                             this.term.resize(cols, rows);
                             this.sendMessage({
                                 resize: { cols: cols, rows: rows }

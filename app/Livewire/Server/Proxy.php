@@ -5,7 +5,6 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Server;
-use App\Services\ProxyDashboardCacheService;
 use Livewire\Component;
 
 class Proxy extends Component
@@ -43,9 +42,6 @@ class Proxy extends Component
         $this->server->proxy = null;
         $this->server->save();
 
-        // Clear Traefik dashboard cache when proxy type changes
-        ProxyDashboardCacheService::clearCache($this->server);
-
         $this->dispatch('reloadWindow');
     }
 
@@ -54,9 +50,6 @@ class Proxy extends Component
         try {
             $this->server->changeProxy($proxy_type, async: false);
             $this->selectedProxy = $this->server->proxy->type;
-
-            // Clear Traefik dashboard cache when proxy type is selected
-            ProxyDashboardCacheService::clearCache($this->server);
 
             $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {

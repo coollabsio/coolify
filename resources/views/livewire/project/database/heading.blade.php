@@ -1,15 +1,15 @@
-<nav wire:poll.10000ms="checkStatus">
+<nav wire:poll.10000ms="checkStatus" class="pb-6">
     <x-resources.breadcrumbs :resource="$database" :parameters="$parameters" />
     <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Database Startup</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" showWaiting fullHeight />
+            <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
         <nav
             class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
-            <a wire:navigate class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>

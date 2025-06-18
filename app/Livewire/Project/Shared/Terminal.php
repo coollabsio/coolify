@@ -44,8 +44,8 @@ class Terminal extends Component
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
-        if (! $server->isTerminalEnabled()) {
-            throw new \RuntimeException('Terminal access is disabled on this server.');
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            abort(403, 'Terminal access is disabled on this server.');
         }
 
         if ($isContainer) {

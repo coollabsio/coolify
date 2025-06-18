@@ -57,7 +57,7 @@
     @else
         @if ($showWaiting)
             <div class="flex justify-start">
-                <x-loading text="Waiting..." />
+                <x-loading text="Waiting for the process to start..." />
             </div>
         @endif
     @endif
