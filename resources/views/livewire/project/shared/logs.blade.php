@@ -6,7 +6,7 @@
     @if ($type === 'application')
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
-        <div class="pt-4">
+        <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
                 <div class="pt-2">The resource is not running.</div>
@@ -41,7 +41,7 @@
     @elseif ($type === 'database')
         <h1>Logs</h1>
         <livewire:project.database.heading :database="$resource" />
-        <div class="pt-4">
+        <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
                 <div class="pt-2">The resource is not running.</div>
@@ -65,7 +65,7 @@
         </div>
     @elseif ($type === 'service')
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" :query="$query" title="Logs" />
-        <div class="pt-4">
+        <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
                 <div class="pt-2">The resource is not running.</div>

@@ -54,7 +54,11 @@ class CloneMe extends Component
         $this->project = Project::where('uuid', $project_uuid)->firstOrFail();
         $this->environment = $this->project->environments->where('uuid', $this->environment_uuid)->first();
         $this->project_id = $this->project->id;
-        $this->servers = currentTeam()->servers;
+        $this->servers = currentTeam()
+            ->servers()
+            ->with('destinations')
+            ->get()
+            ->reject(fn ($server) => $server->isBuildServer());
         $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
     }
 
