@@ -2,7 +2,7 @@
     <x-slot:title>
         Proxy Configuration | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
+    <livewire:server.navbar :server="$server" />
     @if ($server->isFunctional())
         <div class="flex flex-col h-full gap-8 sm:flex-row">
             <x-server.sidebar-proxy :server="$server" :parameters="$parameters" />

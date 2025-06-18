@@ -31,7 +31,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping('docker-cleanup-'.$this->server->uuid))->dontRelease()];
     }
 
     public function __construct(public Server $server, public bool $manualCleanup = false) {}

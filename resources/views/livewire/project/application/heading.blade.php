@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus">
+<nav wire:poll.10000ms="checkStatus" class="pb-6">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">

@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Security | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <x-slide-over closeWithX fullScreen @startupdate.window="slideOverOpen = true">
         <x-slot:title>Updating Packages</x-slot:title>
         <x-slot:content>
@@ -10,7 +10,7 @@
         </x-slot:content>
     </x-slide-over>
 
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row" x-init="$wire.checkForUpdates()">
         <x-server.sidebar-security :server="$server" :parameters="$parameters" />
         <form wire:submit='submit' class="w-full">
             <div>
@@ -19,16 +19,16 @@
                     <span class="text-xs text-neutral-500">(experimental)</span>
                     <x-helper
                         helper="Only available for apt, dnf and zypper package managers atm, more coming
-            soon. <br/> Also scheduled patching and notifications are coming soon..." />
+            soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}'>notification settings</a>." />
                     <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">
                         Check Now</x-forms.button>
                 </div>
-                <div>Update your servers automatically.</div>
+                <div>Update your servers semi-automatically.</div>
                 <div>
                     <div class="flex flex-col gap-6 pt-4">
                         <div class="flex flex-col">
                             <div>
-                                <div wire:target="checkForUpdates" wire:loading>
+                                <div class="pb-2" wire:target="checkForUpdates" wire:loading>
                                     Checking for updates. It may take a few minutes. <x-loading />
                                 </div>
                                 @if ($error)
@@ -38,18 +38,20 @@
                                         <div class="text-green-500">Your server is up to date.</div>
                                     @endif
                                     @if (isset($updates) && count($updates) > 0)
-                                        <x-modal-confirmation title="Confirm package update?"
-                                            buttonTitle="Update All
+                                        <div class="pb-2">
+                                            <x-modal-confirmation title="Confirm package update?"
+                                                buttonTitle="Update All
                                             Packages"
-                                            isHighlightedButton submitAction="updateAllPackages" dispatchAction
-                                            :actions="[
-                                                'All packages will be updated to the latest version.',
-                                                'This action could restart your currently running containers if docker will be updated.',
-                                            ]" confirmationText="Update All Packages"
-                                            confirmationLabel="Please confirm the execution of the actions by entering the name below"
-                                            shortConfirmationLabel="Name" :confirmWithPassword=false
-                                            step2ButtonText="Update All
+                                                isHighlightedButton submitAction="updateAllPackages" dispatchAction
+                                                :actions="[
+                                                    'All packages will be updated to the latest version.',
+                                                    'This action could restart your currently running containers if docker will be updated.',
+                                                ]" confirmationText="Update All Packages"
+                                                confirmationLabel="Please confirm the execution of the actions by entering the name below"
+                                                shortConfirmationLabel="Name" :confirmWithPassword=false
+                                                step2ButtonText="Update All
                                             Packages" />
+                                        </div>
                                         <table>
                                             <thead>
                                                 <tr>
@@ -65,7 +67,7 @@
                                                 @foreach ($updates as $update)
                                                     <tr>
                                                         <td class="inline-flex gap-2 justify-center items-center">
-                                                            @if (data_get_str($update, 'package')->contains('docker'))
+                                                            @if (data_get_str($update, 'package')->contains('docker') || data_get_str($update, 'package')->contains('kernel'))
                                                                 <x-helper :helper="'This package will restart your currently running containers'">
                                                                     <x-slot:icon>
                                                                         <svg class="w-4 h-4 text-red-500 block"

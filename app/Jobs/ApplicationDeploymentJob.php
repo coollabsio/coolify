@@ -361,9 +361,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function post_deployment()
     {
-        if ($this->server->isProxyShouldRun()) {
-            GetContainersStatus::dispatch($this->server);
-        }
+        GetContainersStatus::dispatch($this->server);
         $this->next(ApplicationDeploymentStatus::FINISHED->value);
         if ($this->pull_request_id !== 0) {
             if ($this->application->is_github_based()) {
@@ -1683,13 +1681,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_FQDN')->isEmpty()) {
-                $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
-                $coolify_envs->put('COOLIFY_DOMAIN_URL', $this->preview->fqdn);
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_URL', $this->preview->fqdn);
+                } else {
+                    $coolify_envs->put('COOLIFY_FQDN', $this->preview->fqdn);
+                }
             }
             if ($this->application->environment_variables_preview->where('key', 'COOLIFY_URL')->isEmpty()) {
                 $url = str($this->preview->fqdn)->replace('http://', '')->replace('https://', '');
-                $coolify_envs->put('COOLIFY_URL', $url);
-                $coolify_envs->put('COOLIFY_DOMAIN_FQDN', $url);
+                if ((int) $this->application->compose_parsing_version >= 3) {
+                    $coolify_envs->put('COOLIFY_FQDN', $url);
+                } else {
+                    $coolify_envs->put('COOLIFY_URL', $url);
+                }
             }
             if ($this->application->build_pack !== 'dockercompose' || $this->application->compose_parsing_version === '1' || $this->application->compose_parsing_version === '2') {
                 if ($this->application->environment_variables_preview->where('key', 'COOLIFY_BRANCH')->isEmpty()) {
@@ -2531,20 +2535,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         queue_next_deployment($this->application);
 
         // Never allow changing status from FAILED or CANCELLED_BY_USER to anything else
-        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value ||
-            $this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
+            $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
+
+            return;
+        }
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
             return;
         }
 
         $this->application_deployment_queue->update([
             'status' => $status,
         ]);
-
-        if ($status === ApplicationDeploymentStatus::FAILED->value) {
-            $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
-
-            return;
-        }
 
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
             if (! $this->only_this_server) {

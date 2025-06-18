@@ -69,6 +69,7 @@ class Patches extends Component
     {
         if (! $this->packageManager || ! $this->osId) {
             $this->dispatch('error', message: 'Run “Check for updates” first.');
+
             return;
         }
 

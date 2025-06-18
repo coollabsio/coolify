@@ -1,0 +1,319 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Frontend Architecture & Patterns
+
+## Frontend Philosophy
+
+Coolify uses a **server-side first** approach with minimal JavaScript, leveraging Livewire for reactivity and Alpine.js for lightweight client-side interactions.
+
+## Core Frontend Stack
+
+### Livewire 3.5+ (Primary Framework)
+- **Server-side rendering** with reactive components
+- **Real-time updates** without page refreshes
+- **State management** handled on the server
+- **WebSocket integration** for live updates
+
+### Alpine.js (Client-Side Interactivity)
+- **Lightweight JavaScript** for DOM manipulation
+- **Declarative directives** in HTML
+- **Component-like behavior** without build steps
+- **Perfect companion** to Livewire
+
+### Tailwind CSS 4.1+ (Styling)
+- **Utility-first** CSS framework
+- **Custom design system** for deployment platform
+- **Responsive design** built-in
+- **Dark mode support**
+
+## Livewire Component Structure
+
+### Location: [app/Livewire/](mdc:app/Livewire)
+
+#### Core Application Components
+- **[Dashboard.php](mdc:app/Livewire/Dashboard.php)** - Main dashboard interface
+- **[ActivityMonitor.php](mdc:app/Livewire/ActivityMonitor.php)** - Real-time activity tracking
+- **[MonacoEditor.php](mdc:app/Livewire/MonacoEditor.php)** - Code editor component
+
+#### Server Management
+- **Server/** directory - Server configuration and monitoring
+- Real-time server status updates
+- SSH connection management
+- Resource monitoring
+
+#### Project & Application Management
+- **Project/** directory - Project organization
+- Application deployment interfaces
+- Environment variable management
+- Service configuration
+
+#### Settings & Configuration
+- **Settings/** directory - System configuration
+- **[SettingsEmail.php](mdc:app/Livewire/SettingsEmail.php)** - Email notification setup
+- **[SettingsOauth.php](mdc:app/Livewire/SettingsOauth.php)** - OAuth provider configuration
+- **[SettingsBackup.php](mdc:app/Livewire/SettingsBackup.php)** - Backup configuration
+
+#### User & Team Management
+- **Team/** directory - Team collaboration features
+- **Profile/** directory - User profile management
+- **Security/** directory - Security settings
+
+## Blade Template Organization
+
+### Location: [resources/views/](mdc:resources/views)
+
+#### Layout Structure
+- **layouts/** - Base layout templates
+- **components/** - Reusable UI components
+- **livewire/** - Livewire component views
+
+#### Feature-Specific Views
+- **server/** - Server management interfaces
+- **auth/** - Authentication pages
+- **emails/** - Email templates
+- **errors/** - Error pages
+
+## Interactive Components
+
+### Monaco Editor Integration
+- **Code editing** for configuration files
+- **Syntax highlighting** for multiple languages
+- **Live validation** and error detection
+- **Integration** with deployment process
+
+### Terminal Emulation (XTerm.js)
+- **Real-time terminal** access to servers
+- **WebSocket-based** communication
+- **Multi-session** support
+- **Secure connection** through SSH
+
+### Real-Time Updates
+- **WebSocket connections** via Laravel Echo
+- **Live deployment logs** streaming
+- **Server monitoring** with live metrics
+- **Activity notifications** in real-time
+
+## Alpine.js Patterns
+
+### Common Directives Used
+```html
+<!-- State management -->
+<div x-data="{ open: false }">
+
+<!-- Event handling -->
+<button x-on:click="open = !open">
+
+<!-- Conditional rendering -->
+<div x-show="open">
+
+<!-- Data binding -->
+<input x-model="searchTerm">
+
+<!-- Component initialization -->
+<div x-init="initializeComponent()">
+```
+
+### Integration with Livewire
+```html
+<!-- Livewire actions with Alpine state -->
+<button 
+    x-data="{ loading: false }"
+    x-on:click="loading = true"
+    wire:click="deploy"
+    wire:loading.attr="disabled"
+    wire:target="deploy"
+>
+    <span x-show="!loading">Deploy</span>
+    <span x-show="loading">Deploying...</span>
+</button>
+```
+
+## Tailwind CSS Patterns
+
+### Design System
+- **Consistent spacing** using Tailwind scale
+- **Color palette** optimized for deployment platform
+- **Typography** hierarchy for technical content
+- **Component classes** for reusable elements
+
+### Responsive Design
+```html
+<!-- Mobile-first responsive design -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+    <!-- Content adapts to screen size -->
+</div>
+```
+
+### Dark Mode Support
+```html
+<!-- Dark mode variants -->
+<div class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <!-- Automatic dark mode switching -->
+</div>
+```
+
+## Build Process
+
+### Vite Configuration ([vite.config.js](mdc:vite.config.js))
+- **Fast development** with hot module replacement
+- **Optimized production** builds
+- **Asset versioning** for cache busting
+- **CSS processing** with PostCSS
+
+### Asset Compilation
+```bash
+# Development
+npm run dev
+
+# Production build
+npm run build
+```
+
+## State Management Patterns
+
+### Server-Side State (Livewire)
+- **Component properties** for persistent state
+- **Session storage** for user preferences
+- **Database models** for application state
+- **Cache layer** for performance
+
+### Client-Side State (Alpine.js)
+- **Local component state** for UI interactions
+- **Form validation** and user feedback
+- **Modal and dropdown** state management
+- **Temporary UI states** (loading, hover, etc.)
+
+## Real-Time Features
+
+### WebSocket Integration
+```php
+// Livewire component with real-time updates
+class ActivityMonitor extends Component
+{
+    public function getListeners()
+    {
+        return [
+            'deployment.started' => 'refresh',
+            'deployment.finished' => 'refresh',
+            'server.status.changed' => 'updateServerStatus',
+        ];
+    }
+}
+```
+
+### Event Broadcasting
+- **Laravel Echo** for client-side WebSocket handling
+- **Pusher protocol** for real-time communication
+- **Private channels** for user-specific events
+- **Presence channels** for collaborative features
+
+## Performance Patterns
+
+### Lazy Loading
+```php
+// Livewire lazy loading
+class ServerList extends Component
+{
+    public function placeholder()
+    {
+        return view('components.loading-skeleton');
+    }
+}
+```
+
+### Caching Strategies
+- **Fragment caching** for expensive operations
+- **Image optimization** with lazy loading
+- **Asset bundling** and compression
+- **CDN integration** for static assets
+
+## Form Handling Patterns
+
+### Livewire Forms
+```php
+class ServerCreateForm extends Component
+{
+    public $name;
+    public $ip;
+    
+    protected $rules = [
+        'name' => 'required|min:3',
+        'ip' => 'required|ip',
+    ];
+    
+    public function save()
+    {
+        $this->validate();
+        // Save logic
+    }
+}
+```
+
+### Real-Time Validation
+- **Live validation** as user types
+- **Server-side validation** rules
+- **Error message** display
+- **Success feedback** patterns
+
+## Component Communication
+
+### Parent-Child Communication
+```php
+// Parent component
+$this->emit('serverCreated', $server->id);
+
+// Child component
+protected $listeners = ['serverCreated' => 'refresh'];
+```
+
+### Cross-Component Events
+- **Global events** for application-wide updates
+- **Scoped events** for feature-specific communication
+- **Browser events** for JavaScript integration
+
+## Error Handling & UX
+
+### Loading States
+- **Skeleton screens** during data loading
+- **Progress indicators** for long operations
+- **Optimistic updates** with rollback capability
+
+### Error Display
+- **Toast notifications** for user feedback
+- **Inline validation** errors
+- **Global error** handling
+- **Retry mechanisms** for failed operations
+
+## Accessibility Patterns
+
+### ARIA Labels and Roles
+```html
+<button
+    aria-label="Deploy application"
+    aria-describedby="deploy-help"
+    wire:click="deploy"
+>
+    Deploy
+</button>
+```
+
+### Keyboard Navigation
+- **Tab order** management
+- **Keyboard shortcuts** for power users
+- **Focus management** in modals and forms
+- **Screen reader** compatibility
+
+## Mobile Optimization
+
+### Touch-Friendly Interface
+- **Larger tap targets** for mobile devices
+- **Swipe gestures** where appropriate
+- **Mobile-optimized** forms and navigation
+
+### Progressive Enhancement
+- **Core functionality** works without JavaScript
+- **Enhanced experience** with JavaScript enabled
+- **Offline capabilities** where possible

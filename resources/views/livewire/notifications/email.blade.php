@@ -155,6 +155,8 @@
                     label="Server Reachable" />
                 <x-forms.checkbox instantSave="saveModel" id="serverUnreachableEmailNotifications"
                     label="Server Unreachable" />
+                <x-forms.checkbox instantSave="saveModel" id="serverPatchEmailNotifications"
+                    label="Server Patching" />
             </div>
         </div>
     </div>

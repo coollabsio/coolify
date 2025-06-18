@@ -14,22 +14,25 @@ class ActivityMonitor extends Component
 
     public $eventToDispatch = 'activityFinished';
 
+    public $eventData = null;
+
     public $isPollingActive = false;
 
     public bool $fullHeight = false;
 
-    public bool $showWaiting = false;
+    public $activity;
 
-    protected $activity;
+    public bool $showWaiting = true;
 
     public static $eventDispatched = false;
 
     protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
 
-    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished')
+    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null)
     {
         $this->activityId = $activityId;
         $this->eventToDispatch = $eventToDispatch;
+        $this->eventData = $eventData;
 
         $this->hydrateActivity();
 
@@ -55,7 +58,11 @@ class ActivityMonitor extends Component
                         if ($user) {
                             $teamId = $user->currentTeam()->id;
                             if (! self::$eventDispatched) {
-                                $this->eventToDispatch::dispatch($teamId);
+                                if (filled($this->eventData)) {
+                                    $this->eventToDispatch::dispatch($teamId, $this->eventData);
+                                } else {
+                                    $this->eventToDispatch::dispatch($teamId);
+                                }
                                 self::$eventDispatched = true;
                             }
                         }
@@ -63,7 +70,11 @@ class ActivityMonitor extends Component
                         return;
                     }
                     if (! self::$eventDispatched) {
-                        $this->dispatch($this->eventToDispatch);
+                        if (filled($this->eventData)) {
+                            $this->dispatch($this->eventToDispatch, $this->eventData);
+                        } else {
+                            $this->dispatch($this->eventToDispatch);
+                        }
                         self::$eventDispatched = true;
                     }
                 }

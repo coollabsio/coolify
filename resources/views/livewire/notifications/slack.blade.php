@@ -24,8 +24,8 @@
             <x-forms.checkbox instantSave="instantSaveSlackEnabled" id="slackEnabled" label="Enabled" />
         </div>
         <x-forms.input type="password"
-            helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>" required
-            id="slackWebhookUrl" label="Webhook" />
+            helper="Create a Slack APP and generate a Incoming Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://api.slack.com/apps' target='_blank'>Create Slack APP</a>"
+            required id="slackWebhookUrl" label="Webhook" />
     </form>
     <h2 class="mt-4">Notification Settings</h2>
     <p class="mb-4">
@@ -73,6 +73,7 @@
                     label="Server Reachable" />
                 <x-forms.checkbox instantSave="saveModel" id="serverUnreachableSlackNotifications"
                     label="Server Unreachable" />
+                <x-forms.checkbox instantSave="saveModel" id="serverPatchSlackNotifications" label="Server Patching" />
             </div>
         </div>
     </div>

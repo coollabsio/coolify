@@ -1,16 +1,16 @@
-<div wire:poll.10000ms="checkStatus">
+<div wire:poll.10000ms="checkStatus" class="pb-6">
     <livewire:project.shared.configuration-checker :resource="$service" />
     <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
         <x-slot:title>Service Startup</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" showWaiting fullHeight />
+            <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
     </x-slide-over>
     <h1>{{ $title }}</h1>
     <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
     <div class="navbar-main" x-data">
         <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a wire:navigate class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', $parameters) }}">
                 <button>Configuration</button>
             </a>
@@ -135,7 +135,8 @@
     @script
         <script>
             $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info', 'Gracefully stopping service, it could take a while depending on the service.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping service.<br/>It could take a while depending on the service.');
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', async () => {
@@ -161,7 +162,8 @@
                     );
                     return;
                 }
-                $wire.$dispatch('info', 'Service restart in progress.');
+                $wire.$dispatch('info',
+                    'Gracefully stopping service.<br/>It could take a while depending on the service.');
                 window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('restart');
             });

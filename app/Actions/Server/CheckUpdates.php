@@ -83,8 +83,6 @@ class CheckUpdates
                     $out = $this->parseDnfOutput($output);
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
-                    $rebootRequired = instant_remote_process(['LANG=C dnf needs-restarting -r'], $server);
-                    $out['reboot_required'] = $rebootRequired !== '0';
 
                     return $out;
                 case 'apt':
@@ -94,8 +92,6 @@ class CheckUpdates
                     $out = $this->parseAptOutput($output);
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
-                    $rebootRequired = instant_remote_process(['LANG=C test -f /var/run/reboot-required && echo "YES" || echo "NO"'], $server);
-                    $out['reboot_required'] = $rebootRequired === 'YES' ? true : false;
 
                     return $out;
                 default:
