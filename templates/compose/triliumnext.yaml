@@ -9,10 +9,9 @@ services:
     image: triliumnext/notes:latest
     environment:
       - SERVICE_FQDN_TRILIUMNEXT_8080
+      - TZ=${TZ:-Europe/Berlin}
     volumes:
       - triliumnext_data:/home/node/trilium-data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
     healthcheck:
       test:
         [
