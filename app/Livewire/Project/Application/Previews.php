@@ -247,7 +247,7 @@ class Previews extends Component
             $containerNames[] = str_replace('/', '', $container['Names']);
         }
 
-        $containerList = implode(' ', $containerNames);
+        $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
         $commands = [
             "docker stop --time=$timeout $containerList",
             "docker rm -f $containerList",

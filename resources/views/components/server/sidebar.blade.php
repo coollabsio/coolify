@@ -13,9 +13,9 @@
         href="{{ route('server.ca-certificate', ['server_uuid' => $server->uuid]) }}">CA Certificate
     </a>
     @if (!$server->isLocalhost())
-        <a class="menu-item {{ $activeMenu === 'cloudflare-tunnels' ? 'menu-item-active' : '' }}"
-            href="{{ route('server.cloudflare-tunnels', ['server_uuid' => $server->uuid]) }}">Cloudflare
-            Tunnels</a>
+        <a class="menu-item {{ $activeMenu === 'cloudflare-tunnel' ? 'menu-item-active' : '' }}"
+            href="{{ route('server.cloudflare-tunnel', ['server_uuid' => $server->uuid]) }}">Cloudflare
+            Tunnel</a>
     @endif
     @if ($server->isFunctional())
         <a class="menu-item {{ $activeMenu === 'docker-cleanup' ? 'menu-item-active' : '' }}"

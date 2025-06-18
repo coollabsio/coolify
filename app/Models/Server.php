@@ -69,6 +69,11 @@ class Server extends BaseModel
             }
             if ($server->ip) {
                 $payload['ip'] = str($server->ip)->trim();
+
+                // Update ip_previous when ip is being changed
+                if ($server->isDirty('ip') && $server->getOriginal('ip')) {
+                    $payload['ip_previous'] = $server->getOriginal('ip');
+                }
             }
             $server->forceFill($payload);
         });

@@ -24,7 +24,8 @@
                 <div x-show="filteredGitBasedApplications.length > 0"
                     class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
                     <template x-for="application in filteredGitBasedApplications" :key="application.name">
-                        <div x-on:click='setType(application.id)'>
+                        <div x-on:click='setType(application.id)'
+                            :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description>
@@ -42,7 +43,8 @@
                 <div x-show="filteredDockerBasedApplications.length > 0"
                     class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                     <template x-for="application in filteredDockerBasedApplications" :key="application.name">
-                        <div x-on:click="setType(application.id)">
+                        <div x-on:click="setType(application.id)"
+                            :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description><span x-text="application.description"></span></x-slot>
@@ -57,7 +59,8 @@
                 <div x-show="filteredDatabases.length > 0"
                     class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                     <template x-for="database in filteredDatabases" :key="database.id">
-                        <div x-on:click="setType(database.id)">
+                        <div x-on:click="setType(database.id)"
+                            :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                             <x-resource-view>
                                 <x-slot:title><span x-text="database.name"></span></x-slot>
                                 <x-slot:description><span x-text="database.description"></span></x-slot>
@@ -85,7 +88,8 @@
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                         <template x-for="service in filteredServices" :key="service.name">
-                            <div x-on:click="setType('one-click-service-' + service.name)">
+                            <div x-on:click="setType('one-click-service-' + service.name)"
+                                :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                                 <x-resource-view>
                                     <x-slot:title>
                                         <template x-if="service.name">
@@ -138,11 +142,14 @@
                         search: '',
                         loading: false,
                         isSticky: false,
+                        selecting: false,
                         services: [],
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
                         databases: [],
                         setType(type) {
+                            if (this.selecting) return;
+                            this.selecting = true;
                             this.$wire.setType(type);
                         },
                         async loadResources() {
@@ -275,77 +282,89 @@
         </div>
     @endif
     @if ($current_step === 'select-postgresql-type')
-        <h2>Select a Postgresql type</h2>
-        <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select PostgreSQL
-            17 (default).</div>
-        <div class="flex flex-col gap-6 pt-8">
-            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex "
-                wire:click="setPostgresqlType('postgres:17-alpine')">
-                <div class="flex flex-col">
-                    <div class="box-title">PostgreSQL 17 (default)</div>
-                    <div class="box-description">
-                        PostgreSQL is a powerful, open-source object-relational database system (no extensions).
+        <div x-data="{ selecting: false }">
+            <h2>Select a Postgresql type</h2>
+            <div>If you need extra extensions, you can select Supabase PostgreSQL (or others), otherwise select
+                PostgreSQL
+                17 (default).</div>
+            <div class="flex flex-col gap-6 pt-8">
+                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgres:17-alpine'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PostgreSQL 17 (default)</div>
+                        <div class="box-description">
+                            PostgreSQL is a powerful, open-source object-relational database system (no extensions).
+                        </div>
                     </div>
-                </div>
-                <div class="flex-1"></div>
+                    <div class="flex-1"></div>
 
-                <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
-                        onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/" target="_blank">
-                        Documentation
-                    </a>
-                </div>
-            </div>
-            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('supabase/postgres:17.4.1.032')">
-                <div class="flex flex-col">
-                    <div class="box-title">Supabase PostgreSQL (with extensions)</div>
-                    <div class="box-description">
-                        Supabase is a modern, open-source alternative to PostgreSQL with lots of extensions.
+                    <div class="flex items-center px-2" title="Read the documentation.">
+                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-6000"
+                            onclick="event.stopPropagation()" href="https://hub.docker.com/_/postgres/"
+                            target="_blank">
+                            Documentation
+                        </a>
                     </div>
                 </div>
-                <div class="flex-1"></div>
-                <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                        onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
-                        target="_blank">
-                        Documentation
-                    </a>
-                </div>
-            </div>
-            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('postgis/postgis:17-3.5-alpine')">
-                <div class="flex flex-col">
-                    <div class="box-title">PostGIS (AMD only)</div>
-                    <div class="box-description">
-                        PostGIS is a PostgreSQL extension for geographic objects.
+                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('supabase/postgres:17.4.1.032'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">Supabase PostgreSQL (with extensions)</div>
+                        <div class="box-description">
+                            Supabase is a modern, open-source alternative to PostgreSQL with lots of extensions.
+                        </div>
+                    </div>
+                    <div class="flex-1"></div>
+                    <div class="flex items-center px-2" title="Read the documentation.">
+                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
+                            onclick="event.stopPropagation()" href="https://github.com/supabase/postgres"
+                            target="_blank">
+                            Documentation
+                        </a>
                     </div>
                 </div>
-                <div class="flex-1"></div>
-                <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                        onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
-                        target="_blank">
-                        Documentation
-                    </a>
-                </div>
-            </div>
-            <div class="gap-2 border border-transparent cursor-pointer box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
-                wire:click="setPostgresqlType('pgvector/pgvector:pg17')">
-                <div class="flex flex-col">
-                    <div class="box-title">PGVector (17)</div>
-                    <div class="box-description">
-                        PGVector is a PostgreSQL extension for vector data types.
+                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('postgis/postgis:17-3.5-alpine'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PostGIS (AMD only)</div>
+                        <div class="box-description">
+                            PostGIS is a PostgreSQL extension for geographic objects.
+                        </div>
+                    </div>
+                    <div class="flex-1"></div>
+                    <div class="flex items-center px-2" title="Read the documentation.">
+                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
+                            onclick="event.stopPropagation()" href="https://github.com/postgis/docker-postgis"
+                            target="_blank">
+                            Documentation
+                        </a>
                     </div>
                 </div>
-                <div class="flex-1"></div>
+                <div class="gap-2 border border-transparent box-without-bg dark:bg-coolgray-100 bg-white dark:hover:text-neutral-400 dark:hover:bg-coollabs group flex"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setPostgresqlType('pgvector/pgvector:pg17'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PGVector (17)</div>
+                        <div class="box-description">
+                            PGVector is a PostgreSQL extension for vector data types.
+                        </div>
+                    </div>
+                    <div class="flex-1"></div>
 
-                <div class="flex items-center px-2" title="Read the documentation.">
-                    <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
-                        onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
-                        target="_blank">
-                        Documentation
-                    </a>
+                    <div class="flex items-center px-2" title="Read the documentation.">
+                        <a class="p-2 hover:underline dark:group-hover:text-white dark:text-white text-neutral-600"
+                            onclick="event.stopPropagation()" href="https://github.com/pgvector/pgvector"
+                            target="_blank">
+                            Documentation
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

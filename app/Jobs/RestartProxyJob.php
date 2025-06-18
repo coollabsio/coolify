@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Proxy\StopProxy;
 use App\Models\Server;
@@ -36,9 +35,9 @@ class RestartProxyJob implements ShouldBeEncrypted, ShouldQueue
 
             $this->server->proxy->force_stop = false;
             $this->server->save();
+
             StartProxy::run($this->server, force: true);
 
-            CheckProxy::run($this->server, true);
         } catch (\Throwable $e) {
             return handleError($e);
         }
