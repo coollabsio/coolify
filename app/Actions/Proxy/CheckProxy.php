@@ -5,6 +5,7 @@ namespace App\Actions\Proxy;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -67,22 +68,12 @@ class CheckProxy
             }
             $portsToCheck = ['80', '443'];
 
-            foreach ($portsToCheck as $port) {
-                // Use the smart port checker that handles dual-stack properly
-                if ($this->isPortConflict($server, $port, $proxyContainerName)) {
-                    if ($fromUI) {
-                        throw new \Exception("Port $port is in use.<br>You must stop the process using this port.<br><br>Docs: <a target='_blank' class='dark:text-white hover:underline' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' class='dark:text-white hover:underline' href='https://coolify.io/discord'>https://coolify.io/discord</a>");
-                    } else {
-                        return false;
-                    }
-                }
-            }
             try {
                 if ($server->proxyType() !== ProxyTypes::NONE->value) {
                     $proxyCompose = CheckConfiguration::run($server);
                     if (isset($proxyCompose)) {
                         $yaml = Yaml::parse($proxyCompose);
-                        $portsToCheck = [];
+                        $configPorts = [];
                         if ($server->proxyType() === ProxyTypes::TRAEFIK->value) {
                             $ports = data_get($yaml, 'services.traefik.ports');
                         } elseif ($server->proxyType() === ProxyTypes::CADDY->value) {
@@ -90,9 +81,11 @@ class CheckProxy
                         }
                         if (isset($ports)) {
                             foreach ($ports as $port) {
-                                $portsToCheck[] = str($port)->before(':')->value();
+                                $configPorts[] = str($port)->before(':')->value();
                             }
                         }
+                        // Combine default ports with config ports
+                        $portsToCheck = array_merge($portsToCheck, $configPorts);
                     }
                 } else {
                     $portsToCheck = [];
@@ -103,9 +96,186 @@ class CheckProxy
             if (count($portsToCheck) === 0) {
                 return false;
             }
+            $portsToCheck = array_values(array_unique($portsToCheck));
+            // Check port conflicts in parallel
+            $conflicts = $this->checkPortConflictsInParallel($server, $portsToCheck, $proxyContainerName);
+            foreach ($conflicts as $port => $conflict) {
+                if ($conflict) {
+                    if ($fromUI) {
+                        throw new \Exception("Port $port is in use.<br>You must stop the process using this port.<br><br>Docs: <a target='_blank' class='dark:text-white hover:underline' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' class='dark:text-white hover:underline' href='https://coolify.io/discord'>https://coolify.io/discord</a>");
+                    } else {
+                        return false;
+                    }
+                }
+            }
 
             return true;
         }
+    }
+
+    /**
+     * Check multiple ports for conflicts in parallel
+     * Returns an array with port => conflict_status mapping
+     */
+    private function checkPortConflictsInParallel(Server $server, array $ports, string $proxyContainerName): array
+    {
+        if (empty($ports)) {
+            return [];
+        }
+
+        try {
+            // Build concurrent port check commands
+            $results = Process::concurrently(function ($pool) use ($server, $ports, $proxyContainerName) {
+                foreach ($ports as $port) {
+                    $commands = $this->buildPortCheckCommands($server, $port, $proxyContainerName);
+                    $pool->command($commands['ssh_command'])->timeout(10);
+                }
+            });
+
+            // Process results
+            $conflicts = [];
+
+            foreach ($ports as $index => $port) {
+                $result = $results[$index] ?? null;
+
+                if ($result) {
+                    $conflicts[$port] = $this->parsePortCheckResult($result, $port, $proxyContainerName);
+                } else {
+                    // If process failed, assume no conflict to avoid false positives
+                    $conflicts[$port] = false;
+                }
+            }
+
+            return $conflicts;
+        } catch (\Throwable $e) {
+            Log::warning('Parallel port checking failed: '.$e->getMessage().'. Falling back to sequential checking.');
+
+            // Fallback to sequential checking if parallel fails
+            $conflicts = [];
+            foreach ($ports as $port) {
+                $conflicts[$port] = $this->isPortConflict($server, $port, $proxyContainerName);
+            }
+
+            return $conflicts;
+        }
+    }
+
+    /**
+     * Build the SSH command for checking a specific port
+     */
+    private function buildPortCheckCommands(Server $server, string $port, string $proxyContainerName): array
+    {
+        // First check if our own proxy is using this port (which is fine)
+        $getProxyContainerId = "docker ps -a --filter name=$proxyContainerName --format '{{.ID}}'";
+        $checkProxyPortScript = "
+            CONTAINER_ID=\$($getProxyContainerId);
+            if [ ! -z \"\$CONTAINER_ID\" ]; then
+                if docker inspect \$CONTAINER_ID --format '{{json .NetworkSettings.Ports}}' | grep -q '\"$port/tcp\"'; then
+                    echo 'proxy_using_port';
+                    exit 0;
+                fi;
+            fi;
+        ";
+
+        // Command sets for different ways to check ports, ordered by preference
+        $portCheckScript = "
+            $checkProxyPortScript
+            
+            # Try ss command first
+            if command -v ss >/dev/null 2>&1; then
+                ss_output=\$(ss -Htuln state listening sport = :$port 2>/dev/null);
+                if [ -z \"\$ss_output\" ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                count=\$(echo \"\$ss_output\" | grep -c ':$port ');
+                if [ \$count -eq 0 ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                # Check for dual-stack or docker processes
+                if [ \$count -le 2 ] && (echo \"\$ss_output\" | grep -q 'docker\\|coolify'); then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                echo \"port_conflict|\$ss_output\";
+                exit 0;
+            fi;
+            
+            # Try netstat as fallback
+            if command -v netstat >/dev/null 2>&1; then
+                netstat_output=\$(netstat -tuln 2>/dev/null | grep ':$port ');
+                if [ -z \"\$netstat_output\" ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                count=\$(echo \"\$netstat_output\" | grep -c 'LISTEN');
+                if [ \$count -eq 0 ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                if [ \$count -le 2 ] && (echo \"\$netstat_output\" | grep -q 'docker\\|coolify'); then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                echo \"port_conflict|\$netstat_output\";
+                exit 0;
+            fi;
+            
+            # Final fallback using nc
+            if nc -z -w1 127.0.0.1 $port >/dev/null 2>&1; then
+                echo 'port_conflict|nc_detected';
+            else
+                echo 'port_free';
+            fi;
+        ";
+
+        $sshCommand = \App\Helpers\SshMultiplexingHelper::generateSshCommand($server, $portCheckScript);
+
+        return [
+            'ssh_command' => $sshCommand,
+            'script' => $portCheckScript,
+        ];
+    }
+
+    /**
+     * Parse the result from port check command
+     */
+    private function parsePortCheckResult($processResult, string $port, string $proxyContainerName): bool
+    {
+        $exitCode = $processResult->exitCode();
+        $output = trim($processResult->output());
+        $errorOutput = trim($processResult->errorOutput());
+
+        if ($exitCode !== 0) {
+            return false;
+        }
+
+        if ($output === 'proxy_using_port' || $output === 'port_free') {
+            return false; // No conflict
+        }
+
+        if (str_starts_with($output, 'port_conflict|')) {
+            $details = substr($output, strlen('port_conflict|'));
+
+            // Additional logic to detect dual-stack scenarios
+            if ($details !== 'nc_detected') {
+                // Check for dual-stack scenario - typically 1-2 listeners (IPv4+IPv6)
+                $lines = explode("\n", $details);
+                if (count($lines) <= 2) {
+                    // Look for IPv4 and IPv6 in the listing
+                    if ((strpos($details, '0.0.0.0:'.$port) !== false && strpos($details, ':::'.$port) !== false) ||
+                        (strpos($details, '*:'.$port) !== false && preg_match('/\*:'.$port.'.*IPv[46]/', $details))) {
+
+                        return false; // This is just a normal dual-stack setup
+                    }
+                }
+            }
+
+            return true; // Real port conflict
+        }
+
+        return false;
     }
 
     /**
@@ -176,14 +346,11 @@ class CheckProxy
 
                 // Run the actual check commands
                 $output = instant_remote_process($set['check'], $server, true);
-
                 // Parse the output lines
                 $lines = explode("\n", trim($output));
-
                 // Get the detailed output and listener count
-                $details = trim($lines[0] ?? '');
-                $count = intval(trim($lines[1] ?? '0'));
-
+                $details = trim(implode("\n", array_slice($lines, 0, -1)));
+                $count = intval(trim($lines[count($lines) - 1] ?? '0'));
                 // If no listeners or empty result, port is free
                 if ($count == 0 || empty($details)) {
                     return false;

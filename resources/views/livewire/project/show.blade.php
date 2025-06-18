@@ -5,7 +5,7 @@
     <div class="flex items-center gap-2">
         <h1>Environments</h1>
         <x-modal-input buttonTitle="+ Add" title="New Environment">
-            <form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
+            <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submit'>
                 <x-forms.input placeholder="production" id="name" label="Name" required />
                 <x-forms.button type="submit">
                     Save

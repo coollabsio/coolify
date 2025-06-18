@@ -10,7 +10,7 @@
         <div>Configuration</div>
     </div>
     <div class="flex gap-2">
-        <x-forms.input id="service.name" required label="Service Name" placeholder="My super wordpress site" />
+        <x-forms.input id="service.name" required label="Service Name" placeholder="My super WordPress site" />
         <x-forms.input id="service.description" label="Description" />
     </div>
     <div class="w-96">

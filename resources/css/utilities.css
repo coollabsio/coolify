@@ -1,0 +1,210 @@
+@utility apexcharts-tooltip {
+    @apply dark:text-white! dark:border-coolgray-300! dark:bg-coolgray-200! shadow-none!;
+}
+
+@utility apexcharts-tooltip-title {
+    @apply hidden!;
+}
+
+@utility apexcharts-xaxistooltip {
+    @apply hidden!;
+}
+
+@utility input-sticky {
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300;
+}
+
+@utility input-sticky-active {
+    @apply text-black border-2 border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+}
+
+/* Focus */
+@utility input-focus {
+    @apply focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300;
+}
+
+/*  input, select before */
+@utility input-select {
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
+}
+
+/* Readonly */
+@utility input {
+    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
+    @apply input-focus;
+    @apply input-select;
+}
+
+@utility select {
+    @apply w-full;
+    @apply input-focus;
+    @apply input-select;
+}
+
+@utility button {
+    @apply flex gap-2 justify-center items-center px-2 py-1 text-sm text-black normal-case rounded-sm border outline-0 cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-none disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
+}
+
+@utility alert-success {
+    @apply flex gap-2 items-center text-success;
+}
+
+@utility alert-error {
+    @apply flex gap-2 items-center text-error;
+}
+
+@utility tag {
+    @apply px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200;
+}
+
+@utility add-tag {
+    @apply flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200;
+}
+
+@utility dropdown-item {
+    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
+}
+
+@utility dropdown-item-no-padding {
+    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
+}
+
+@utility badge {
+    @apply inline-block w-3 h-3 text-xs font-bold rounded-full leading-none border border-neutral-200 dark:border-black;
+}
+
+@utility badge-dashboard {
+    @apply absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
+}
+
+@utility badge-success {
+    @apply bg-success;
+}
+
+@utility badge-warning {
+    @apply bg-warning;
+}
+
+@utility badge-error {
+    @apply bg-error;
+}
+
+@utility menu {
+    @apply flex gap-1 items-center;
+}
+
+@utility menu-item {
+    @apply flex gap-3 items-center px-2 py-1 w-full text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64;
+}
+
+@utility menu-item-active {
+    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
+}
+
+@utility heading-item-active {
+    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning;
+}
+
+@utility icon {
+    @apply w-6 h-6 dark:hover:text-white;
+}
+
+@utility scrollbar {
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-track-coolgray-200 scrollbar-thin;
+}
+
+@utility main {
+    @apply pt-4 pr-10 pl-24 lg:pr-32 lg:pl-44;
+}
+
+@utility custom-modal {
+    @apply flex z-50 flex-col gap-2 px-8 py-4 border dark:bg-coolgray-100 dark:border-coolgray-200;
+}
+
+@utility navbar-main {
+    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 md:items-center;
+}
+
+@utility loading {
+    @apply w-4 dark:text-warning text-coollabs;
+}
+
+@utility kbd-custom {
+    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-warning;
+}
+
+@utility box {
+    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow-sm bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+}
+
+@utility box-boarding {
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
+}
+
+@utility box-without-bg {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] border border-neutral-200 dark:border-black;
+}
+
+@utility box-without-bg-without-border {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
+}
+
+@utility on-box {
+    @apply rounded-sm hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
+}
+
+@utility box-title {
+    @apply font-bold text-black dark:text-white dark:group-hover:text-white;
+}
+
+@utility box-description {
+    @apply text-xs font-bold text-neutral-500 dark:group-hover:text-white group-hover:text-black;
+}
+
+@utility description {
+    @apply text-xs font-bold text-neutral-500 dark:group-hover:text-white group-hover:text-black;
+}
+
+@utility bg-coollabs-gradient {
+    @apply from-purple-500 via-pink-500 to-red-500 bg-linear-to-r;
+}
+
+@utility text-helper {
+    @apply inline-block font-bold text-coollabs dark:text-warning;
+}
+
+@utility info-helper {
+    @apply cursor-pointer text-coollabs dark:text-warning;
+}
+
+@utility info-helper-popup {
+    @apply hidden absolute z-40 text-xs rounded-sm text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300;
+}
+
+@utility buyme {
+    @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-xs hover:text-white bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200 hover:no-underline;
+}
+
+@utility title {
+    @apply hidden pb-0 lg:block lg:pb-8;
+}
+
+@utility subtitle {
+    @apply pt-2 pb-9;
+}
+
+@utility fullscreen {
+    @apply overflow-y-auto fixed top-0 left-0 w-full h-full bg-white z-[9999] dark:bg-coolgray-100 scrollbar;
+}
+
+@utility toast {
+    @apply z-[1];
+}
+
+@utility dz-button {
+    @apply p-4 py-10 my-4 w-full font-bold bg-white border dark:border-coolgray-400 dark:text-white dark:bg-transparent dark:hover:bg-coolgray-400;
+}
+
+@utility xterm {
+    @apply p-2;
+}

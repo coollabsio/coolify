@@ -4,7 +4,7 @@
 </x-slot>
 <section class="flex flex-col h-full lg:items-center lg:justify-center">
     <div
-        class="flex flex-col items-center justify-center p-10 mx-2 mt-10 bg-white border rounded-lg shadow lg:p-20 dark:bg-transparent dark:border-none max-w-7xl ">
+        class="flex flex-col items-center justify-center p-10 mx-2 mt-10 bg-white border rounded-lg shadow-sm lg:p-20 dark:bg-transparent dark:border-none max-w-7xl ">
         @if ($currentState === 'welcome')
             <h1 class="text-3xl font-bold lg:text-5xl">Welcome to Coolify</h1>
             <div class="py-6 text-center lg:text-xl">Let me help you set up the basics.</div>
@@ -89,7 +89,7 @@
                                 <p class="mb-2">If the connection details are correct, please ensure:</p>
                                 <ul class="list-disc list-inside">
                                     <li>The correct public key is in your <code
-                                            class="bg-red-200 dark:bg-red-900 px-1 rounded">~/.ssh/authorized_keys</code>
+                                            class="bg-red-200 dark:bg-red-900 px-1 rounded-sm">~/.ssh/authorized_keys</code>
                                         file for the specified user</li>
                                     <li>Or skip the boarding process and manually add a new private key to Coolify and
                                         the server</li>
@@ -207,7 +207,7 @@
                                 <p class="mb-2">If the connection details are correct, please ensure:</p>
                                 <ul class="list-disc list-inside">
                                     <li>The correct public key is in your <code
-                                            class="bg-red-200 dark:bg-red-900 px-1 rounded">~/.ssh/authorized_keys</code>
+                                            class="bg-red-200 dark:bg-red-900 px-1 rounded-sm">~/.ssh/authorized_keys</code>
                                         file for the specified user</li>
                                     <li>Or skip the boarding process and manually add a new private key to Coolify and
                                         the server</li>

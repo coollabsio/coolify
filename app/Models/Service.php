@@ -141,31 +141,6 @@ class Service extends BaseModel
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
-    public function getContainersToStop(): array
-    {
-        $containersToStop = [];
-        $applications = $this->applications()->get();
-        foreach ($applications as $application) {
-            $containersToStop[] = "{$application->name}-{$this->uuid}";
-        }
-        $dbs = $this->databases()->get();
-        foreach ($dbs as $db) {
-            $containersToStop[] = "{$db->name}-{$this->uuid}";
-        }
-
-        return $containersToStop;
-    }
-
-    public function stopContainers(array $containerNames, $server, int $timeout = 30)
-    {
-        foreach ($containerNames as $containerName) {
-            instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
-                "docker rm -f $containerName",
-            ], server: $server, throwError: false);
-        }
-    }
-
     public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
