@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.419] - 2025-06-16
 
 ### 🚀 Features
 
@@ -203,6 +203,7 @@ All notable changes to this project will be documented in this file.
 
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 
 ### 🎨 Styling
