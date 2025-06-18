@@ -80,6 +80,8 @@
                     label="Server Reachable" />
                 <x-forms.checkbox instantSave="saveModel" id="serverUnreachablePushoverNotifications"
                     label="Server Unreachable" />
+                <x-forms.checkbox instantSave="saveModel" id="serverPatchPushoverNotifications"
+                    label="Server Patching" />
             </div>
         </div>
     </div>

@@ -12,11 +12,11 @@
     ],
     "require": {
         "php": "^8.4",
-        "danharrin/livewire-rate-limiting": "2.1.0",
+        "danharrin/livewire-rate-limiting": "^2.1.0",
         "doctrine/dbal": "^4.2.2",
         "guzzlehttp/guzzle": "^7.9.2",
         "laravel/fortify": "^1.25.4",
-        "laravel/framework": "12.4.1",
+        "laravel/framework": "^12.4.1",
         "laravel/horizon": "^5.30.3",
         "laravel/pail": "^1.2.2",
         "laravel/prompts": "^0.3.5|^0.3.5|^0.3.5",

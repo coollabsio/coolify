@@ -478,7 +478,7 @@ function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
     $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
     if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment')->unsetRelation('destination');
+        return $postgresql->unsetRelation('environment');
     }
     $redis = StandaloneRedis::whereUuid($uuid)->first();
     if ($redis && $redis->team()->id == $teamId) {
@@ -599,7 +599,7 @@ function getTopLevelNetworks(Service|Application $resource)
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                throw new \RuntimeException($e->getMessage());
             }
             $services = data_get($yaml, 'services');
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
@@ -653,7 +653,7 @@ function getTopLevelNetworks(Service|Application $resource)
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         }
         $server = $resource->destination->server;
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
@@ -1435,7 +1435,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                throw new \RuntimeException($e->getMessage());
             }
             $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
@@ -1506,8 +1506,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $containerName = "$serviceName-{$resource->uuid}";
 
                 // Decide if the service is a database
-                $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
                 $image = data_get_str($service, 'image');
+                $isDatabase = isDatabaseImage($image, $service);
                 data_set($service, 'is_database', $isDatabase);
 
                 // Create new serviceApplication or serviceDatabase
@@ -2494,7 +2494,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
 
             // Decide if the service is a database
-            $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
+            $image = data_get_str($service, 'image');
+            $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
             // Collect/create/update networks
@@ -2965,7 +2966,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $environment = collect(data_get($service, 'environment', []));
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
-        $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
+        $isDatabase = isDatabaseImage($image, $service);
 
         if ($isService) {
             $containerName = "$serviceName-{$resource->uuid}";
@@ -3214,7 +3215,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         $environment = convertToKeyValueCollection($environment);
         $coolifyEnvironments = collect([]);
 
-        $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
+        $isDatabase = isDatabaseImage($image, $service);
         $volumesParsed = collect([]);
 
         if ($isApplication) {

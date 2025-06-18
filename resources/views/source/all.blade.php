@@ -15,10 +15,10 @@
                 <a class="flex gap-4 text-center hover:no-underline box group"
                     href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
                     <x-git-icon class="dark:text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
-                    <div class="text-left group-hover:dark:text-white">
+                    <div class="text-left dark:group-hover:text-white">
                         <div class="box-title">{{ $source->name }}</div>
                         @if (is_null($source->app_id))
-                            <span class="box-description !text-error ">Configuration is not finished.</span>
+                            <span class="box-description text-error! ">Configuration is not finished.</span>
                         @endif
                     </div>
                 </a>
@@ -27,7 +27,7 @@
                 <a class="flex gap-4 text-center hover:no-underline box group"
                     href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
                     <x-git-icon class="dark:text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
-                    <div class="text-left group-hover:dark:text-white">
+                    <div class="text-left dark:group-hover:text-white">
                         <div>{{ $source->name }}</div>
                         @if (is_null($source->app_id))
                             <span class="text-error">Configuration is not finished</span>

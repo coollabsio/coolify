@@ -11,13 +11,6 @@ class Show extends Component
 
     public $parameters = [];
 
-    protected $listeners = ['proxyStatusUpdated', 'proxyChanged' => 'proxyStatusUpdated'];
-
-    public function proxyStatusUpdated()
-    {
-        $this->server->refresh();
-    }
-
     public function mount()
     {
         $this->parameters = get_route_parameters();

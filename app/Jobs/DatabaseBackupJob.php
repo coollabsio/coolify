@@ -54,6 +54,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $postgres_password = null;
 
+    public ?string $mongo_root_username = null;
+
+    public ?string $mongo_root_password = null;
+
     public ?S3Storage $s3 = null;
 
     public function __construct(public ScheduledDatabaseBackup $backup)
@@ -189,6 +193,40 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             throw new \Exception('MARIADB_DATABASE or MYSQL_DATABASE not found');
                         }
                     }
+                } elseif (str($databaseType)->contains('mongo')) {
+                    $databasesToBackup = ['*'];
+                    $this->container_name = "{$this->database->name}-$serviceUuid";
+                    $this->directory_name = $serviceName.'-'.$this->container_name;
+
+                    // Try to extract MongoDB credentials from environment variables
+                    try {
+                        $commands = [];
+                        $commands[] = "docker exec $this->container_name env | grep MONGO_INITDB_";
+                        $envs = instant_remote_process($commands, $this->server);
+
+                        if (filled($envs)) {
+                            $envs = str($envs)->explode("\n");
+                            $rootPassword = $envs->filter(function ($env) {
+                                return str($env)->startsWith('MONGO_INITDB_ROOT_PASSWORD=');
+                            })->first();
+                            if ($rootPassword) {
+                                $this->mongo_root_password = str($rootPassword)->after('MONGO_INITDB_ROOT_PASSWORD=')->value();
+                            }
+                            $rootUsername = $envs->filter(function ($env) {
+                                return str($env)->startsWith('MONGO_INITDB_ROOT_USERNAME=');
+                            })->first();
+                            if ($rootUsername) {
+                                $this->mongo_root_username = str($rootUsername)->after('MONGO_INITDB_ROOT_USERNAME=')->value();
+                            }
+                        }
+                        \Log::info('MongoDB credentials extracted from environment', [
+                            'has_username' => filled($this->mongo_root_username),
+                            'has_password' => filled($this->mongo_root_password),
+                        ]);
+                    } catch (\Throwable $e) {
+                        \Log::warning('Failed to extract MongoDB environment variables', ['error' => $e->getMessage()]);
+                        // Continue without env vars - will be handled in backup_standalone_mongodb method
+                    }
                 }
             } else {
                 $databaseName = str($this->database->name)->slug()->value();
@@ -200,7 +238,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if (blank($databasesToBackup)) {
                 if (str($databaseType)->contains('postgres')) {
                     $databasesToBackup = [$this->database->postgres_db];
-                } elseif (str($databaseType)->contains('mongodb')) {
+                } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
                 } elseif (str($databaseType)->contains('mysql')) {
                     $databasesToBackup = [$this->database->mysql_database];
@@ -214,10 +252,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mongodb')) {
+                } elseif (str($databaseType)->contains('mongo')) {
                     // Format: db1:collection1,collection2|db2:collection3,collection4
-                    $databasesToBackup = explode('|', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
+                    // Only explode if it's a string, not if it's already an array
+                    if (is_string($databasesToBackup)) {
+                        $databasesToBackup = explode('|', $databasesToBackup);
+                        $databasesToBackup = array_map('trim', $databasesToBackup);
+                    }
                 } elseif (str($databaseType)->contains('mysql')) {
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
@@ -252,7 +293,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'scheduled_database_backup_id' => $this->backup->id,
                         ]);
                         $this->backup_standalone_postgresql($database);
-                    } elseif (str($databaseType)->contains('mongodb')) {
+                    } elseif (str($databaseType)->contains('mongo')) {
                         if ($database === '*') {
                             $database = 'all';
                             $databaseName = 'all';
@@ -343,6 +384,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $url = $this->database->internal_db_url;
+            if (blank($url)) {
+                // For service-based MongoDB, try to build URL from environment variables
+                if (filled($this->mongo_root_username) && filled($this->mongo_root_password)) {
+                    // Use container name instead of server IP for service-based MongoDB
+                    $url = "mongodb://{$this->mongo_root_username}:{$this->mongo_root_password}@{$this->container_name}:27017";
+                } else {
+                    // If no environment variables are available, throw an exception
+                    throw new \Exception('MongoDB credentials not found. Ensure MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD environment variables are available in the container.');
+                }
+            }
+            \Log::info('MongoDB backup URL configured', ['has_url' => filled($url), 'using_env_vars' => blank($this->database->internal_db_url)]);
             if ($databaseWithCollections === 'all') {
                 $commands[] = 'mkdir -p '.$this->backup_dir;
                 if (str($this->database->image)->startsWith('mongo:4')) {

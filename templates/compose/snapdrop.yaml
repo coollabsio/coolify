@@ -4,7 +4,7 @@
 
 services:
   snapdrop:
-    image: lscr.io/linuxserver/snapdrop:latest
+    image: 'linuxserver/snapdrop:version-b8b78cc2'
     environment:
       - SERVICE_FQDN_SNAPDROP
       - PUID=1000

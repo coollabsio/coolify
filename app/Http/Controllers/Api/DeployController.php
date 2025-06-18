@@ -319,9 +319,10 @@ class DeployController extends Controller
             default:
                 // Database resource
                 StartDatabase::dispatch($resource);
-                $resource->update([
-                    'started_at' => now(),
-                ]);
+
+                $resource->started_at ??= now();
+                $resource->save();
+
                 $message = "Database {$resource->name} started.";
                 break;
         }
