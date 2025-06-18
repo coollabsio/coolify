@@ -465,11 +465,3 @@ services:
       - --dsn=tcp://clickhouse:9000
       - --up=
     restart: on-failure
-
-volumes:
-  clickhouse:
-    name: signoz-clickhouse
-  sqlite:
-    name: signoz-sqlite
-  zookeeper-1:
-    name: signoz-zookeeper-1
