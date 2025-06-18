@@ -57,7 +57,7 @@ class EnvironmentVariable extends BaseModel
 
                 if (! $found) {
                     $application = Application::find($environment_variable->resourceable_id);
-                    if ($application && $application->build_pack !== 'dockerfile') {
+                    if ($application) {
                         ModelsEnvironmentVariable::create([
                             'key' => $environment_variable->key,
                             'value' => $environment_variable->value,

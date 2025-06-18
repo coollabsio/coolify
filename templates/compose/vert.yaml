@@ -1,0 +1,15 @@
+# documentation: https://github.com/VERT-sh/VERT
+# slogan: The next-generation file converter. Open source, fully local and free forever.
+# tags: converter,file,documents,files,ffmpeg,wasm
+# logo: svgs/vert.png
+# port: 80
+
+services:
+  vert:
+    image: ghcr.io/vert-sh/vert:latest
+    environment:
+      - SERVICE_FQDN_VERT_80
+      - PUB_VERT_URL=${SERVICE_FQDN_VERT_80}
+      - PUB_HOSTNAME=${SERVICE_URL_VERT_80}
+      - PUB_PORT=80
+      - PUB_ENV=production

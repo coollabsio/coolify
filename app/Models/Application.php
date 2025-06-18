@@ -259,23 +259,13 @@ class Application extends BaseModel
         return Application::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
-    public function getContainersToStop(bool $previewDeployments = false): array
+    public function getContainersToStop(Server $server, bool $previewDeployments = false): array
     {
         $containers = $previewDeployments
-            ? getCurrentApplicationContainerStatus($this->destination->server, $this->id, includePullrequests: true)
-            : getCurrentApplicationContainerStatus($this->destination->server, $this->id, 0);
+            ? getCurrentApplicationContainerStatus($server, $this->id, includePullrequests: true)
+            : getCurrentApplicationContainerStatus($server, $this->id, 0);
 
         return $containers->pluck('Names')->toArray();
-    }
-
-    public function stopContainers(array $containerNames, $server, int $timeout = 30)
-    {
-        foreach ($containerNames as $containerName) {
-            instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
-                "docker rm -f $containerName",
-            ], server: $server, throwError: false);
-        }
     }
 
     public function deleteConfigurations()
@@ -1299,7 +1289,7 @@ class Application extends BaseModel
         try {
             $yaml = Yaml::parse($this->docker_compose_raw);
         } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         }
         $services = data_get($yaml, 'services');
 

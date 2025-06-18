@@ -27,7 +27,7 @@
         @endif
         <div class="flex items-center gap-2 mb-2">
             <span @class([
-                'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-sm',
+                'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs',
                 'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:shadow-blue-900/5' => data_get($execution, 'status') === 'running',
                 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' => data_get($execution, 'status') === 'failed',
                 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' => data_get($execution, 'status') === 'success',
@@ -61,7 +61,7 @@
     @endif
     @if (data_get($execution, 'id') == $selectedKey)
     <div class="flex flex-col">
-        <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded">
+        <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded-sm">
             @if (data_get($execution, 'status') === 'running')
             <div class="flex items-center gap-2 mb-2">
                 <span>Execution is running...</span>
@@ -95,9 +95,9 @@
             <div class="mt-6 space-y-6">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Cleanup Log:</h3>
                 @foreach(json_decode(data_get($execution, 'cleanup_log'), true) as $result)
-                <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-coolgray-400 bg-white dark:bg-coolgray-100 shadow-sm">
+                <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-coolgray-400 bg-white dark:bg-coolgray-100 shadow-xs">
                     <div class="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-coolgray-200 border-b border-gray-200 dark:border-coolgray-400">
-                        <svg class="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg class="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         <code class="flex-1 text-sm font-mono text-gray-700 dark:text-gray-300">{{ data_get($result, 'command') }}</code>
@@ -123,6 +123,6 @@
     </div>
     @endif
     @empty
-    <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded">No executions found.</div>
+    <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
     @endforelse
 </div>

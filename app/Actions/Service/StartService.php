@@ -41,6 +41,6 @@ class StartService
             }
         }
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
+        return remote_process($commands, $service->server, type_uuid: $service->uuid);
     }
 }

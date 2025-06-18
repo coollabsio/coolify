@@ -27,8 +27,9 @@
             <x-forms.input type="password" autocomplete="new-password"
                 helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
                 required id="telegramToken" label="Bot API Token" />
-            <x-forms.input type="password" autocomplete="new-password" helper="Add your bot to a group chat and add its Chat ID here." required
-                id="telegramChatId" label="Chat ID" />
+            <x-forms.input type="password" autocomplete="new-password"
+                helper="Add your bot to a group chat and add its Chat ID here." required id="telegramChatId"
+                label="Chat ID" />
         </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>
@@ -151,7 +152,6 @@
                         id="telegramNotificationsServerReachableThreadId" />
                 </div>
 
-
                 <div class="pl-1 flex gap-2">
                     <div class="w-96">
                         <x-forms.checkbox instantSave="saveModel" id="serverUnreachableTelegramNotifications"
@@ -159,6 +159,15 @@
                     </div>
                     <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
                         id="telegramNotificationsServerUnreachableThreadId" />
+                </div>
+
+                <div class="pl-1 flex gap-2">
+                    <div class="w-96">
+                        <x-forms.checkbox instantSave="saveModel" id="serverPatchTelegramNotifications"
+                            label="Server Patching" />
+                    </div>
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsServerPatchThreadId" />
                 </div>
             </div>
         </div>

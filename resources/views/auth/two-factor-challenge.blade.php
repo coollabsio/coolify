@@ -4,14 +4,14 @@
             <a class="flex items-center mb-6 text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
                 Coolify
             </a>
-            <div class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
+            <div class="w-full bg-white shadow-sm md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
                     <form action="/two-factor-challenge" method="POST" class="flex flex-col gap-2">
                         @csrf
                         <div>
                             <x-forms.input type="number" name="code" autocomplete="one-time-code" label="{{ __('input.code') }}" />
                             <div x-show="!showRecovery"
-                                class="pt-2 text-xs cursor-pointer hover:underline hover:dark:text-white"
+                                class="pt-2 text-xs cursor-pointer hover:underline dark:hover:text-white"
                                 x-on:click="showRecovery = !showRecovery">Enter
                                 Recovery Code
                             </div>
