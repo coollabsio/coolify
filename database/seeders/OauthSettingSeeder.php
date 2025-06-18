@@ -17,6 +17,8 @@ class OauthSettingSeeder extends Seeder
             $providers = collect([
                 'azure',
                 'bitbucket',
+                'clerk',
+                'discord',
                 'github',
                 'gitlab',
                 'google',
