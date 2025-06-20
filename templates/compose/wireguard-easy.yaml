@@ -5,11 +5,11 @@
 # port: 8000
 
 services:
-  wg-easy:
+  wgeasy:
     image: ghcr.io/wg-easy/wg-easy:latest
     environment:
-      - SERVICE_FQDN_WIREGUARDEASY_8000
-      - WG_HOST=${SERVICE_FQDN_WIREGUARDEASY}
+      - SERVICE_FQDN_WGEASY_8000
+      - WG_HOST=${SERVICE_URL_WGEASY}
       - LANG=${LANG:-en}
       - PORT=8000
       - WG_PORT=51820
