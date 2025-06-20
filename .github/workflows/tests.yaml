@@ -21,8 +21,8 @@ jobs:
       - name: Validate composer.json
         run: composer validate --check-lock --strict
 
-  security-audit:
-    name: Composer Security Audit
+  composer-audit:
+    name: Composer Audit
     runs-on: ubuntu-latest
     needs: [composer-validate]
     steps:
@@ -45,13 +45,28 @@ jobs:
         if: steps.composer-cache.outputs.cache-hit != 'true'
         run: composer install --no-progress --no-interaction
 
-      - name: Run Composer Security Audit
+      - name: Run Composer audit
         run: composer audit --locked --abandoned=fail
+
+  bun-audit:
+    name: Bun Audit
+    runs-on: ubuntu-latest
+    needs: [composer-validate]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.16
+      - name: Run Bun audit
+        run: bun audit --frozen-lockfile
 
   test:
     name: Tests
     runs-on: ubuntu-latest
-    needs: [composer-validate]
+    needs: [composer-audit, bun-audit]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,5 +91,5 @@ jobs:
         if: steps.composer-cache.outputs.cache-hit != 'true'
         run: composer install --no-progress --no-interaction
 
-      - name: Tests
+      - name: Run tests
         run: composer test:all
