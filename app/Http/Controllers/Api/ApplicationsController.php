@@ -61,6 +61,10 @@ class ApplicationsController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'project_uuid', in: 'query', required: false, description: 'Filter by project UUID.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_name', in: 'query', required: false, description: 'Filter by environment name (requires project_uuid).', schema: new OA\Schema(type: 'string')),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
@@ -91,10 +95,22 @@ class ApplicationsController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
-        $applications = collect();
-        $applications->push($projects->pluck('applications')->flatten());
-        $applications = $applications->flatten();
+
+        $projectUuid = $request->query('project_uuid');
+        $environmentName = $request->query('environment_name');
+
+        if ($environmentName && ! $projectUuid) {
+            return response()->json(['message' => 'Filtering by environment_name requires project_uuid to be specified.'], 422);
+        }
+        
+        if ($projectUuid) {
+            $project = Project::where('uuid', $projectUuid)->where('team_id', $teamId)->first();
+            if (! $project) {
+                return response()->json(['message' => 'Project not found.'], 404);
+            }
+        }
+
+        $applications = $this->get_applications($request, $teamId);
         $applications = $applications->map(function ($application) {
             return $this->removeSensitiveData($application);
         });
@@ -3263,5 +3279,29 @@ class ApplicationsController extends Controller
                 ], 422);
             }
         }
+    }
+
+    private function get_applications(Request $request, int $teamId)
+    {
+        $projectUuid = $request->query('project_uuid');
+        $environmentName = $request->query('environment_name');
+
+        $applications = Application::query()
+            ->with(['environment.project', 'destination'])
+            ->whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId));
+
+        if ($projectUuid && $environmentName) {
+            $applications->whereHas('environment', function ($query) use ($projectUuid, $environmentName) {
+                $query->where('name', $environmentName)->whereHas('project', function ($query) use ($projectUuid) {
+                    $query->where('uuid', $projectUuid);
+                });
+            });
+        } elseif ($projectUuid) {
+            $applications->whereHas('environment.project', function ($q) use ($projectUuid) {
+                $q->where('uuid', $projectUuid);
+            });
+        }
+
+        return $applications->get();
     }
 }
