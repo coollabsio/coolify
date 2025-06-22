@@ -434,3 +434,17 @@ function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null):
 
     return false;
 }
+
+function get_standalone_database_models()
+{
+    return [
+        StandalonePostgresql::class,
+        StandaloneRedis::class,
+        StandaloneMongodb::class,
+        StandaloneMysql::class,
+        StandaloneMariadb::class,
+        StandaloneKeydb::class,
+        StandaloneDragonfly::class,
+        StandaloneClickhouse::class,
+    ];
+}

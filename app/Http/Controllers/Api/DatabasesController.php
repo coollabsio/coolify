@@ -48,6 +48,10 @@ class DatabasesController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'project_uuid', in: 'query', required: false, description: 'Filter by project UUID.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_name', in: 'query', required: false, description: 'Filter by environment name (requires project_uuid).', schema: new OA\Schema(type: 'string')),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
@@ -73,11 +77,22 @@ class DatabasesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
-        $databases = collect();
-        foreach ($projects as $project) {
-            $databases = $databases->merge($project->databases());
+        $projectUuid = $request->query('project_uuid');
+        $environmentName = $request->query('environment_name');
+
+        if ($environmentName && ! $projectUuid) {
+            return response()->json(['message' => 'Filtering by environment_name requires project_uuid to be specified.'], 422);
         }
+
+        if ($projectUuid) {
+            $project = Project::where('uuid', $projectUuid)->where('team_id', $teamId)->first();
+            if (! $project) {
+                return response()->json(['message' => 'Project not found.'], 404);
+            }
+        }
+
+        $databases = $this->get_databases($request, $teamId);
+
         $databases = $databases->map(function ($database) {
             return $this->removeSensitiveData($database);
         });
@@ -1848,5 +1863,31 @@ class DatabasesController extends Controller
             ],
             200
         );
+    }
+
+    private function get_databases(Request $request, int $teamId)
+    {
+        $projectUuid = $request->query('project_uuid');
+        $environmentName = $request->query('environment_name');
+        $databases = collect();
+        $database_models = get_standalone_database_models();
+        foreach ($database_models as $model) {
+            $query = $model::query()->with(['environment.project', 'destination'])->whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId));
+
+            if ($projectUuid && $environmentName) {
+                $query->whereHas('environment', function ($query) use ($projectUuid, $environmentName) {
+                    $query->where('name', $environmentName)->whereHas('project', function ($query) use ($projectUuid) {
+                        $query->where('uuid', $projectUuid);
+                    });
+                });
+            } elseif ($projectUuid) {
+                $query->whereHas('environment.project', function ($q) use ($projectUuid) {
+                    $q->where('uuid', $projectUuid);
+                });
+            }
+            $databases = $databases->merge($query->get());
+        }
+
+        return $databases;
     }
 }
