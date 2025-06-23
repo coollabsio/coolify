@@ -1,0 +1,47 @@
+# documentation: https://github.com/awinterstein/habitica
+# slogan: Adaptions and infrastructure to facilitate self-hosting of the habit-building program [Habitica](https://habitica.com).
+# tags: habit-tracking, habitica
+# logo: svgs/habitica.svg
+# port: 3000
+
+services:
+  habitica:
+    image: 'docker.io/awinterstein/habitica-server:latest'
+    depends_on:
+      - mongo
+    environment:
+      - SERVICE_FQDN_HABITICA_3000
+      - 'NODE_DB_URI=mongodb://mongo/habitica'
+      - 'BASE_URL=${SERVICE_FQDN_HABITICA}'
+      - 'INVITE_ONLY=${INVITE_ONLY:-false}'
+      - 'EMAIL_SERVER_URL=${EMAIL_SERVER_URL}'
+      - 'EMAIL_SERVER_PORT=${EMAIL_SERVER_PORT}'
+      - 'EMAIL_SERVER_AUTH_USER=${EMAIL_SERVER_AUTH_USER}'
+      - 'EMAIL_SERVER_AUTH_PASSWORD=${EMAIL_SERVER_AUTH_PASSWORD}'
+      - 'ADMIN_EMAIL=${ADMIN_EMAIL}'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - 'http://127.0.0.1:3000'
+      timeout: 5s
+      interval: 5s
+      retries: 10
+  mongo:
+    image: 'docker.io/mongo:latest'
+    command:
+      - '--replSet'
+      - rs
+      - '--bind_ip_all'
+      - '--port'
+      - '27017'
+    healthcheck:
+      test: 'echo "try { rs.status() } catch (err) { rs.initiate() }" | mongosh --port 27017 --quiet'
+      interval: 10s
+      timeout: 30s
+      start_period: 0s
+      start_interval: 1s
+      retries: 30
+    volumes:
+      - 'mongo-db:/data/db:rw'
+      - 'mongo-dbconf:/data/configdb'
