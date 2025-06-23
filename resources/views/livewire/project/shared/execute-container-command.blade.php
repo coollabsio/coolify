@@ -20,23 +20,21 @@
         @if (count($containers) === 0)
             <div>No containers are running or terminal access is disabled on this server.</div>
         @else
-            @foreach ($containers as $container)
-                <form class="w-full flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')">
-                    <x-forms.select label="Container" id="container" required wire:model="selected_container">
-                        @foreach ($containers as $container)
-                            @if ($loop->first)
-                                <option disabled value="default">Select a container</option>
-                            @endif
-                            <option value="{{ data_get($container, 'container.Names') }}">
-                                {{ data_get($container, 'container.Names') }}
-                                ({{ data_get($container, 'server.name') }})
-                            </option>
-                        @endforeach
-                    </x-forms.select>
-                    <x-forms.button :disabled="$isConnecting"
-                        type="submit">{{ $isConnecting ? 'Connecting...' : 'Connect' }}</x-forms.button>
-                </form>
-            @endforeach
+            <form class="w-full flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')">
+                <x-forms.select label="Container" id="container" required wire:model="selected_container">
+                    @foreach ($containers as $container)
+                        @if ($loop->first)
+                            <option disabled value="default">Select a container</option>
+                        @endif
+                        <option value="{{ data_get($container, 'container.Names') }}">
+                            {{ data_get($container, 'container.Names') }}
+                            ({{ data_get($container, 'server.name') }})
+                        </option>
+                    @endforeach
+                </x-forms.select>
+                <x-forms.button :disabled="$isConnecting"
+                    type="submit">{{ $isConnecting ? 'Connecting...' : 'Connect' }}</x-forms.button>
+            </form>
             <div class="mx-auto w-full">
                 <livewire:project.shared.terminal />
             </div>
