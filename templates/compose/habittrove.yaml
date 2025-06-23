@@ -1,0 +1,20 @@
+# documentation: https://github.com/dohsimpson/HabitTrove
+# slogan: HabitTrove is a gamified habit tracking application that helps you build and maintain positive habits by rewarding you with coins, which you can use to exchange for rewards.
+# tags: nextjs, gamification, habits, habit-tracking, rewards
+# logo: svgs/habittrove.png
+# port: 3000
+
+services:
+  habittrove:
+    image: dohsimpson/habittrove
+    environment:
+      - SERVICE_FQDN_HABITTROVE_3000
+      - AUTH_SECRET=${SERVICE_PASSWORD_HABITTROVE}
+    volumes:
+      - habittrove-data:/app/data
+      - habittrove-backups:/app/backups
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
