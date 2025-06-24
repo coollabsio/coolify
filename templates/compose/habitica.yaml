@@ -30,18 +30,19 @@ services:
   mongo:
     image: 'docker.io/mongo:latest'
     command:
+      - mongod
       - '--replSet'
-      - rs
+      - rs0
       - '--bind_ip_all'
       - '--port'
       - '27017'
     healthcheck:
-      test: 'echo "try { rs.status() } catch (err) { rs.initiate() }" | mongosh --port 27017 --quiet'
+      test: |
+        bash -c 'mongosh --quiet --eval "try { rs.status().ok || rs.initiate({_id: \"rs0\", members: [{ _id: 0, host: \"mongo:27017\" }]}) } catch(e) { rs.initiate({_id: \"rs0\", members: [{ _id: 0, host: \"mongo:27017\" }]}) }"'
       interval: 10s
-      timeout: 30s
-      start_period: 0s
-      start_interval: 1s
+      timeout: 10s
       retries: 30
+      start_period: 20s
     volumes:
       - 'mongo-db:/data/db:rw'
       - 'mongo-dbconf:/data/configdb'
