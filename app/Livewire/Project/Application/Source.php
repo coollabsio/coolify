@@ -29,6 +29,15 @@ class Source extends Component
 
     #[Validate(['nullable', 'string'])]
     public ?string $gitCommitSha = null;
+    
+    #[Validate(['required', 'string', 'in:deploy_key,https_basic,source'])]
+    public string $gitAuthType = 'deploy_key';
+    
+    #[Validate(['nullable', 'string'])]
+    public ?string $gitBasicAuthUsername = null;
+    
+    #[Validate(['nullable', 'string'])]
+    public ?string $gitBasicAuthPassword = null;
 
     #[Locked]
     public $sources;
@@ -48,18 +57,34 @@ class Source extends Component
     {
         if ($toModel) {
             $this->validate();
-            $this->application->update([
+            $updateData = [
                 'git_repository' => $this->gitRepository,
                 'git_branch' => $this->gitBranch,
                 'git_commit_sha' => $this->gitCommitSha,
-                'private_key_id' => $this->privateKeyId,
-            ]);
+                'git_auth_type' => $this->gitAuthType,
+            ];
+            
+            // Only update auth fields based on selected auth type
+            if ($this->gitAuthType === 'deploy_key') {
+                $updateData['private_key_id'] = $this->privateKeyId;
+                $updateData['git_basic_auth_username'] = null;
+                $updateData['git_basic_auth_password'] = null;
+            } elseif ($this->gitAuthType === 'https_basic') {
+                $updateData['git_basic_auth_username'] = $this->gitBasicAuthUsername;
+                $updateData['git_basic_auth_password'] = $this->gitBasicAuthPassword;
+                $updateData['private_key_id'] = null;
+            }
+            
+            $this->application->update($updateData);
         } else {
             $this->gitRepository = $this->application->git_repository;
             $this->gitBranch = $this->application->git_branch;
             $this->gitCommitSha = $this->application->git_commit_sha;
+            $this->gitAuthType = $this->application->git_auth_type ?? 'deploy_key';
             $this->privateKeyId = $this->application->private_key_id;
             $this->privateKeyName = data_get($this->application, 'private_key.name');
+            $this->gitBasicAuthUsername = $this->application->git_basic_auth_username;
+            $this->gitBasicAuthPassword = $this->application->git_basic_auth_password;
         }
     }
 
@@ -98,6 +123,21 @@ class Source extends Component
             if (str($this->gitCommitSha)->isEmpty()) {
                 $this->gitCommitSha = 'HEAD';
             }
+            
+            // Additional validation for HTTPS auth
+            if ($this->gitAuthType === 'https_basic') {
+                $this->validate([
+                    'gitBasicAuthUsername' => 'required|string',
+                    'gitBasicAuthPassword' => 'required|string',
+                ]);
+                
+                // Validate HTTPS URL
+                $parsed_url = parse_url($this->gitRepository);
+                if (!$parsed_url || !isset($parsed_url['scheme']) || $parsed_url['scheme'] !== 'https') {
+                    $this->dispatch('error', 'HTTPS authentication requires an HTTPS repository URL.');
+                    return;
+                }
+            }
             $this->syncData(true);
             $this->dispatch('success', 'Application source updated!');
         } catch (\Throwable $e) {
@@ -116,6 +156,25 @@ class Source extends Component
             $this->application->refresh();
             $this->getSources();
             $this->dispatch('success', 'Source updated!');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+    
+    public function changeAuthType()
+    {
+        try {
+            // Validate repository URL for HTTPS auth
+            if ($this->gitAuthType === 'https_basic') {
+                $parsed_url = parse_url($this->gitRepository);
+                if (!$parsed_url || !isset($parsed_url['scheme']) || $parsed_url['scheme'] !== 'https') {
+                    $this->dispatch('error', 'HTTPS authentication requires an HTTPS repository URL.');
+                    return;
+                }
+            }
+            
+            $this->syncData(true);
+            $this->dispatch('success', 'Authentication type updated!');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

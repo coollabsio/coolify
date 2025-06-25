@@ -120,6 +120,7 @@ class Application extends BaseModel
     protected $casts = [
         'custom_network_aliases' => 'array',
         'http_basic_auth_password' => 'encrypted',
+        'git_basic_auth_password' => 'encrypted',
     ];
 
     public function customNetworkAliases(): Attribute
@@ -873,6 +874,12 @@ class Application extends BaseModel
 
     public function deploymentType()
     {
+        // If git_auth_type is explicitly set and is https_basic, use it
+        if ($this->git_auth_type === 'https_basic') {
+            return 'https_basic';
+        }
+        
+        // Fall back to legacy behavior for backward compatibility
         if (isDev() && data_get($this, 'private_key_id') === 0) {
             return 'deploy_key';
         }
@@ -1087,6 +1094,47 @@ class Application extends BaseModel
                 'fullRepoUrl' => $fullRepoUrl,
             ];
         }
+        
+        if ($this->deploymentType() === 'https_basic') {
+            $git_username = $this->git_basic_auth_username;
+            $git_password = $this->git_basic_auth_password;
+            
+            if (!$git_username || !$git_password) {
+                throw new RuntimeException('HTTPS basic auth credentials not found. Please configure username and password.');
+            }
+            
+            // Parse the repository URL to inject credentials
+            $parsed_url = parse_url($customRepository);
+            if ($parsed_url === false || !isset($parsed_url['scheme']) || $parsed_url['scheme'] !== 'https') {
+                throw new RuntimeException('HTTPS basic auth requires an HTTPS repository URL.');
+            }
+            
+            // URL encode credentials to handle special characters
+            $encoded_username = urlencode($git_username);
+            $encoded_password = urlencode($git_password);
+            
+            // Construct the authenticated URL
+            $host = $parsed_url['host'];
+            $port = isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '';
+            $path = $parsed_url['path'] ?? '';
+            
+            $authenticated_url = "https://{$encoded_username}:{$encoded_password}@{$host}{$port}{$path}";
+            $fullRepoUrl = $customRepository; // Store original URL for display
+            
+            $base_command = "{$base_command} {$authenticated_url}";
+
+            if ($exec_in_docker) {
+                $commands->push(executeInDocker($deployment_uuid, $base_command));
+            } else {
+                $commands->push($base_command);
+            }
+
+            return [
+                'commands' => $commands->implode(' && '),
+                'branch' => $branch,
+                'fullRepoUrl' => $fullRepoUrl,
+            ];
+        }
 
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
@@ -1223,6 +1271,79 @@ class Application extends BaseModel
                         $commands->push("echo 'Checking out $branch'");
                     }
                     $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" ".$this->buildGitCheckoutCommand($commit);
+                }
+            }
+
+            if ($exec_in_docker) {
+                $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
+            } else {
+                $commands->push($git_clone_command);
+            }
+
+            return [
+                'commands' => $commands->implode(' && '),
+                'branch' => $branch,
+                'fullRepoUrl' => $fullRepoUrl,
+            ];
+        }
+        if ($this->deploymentType() === 'https_basic') {
+            $git_username = $this->git_basic_auth_username;
+            $git_password = $this->git_basic_auth_password;
+            
+            if (!$git_username || !$git_password) {
+                throw new RuntimeException('HTTPS basic auth credentials not found. Please configure username and password.');
+            }
+            
+            // Parse the repository URL to inject credentials
+            $parsed_url = parse_url($customRepository);
+            if ($parsed_url === false || !isset($parsed_url['scheme']) || $parsed_url['scheme'] !== 'https') {
+                throw new RuntimeException('HTTPS basic auth requires an HTTPS repository URL.');
+            }
+            
+            // URL encode credentials to handle special characters
+            $encoded_username = urlencode($git_username);
+            $encoded_password = urlencode($git_password);
+            
+            // Construct the authenticated URL
+            $host = $parsed_url['host'];
+            $port = isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '';
+            $path = $parsed_url['path'] ?? '';
+            $query = isset($parsed_url['query']) ? '?' . $parsed_url['query'] : '';
+            $fragment = isset($parsed_url['fragment']) ? '#' . $parsed_url['fragment'] : '';
+            
+            $authenticated_url = "https://{$encoded_username}:{$encoded_password}@{$host}{$port}{$path}{$query}{$fragment}";
+            $fullRepoUrl = $customRepository; // Store original URL for display
+            
+            $git_clone_command = "{$git_clone_command} {$authenticated_url} {$baseDir}";
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false);
+            
+            // Clear stored credentials after cloning for security
+            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && git config --unset credential.helper || true";
+
+            if ($pull_request_id !== 0) {
+                if ($git_type === 'gitlab') {
+                    $branch = "merge-requests/{$pull_request_id}/head:$pr_branch_name";
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && git fetch {$authenticated_url} $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                } elseif ($git_type === 'github' || $git_type === 'gitea') {
+                    $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && git fetch {$authenticated_url} $branch && ".$this->buildGitCheckoutCommand($pr_branch_name);
+                } elseif ($git_type === 'bitbucket') {
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && ".$this->buildGitCheckoutCommand($commit);
                 }
             }
 

@@ -26,7 +26,7 @@
         <div class="pb-4">Code source of your application.</div>
 
         <div class="flex flex-col gap-2">
-            @if (!$privateKeyId)
+            @if ($application->source_id)
                 <div>Currently connected source: <span
                         class="font-bold text-warning">{{ data_get($application, 'source.name', 'No source connected') }}</span>
                 </div>
@@ -40,20 +40,80 @@
             </div>
         </div>
 
-        @if ($privateKeyId)
-            <h3 class="pt-4">Deploy Key</h3>
-            <div class="py-2 pt-4">Currently attached Private Key: <span
-                    class="dark:text-warning">{{ $privateKeyName }}</span>
+        {{-- Authentication Method Selection --}}
+        @if (!$application->source_id)
+            <h3 class="pt-4">Authentication Method</h3>
+            <div class="pt-2 pb-4">
+                <x-forms.select id="gitAuthType" label="Authentication Type" wire:change="changeAuthType">
+                    <option value="deploy_key">SSH Deploy Key</option>
+                    <option value="https_basic">HTTPS with Username/Password</option>
+                </x-forms.select>
             </div>
 
-            <h4 class="py-2 ">Select another Private Key</h4>
-            <div class="flex flex-wrap gap-2">
-                @foreach ($privateKeys as $key)
-                    <x-forms.button wire:click="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
-                    </x-forms.button>
-                @endforeach
-            </div>
+            {{-- SSH Deploy Key Section --}}
+            @if ($gitAuthType === 'deploy_key')
+                @if ($privateKeyId)
+                    <h4 class="pt-2">Deploy Key</h4>
+                    <div class="py-2">Currently attached Private Key: <span
+                            class="dark:text-warning">{{ $privateKeyName }}</span>
+                    </div>
+
+                    <h4 class="py-2">Select another Private Key</h4>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($privateKeys as $key)
+                            <x-forms.button wire:click="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
+                            </x-forms.button>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="pt-2">
+                        <p class="text-warning">No SSH key is currently attached to this application.</p>
+                        <p class="text-sm">Please select a private key from the list below:</p>
+                        <div class="flex flex-wrap gap-2 pt-2">
+                            @forelse ($privateKeys as $key)
+                                <x-forms.button wire:click="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
+                                </x-forms.button>
+                            @empty
+                                <p>No private keys found. <a href="{{ route('security.private-key.index') }}" class="text-primary underline">Create a new private key</a></p>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
+            @endif
+
+            {{-- HTTPS Basic Auth Section --}}
+            @if ($gitAuthType === 'https_basic')
+                <h4 class="pt-2">HTTPS Credentials</h4>
+                <div class="pt-2 pb-4">
+                    <div class="p-4 mb-4 bg-warning/10 rounded-md">
+                        <h5 class="font-bold mb-2">Security Notes:</h5>
+                        <ul class="list-disc list-inside text-sm space-y-1">
+                            <li>Your credentials will be encrypted before storage</li>
+                            <li>We recommend using personal access tokens instead of passwords</li>
+                            <li>For GitHub: Create a token at Settings → Developer settings → Personal access tokens</li>
+                            <li>For GitLab: Create a token at User Settings → Access Tokens</li>
+                            <li>Ensure your token has repository read permissions</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="flex flex-col gap-4">
+                        <x-forms.input 
+                            id="gitBasicAuthUsername" 
+                            label="Username" 
+                            placeholder="Your Git username or 'oauth2' for GitLab"
+                            helper="For GitHub, use your username. For GitLab, use 'oauth2' or your username." />
+                        
+                        <x-forms.input 
+                            type="password"
+                            id="gitBasicAuthPassword" 
+                            label="Password / Personal Access Token" 
+                            placeholder="Your password or personal access token"
+                            helper="For GitHub/GitLab, we recommend using a personal access token instead of your password." />
+                    </div>
+                </div>
+            @endif
         @else
+            {{-- Show current source and allow changing --}}
             <div class="pt-4">
                 <h3 class="pb-2">Change Git Source</h3>
                 <div class="grid grid-cols-1 gap-2">
