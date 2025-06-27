@@ -10,7 +10,7 @@ on:
 env:
   GITHUB_REGISTRY: ghcr.io
   DOCKER_REGISTRY: docker.io
-  IMAGE_NAME: "coollabsio/coolify-testing-host"
+  IMAGE_NAME: "iniitydev/ideploy-testing-host"
 
 jobs:
   amd64:

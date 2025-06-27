@@ -17,10 +17,10 @@ class InstanceSettingsSeeder extends Seeder
             'id' => 0,
             'is_registration_enabled' => true,
             'smtp_enabled' => true,
-            'smtp_host' => 'coolify-mail',
+            'smtp_host' => 'ideploy-mail',
             'smtp_port' => 1025,
             'smtp_from_address' => 'hi@localhost.com',
-            'smtp_from_name' => 'Coolify',
+            'smtp_from_name' => 'ideploy.space',
         ]);
         try {
             $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();

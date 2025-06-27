@@ -1,16 +1,16 @@
-name: Coolify Helper Image
+name: Coolify Helper Image Development
 
 on:
   push:
-    branches: [ "v4.x" ]
+    branches: [ "next" ]
     paths:
-      - .github/workflows/coolify-helper.yml
+      - .github/workflows/coolify-helper-next.yml
       - docker/coolify-helper/Dockerfile
 
 env:
   GITHUB_REGISTRY: ghcr.io
   DOCKER_REGISTRY: docker.io
-  IMAGE_NAME: "coollabsio/coolify-helper"
+  IMAGE_NAME: "iniitydev/ideploy-helper"
 
 jobs:
   amd64:
@@ -48,8 +48,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next
           labels: |
             coolify.managed=true
   aarch64:
@@ -87,10 +87,11 @@ jobs:
           platforms: linux/aarch64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64
           labels: |
             coolify.managed=true
+
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:
@@ -99,7 +100,6 @@ jobs:
     needs: [ amd64, aarch64 ]
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to ${{ env.GITHUB_REGISTRY }}
@@ -124,19 +124,19 @@ jobs:
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         run: |
           docker buildx imagetools create \
-          --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 \
-          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
-          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          --append ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next \
+          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:next
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         run: |
           docker buildx imagetools create \
-          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-aarch64 \
-          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
-          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          --append ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next-aarch64 \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}-next \
+          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:next
 
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}
 

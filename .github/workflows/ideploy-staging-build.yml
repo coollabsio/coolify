@@ -1,4 +1,4 @@
-name: Staging Build
+name: Staging Build ideploy
 
 on:
   push:
@@ -7,12 +7,12 @@ on:
       - v3.x
       - '**v5.x**'
     paths-ignore:
-        - .github/workflows/coolify-helper.yml
-        - .github/workflows/coolify-helper-next.yml
-        - .github/workflows/coolify-realtime.yml
-        - .github/workflows/coolify-realtime-next.yml
-        - docker/coolify-helper/Dockerfile
-        - docker/coolify-realtime/Dockerfile
+        - .github/workflows/ideploy-helper.yml
+        - .github/workflows/ideploy-helper-next.yml
+        - .github/workflows/ideploy-realtime.yml
+        - .github/workflows/ideploy-realtime-next.yml
+        - docker/ideploy-helper/Dockerfile
+        - docker/ideploy-realtime/Dockerfile
         - docker/testing-host/Dockerfile
         - templates/**
         - CHANGELOG.md
@@ -20,7 +20,7 @@ on:
 env:
   GITHUB_REGISTRY: ghcr.io
   DOCKER_REGISTRY: docker.io
-  IMAGE_NAME: "coollabsio/coolify"
+  IMAGE_NAME: "iniitydev/ideploy"
 
 jobs:
   amd64:

@@ -1,10 +1,10 @@
 {
-    "name": "coollabsio/coolify",
-    "description": "The Coolify project.",
+    "name": "ideploy/ideploy",
+    "description": "The ideploy project.",
     "license": "Apache-2.0",
     "type": "project",
     "keywords": [
-        "coolify",
+        "ideploy",
         "deployment",
         "docker",
         "self-hosted",

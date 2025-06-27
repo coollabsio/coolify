@@ -1,5 +1,5 @@
 services:
-  coolify:
+  ideploy:
     build:
       context: .
       dockerfile: ./docker/development/Dockerfile
@@ -13,9 +13,9 @@ services:
       PUSHER_HOST: "${PUSHER_HOST}"
       PUSHER_PORT: "${PUSHER_PORT}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
-      PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
-      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
-      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      PUSHER_APP_ID: "${PUSHER_APP_ID:-ideploy}"
+      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-ideploy}"
+      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-ideploy}"
     volumes:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
@@ -26,9 +26,9 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_USER: "${DB_USERNAME:-ideploy}"
       POSTGRES_PASSWORD: "${DB_PASSWORD:-password}"
-      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+      POSTGRES_DB: "${DB_DATABASE:-ideploy}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
@@ -54,9 +54,9 @@ services:
       - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
     environment:
       SOKETI_DEBUG: "false"
-      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
-      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
-      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-ideploy}"
+      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-ideploy}"
+      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-ideploy}"
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
     image: node:20-alpine
@@ -71,35 +71,35 @@ services:
       - .:/var/www/html/:cached
     command: sh -c "npm install && npm run dev"
     networks:
-      - coolify
+      - ideploy
   testing-host:
     build:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
     init: true
-    container_name: coolify-testing-host
+    container_name: ideploy-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dev_coolify_data:/data/coolify
-      - dev_backups_data:/data/coolify/backups
-      - dev_postgres_data:/data/coolify/_volumes/database
-      - dev_redis_data:/data/coolify/_volumes/redis
-      - dev_minio_data:/data/coolify/_volumes/minio
+      - dev_ideploy_data:/data/ideploy
+      - dev_backups_data:/data/ideploy/backups
+      - dev_postgres_data:/data/ideploy/_volumes/database
+      - dev_redis_data:/data/ideploy/_volumes/redis
+      - dev_minio_data:/data/ideploy/_volumes/minio
     networks:
-      - coolify
+      - ideploy
   mailpit:
     image: axllent/mailpit:latest
     pull_policy: always
-    container_name: coolify-mail
+    container_name: ideploy-mail
     ports:
       - "${FORWARD_MAILPIT_PORT:-1025}:1025"
       - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
-      - coolify
+      - ideploy
   minio:
     image: minio/minio:latest
     pull_policy: always
-    container_name: coolify-minio
+    container_name: ideploy-minio
     command: server /data --console-address ":9001"
     ports:
       - "${FORWARD_MINIO_PORT:-9000}:9000"
@@ -110,16 +110,16 @@ services:
     volumes:
       - dev_minio_data:/data
     networks:
-      - coolify
+      - ideploy
 
 volumes:
   dev_backups_data:
   dev_postgres_data:
   dev_redis_data:
-  dev_coolify_data:
+  dev_ideploy_data:
   dev_minio_data:
 
 networks:
-  coolify:
-    name: coolify
+  ideploy:
+    name: ideploy
     external: false

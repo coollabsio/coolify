@@ -1,37 +1,37 @@
 services:
-    coolify:
-        container_name: coolify
+    ideploy:
+        container_name: ideploy
         restart: always
         working_dir: /var/www/html
         extra_hosts:
             - host.docker.internal:host-gateway
         networks:
-            - coolify
+            - ideploy
         depends_on:
             - postgres
             - redis
             - soketi
     postgres:
         image: postgres:15-alpine
-        container_name: coolify-db
+        container_name: ideploy-db
         restart: always
         networks:
-            - coolify
+            - ideploy
     redis:
         image: redis:7-alpine
-        container_name: coolify-redis
+        container_name: ideploy-redis
         restart: always
         networks:
-            - coolify
+            - ideploy
     soketi:
-        container_name: coolify-realtime
+        container_name: ideploy-realtime
         extra_hosts:
             - host.docker.internal:host-gateway
         restart: always
         networks:
-            - coolify
+            - ideploy
 networks:
-    coolify:
-        name: coolify
+    ideploy:
+        name: ideploy
         driver: bridge
         external: false

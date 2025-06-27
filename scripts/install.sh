@@ -15,11 +15,11 @@ set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
-CDN="https://cdn.coollabs.io/coolify"
+CDN="https://cdn.ideploy.space/ideploy"
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
-ENV_FILE="/data/coolify/source/.env"
+ENV_FILE="/data/ideploy/source/.env"
 VERSION="21"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
@@ -30,9 +30,9 @@ if [ $EUID != 0 ]; then
     exit
 fi
 
-echo -e "Welcome to Coolify Installer!"
+echo -e "Welcome to ideploy Installer!"
 echo -e "This script will install everything for you. Sit back and relax."
-echo -e "Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh\n"
+echo -e "Source code: https://github.com/iniitydev/ooity/blob/main/scripts/install.sh\n"
 
 # Predefined root user
 ROOT_USERNAME=${ROOT_USERNAME:-}
@@ -120,9 +120,9 @@ DOCKER_ADDRESS_POOL_BASE=${DOCKER_ADDRESS_POOL_BASE:-"$DOCKER_ADDRESS_POOL_BASE_
 DOCKER_ADDRESS_POOL_SIZE=${DOCKER_ADDRESS_POOL_SIZE:-$DOCKER_ADDRESS_POOL_SIZE_DEFAULT}
 
 # Load Docker address pool configuration from .env file if it exists and environment variables were not provided
-if [ -f "/data/coolify/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
-    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
-    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
+if [ -f "/data/ideploy/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
+    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/ideploy/source/.env | cut -d '=' -f2 || true)
+    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/ideploy/source/.env | cut -d '=' -f2 || true)
 
     if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ]; then
         DOCKER_ADDRESS_POOL_BASE="$ENV_DOCKER_ADDRESS_POOL_BASE"
@@ -224,14 +224,14 @@ if [ "$WARNING_SPACE" = true ]; then
     sleep 5
 fi
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+mkdir -p /data/ideploy/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,sentinel}
+mkdir -p /data/ideploy/ssh/{keys,mux}
+mkdir -p /data/ideploy/proxy/dynamic
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root /data/ideploy
+chmod -R 700 /data/ideploy
 
-INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
+INSTALLATION_LOG_WITH_DATE="/data/ideploy/source/installation-${DATE}.log"
 
 exec > >(tee -a $INSTALLATION_LOG_WITH_DATE) 2>&1
 
@@ -284,9 +284,9 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null
 fi
 
-LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $6}' | tr -d ',')
-LATEST_REALTIME_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $8}' | tr -d ',')
+LATEST_VERSION=$(curl --silent $CDN/versions.json | jq -r '.ideploy.v4.version')
+LATEST_HELPER_VERSION=$(curl --silent $CDN/versions.json | jq -r '.ideploy.v4.helper_version')
+LATEST_REALTIME_VERSION=$(curl --silent $CDN/versions.json | jq -r '.ideploy.v4.realtime_version')
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest
@@ -314,7 +314,7 @@ fi
 echo -e "---------------------------------------------"
 echo "| Operating System  | $OS_TYPE $OS_VERSION"
 echo "| Docker            | $DOCKER_VERSION"
-echo "| Coolify           | $LATEST_VERSION"
+echo "| ideploy           | $LATEST_VERSION"
 echo "| Helper            | $LATEST_HELPER_VERSION"
 echo "| Realtime          | $LATEST_REALTIME_VERSION"
 echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
@@ -416,13 +416,14 @@ if [ "$SSH_DETECTED" = "false" ]; then
     *)
         echo "###############################################################################"
         echo "WARNING: Could not detect and install OpenSSH server - this does not mean that it is not installed or not running, just that we could not detect it."
-        echo -e "Please make sure it is installed and running, otherwise Coolify cannot connect to the host system. \n"
+        echo -e "Please make sure it is installed and running, otherwise ideploy cannot connect to the host system. \n"
         echo "###############################################################################"
         exit 1
         ;;
     esac
     echo " - OpenSSH server installed successfully."
     SSH_DETECTED=true
+# This fi was missing, which caused the previous error.
 fi
 
 # Detect SSH PermitRootLogin
@@ -431,7 +432,7 @@ if [ "$SSH_PERMIT_ROOT_LOGIN" = "yes" ] || [ "$SSH_PERMIT_ROOT_LOGIN" = "without
     echo " - SSH PermitRootLogin is enabled."
 else
     echo " - SSH PermitRootLogin is disabled."
-    echo "   If you have problems with SSH, please read this: https://coolify.io/docs/knowledge-base/server/openssh"
+    echo "   If you have problems with SSH, please read this: https://ideploy.space/docs/knowledge-base/server/openssh"
 fi
 
 # Detect if docker is installed via snap
@@ -439,7 +440,7 @@ if [ -x "$(command -v snap)" ]; then
     SNAP_DOCKER_INSTALLED=$(snap list docker >/dev/null 2>&1 && echo "true" || echo "false")
     if [ "$SNAP_DOCKER_INSTALLED" = "true" ]; then
         echo "Docker is installed via snap."
-        echo "   Please note that Coolify does not support Docker installed via snap."
+        echo "   Please note that ideploy does not support Docker installed via snap."
         echo "   Please remove Docker with snap (snap remove docker) and reexecute this script."
         exit 1
     fi
@@ -635,7 +636,7 @@ else
         NEED_MERGE=false
     else
         # Create a configuration without address pools to preserve existing ones
-        cat >/etc/docker/daemon.json.coolify <<EOL
+        cat >/etc/docker/daemon.json.ideploy <<EOL
 {
   "log-driver": "json-file",
   "log-opts": {
@@ -701,10 +702,10 @@ else
 fi
 
 echo -e "5. Download required files from CDN. "
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL $CDN/docker-compose.yml -o /data/ideploy/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o /data/ideploy/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o /data/ideploy/source/.env.production
+curl -fsSL $CDN/upgrade.sh -o /data/ideploy/source/upgrade.sh
 
 echo -e "6. Make backup of .env to .env-$DATE"
 
@@ -714,7 +715,7 @@ if [ -f $ENV_FILE ]; then
 else
     echo " - File does not exist: $ENV_FILE"
     echo " - Copying .env.production to .env-$DATE"
-    cp /data/coolify/source/.env.production $ENV_FILE-$DATE
+    cp /data/ideploy/source/.env.production $ENV_FILE-$DATE
     # Generate a secure APP_ID and APP_KEY
     sed -i "s|^APP_ID=.*|APP_ID=$(openssl rand -hex 16)|" "$ENV_FILE-$DATE"
     sed -i "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$ENV_FILE-$DATE"
@@ -758,32 +759,32 @@ fi
 
 # Merge .env and .env.production. New values will be added to .env
 echo -e "7. Propagating .env with new values - if necessary."
-awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/coolify/source/.env.production >$ENV_FILE
+awk -F '=' '!seen[$1]++' "$ENV_FILE-$DATE" /data/ideploy/source/.env.production >$ENV_FILE
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    if ! grep -q "AUTOUPDATE=" /data/ideploy/source/.env; then
+        echo "AUTOUPDATE=false" >>/data/ideploy/source/.env
     else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/ideploy/source/.env
     fi
 fi
 
 # Save Docker address pool configuration to .env file
-if ! grep -q "DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env; then
-    echo "DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE" >>/data/coolify/source/.env
+if ! grep -q "DOCKER_ADDRESS_POOL_BASE=" /data/ideploy/source/.env; then
+    echo "DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE" >>/data/ideploy/source/.env
 else
     # Only update if explicitly provided
     if [ "$DOCKER_POOL_BASE_PROVIDED" = true ]; then
-        sed -i "s|DOCKER_ADDRESS_POOL_BASE=.*|DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE|g" /data/coolify/source/.env
+        sed -i "s|DOCKER_ADDRESS_POOL_BASE=.*|DOCKER_ADDRESS_POOL_BASE=$DOCKER_ADDRESS_POOL_BASE|g" /data/ideploy/source/.env
     fi
 fi
 
-if ! grep -q "DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env; then
-    echo "DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE" >>/data/coolify/source/.env
+if ! grep -q "DOCKER_ADDRESS_POOL_SIZE=" /data/ideploy/source/.env; then
+    echo "DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE" >>/data/ideploy/source/.env
 else
     # Only update if explicitly provided
     if [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
-        sed -i "s|DOCKER_ADDRESS_POOL_SIZE=.*|DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE|g" /data/coolify/source/.env
+        sed -i "s|DOCKER_ADDRESS_POOL_SIZE=.*|DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE|g" /data/ideploy/source/.env
     fi
 fi
 
@@ -796,47 +797,47 @@ if [ ! -f ~/.ssh/authorized_keys ]; then
 fi
 
 set +e
-IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
+IS_IDEPLOY_VOLUME_EXISTS=$(docker volume ls | grep ideploy-db | wc -l)
 set -e
 
-if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
+if [ "$IS_IDEPLOY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
-    test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
-    test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
-    chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
-    sed -i "/coolify/d" ~/.ssh/authorized_keys
-    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
-    rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+    test -f /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal && rm -f /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    test -f /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+    ssh-keygen -t ed25519 -a 100 -f /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C ideploy
+    chown 9999 /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    sed -i "/ideploy/d" ~/.ssh/authorized_keys
+    cat /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
+    rm -f /data/ideploy/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+chown -R 9999:root /data/ideploy
+chmod -R 700 /data/ideploy
 
-echo -e "9. Installing Coolify ($LATEST_VERSION)"
+echo -e "9. Installing ideploy ($LATEST_VERSION)"
 echo -e " - It could take a while based on your server's performance, network speed, stars, etc."
 echo -e " - Please wait."
 getAJoke
 
 if [[ $- == *x* ]]; then
-    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+    bash -x /data/ideploy/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
 else
-    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
+    bash /data/ideploy/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-ghcr.io}"
 fi
-echo " - Coolify installed successfully."
+echo " - ideploy installed successfully."
 rm -f $ENV_FILE-$DATE
 
-echo " - Waiting for 20 seconds for Coolify (database migrations) to be ready."
+echo " - Waiting for 20 seconds for ideploy (database migrations) to be ready."
 getAJoke
 
 sleep 20
 echo -e "\033[0;35m
-   ____                            _         _       _   _                 _
-  / ___|___  _ __   __ _ _ __ __ _| |_ _   _| | __ _| |_(_) ___  _ __  ___| |
- | |   / _ \| '_ \ / _\` | '__/ _\` | __| | | | |/ _\` | __| |/ _ \| '_ \/ __| |
- | |__| (_) | | | | (_| | | | (_| | |_| |_| | | (_| | |_| | (_) | | | \__ \_|
-  \____\___/|_| |_|\__, |_|  \__,_|\__|\__,_|_|\__,_|\__|_|\___/|_| |_|___(_)
-                   |___/
+ ██████╗ ███████╗██████╗ ██╗      ██████╗ ██╗   ██╗
+ ██╔══██╗██╔════╝██╔══██╗██║     ██╔═══██╗╚██╗ ██╔╝
+ ██║  ██║█████╗  ██████╔╝██║     ██║   ██║ ╚████╔╝
+ ██║  ██║██╔══╝  ██╔═══╝ ██║     ██║   ██║  ╚██╔╝
+ ██████╔╝███████╗██║     ███████╗╚██████╔╝   ██║
+ ╚═════╝ ╚══════╝╚═╝     ╚══════╝ ╚═════╝    ╚═╝
 \033[0m"
 
 IPV4_PUBLIC_IP=$(curl -4s https://ifconfig.io || true)
@@ -844,10 +845,10 @@ IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
 
 echo -e "\nYour instance is ready to use!\n"
 if [ -n "$IPV4_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPV4: http://$(curl -4s https://ifconfig.io):8000"
+    echo -e "You can access ideploy through your Public IPV4: http://$(curl -4s https://ifconfig.io):8000"
 fi
 if [ -n "$IPV6_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"
+    echo -e "You can access ideploy through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"
 fi
 
 set +e
@@ -863,5 +864,5 @@ if [ -n "$PRIVATE_IPS" ]; then
         fi
     done
 fi
-echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/coolify/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
-cp /data/coolify/source/.env /data/coolify/source/.env.backup
+echo -e "\nWARNING: It is highly recommended to backup your Environment variables file (/data/ideploy/source/.env) to a safe location, outside of this server (e.g. into a Password Manager).\n"
+cp /data/ideploy/source/.env /data/ideploy/source/.env.backup

@@ -1,4 +1,4 @@
-<div wire:key="{{ rand() }}" class="coolify-monaco-editor flex-1">
+<div wire:key="{{ rand() }}" class="ideploy-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
         monacoVersion: '0.52.2',
         monacoContent: @entangle($id),

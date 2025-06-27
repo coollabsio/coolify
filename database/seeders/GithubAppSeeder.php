@@ -21,19 +21,19 @@ class GithubAppSeeder extends Seeder
             'team_id' => 0,
         ]);
         GithubApp::create([
-            'name' => 'coolify-laravel-dev-public',
+            'name' => 'ideploy-dev-app-example',
             'uuid' => '69420',
-            'organization' => 'coollabsio',
+            'organization' => 'iniitydev',
             'api_url' => 'https://api.github.com',
             'html_url' => 'https://github.com',
             'is_public' => false,
-            'app_id' => 292941,
-            'installation_id' => 37267016,
-            'client_id' => 'Iv1.220e564d2b0abd8c',
-            'client_secret' => '116d1d80289f378410dd70ab4e4b81dd8d2c52b6',
-            'webhook_secret' => '326a47b49054f03288f800d81247ec9414d0abf3',
-            'private_key_id' => 2,
-            'team_id' => 0,
+            'app_id' => null, // User must replace this
+            'installation_id' => null, // User must replace this
+            'client_id' => 'your-client-id', // User must replace this
+            'client_secret' => 'your-client-secret', // User must replace this
+            'webhook_secret' => 'your-webhook-secret', // User must replace this
+            'private_key_id' => null, // User must replace this (or setup a new private key)
+            'team_id' => 0, // Belongs to system team by default
         ]);
     }
 }

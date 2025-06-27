@@ -2201,7 +2201,7 @@
         "minversion": "0.0.0"
     },
     "next-image-transformation": {
-        "documentation": "https://github.com/coollabsio/next-image-transformation?utm_source=coolify.io",
+        "documentation": "https://github.com/iniitydev/ideploy-next-image-transformation?utm_source=ideploy.space",
         "slogan": "Drop-in replacement for Vercel's Nextjs image optimization service.",
         "compose": "c2VydmljZXM6CiAgbmV4dC1pbWFnZS10cmFuc2Zvcm1hdGlvbjoKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL25leHQtaW1hZ2UtdHJhbnNmb3JtYXRpb246bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1RSQU5TRk9STUFUSU9OXzMwMDAKICAgICAgLSBOT0RFX0VOVj1wcm9kdWN0aW9uCiAgICAgIC0gJ0FMTE9XRURfUkVNT1RFX0RPTUFJTlM9JHtBTExPV0VEX1JFTU9URV9ET01BSU5TOi0qfScKICAgICAgLSAnSU1HUFJPWFlfVVJMPSR7SU1HUFJPWFlfVVJMOi1odHRwOi8vaW1ncHJveHk6ODA4MH0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogJ3dnZXQgLXFPLSBodHRwOi8vMTI3LjAuMC4xOjMwMDAvaGVhbHRoIHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiA1CiAgaW1ncHJveHk6CiAgICBpbWFnZTogZGFydGhzaW0vaW1ncHJveHkKICAgIGVudmlyb25tZW50OgogICAgICAtIElNR1BST1hZX0VOQUJMRV9XRUJQX0RFVEVDVElPTj10cnVlCiAgICAgIC0gSU1HUFJPWFlfSlBFR19QUk9HUkVTU0lWRT10cnVlCiAgICAgIC0gSU1HUFJPWFlfVVNFX0VUQUc9dHJ1ZQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGltZ3Byb3h5CiAgICAgICAgLSBoZWFsdGgKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiA1Cg==",
         "tags": [
@@ -2210,7 +2210,7 @@
             "transformation",
             "service"
         ],
-        "logo": "coolify-logo.svg",
+        "logo": "ideploy-logo.svg",
         "minversion": "0.0.0",
         "port": "3000"
     },

@@ -72,7 +72,7 @@ class ProductionSeeder extends Seeder
             ]);
         }
 
-        if (! isCloud() && config('constants.coolify.is_windows_docker_desktop') == false) {
+        if (! isCloud() && config('constants.ideploy.is_windows_docker_desktop') == false) {
             $coolify_key_name = '@host.docker.internal';
             $ssh_keys_directory = Storage::disk('ssh-keys')->files();
             $coolify_key = collect($ssh_keys_directory)->firstWhere(fn ($item) => str($item)->contains($coolify_key_name));
@@ -86,14 +86,14 @@ class ProductionSeeder extends Seeder
                         'id' => 0,
                         'team_id' => 0,
                         'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).',
+                        'description' => 'The private key for the ideploy host machine (localhost).',
                         'private_key' => $coolify_key,
                     ]);
-                    echo "SSH key found for the Coolify host machine (localhost).\n";
+                    echo "SSH key found for the ideploy host machine (localhost).\n";
                 } else {
-                    echo "No SSH key found for the Coolify host machine (localhost).\n";
-                    echo "Please read the following documentation (point 3) to fix it: https://coolify.
-                io/docs/knowledge-base/server/openssh/\n";
+                    echo "No SSH key found for the ideploy host machine (localhost).\n";
+                    echo "Please read the following documentation (point 3) to fix it: https://ideploy.
+                space/docs/knowledge-base/server/openssh/\n";
                     echo "Your localhost connection won't work until then.";
                 }
             }
@@ -104,7 +104,7 @@ class ProductionSeeder extends Seeder
                 $server_details = [
                     'id' => 0,
                     'name' => 'localhost',
-                    'description' => "This is the server where Coolify is running on. Don't delete this!",
+                    'description' => "This is the server where ideploy is running on. Don't delete this!",
                     'user' => $user,
                     'ip' => 'host.docker.internal',
                     'team_id' => 0,
@@ -137,14 +137,14 @@ class ProductionSeeder extends Seeder
             if (StandaloneDocker::find(0) == null) {
                 StandaloneDocker::create([
                     'id' => 0,
-                    'name' => 'localhost-coolify',
-                    'network' => 'coolify',
+                    'name' => 'localhost-ideploy',
+                    'network' => 'ideploy',
                     'server_id' => 0,
                 ]);
             }
         }
 
-        if (config('constants.coolify.is_windows_docker_desktop')) {
+        if (config('constants.ideploy.is_windows_docker_desktop')) {
             PrivateKey::updateOrCreate(
                 [
                     'id' => 0,
@@ -166,11 +166,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (Server::find(0) == null) {
                 $server_details = [
                     'id' => 0,
-                    'uuid' => 'coolify-testing-host',
+                    'uuid' => 'ideploy-testing-host',
                     'name' => 'localhost',
-                    'description' => "This is the server where Coolify is running on. Don't delete this!",
+                    'description' => "This is the server where ideploy is running on. Don't delete this!",
                     'user' => 'root',
-                    'ip' => 'coolify-testing-host',
+                    'ip' => 'ideploy-testing-host',
                     'team_id' => 0,
                     'private_key_id' => 0,
                 ];
@@ -192,8 +192,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (StandaloneDocker::find(0) == null) {
                 StandaloneDocker::create([
                     'id' => 0,
-                    'name' => 'localhost-coolify',
-                    'network' => 'coolify',
+                    'name' => 'localhost-ideploy',
+                    'network' => 'ideploy',
                     'server_id' => 0,
                 ]);
             }

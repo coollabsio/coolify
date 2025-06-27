@@ -38,10 +38,10 @@ return [
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', 'coolify-db'),
+            'host' => env('DB_HOST', 'ideploy-db'),
             'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'coolify'),
-            'username' => env('DB_USERNAME', 'coolify'),
+            'database' => env('DB_DATABASE', 'ideploy'),
+            'username' => env('DB_USERNAME', 'ideploy'),
             'password' => env('DB_PASSWORD', ''),
             'charset' => 'utf8',
             'prefix' => '',
@@ -55,8 +55,8 @@ return [
             'url' => env('DATABASE_TEST_URL'),
             'host' => env('DB_TEST_HOST', 'postgres'),
             'port' => env('DB_TEST_PORT', '5432'),
-            'database' => env('DB_TEST_DATABASE', 'coolify_test'),
-            'username' => env('DB_TEST_USERNAME', 'coolify'),
+            'database' => env('DB_TEST_DATABASE', 'ideploy_test'),
+            'username' => env('DB_TEST_USERNAME', 'ideploy'),
             'password' => env('DB_TEST_PASSWORD', 'password'),
             'charset' => 'utf8',
             'prefix' => '',
@@ -102,7 +102,7 @@ return [
 
         'default' => [
             'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', 'coolify-redis'),
+            'host' => env('REDIS_HOST', 'ideploy-redis'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
@@ -111,7 +111,7 @@ return [
 
         'cache' => [
             'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', 'coolify-redis'),
+            'host' => env('REDIS_HOST', 'ideploy-redis'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),

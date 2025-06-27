@@ -1,28 +1,28 @@
 <?php
 
 return [
-    'coolify' => [
-        'version' => '4.0.0-beta.419',
-        'helper_version' => '1.0.8',
-        'realtime_version' => '1.0.9',
+    'ideploy' => [
+        'version' => '4.0.0-beta.419', // This version will be updated by release script
+        'helper_version' => '1.0.8', // This version will be updated by release script
+        'realtime_version' => '1.0.9', // This version will be updated by release script
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
-        'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
+        'base_config_path' => env('BASE_CONFIG_PATH', '/data/ideploy'),
         'registry_url' => env('REGISTRY_URL', 'ghcr.io'),
-        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
-        'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-realtime'),
+        'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/iniitydev/ideploy-helper'),
+        'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/iniitydev/ideploy-realtime'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
     ],
 
     'urls' => [
-        'docs' => 'https://coolify.io/docs',
-        'contact' => 'https://coolify.io/docs/contact',
+        'docs' => 'https://ideploy.space/docs',
+        'contact' => 'https://ideploy.space/docs/contact',
     ],
 
     'services' => [
         // Temporary disabled until cache is implemented
-        // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
-        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
+        // 'official' => 'https://cdn.ideploy.space/ideploy/service-templates.json',
+        'official' => 'https://raw.githubusercontent.com/iniitydev/ooity/main/templates/service-templates.json',
     ],
 
     'terminal' => [

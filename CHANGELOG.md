@@ -32,7 +32,7 @@ All notable changes to this project will be documented in this file.
 - *(service)* Add Seafile service (#5817)
 - *(service)* Add Netbird-Client service (#5873)
 - *(service)* Add OrangeHRM and Grist services (#5212)
-- *(rules)* Add comprehensive documentation for Coolify architecture and development practices for AI tools, especially for cursor
+- *(rules)* Add comprehensive documentation for ideploy architecture and development practices for AI tools, especially for cursor
 - *(server)* Implement server patch check notifications
 - *(api)* Add latest query param to Service restart API (#5881)
 - *(api)* Add connect_to_docker_network setting to App creation API (#5691)
@@ -705,9 +705,9 @@ All notable changes to this project will be documented in this file.
 - *(ssl)* Ssl generation helper
 - *(ssl)* Migrate to `ECC`certificates using `secp521r1`
 - *(ssl)* Improve SSL helper
-- *(ssl)* Add a Coolify CA Certificate to all servers
+- *(ssl)* Add a ideploy CA Certificate to all servers
 - *(seeder)* Call CA SSL seeder in prod and dev
-- *(ssl)* Add Coolify CA Certificate when adding a new server
+- *(ssl)* Add ideploy CA Certificate when adding a new server
 - *(installer)* Create CA folder during installation
 - *(ssl)* Improve SSL helper
 - *(ssl)* Use new improved helper for SSL generation
