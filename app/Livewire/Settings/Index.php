@@ -68,6 +68,9 @@ class Index extends Component
     #[Validate('boolean')]
     public bool $disable_two_step_confirmation;
 
+    #[Validate('boolean')]
+    public bool $is_sponsorship_popup_enabled;
+
     public function render()
     {
         return view('livewire.settings.index');
@@ -96,6 +99,7 @@ class Index extends Component
             $this->update_check_frequency = $this->settings->update_check_frequency;
             $this->instance_timezone = $this->settings->instance_timezone;
             $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
+            $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         }
     }
 
@@ -134,6 +138,7 @@ class Index extends Component
         $this->settings->update_check_frequency = $this->update_check_frequency;
         $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation;
         $this->settings->instance_timezone = $this->instance_timezone;
+        $this->settings->is_sponsorship_popup_enabled = $this->is_sponsorship_popup_enabled;
         if ($isSave) {
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');

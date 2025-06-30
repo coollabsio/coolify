@@ -78,7 +78,7 @@
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
                     </div>
-                    <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
+                    <div class="py-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
                         the
                         respective
                         companies, and use of them does not imply any affiliation or endorsement.<br>Find more services

@@ -2991,12 +2991,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
                 if ($applicationFound) {
                     $savedService = $applicationFound;
-                    // $savedService = ServiceDatabase::firstOrCreate([
-                    //     'name' => $applicationFound->name,
-                    //     'image' => $applicationFound->image,
-                    //     'service_id' => $applicationFound->service_id,
-                    // ]);
-                    // $applicationFound->delete();
                 } else {
                     $savedService = ServiceDatabase::firstOrCreate([
                         'name' => $serviceName,
@@ -3007,15 +3001,22 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 $savedService = ServiceApplication::firstOrCreate([
                     'name' => $serviceName,
                     'service_id' => $resource->id,
+                ], [
+                    'is_gzip_enabled' => true,
                 ]);
             }
-
             // Check if image changed
             if ($savedService->image !== $image) {
                 $savedService->image = $image;
                 $savedService->save();
             }
+            // Pocketbase does not need gzip for SSE.
+            if (str($savedService->image)->contains('pocketbase') && $savedService->is_gzip_enabled) {
+                $savedService->is_gzip_enabled = false;
+                $savedService->save();
+            }
         }
+
         $environment = collect(data_get($service, 'environment', []));
         $buildArgs = collect(data_get($service, 'build.args', []));
         $environment = $environment->merge($buildArgs);
@@ -3060,12 +3061,18 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     $port = null;
                 }
                 if ($isApplication) {
-                    $fqdn = generateFqdn($server, "$uuid");
+                    $fqdn = $resource->fqdn;
+                    if (blank($resource->fqdn)) {
+                        $fqdn = generateFqdn($server, "$uuid");
+                    }
                 } elseif ($isService) {
-                    if ($fqdnFor) {
-                        $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
-                    } else {
-                        $fqdn = generateFqdn($server, "{$savedService->name}-$uuid");
+                    $fqdn = $savedService->fqdn;
+                    if (blank($savedService->fqdn)) {
+                        if ($fqdnFor) {
+                            $fqdn = generateFqdn($server, "$fqdnFor-$uuid");
+                        } else {
+                            $fqdn = generateFqdn($server, "{$savedService->name}-$uuid");
+                        }
                     }
                 }
 
@@ -3090,7 +3097,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 }
 
                 if (substr_count(str($key)->value(), '_') === 2) {
-                    $resource->environment_variables()->firstOrCreate([
+                    $resource->environment_variables()->updateOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
@@ -3102,7 +3109,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 }
                 if (substr_count(str($key)->value(), '_') === 3) {
                     $newKey = str($key)->beforeLast('_');
-                    $resource->environment_variables()->firstOrCreate([
+                    $resource->environment_variables()->updateOrCreate([
                         'key' => $newKey->value(),
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,

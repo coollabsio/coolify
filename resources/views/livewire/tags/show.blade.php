@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-start gap-2 pb-10">
         <div>
-            <h1>Tags</h1>
+            <h1 class="pb-2">Tags</h1>
             <div>Tags help you to perform actions on multiple resources.</div>
         </div>
     </div>

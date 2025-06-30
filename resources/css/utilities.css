@@ -122,7 +122,7 @@
 }
 
 @utility navbar-main {
-    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 md:items-center;
+    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 border-neutral-200 md:items-center;
 }
 
 @utility loading {

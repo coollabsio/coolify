@@ -164,7 +164,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
-        Route::get('/{uuid}/revoke', [Controller::class, 'revoke_invitation'])->name('team.invitation.revoke');
+        Route::get('/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');

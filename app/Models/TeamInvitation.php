@@ -33,6 +33,10 @@ class TeamInvitation extends Model
             return true;
         } else {
             $this->delete();
+            $user = User::whereEmail($this->email)->first();
+            if (filled($user)) {
+                $user->deleteIfNotVerifiedAndForcePasswordReset();
+            }
 
             return false;
         }

@@ -8,16 +8,16 @@
             </a>
             <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.deployment.index', $parameters) }}">
-                <button>Deployments</button>
+                Deployments
             </a>
             <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.application.logs', $parameters) }}">
-                <button>Logs</button>
+                Logs
             </a>
             @if (!$application->destination->server->isSwarm())
                 <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
                     href="{{ route('project.application.command', $parameters) }}">
-                    <button>Terminal</button>
+                    Terminal
                 </a>
             @endif
             <x-applications.links :application="$application" />

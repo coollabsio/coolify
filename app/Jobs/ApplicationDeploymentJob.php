@@ -1381,8 +1381,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (is_object($this->source) && $this->source->getMorphClass() === \App\Models\GithubApp::class && $this->source->is_public === false) {
             $repository = githubApi($this->source, "repos/{$this->customRepository}");
             $data = data_get($repository, 'data');
-            if (isset($data->id)) {
-                $repository_project_id = $data->id;
+            $repository_project_id = data_get($data, 'id');
+            if (isset($repository_project_id)) {
                 if (blank($this->application->repository_project_id) || $this->application->repository_project_id !== $repository_project_id) {
                     $this->application->repository_project_id = $repository_project_id;
                     $this->application->save();
