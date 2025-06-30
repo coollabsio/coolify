@@ -17,9 +17,9 @@
     <section>
         <h3 class="pb-2">Projects</h3>
         @if ($projects->count() > 0)
-            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
-                    <div class="gap-2 border border-transparent cursor-pointer box group"
+                    <div class="gap-2 border cursor-pointer box group"
                         wire:click="navigateToProject('{{ $project->uuid }}')">
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
@@ -68,7 +68,6 @@
                     <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                         @class([
                             'gap-2 border cursor-pointer box group',
-                            'border-transparent' => $server->settings->is_reachable,
                             'border-red-500' => !$server->settings->is_reachable,
                         ])>
                         <div class="flex flex-col justify-center mx-6">
@@ -124,7 +123,7 @@
 
     @if ($servers->count() > 0 && $projects->count() > 0)
         <section>
-            <div class="flex items-center gap-2">
+            <div class="flex items-start gap-2">
                 <h3 class="pb-2">Deployments</h3>
                 @if (count($deploymentsPerServer) > 0)
                     <x-loading />

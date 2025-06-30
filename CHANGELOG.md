@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [4.0.0-beta.419] - 2025-06-16
+## [unreleased]
+
+### 🚀 Features
+
+- *(core)* Set custom API rate limit (#5984)
+
+## [4.0.0-beta.419] - 2025-06-17
 
 ### 🚀 Features
 
@@ -203,6 +209,7 @@ All notable changes to this project will be documented in this file.
 
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 - Update changelog
 

@@ -2,7 +2,7 @@
     <form wire:submit='submit' @class([
         'flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base',
         'border-error' => $is_really_required,
-        'dark:border-coolgray-300' => !$is_really_required,
+        'dark:border-coolgray-300 border-neutral-200' => !$is_really_required,
     ])>
         @if ($isLocked)
             <div class="flex flex-1 w-full gap-2">

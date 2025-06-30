@@ -56,7 +56,7 @@
                         </span>
                     </p>
                     <div class="flex items-center pt-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="flex-none w-8 h-8 mr-3 text-warning"
+                        <svg xmlns="http://www.w3.org/2000/svg" class="flex-none w-8 h-8 mr-3 dark:text-warning"
                             fill="currentColor" viewBox="0 0 256 256">
                             <path
                                 d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z">
@@ -89,8 +89,8 @@
                     </div>
                     <ul role="list" class="mt-8 space-y-3 text-sm leading-6 dark:text-neutral-400">
                         <li class="flex">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20"
+                                fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
@@ -99,8 +99,8 @@
                             <span class="px-1 font-bold dark:text-white">unlimited</span> servers
                         </li>
                         <li class="flex">
-                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
+                            <svg class="flex-none w-5 h-6 mr-3 dark:text-warning" viewBox="0 0 20 20"
+                                fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
@@ -109,7 +109,7 @@
                             <span class="px-1 font-bold dark:text-white">unlimited</span> applications per server
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -118,7 +118,7 @@
                             Free email notifications
                         </li>
                         <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                            <svg class="flex-none w-5 h-6 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"

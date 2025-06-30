@@ -4,7 +4,7 @@
     </x-slot>
     <x-settings.navbar />
     <form wire:submit='submit' class="flex flex-col">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 pb-2">
             <h2>Configuration</h2>
             <x-forms.button type="submit">
                 Save
@@ -97,7 +97,7 @@
             helper="Allowed IP lists for the API. A comma separated list of IPs. Empty means you allow from everywhere."
             placeholder="1.1.1.1,8.8.8.8" />
         <h4 class="pt-6">Update</h4>
-        <div class="text-right md:w-96">
+        <div class="text-right md:w-96 pb-4">
             @if (!is_null(config('constants.coolify.autoupdate', null)))
                 <div class="text-right md:w-96">
                     <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there."
@@ -128,6 +128,10 @@
         </div>
 
         <h4 class="py-4">Confirmation Settings</h4>
+        <div class="md:w-96 ">
+            <x-forms.checkbox instantSave id="is_sponsorship_popup_enabled" label="Show Sponsorship Popup"
+                helper="When enabled, sponsorship popups will be shown monthly to users. When disabled, the sponsorship popup will be permanently hidden for all users." />
+        </div>
 
         @if ($disable_two_step_confirmation)
             <div class="md:w-96 pb-4" wire:key="two-step-confirmation-enabled">

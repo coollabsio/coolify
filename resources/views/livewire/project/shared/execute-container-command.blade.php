@@ -43,7 +43,7 @@
 
     @if ($type === 'server')
         <livewire:server.navbar :server="$servers->first()" />
-        @if ($servers->first()->isTerminalEnabled())
+        @if ($servers->first()->isTerminalEnabled() && $servers->first()->isFunctional())
             <form class="w-full flex gap-2 items-start" wire:submit="$dispatchSelf('connectToServer')"
                 wire:init="$dispatchSelf('connectToServer')">
                 <h2 class="pb-4">Terminal</h2>
@@ -54,7 +54,7 @@
                 <livewire:project.shared.terminal />
             </div>
         @else
-            <div>Terminal access is disabled on this server.</div>
+            <div>Server is not functional or terminal access is disabled.</div>
         @endif
     @endif
 </div>
