@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProcessStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
@@ -116,6 +118,18 @@ class Service extends BaseModel
         return (bool) str($this->status)->contains('exited');
     }
 
+    public function isStarting(): bool
+    {
+        try {
+            $activity = Activity::where('properties->type_uuid', $this->uuid)->latest()->first();
+            $status = data_get($activity, 'properties.status');
+
+            return $status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function type()
     {
         return 'service';
@@ -141,31 +155,6 @@ class Service extends BaseModel
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
-    public function getContainersToStop(): array
-    {
-        $containersToStop = [];
-        $applications = $this->applications()->get();
-        foreach ($applications as $application) {
-            $containersToStop[] = "{$application->name}-{$this->uuid}";
-        }
-        $dbs = $this->databases()->get();
-        foreach ($dbs as $db) {
-            $containersToStop[] = "{$db->name}-{$this->uuid}";
-        }
-
-        return $containersToStop;
-    }
-
-    public function stopContainers(array $containerNames, $server, int $timeout = 30)
-    {
-        foreach ($containerNames as $containerName) {
-            instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
-                "docker rm -f $containerName",
-            ], server: $server, throwError: false);
-        }
-    }
-
     public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
@@ -184,6 +173,10 @@ class Service extends BaseModel
 
     public function getStatusAttribute()
     {
+        if ($this->isStarting()) {
+            return 'starting:unhealthy';
+        }
+
         $applications = $this->applications;
         $databases = $this->databases;
 

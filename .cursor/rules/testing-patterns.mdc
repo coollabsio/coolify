@@ -1,0 +1,606 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Coolify Testing Architecture & Patterns
+
+## Testing Philosophy
+
+Coolify employs **comprehensive testing strategies** using modern PHP testing frameworks to ensure reliability of deployment operations, infrastructure management, and user interactions.
+
+## Testing Framework Stack
+
+### Core Testing Tools
+- **Pest PHP 3.8+** - Primary testing framework with expressive syntax
+- **Laravel Dusk** - Browser automation and end-to-end testing
+- **PHPUnit** - Underlying unit testing framework
+- **Mockery** - Mocking and stubbing for isolated tests
+
+### Testing Configuration
+- **[tests/Pest.php](mdc:tests/Pest.php)** - Pest configuration and global setup (1.5KB, 45 lines)
+- **[tests/TestCase.php](mdc:tests/TestCase.php)** - Base test case class (163B, 11 lines)
+- **[tests/CreatesApplication.php](mdc:tests/CreatesApplication.php)** - Application factory trait (375B, 22 lines)
+- **[tests/DuskTestCase.php](mdc:tests/DuskTestCase.php)** - Browser testing setup (1.4KB, 58 lines)
+
+## Test Directory Structure
+
+### Test Organization
+- **[tests/Feature/](mdc:tests/Feature)** - Feature and integration tests
+- **[tests/Unit/](mdc:tests/Unit)** - Unit tests for isolated components
+- **[tests/Browser/](mdc:tests/Browser)** - Laravel Dusk browser tests
+- **[tests/Traits/](mdc:tests/Traits)** - Shared testing utilities
+
+## Unit Testing Patterns
+
+### Model Testing
+```php
+// Testing Eloquent models
+test('application model has correct relationships', function () {
+    $application = Application::factory()->create();
+    
+    expect($application->server)->toBeInstanceOf(Server::class);
+    expect($application->environment)->toBeInstanceOf(Environment::class);
+    expect($application->deployments)->toBeInstanceOf(Collection::class);
+});
+
+test('application can generate deployment configuration', function () {
+    $application = Application::factory()->create([
+        'name' => 'test-app',
+        'git_repository' => 'https://github.com/user/repo.git'
+    ]);
+    
+    $config = $application->generateDockerCompose();
+    
+    expect($config)->toContain('test-app');
+    expect($config)->toContain('image:');
+    expect($config)->toContain('networks:');
+});
+```
+
+### Service Layer Testing
+```php
+// Testing service classes
+test('configuration generator creates valid docker compose', function () {
+    $generator = new ConfigurationGenerator();
+    $application = Application::factory()->create();
+    
+    $compose = $generator->generateDockerCompose($application);
+    
+    expect($compose)->toBeString();
+    expect(yaml_parse($compose))->toBeArray();
+    expect($compose)->toContain('version: "3.8"');
+});
+
+test('docker image parser validates image names', function () {
+    $parser = new DockerImageParser();
+    
+    expect($parser->isValid('nginx:latest'))->toBeTrue();
+    expect($parser->isValid('invalid-image-name'))->toBeFalse();
+    expect($parser->parse('nginx:1.21'))->toEqual([
+        'registry' => 'docker.io',
+        'namespace' => 'library',
+        'repository' => 'nginx',
+        'tag' => '1.21'
+    ]);
+});
+```
+
+### Action Testing
+```php
+// Testing Laravel Actions
+test('deploy application action creates deployment queue', function () {
+    $application = Application::factory()->create();
+    $action = new DeployApplicationAction();
+    
+    $deployment = $action->handle($application);
+    
+    expect($deployment)->toBeInstanceOf(ApplicationDeploymentQueue::class);
+    expect($deployment->status)->toBe('queued');
+    expect($deployment->application_id)->toBe($application->id);
+});
+
+test('server validation action checks ssh connectivity', function () {
+    $server = Server::factory()->create([
+        'ip' => '192.168.1.100',
+        'port' => 22
+    ]);
+    
+    $action = new ValidateServerAction();
+    
+    // Mock SSH connection
+    $this->mock(SshConnection::class, function ($mock) {
+        $mock->shouldReceive('connect')->andReturn(true);
+        $mock->shouldReceive('execute')->with('docker --version')->andReturn('Docker version 20.10.0');
+    });
+    
+    $result = $action->handle($server);
+    
+    expect($result['ssh_connection'])->toBeTrue();
+    expect($result['docker_installed'])->toBeTrue();
+});
+```
+
+## Feature Testing Patterns
+
+### API Testing
+```php
+// Testing API endpoints
+test('authenticated user can list applications', function () {
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+    $user->teams()->attach($team);
+    
+    $applications = Application::factory(3)->create([
+        'team_id' => $team->id
+    ]);
+    
+    $response = $this->actingAs($user)
+        ->getJson('/api/v1/applications');
+    
+    $response->assertStatus(200)
+        ->assertJsonCount(3, 'data')
+        ->assertJsonStructure([
+            'data' => [
+                '*' => ['id', 'name', 'fqdn', 'status', 'created_at']
+            ]
+        ]);
+});
+
+test('user cannot access applications from other teams', function () {
+    $user = User::factory()->create();
+    $otherTeam = Team::factory()->create();
+    
+    $application = Application::factory()->create([
+        'team_id' => $otherTeam->id
+    ]);
+    
+    $response = $this->actingAs($user)
+        ->getJson("/api/v1/applications/{$application->id}");
+    
+    $response->assertStatus(403);
+});
+```
+
+### Deployment Testing
+```php
+// Testing deployment workflows
+test('application deployment creates docker containers', function () {
+    $application = Application::factory()->create([
+        'git_repository' => 'https://github.com/laravel/laravel.git',
+        'git_branch' => 'main'
+    ]);
+    
+    // Mock Docker operations
+    $this->mock(DockerService::class, function ($mock) {
+        $mock->shouldReceive('buildImage')->andReturn('app:latest');
+        $mock->shouldReceive('createContainer')->andReturn('container_id');
+        $mock->shouldReceive('startContainer')->andReturn(true);
+    });
+    
+    $deployment = $application->deploy();
+    
+    expect($deployment->status)->toBe('queued');
+    
+    // Process the deployment job
+    $this->artisan('queue:work --once');
+    
+    $deployment->refresh();
+    expect($deployment->status)->toBe('success');
+});
+
+test('failed deployment triggers rollback', function () {
+    $application = Application::factory()->create();
+    
+    // Mock failed deployment
+    $this->mock(DockerService::class, function ($mock) {
+        $mock->shouldReceive('buildImage')->andThrow(new DeploymentException('Build failed'));
+    });
+    
+    $deployment = $application->deploy();
+    
+    $this->artisan('queue:work --once');
+    
+    $deployment->refresh();
+    expect($deployment->status)->toBe('failed');
+    expect($deployment->error_message)->toContain('Build failed');
+});
+```
+
+### Webhook Testing
+```php
+// Testing webhook endpoints
+test('github webhook triggers deployment', function () {
+    $application = Application::factory()->create([
+        'git_repository' => 'https://github.com/user/repo.git',
+        'git_branch' => 'main'
+    ]);
+    
+    $payload = [
+        'ref' => 'refs/heads/main',
+        'repository' => [
+            'clone_url' => 'https://github.com/user/repo.git'
+        ],
+        'head_commit' => [
+            'id' => 'abc123',
+            'message' => 'Update application'
+        ]
+    ];
+    
+    $response = $this->postJson("/webhooks/github/{$application->id}", $payload);
+    
+    $response->assertStatus(200);
+    
+    expect($application->deployments()->count())->toBe(1);
+    expect($application->deployments()->first()->commit_sha)->toBe('abc123');
+});
+
+test('webhook validates payload signature', function () {
+    $application = Application::factory()->create();
+    
+    $payload = ['invalid' => 'payload'];
+    
+    $response = $this->postJson("/webhooks/github/{$application->id}", $payload);
+    
+    $response->assertStatus(400);
+});
+```
+
+## Browser Testing (Laravel Dusk)
+
+### End-to-End Testing
+```php
+// Testing complete user workflows
+test('user can create and deploy application', function () {
+    $user = User::factory()->create();
+    $server = Server::factory()->create(['team_id' => $user->currentTeam->id]);
+    
+    $this->browse(function (Browser $browser) use ($user, $server) {
+        $browser->loginAs($user)
+            ->visit('/applications/create')
+            ->type('name', 'Test Application')
+            ->type('git_repository', 'https://github.com/laravel/laravel.git')
+            ->type('git_branch', 'main')
+            ->select('server_id', $server->id)
+            ->press('Create Application')
+            ->assertPathIs('/applications/*')
+            ->assertSee('Test Application')
+            ->press('Deploy')
+            ->waitForText('Deployment started', 10)
+            ->assertSee('Deployment started');
+    });
+});
+
+test('user can monitor deployment logs in real-time', function () {
+    $user = User::factory()->create();
+    $application = Application::factory()->create(['team_id' => $user->currentTeam->id]);
+    
+    $this->browse(function (Browser $browser) use ($user, $application) {
+        $browser->loginAs($user)
+            ->visit("/applications/{$application->id}")
+            ->press('Deploy')
+            ->waitForText('Deployment started')
+            ->click('@logs-tab')
+            ->waitFor('@deployment-logs')
+            ->assertSee('Building Docker image')
+            ->waitForText('Deployment completed', 30);
+    });
+});
+```
+
+### UI Component Testing
+```php
+// Testing Livewire components
+test('server status component updates in real-time', function () {
+    $user = User::factory()->create();
+    $server = Server::factory()->create(['team_id' => $user->currentTeam->id]);
+    
+    $this->browse(function (Browser $browser) use ($user, $server) {
+        $browser->loginAs($user)
+            ->visit("/servers/{$server->id}")
+            ->assertSee('Status: Online')
+            ->waitFor('@server-metrics')
+            ->assertSee('CPU Usage')
+            ->assertSee('Memory Usage')
+            ->assertSee('Disk Usage');
+        
+        // Simulate server going offline
+        $server->update(['status' => 'offline']);
+        
+        $browser->waitForText('Status: Offline', 5)
+            ->assertSee('Status: Offline');
+    });
+});
+```
+
+## Database Testing Patterns
+
+### Migration Testing
+```php
+// Testing database migrations
+test('applications table has correct structure', function () {
+    expect(Schema::hasTable('applications'))->toBeTrue();
+    expect(Schema::hasColumns('applications', [
+        'id', 'name', 'fqdn', 'git_repository', 'git_branch',
+        'server_id', 'environment_id', 'created_at', 'updated_at'
+    ]))->toBeTrue();
+});
+
+test('foreign key constraints are properly set', function () {
+    $application = Application::factory()->create();
+    
+    expect($application->server)->toBeInstanceOf(Server::class);
+    expect($application->environment)->toBeInstanceOf(Environment::class);
+    
+    // Test cascade deletion
+    $application->server->delete();
+    expect(Application::find($application->id))->toBeNull();
+});
+```
+
+### Factory Testing
+```php
+// Testing model factories
+test('application factory creates valid models', function () {
+    $application = Application::factory()->create();
+    
+    expect($application->name)->toBeString();
+    expect($application->git_repository)->toStartWith('https://');
+    expect($application->server_id)->toBeInt();
+    expect($application->environment_id)->toBeInt();
+});
+
+test('application factory can create with custom attributes', function () {
+    $application = Application::factory()->create([
+        'name' => 'Custom App',
+        'git_branch' => 'develop'
+    ]);
+    
+    expect($application->name)->toBe('Custom App');
+    expect($application->git_branch)->toBe('develop');
+});
+```
+
+## Queue Testing
+
+### Job Testing
+```php
+// Testing background jobs
+test('deploy application job processes successfully', function () {
+    $application = Application::factory()->create();
+    $deployment = ApplicationDeploymentQueue::factory()->create([
+        'application_id' => $application->id,
+        'status' => 'queued'
+    ]);
+    
+    $job = new DeployApplicationJob($deployment);
+    
+    // Mock external dependencies
+    $this->mock(DockerService::class, function ($mock) {
+        $mock->shouldReceive('buildImage')->andReturn('app:latest');
+        $mock->shouldReceive('deployContainer')->andReturn(true);
+    });
+    
+    $job->handle();
+    
+    $deployment->refresh();
+    expect($deployment->status)->toBe('success');
+});
+
+test('failed job is retried with exponential backoff', function () {
+    $application = Application::factory()->create();
+    $deployment = ApplicationDeploymentQueue::factory()->create([
+        'application_id' => $application->id
+    ]);
+    
+    $job = new DeployApplicationJob($deployment);
+    
+    // Mock failure
+    $this->mock(DockerService::class, function ($mock) {
+        $mock->shouldReceive('buildImage')->andThrow(new Exception('Network error'));
+    });
+    
+    expect(fn() => $job->handle())->toThrow(Exception::class);
+    
+    // Job should be retried
+    expect($job->tries)->toBe(3);
+    expect($job->backoff())->toBe([1, 5, 10]);
+});
+```
+
+## Security Testing
+
+### Authentication Testing
+```php
+// Testing authentication and authorization
+test('unauthenticated users cannot access protected routes', function () {
+    $response = $this->get('/dashboard');
+    $response->assertRedirect('/login');
+});
+
+test('users can only access their team resources', function () {
+    $user1 = User::factory()->create();
+    $user2 = User::factory()->create();
+    
+    $team1 = Team::factory()->create();
+    $team2 = Team::factory()->create();
+    
+    $user1->teams()->attach($team1);
+    $user2->teams()->attach($team2);
+    
+    $application = Application::factory()->create(['team_id' => $team1->id]);
+    
+    $response = $this->actingAs($user2)
+        ->get("/applications/{$application->id}");
+    
+    $response->assertStatus(403);
+});
+```
+
+### Input Validation Testing
+```php
+// Testing input validation and sanitization
+test('application creation validates required fields', function () {
+    $user = User::factory()->create();
+    
+    $response = $this->actingAs($user)
+        ->postJson('/api/v1/applications', []);
+    
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['name', 'git_repository', 'server_id']);
+});
+
+test('malicious input is properly sanitized', function () {
+    $user = User::factory()->create();
+    
+    $response = $this->actingAs($user)
+        ->postJson('/api/v1/applications', [
+            'name' => '<script>alert("xss")</script>',
+            'git_repository' => 'javascript:alert("xss")',
+            'server_id' => 'invalid'
+        ]);
+    
+    $response->assertStatus(422);
+});
+```
+
+## Performance Testing
+
+### Load Testing
+```php
+// Testing application performance under load
+test('application list endpoint handles concurrent requests', function () {
+    $user = User::factory()->create();
+    $applications = Application::factory(100)->create(['team_id' => $user->currentTeam->id]);
+    
+    $startTime = microtime(true);
+    
+    $response = $this->actingAs($user)
+        ->getJson('/api/v1/applications');
+    
+    $endTime = microtime(true);
+    $responseTime = ($endTime - $startTime) * 1000; // Convert to milliseconds
+    
+    $response->assertStatus(200);
+    expect($responseTime)->toBeLessThan(500); // Should respond within 500ms
+});
+```
+
+### Memory Usage Testing
+```php
+// Testing memory efficiency
+test('deployment process does not exceed memory limits', function () {
+    $initialMemory = memory_get_usage();
+    
+    $application = Application::factory()->create();
+    $deployment = $application->deploy();
+    
+    // Process deployment
+    $this->artisan('queue:work --once');
+    
+    $finalMemory = memory_get_usage();
+    $memoryIncrease = $finalMemory - $initialMemory;
+    
+    expect($memoryIncrease)->toBeLessThan(50 * 1024 * 1024); // Less than 50MB
+});
+```
+
+## Test Utilities and Helpers
+
+### Custom Assertions
+```php
+// Custom test assertions
+expect()->extend('toBeValidDockerCompose', function () {
+    $yaml = yaml_parse($this->value);
+    
+    return $yaml !== false &&
+           isset($yaml['version']) &&
+           isset($yaml['services']) &&
+           is_array($yaml['services']);
+});
+
+expect()->extend('toHaveValidSshConnection', function () {
+    $server = $this->value;
+    
+    try {
+        $connection = new SshConnection($server);
+        return $connection->test();
+    } catch (Exception $e) {
+        return false;
+    }
+});
+```
+
+### Test Traits
+```php
+// Shared testing functionality
+trait CreatesTestServers
+{
+    protected function createTestServer(array $attributes = []): Server
+    {
+        return Server::factory()->create(array_merge([
+            'name' => 'Test Server',
+            'ip' => '127.0.0.1',
+            'port' => 22,
+            'team_id' => $this->user->currentTeam->id
+        ], $attributes));
+    }
+}
+
+trait MocksDockerOperations
+{
+    protected function mockDockerService(): void
+    {
+        $this->mock(DockerService::class, function ($mock) {
+            $mock->shouldReceive('buildImage')->andReturn('test:latest');
+            $mock->shouldReceive('createContainer')->andReturn('container_123');
+            $mock->shouldReceive('startContainer')->andReturn(true);
+            $mock->shouldReceive('stopContainer')->andReturn(true);
+        });
+    }
+}
+```
+
+## Continuous Integration Testing
+
+### GitHub Actions Integration
+```yaml
+# .github/workflows/tests.yml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+      - name: Install dependencies
+        run: composer install
+      - name: Run tests
+        run: ./vendor/bin/pest
+```
+
+### Test Coverage
+```php
+// Generate test coverage reports
+test('application has adequate test coverage', function () {
+    $coverage = $this->getCoverageData();
+    
+    expect($coverage['application'])->toBeGreaterThan(80);
+    expect($coverage['models'])->toBeGreaterThan(90);
+    expect($coverage['actions'])->toBeGreaterThan(85);
+});
+```

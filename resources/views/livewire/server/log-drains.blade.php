@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Log Drains | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="log-drains" />
         <div class="w-full">
@@ -13,7 +13,7 @@
                 </div>
                 <div>Sends service logs to 3rd party tools.</div>
                 <div class="flex flex-col gap-4 pt-4">
-                    <div class="p-4 border dark:border-coolgray-300">
+                    <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
                         <form wire:submit='submit("newrelic")' class="flex flex-col">
                             <h3>New Relic</h3>
                             <div class="w-32">

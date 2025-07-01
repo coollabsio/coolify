@@ -39,10 +39,15 @@
                     label="Image" id="application.image"></x-forms.input>
             </div>
         </div>
-        <h3 class="pt-2">Advanced</h3>
-        <div class="w-96">
-            <x-forms.checkbox instantSave id="application.is_gzip_enabled" label="Enable gzip compression"
-                helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
+        <h3 class="py-2 pt-4">Advanced</h3>
+        <div class="w-96 flex flex-col gap-1">
+            @if (str($application->image)->contains('pocketbase'))
+                <x-forms.checkbox instantSave id="application.is_gzip_enabled" label="Enable Gzip Compression"
+                    helper="Pocketbase does not need gzip compression, otherwise SSE will not work." disabled />
+            @else
+                <x-forms.checkbox instantSave id="application.is_gzip_enabled" label="Enable Gzip Compression"
+                    helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
+            @endif
             <x-forms.checkbox instantSave id="application.is_stripprefix_enabled" label="Strip Prefixes"
                 helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api." />
             <x-forms.checkbox instantSave label="Exclude from service status"

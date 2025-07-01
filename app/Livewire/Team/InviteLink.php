@@ -29,15 +29,15 @@ class InviteLink extends Component
 
     public function viaEmail()
     {
-        $this->generate_invite_link(sendEmail: true);
+        $this->generateInviteLink(sendEmail: true);
     }
 
     public function viaLink()
     {
-        $this->generate_invite_link(sendEmail: false);
+        $this->generateInviteLink(sendEmail: false);
     }
 
-    private function generate_invite_link(bool $sendEmail = false)
+    private function generateInviteLink(bool $sendEmail = false)
     {
         try {
             $this->validate();

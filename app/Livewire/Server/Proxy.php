@@ -19,7 +19,15 @@ class Proxy extends Component
 
     public ?string $redirect_url = null;
 
-    protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            'saveConfiguration' => 'submit',
+            "echo-private:team.{$teamId},ProxyStatusChangedUI" => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'server.settings.generate_exact_labels' => 'required|boolean',
@@ -32,15 +40,16 @@ class Proxy extends Component
         $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
     }
 
-    public function proxyStatusUpdated()
-    {
-        $this->dispatch('refresh')->self();
-    }
+    // public function proxyStatusUpdated()
+    // {
+    //     $this->dispatch('refresh')->self();
+    // }
 
     public function changeProxy()
     {
         $this->server->proxy = null;
         $this->server->save();
+
         $this->dispatch('reloadWindow');
     }
 
@@ -49,6 +58,7 @@ class Proxy extends Component
         try {
             $this->server->changeProxy($proxy_type, async: false);
             $this->selectedProxy = $this->server->proxy->type;
+
             $this->dispatch('reloadWindow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -107,11 +117,6 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server);
-            if (str($this->proxy_settings)->contains('--api.dashboard=true') && str($this->proxy_settings)->contains('--api.insecure=true')) {
-                $this->dispatch('traefikDashboardAvailable', true);
-            } else {
-                $this->dispatch('traefikDashboardAvailable', false);
-            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

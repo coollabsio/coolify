@@ -21,7 +21,7 @@
                         </svg>Before switching proxies, please read <a class="underline dark:text-white"
                             href="https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies">this</a>.
                     </div>
-                    <h4>Advanced</h4>
+                    <h3>Advanced</h3>
                     <div class="pb-4 w-96">
                         <x-forms.checkbox
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
@@ -36,9 +36,9 @@
                         @endif
                     </div>
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                        <h4>Traefik</h4>
+                        <h3>Traefik</h3>
                     @elseif ($server->proxyType() === 'CADDY')
-                        <h4>Caddy</h4>
+                        <h3>Caddy</h3>
                     @endif
                     @if (
                         $server->proxy->last_applied_settings &&

@@ -17,7 +17,17 @@ class Configuration extends Component
 
     public $servers;
 
-    protected $listeners = ['buildPackUpdated' => '$refresh'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+            "echo-private:team.{$teamId},ServiceStatusChanged" => '$refresh',
+            'buildPackUpdated' => '$refresh',
+            'refresh' => '$refresh',
+        ];
+    }
 
     public function mount()
     {
@@ -40,6 +50,11 @@ class Configuration extends Component
         $this->project = $project;
         $this->environment = $environment;
         $this->application = $application;
+
+        if ($this->application->deploymentType() === 'deploy_key' && $this->currentRoute === 'project.application.preview-deployments') {
+            return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
+        }
+
         if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
             return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
         }

@@ -138,13 +138,18 @@ class Previews extends Component
         }
     }
 
+    public function force_deploy_without_cache(int $pull_request_id, ?string $pull_request_html_url = null)
+    {
+        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true);
+    }
+
     public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         $this->add($pull_request_id, $pull_request_html_url);
         $this->deploy($pull_request_id, $pull_request_html_url);
     }
 
-    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null)
+    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false)
     {
         try {
             $this->setDeploymentUuid();
@@ -159,7 +164,7 @@ class Previews extends Component
             $result = queue_application_deployment(
                 application: $this->application,
                 deployment_uuid: $this->deployment_uuid,
-                force_rebuild: false,
+                force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
             );
@@ -234,12 +239,24 @@ class Previews extends Component
 
     private function stopContainers(array $containers, $server, int $timeout = 30)
     {
-        foreach ($containers as $container) {
-            $containerName = str_replace('/', '', $container['Names']);
-            instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
-                "docker rm -f $containerName",
-            ], server: $server, throwError: false);
+        if (empty($containers)) {
+            return;
         }
+        $containerNames = [];
+        foreach ($containers as $container) {
+            $containerNames[] = str_replace('/', '', $container['Names']);
+        }
+
+        $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
+        $commands = [
+            "docker stop --time=$timeout $containerList",
+            "docker rm -f $containerList",
+        ];
+
+        instant_remote_process(
+            command: $commands,
+            server: $server,
+            throwError: false
+        );
     }
 }

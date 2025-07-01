@@ -85,7 +85,7 @@
             <x-dropdown>
                 <x-slot:title>
                     <div class="flex justify-end w-8" x-show="theme === 'dark' || theme === 'system'">
-                        <svg class="w-5 h-5 rounded dark:fill-white" xmlns="http://www.w3.org/2000/svg"
+                        <svg class="w-5 h-5 rounded-sm dark:fill-white" xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 24 24">
                             <path
                                 d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" />
@@ -344,7 +344,7 @@
                         @if (isInstanceAdmin() || session('impersonating'))
                             <li>
                                 <a title="Admin" class="menu-item" href="/admin">
-                                    <svg class="text-pink-600 icon" viewBox="0 0 256 256"
+                                    <svg class="text-pink-500 icon" viewBox="0 0 256 256"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <path fill="currentColor"
                                             d="M177.62 159.6a52 52 0 0 1-34 34a12.2 12.2 0 0 1-3.6.55a12 12 0 0 1-3.6-23.45a28 28 0 0 0 18.32-18.32a12 12 0 0 1 22.9 7.2ZM220 144a92 92 0 0 1-184 0c0-28.81 11.27-58.18 33.48-87.28a12 12 0 0 1 17.9-1.33l19.69 19.11L127 19.89a12 12 0 0 1 18.94-5.12C168.2 33.25 220 82.85 220 144m-24 0c0-41.71-30.61-78.39-52.52-99.29l-20.21 55.4a12 12 0 0 1-19.63 4.5L80.71 82.36C67 103.38 60 124.06 60 144a68 68 0 0 0 136 0" />
@@ -362,7 +362,7 @@
                             </li>
                         @endpersist
                     @endif
-                    <li>
+                    {{-- <li>
                         <a title="Onboarding"
                             class="{{ request()->is('onboarding*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('onboarding') }}">
@@ -372,7 +372,7 @@
                             </svg>
                             Onboarding
                         </a>
-                    </li>
+                    </li> --}}
                     <li>
                         <a title="Sponsor us" class="menu-item" href="https://coolify.io/sponsorships"
                             target="_blank">
@@ -410,7 +410,7 @@
                     <form action="/logout" method="POST">
                         @csrf
                         <button title="Logout" type="submit" class="gap-2 mb-6 menu-item">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <svg class="icon mr-1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="currentColor"
                                     d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z" />
                             </svg>
