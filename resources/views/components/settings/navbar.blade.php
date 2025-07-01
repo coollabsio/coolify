@@ -5,19 +5,19 @@
         <nav class="flex items-center gap-6 min-h-10 whitespace-nowrap">
             <a class="{{ request()->routeIs('settings.index') ? 'dark:text-white' : '' }}"
                 href="{{ route('settings.index') }}">
-                <button>Configuration</button>
+                Configuration
             </a>
             <a class="{{ request()->routeIs('settings.backup') ? 'dark:text-white' : '' }}"
                 href="{{ route('settings.backup') }}">
-                <button>Backup</button>
+                Backup
             </a>
             <a class="{{ request()->routeIs('settings.email') ? 'dark:text-white' : '' }}"
                 href="{{ route('settings.email') }}">
-                <button>Transactional Email</button>
+                Transactional Email
             </a>
             <a class="{{ request()->routeIs('settings.oauth') ? 'dark:text-white' : '' }}"
                 href="{{ route('settings.oauth') }}">
-                <button>OAuth</button>
+                OAuth
             </a>
             <div class="flex-1"></div>
         </nav>

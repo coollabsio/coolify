@@ -7,8 +7,8 @@
     </div>
     <div class="flex flex-wrap gap-2 ">
         @forelse ($tags as $oneTag)
-            <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs hover:bg-coollabs-100'"
-                class="w-64 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold"
+            <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs'"
+                class="w-32 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold  dark:hover:bg-coollabs-100 flex justify-center items-center"
                 href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
         @empty
             <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
@@ -16,7 +16,7 @@
     </div>
     @if (isset($tag))
         <div>
-            <h3 class="py-4">Details</h3>
+            <h3 class="py-4">Tag Details</h3>
             <div class="flex items-end gap-2 ">
                 <div class="w-[500px]">
                     <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />
@@ -35,7 +35,7 @@
                 @if (isset($applications) && count($applications) > 0)
                     @foreach ($applications as $application)
                         <a href="{{ $application->link() }}" class="box group">
-                            <div class="flex flex-col">
+                            <div class="flex flex-col justify-center">
                                 <div class="box-title">
                                     {{ $application->project()->name }}/{{ $application->environment->name }}
                                 </div>
