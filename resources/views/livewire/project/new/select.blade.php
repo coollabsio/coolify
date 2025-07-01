@@ -253,7 +253,8 @@
     @endif
     @if ($current_step === 'destinations')
         <h2>Select a destination</h2>
-        <div>Destinations are used to segregate resources by network. If you are unsure, select the default
+        <div class="pb-4">Destinations are used to segregate resources by network. If you are unsure, select the
+            default
             Standalone Docker (coolify).</div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($server->isSwarm())
