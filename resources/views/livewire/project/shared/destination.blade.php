@@ -70,7 +70,7 @@
                                 'This will stop the all running applications on this server and remove it as a deployment destination.',
                             ]" confirmationText="{{ data_get($destination, 'server.name') }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                            shortConfirmationLabel="Server Name" step3ButtonText="Remove application from server" />
+                            shortConfirmationLabel="Server Name" />
                     </div>
                 </div>
             @endforeach

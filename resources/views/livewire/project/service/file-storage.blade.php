@@ -21,7 +21,7 @@
                     ]"
                     confirmationText="{{ $fs_path }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                    shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
+                    shortConfirmationLabel="Filepath" />
             @else
                 @if (!$fileStorage->is_binary)
                     <x-modal-confirmation :ignoreWire="false" title="Confirm File Conversion to Directory?"
@@ -37,7 +37,7 @@
                     isErrorButton submitAction="delete" :checkboxes="$fileDeletionCheckboxes" :actions="['The selected file will be permanently deleted from the container.']"
                     confirmationText="{{ $fs_path }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
-                    shortConfirmationLabel="Filepath" step3ButtonText="Permanently Delete" />
+                    shortConfirmationLabel="Filepath" />
             @endif
         </div>
         @if (!$fileStorage->is_directory)

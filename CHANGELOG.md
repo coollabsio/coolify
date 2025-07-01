@@ -2,11 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.420] - 2025-06-26
 
 ### 🚀 Features
 
 - *(core)* Set custom API rate limit (#5984)
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.419] - 2025-06-17
 

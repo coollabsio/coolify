@@ -3,12 +3,16 @@
         Team Admin | Coolify
     </x-slot>
     <x-team.navbar />
+    <h2>Admin View</h2>
+    <div class="subtitle">
+        Manage users of this instance.
+    </div>
     <form wire:submit="submitSearch" class="flex flex-col gap-2 lg:flex-row">
         <x-forms.input wire:model="search" placeholder="Search for a user" />
         <x-forms.button type="submit">Search</x-forms.button>
     </form>
-    <h3 class="pt-4">Users</h3>
-    <div class="flex flex-col gap-2 ">
+    <h3 class="py-4">Users</h3>
+    <div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
         @forelse ($users as $user)
             <div wire:key="user-{{ $user->id }}"
                 class="flex items-center justify-center gap-2 bg-white box-without-bg dark:bg-coolgray-100">
@@ -23,7 +27,7 @@
                         ]"
                         confirmationText="{{ $user->name }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the User Name below"
-                        shortConfirmationLabel="User Name" step3ButtonText="Permanently Delete" />
+                        shortConfirmationLabel="User Name" />
                 </div>
             </div>
         @empty
