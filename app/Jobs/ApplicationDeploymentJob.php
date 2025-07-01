@@ -1094,6 +1094,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        if (! $this->newVersionIsHealthy) {
+            $this->application_deployment_queue->addLogEntry('New version is not healthy, skipping drain of old containers.');
+
+            return;
+        }
         $max_wait_time = (int) $this->application->health_check_interval * (int) $this->application->health_check_retries * (int) $this->application->health_check_timeout + 1;
         $this->application_deployment_queue->addLogEntry("Draining old containers (max wait time: {$max_wait_time} seconds).");
 
