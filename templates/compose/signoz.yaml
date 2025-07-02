@@ -569,13 +569,10 @@ services:
               dsn: tcp://clickhouse:9000/signoz_logs
               timeout: 10s
               use_new_schema: true
-            # debug: {}
           service:
             telemetry:
               logs:
                 encoding: json
-              metrics:
-                address: 0.0.0.0:8888
             extensions:
               - health_check
               - pprof
