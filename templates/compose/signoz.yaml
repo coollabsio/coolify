@@ -521,7 +521,7 @@ services:
               detectors: [env, system]
               timeout: 2s
             signozspanmetrics/delta:
-              metrics_exporter: clickhousemetricswrite
+              metrics_exporter: clickhousemetricswrite, signozclickhousemetrics
               metrics_flush_interval: 60s
               latency_histogram_buckets: [100us, 1ms, 2ms, 6ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s ]
               dimensions_cache_size: 100000
@@ -557,10 +557,12 @@ services:
               use_new_schema: true
             clickhousemetricswrite:
               endpoint: tcp://clickhouse:9000/signoz_metrics
+              disable_v2: true
               resource_to_telemetry_conversion:
                 enabled: true
             clickhousemetricswrite/prometheus:
               endpoint: tcp://clickhouse:9000/signoz_metrics
+              disable_v2: true
             signozclickhousemetrics:
               dsn: tcp://clickhouse:9000/signoz_metrics
             clickhouselogsexporter:
