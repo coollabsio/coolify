@@ -82,62 +82,9 @@ services:
         max-size: 50m
         max-file: "3"
     volumes:
-      - type: bind
-        source: ./clickhouse/config.xml
-        target: /etc/clickhouse-server/config.xml
-        content: |
-          <clickhouse>
-            <max_connections>4096</max_connections>
-            <keep_alive_timeout>3</keep_alive_timeout>
-            <max_concurrent_queries>100</max_concurrent_queries>
-            <mark_cache_size>5368709120</mark_cache_size>
-            <mmap_cache_size>1000</mmap_cache_size>
-            <compiled_expression_cache_size>134217728</compiled_expression_cache_size>
-            <compiled_expression_cache_elements_size>10000</compiled_expression_cache_elements_size>
-            <custom_settings_prefixes></custom_settings_prefixes>
-            <dictionaries_config>*_dictionary.xml</dictionaries_config>
-            <user_defined_executable_functions_config>*function.xml</user_defined_executable_functions_config>
-            <user_scripts_path>/var/lib/clickhouse/user_scripts/</user_scripts_path>
-            <logger>
-              <level>information</level>
-              <formatting>
-                <type>json</type>
-              </formatting>
-            </logger>
-            <macros>
-              <shard>01</shard>
-              <replica>example01-01-1</replica>
-            </macros>
-            <prometheus>
-              <endpoint>/metrics</endpoint>
-              <port>9363</port>
-              <metrics>true</metrics>
-              <events>true</events>
-              <asynchronous_metrics>true</asynchronous_metrics>
-              <status_info>true</status_info>
-            </prometheus>
-            <opentelemetry_span_log>
-              <engine>engine MergeTree
-                      partition by toYYYYMM(finish_date)
-                      order by (finish_date, finish_time_us, trace_id)</engine>
-            </opentelemetry_span_log>
-            <query_masking_rules>
-              <rule>
-                <name>hide encrypt/decrypt arguments</name>
-                <regexp>((?:aes_)?(?:encrypt|decrypt)(?:_mysql)?)\s*\(\s*(?:'(?:\\'|.)+'|.*?)\s*\)</regexp>
-                <replace>\1(???)</replace>
-              </rule>
-            </query_masking_rules>
-            <send_crash_reports>
-              <enabled>false</enabled>
-              <anonymize>false</anonymize>
-              <endpoint>https://6f33034cfe684dd7a3ab9875e57b1c8d@o388870.ingest.sentry.io/5226277</endpoint>
-            </send_crash_reports>
-            <merge_tree_metadata_cache>
-              <lru_cache_size>268435456</lru_cache_size>
-              <continue_if_corrupted>true</continue_if_corrupted>
-            </merge_tree_metadata_cache>
-          </clickhouse>
+      - type: volume
+        source: clickhouse
+        target: /var/lib/clickhouse/
       - type: bind
         source: ./clickhouse/custom-function.xml
         target: /etc/clickhouse-server/custom-function.xml
@@ -167,6 +114,7 @@ services:
         source: ./clickhouse/cluster.xml
         target: /etc/clickhouse-server/config.d/cluster.xml
         content: |
+          <?xml version="1.0"?>
           <clickhouse>
               <!-- ZooKeeper is used to store metadata about replicas, when using Replicated tables.
                   Optional. If you don't use replicated tables, you could omit that.
@@ -233,9 +181,210 @@ services:
                   </cluster>
               </remote_servers>
           </clickhouse>
-      - type: volume
-        source: clickhouse
-        target: /var/lib/clickhouse/
+      - type: bind
+        source: ./clickhouse/users.xml
+        target: /etc/clickhouse-server/users.xml
+        content: |
+          <?xml version="1.0"?>
+          <clickhouse>
+              <!-- See also the files in users.d directory where the settings can be overridden. -->
+
+              <!-- Profiles of settings. -->
+              <profiles>
+                  <!-- Default settings. -->
+                  <default>
+                      <!-- Maximum memory usage for processing single query, in bytes. -->
+                      <max_memory_usage>10000000000</max_memory_usage>
+
+                      <!-- How to choose between replicas during distributed query processing.
+                          random - choose random replica from set of replicas with minimum number of errors
+                          nearest_hostname - from set of replicas with minimum number of errors, choose replica
+                            with minimum number of different symbols between replica's hostname and local hostname
+                            (Hamming distance).
+                          in_order - first live replica is chosen in specified order.
+                          first_or_random - if first replica one has higher number of errors, pick a random one from replicas with minimum number of errors.
+                      -->
+                      <load_balancing>random</load_balancing>
+                  </default>
+
+                  <!-- Profile that allows only read queries. -->
+                  <readonly>
+                      <readonly>1</readonly>
+                  </readonly>
+              </profiles>
+
+              <!-- Users and ACL. -->
+              <users>
+                  <!-- If user name was not specified, 'default' user is used. -->
+                  <default>
+                      <!-- See also the files in users.d directory where the password can be overridden.
+
+                          Password could be specified in plaintext or in SHA256 (in hex format).
+
+                          If you want to specify password in plaintext (not recommended), place it in 'password' element.
+                          Example: <password>qwerty</password>.
+                          Password could be empty.
+
+                          If you want to specify SHA256, place it in 'password_sha256_hex' element.
+                          Example: <password_sha256_hex>65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5</password_sha256_hex>
+                          Restrictions of SHA256: impossibility to connect to ClickHouse using MySQL JS client (as of July 2019).
+
+                          If you want to specify double SHA1, place it in 'password_double_sha1_hex' element.
+                          Example: <password_double_sha1_hex>e395796d6546b1b65db9d665cd43f0e858dd4303</password_double_sha1_hex>
+
+                          If you want to specify a previously defined LDAP server (see 'ldap_servers' in the main config) for authentication,
+                            place its name in 'server' element inside 'ldap' element.
+                          Example: <ldap><server>my_ldap_server</server></ldap>
+
+                          If you want to authenticate the user via Kerberos (assuming Kerberos is enabled, see 'kerberos' in the main config),
+                            place 'kerberos' element instead of 'password' (and similar) elements.
+                          The name part of the canonical principal name of the initiator must match the user name for authentication to succeed.
+                          You can also place 'realm' element inside 'kerberos' element to further restrict authentication to only those requests
+                            whose initiator's realm matches it.
+                          Example: <kerberos />
+                          Example: <kerberos><realm>EXAMPLE.COM</realm></kerberos>
+
+                          How to generate decent password:
+                          Execute: PASSWORD=$(base64 < /dev/urandom | head -c8); echo "$PASSWORD"; echo -n "$PASSWORD" | sha256sum | tr -d '-'
+                          In first line will be password and in second - corresponding SHA256.
+
+                          How to generate double SHA1:
+                          Execute: PASSWORD=$(base64 < /dev/urandom | head -c8); echo "$PASSWORD"; echo -n "$PASSWORD" | sha1sum | tr -d '-' | xxd -r -p | sha1sum | tr -d '-'
+                          In first line will be password and in second - corresponding double SHA1.
+                      -->
+                      <password></password>
+
+                      <!-- List of networks with open access.
+
+                          To open access from everywhere, specify:
+                              <ip>::/0</ip>
+
+                          To open access only from localhost, specify:
+                              <ip>::1</ip>
+                              <ip>127.0.0.1</ip>
+
+                          Each element of list has one of the following forms:
+                          <ip> IP-address or network mask. Examples: 213.180.204.3 or 10.0.0.1/8 or 10.0.0.1/255.255.255.0
+                              2a02:6b8::3 or 2a02:6b8::3/64 or 2a02:6b8::3/ffff:ffff:ffff:ffff::.
+                          <host> Hostname. Example: server01.clickhouse.com.
+                              To check access, DNS query is performed, and all received addresses compared to peer address.
+                          <host_regexp> Regular expression for host names. Example, ^server\d\d-\d\d-\d\.clickhouse\.com$
+                              To check access, DNS PTR query is performed for peer address and then regexp is applied.
+                              Then, for result of PTR query, another DNS query is performed and all received addresses compared to peer address.
+                              Strongly recommended that regexp is ends with $
+                          All results of DNS requests are cached till server restart.
+                      -->
+                      <networks>
+                          <ip>::/0</ip>
+                      </networks>
+
+                      <!-- Settings profile for user. -->
+                      <profile>default</profile>
+
+                      <!-- Quota for user. -->
+                      <quota>default</quota>
+
+                      <!-- User can create other users and grant rights to them. -->
+                      <!-- <access_management>1</access_management> -->
+                  </default>
+              </users>
+
+              <!-- Quotas. -->
+              <quotas>
+                  <!-- Name of quota. -->
+                  <default>
+                      <!-- Limits for time interval. You could specify many intervals with different limits. -->
+                      <interval>
+                          <!-- Length of interval. -->
+                          <duration>3600</duration>
+
+                          <!-- No limits. Just calculate resource usage for time interval. -->
+                          <queries>0</queries>
+                          <errors>0</errors>
+                          <result_rows>0</result_rows>
+                          <read_rows>0</read_rows>
+                          <execution_time>0</execution_time>
+                      </interval>
+                  </default>
+              </quotas>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse/config.xml
+        target: /etc/clickhouse-server/config.xml
+        content: |
+          <?xml version="1.0"?>
+          <clickhouse>
+            <max_connections>4096</max_connections>
+            <keep_alive_timeout>3</keep_alive_timeout>
+            <max_concurrent_queries>100</max_concurrent_queries>
+            <mark_cache_size>5368709120</mark_cache_size>
+            <mmap_cache_size>1000</mmap_cache_size>
+            <compiled_expression_cache_size>134217728</compiled_expression_cache_size>
+            <compiled_expression_cache_elements_size>10000</compiled_expression_cache_elements_size>
+            <custom_settings_prefixes></custom_settings_prefixes>
+            <dictionaries_config>*_dictionary.xml</dictionaries_config>
+            <user_defined_executable_functions_config>*function.xml</user_defined_executable_functions_config>
+            <user_scripts_path>/var/lib/clickhouse/user_scripts/</user_scripts_path>
+            <http_port>8123</http_port>
+            <tcp_port>9000</tcp_port>
+            <mysql_port>9004</mysql_port>
+            <postgresql_port>9005</postgresql_port>
+            <interserver_http_port>9009</interserver_http_port>
+            <logger>
+              <level>information</level>
+              <formatting>
+                <type>json</type>
+              </formatting>
+            </logger>
+            <macros>
+              <shard>01</shard>
+              <replica>example01-01-1</replica>
+            </macros>
+            <prometheus>
+              <endpoint>/metrics</endpoint>
+              <port>9363</port>
+              <metrics>true</metrics>
+              <events>true</events>
+              <asynchronous_metrics>true</asynchronous_metrics>
+              <status_info>true</status_info>
+            </prometheus>
+            <opentelemetry_span_log>
+              <engine>engine MergeTree
+                      partition by toYYYYMM(finish_date)
+                      order by (finish_date, finish_time_us, trace_id)</engine>
+            </opentelemetry_span_log>
+            <query_masking_rules>
+              <rule>
+                <name>hide encrypt/decrypt arguments</name>
+                <regexp>((?:aes_)?(?:encrypt|decrypt)(?:_mysql)?)\s*\(\s*(?:'(?:\\'|.)+'|.*?)\s*\)</regexp>
+                <replace>\1(???)</replace>
+              </rule>
+            </query_masking_rules>
+            <send_crash_reports>
+              <enabled>false</enabled>
+              <anonymize>false</anonymize>
+              <endpoint>https://6f33034cfe684dd7a3ab9875e57b1c8d@o388870.ingest.sentry.io/5226277</endpoint>
+            </send_crash_reports>
+            <merge_tree_metadata_cache>
+              <lru_cache_size>268435456</lru_cache_size>
+              <continue_if_corrupted>true</continue_if_corrupted>
+            </merge_tree_metadata_cache>
+            <user_directories>
+              <users_xml>
+                  <!-- Path to configuration file with predefined users. -->
+                  <path>users.xml</path>
+              </users_xml>
+              <local_directory>
+                  <!-- Path to folder where users created by SQL commands are stored. -->
+                  <path>/var/lib/clickhouse/access/</path>
+              </local_directory>
+            </user_directories>
+            <default_profile>default</default_profile>
+              <distributed_ddl>
+                  <!-- Path in ZooKeeper to queue with DDL queries -->
+                  <path>/clickhouse/task_queue/ddl</path>
+              </distributed_ddl>
+          </clickhouse>
 
   signoz:
     image: signoz/signoz:latest
