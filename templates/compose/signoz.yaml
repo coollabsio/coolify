@@ -83,21 +83,60 @@ services:
         max-file: "3"
     volumes:
       - type: bind
-        source: ./clickhouse/config.d/config.xml
-        target: /etc/clickhouse-server/config.d/config.xml
+        source: ./clickhouse/config.xml
+        target: /etc/clickhouse-server/config.xml
         content: |
           <clickhouse>
+            <max_connections>4096</max_connections>
+            <keep_alive_timeout>3</keep_alive_timeout>
+            <max_concurrent_queries>100</max_concurrent_queries>
+            <mark_cache_size>5368709120</mark_cache_size>
+            <mmap_cache_size>1000</mmap_cache_size>
+            <compiled_expression_cache_size>134217728</compiled_expression_cache_size>
+            <compiled_expression_cache_elements_size>10000</compiled_expression_cache_elements_size>
+            <custom_settings_prefixes></custom_settings_prefixes>
+            <dictionaries_config>*_dictionary.xml</dictionaries_config>
+            <user_defined_executable_functions_config>*function.xml</user_defined_executable_functions_config>
+            <user_scripts_path>/var/lib/clickhouse/user_scripts/</user_scripts_path>
             <logger>
               <level>information</level>
               <formatting>
-                  <type>json</type>
+                <type>json</type>
               </formatting>
             </logger>
             <macros>
               <shard>01</shard>
               <replica>example01-01-1</replica>
             </macros>
-            <user_defined_executable_functions_config>*function.xml</user_defined_executable_functions_config>
+            <prometheus>
+              <endpoint>/metrics</endpoint>
+              <port>9363</port>
+              <metrics>true</metrics>
+              <events>true</events>
+              <asynchronous_metrics>true</asynchronous_metrics>
+              <status_info>true</status_info>
+            </prometheus>
+            <opentelemetry_span_log>
+              <engine>engine MergeTree
+                      partition by toYYYYMM(finish_date)
+                      order by (finish_date, finish_time_us, trace_id)</engine>
+            </opentelemetry_span_log>
+            <query_masking_rules>
+              <rule>
+                <name>hide encrypt/decrypt arguments</name>
+                <regexp>((?:aes_)?(?:encrypt|decrypt)(?:_mysql)?)\s*\(\s*(?:'(?:\\'|.)+'|.*?)\s*\)</regexp>
+                <replace>\1(???)</replace>
+              </rule>
+            </query_masking_rules>
+            <send_crash_reports>
+              <enabled>false</enabled>
+              <anonymize>false</anonymize>
+              <endpoint>https://6f33034cfe684dd7a3ab9875e57b1c8d@o388870.ingest.sentry.io/5226277</endpoint>
+            </send_crash_reports>
+            <merge_tree_metadata_cache>
+              <lru_cache_size>268435456</lru_cache_size>
+              <continue_if_corrupted>true</continue_if_corrupted>
+            </merge_tree_metadata_cache>
           </clickhouse>
       - type: bind
         source: ./clickhouse/custom-function.xml
