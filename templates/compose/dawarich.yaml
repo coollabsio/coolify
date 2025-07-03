@@ -1,0 +1,173 @@
+# documentation: https://dawarich.app/docs/intro
+# slogan: Visualize your location history, track your movements, and analyze your travel patterns with complete privacy and control.
+# tags: dawarich,location,maps,tracking,owntracks,gpslogger
+# logo: svgs/dawarich.svg
+# port: 3000
+
+networks:
+  dawarich: null
+services:
+  dawarich_redis:
+    image: 'redis:7.4-alpine'
+    container_name: dawarich_redis
+    command: redis-server
+    networks:
+      - dawarich
+    volumes:
+      - 'dawarich_shared:/data'
+    restart: always
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - '--raw'
+        - incr
+        - ping
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  dawarich_db:
+    image: 'postgis/postgis:17-3.5-alpine'
+    shm_size: 1G
+    container_name: dawarich_db
+    volumes:
+      - 'dawarich_db_data:/var/lib/postgresql/data'
+      - 'dawarich_shared:/var/shared'
+    networks:
+      - dawarich
+    environment:
+      POSTGRES_USER: '${SERVICE_USER_POSTGRES}'
+      POSTGRES_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
+      POSTGRES_DB: ${POSTGRES_DB:-dawarich_development}
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-dawarich_development}'
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  dawarich_app:
+    image: 'freikin/dawarich:latest'
+    container_name: dawarich_app
+    volumes:
+      - 'dawarich_public:/var/app/public'
+      - 'dawarich_watched:/var/app/tmp/imports/watched'
+      - 'dawarich_storage:/var/app/storage'
+      - 'dawarich_db_data:/dawarich_db_data'
+    networks:
+      - dawarich
+    stdin_open: true
+    tty: true
+    entrypoint: web-entrypoint.sh
+    command:
+      - bin/rails
+      - server
+      - '-p'
+      - '3000'
+      - '-b'
+      - '::'
+    restart: on-failure
+    environment:
+      SERVICE_FQDN_DAWARICH_3000: null
+      RAILS_ENV: development
+      REDIS_URL: 'redis://dawarich_redis:6379'
+      DATABASE_HOST: dawarich_db
+      DATABASE_USERNAME: '${SERVICE_USER_POSTGRES}'
+      DATABASE_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
+      DATABASE_NAME: ${POSTGRES_DB:-dawarich_development}
+      MIN_MINUTES_SPENT_IN_CITY: 60
+      APPLICATION_HOSTS: 'localhost,$SERVICE_URL_DAWARICH'
+      TIME_ZONE: '${TIMEZONE:-Europe/Berlin}'
+      APPLICATION_PROTOCOL: http
+      PROMETHEUS_EXPORTER_ENABLED: 'false'
+      PROMETHEUS_EXPORTER_HOST: 0.0.0.0
+      PROMETHEUS_EXPORTER_PORT: 9394
+      SELF_HOSTED: 'true'
+      STORE_GEODATA: 'true'
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO - http://127.0.0.1:3000/api/v1/health | grep -q ''"status"\s*:\s*"ok"'''
+      interval: 10s
+      retries: 30
+      start_period: 30s
+      timeout: 10s
+    depends_on:
+      dawarich_db:
+        condition: service_healthy
+        restart: true
+      dawarich_redis:
+        condition: service_healthy
+        restart: true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 4G
+  dawarich_sidekiq:
+    image: 'freikin/dawarich:latest'
+    container_name: dawarich_sidekiq
+    volumes:
+      - 'dawarich_public:/var/app/public'
+      - 'dawarich_watched:/var/app/tmp/imports/watched'
+      - 'dawarich_storage:/var/app/storage'
+    networks:
+      - dawarich
+    stdin_open: true
+    tty: true
+    entrypoint: sidekiq-entrypoint.sh
+    command:
+      - sidekiq
+    restart: on-failure
+    environment:
+      RAILS_ENV: development
+      REDIS_URL: 'redis://dawarich_redis:6379'
+      DATABASE_HOST: dawarich_db
+      DATABASE_USERNAME: '${SERVICE_USER_POSTGRES}'
+      DATABASE_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
+      DATABASE_NAME: ${POSTGRES_DB:-dawarich_development}
+      APPLICATION_HOSTS: 'localhost,$SERVICE_URL_DAWARICH'
+      BACKGROUND_PROCESSING_CONCURRENCY: 10
+      APPLICATION_PROTOCOL: http
+      PROMETHEUS_EXPORTER_ENABLED: 'false'
+      PROMETHEUS_EXPORTER_HOST: dawarich_app
+      PROMETHEUS_EXPORTER_PORT: 9394
+      SELF_HOSTED: 'true'
+      STORE_GEODATA: 'true'
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pgrep -f sidekiq'
+      interval: 10s
+      retries: 30
+      start_period: 30s
+      timeout: 10s
+    depends_on:
+      dawarich_db:
+        condition: service_healthy
+        restart: true
+      dawarich_redis:
+        condition: service_healthy
+        restart: true
+      dawarich_app:
+        condition: service_healthy
+        restart: true
+volumes:
+  dawarich_db_data: null
+  dawarich_shared: null
+  dawarich_public: null
+  dawarich_watched: null
+  dawarich_storage: null
