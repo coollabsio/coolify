@@ -6,18 +6,18 @@
 
 services:
   homebox:
-    image: 'ghcr.io/hay-kot/homebox:latest'
+    image: 'ghcr.io/sysadminsmedia/homebox:latest'
     environment:
       - SERVICE_FQDN_HOMEBOX_7745
-      - HBOX_OPTIONS_ALLOW_REGISTRATION=false
-      - HBOX_LOG_LEVEL=info
-      - HBOX_LOG_FORMAT=text
-      - HBOX_WEB_MAX_UPLOAD_SIZE=10
-      - HBOX_MAILER_HOST=
-      - HBOX_MAILER_PORT=
-      - HBOX_MAILER_USERNAME=
-      - HBOX_MAILER_PASSWORD=
-      - HBOX_MAILER_FROM=
+      - HBOX_OPTIONS_ALLOW_REGISTRATION=${HBOX_OPTIONS_ALLOW_REGISTRATION:-false}
+      - HBOX_LOG_LEVEL=${HBOX_LOG_LEVEL:-info}
+      - HBOX_LOG_FORMAT=${HBOX_LOG_FORMAT:-text}
+      - HBOX_WEB_MAX_UPLOAD_SIZE=${HBOX_WEB_MAX_UPLOAD_SIZE:-0}
+      - HBOX_MAILER_HOST==${HBOX_MAILER_HOST}
+      - HBOX_MAILER_PORT==${HBOX_MAILER_PORT}
+      - HBOX_MAILER_USERNAME==${HBOX_MAILER_USERNAME}
+      - HBOX_MAILER_PASSWORD==${HBOX_MAILER_PASSWORD}
+      - HBOX_MAILER_FROM==${HBOX_MAILER_FROM}
     volumes:
       - 'homebox-data:/data/'
     healthcheck:
