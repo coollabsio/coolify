@@ -21,12 +21,7 @@ services:
     volumes:
       - 'homebox-data:/data/'
     healthcheck:
-      test:
-        - CMD
-        - wget
-        - '--spider'
-        - '--quiet'
-        - 'http://localhost:7745/api/v1/status'
+      test: ["CMD", "sh", "-c", "wget --method=GET -qO- http://localhost:7745/api/v1/status > /dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10
