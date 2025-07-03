@@ -437,6 +437,7 @@ services:
     environment:
       - SERVICE_FQDN_SIGNOZ_8080
       - SIGNOZ_ALERTMANAGER_PROVIDER=signoz
+      - SIGNOZ_JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
       - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://clickhouse:9000
       - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
       - DASHBOARDS_PATH=/root/config/dashboards
