@@ -1,5 +1,5 @@
 <div class="flex flex-col w-full gap-2 max-h-[80vh] overflow-y-auto scrollbar">
-    <form class="flex flex-col w-full gap-2 rounded " wire:submit='submitPersistentVolume'>
+    <form class="flex flex-col w-full gap-2 rounded-sm " wire:submit='submitPersistentVolume'>
         <div class="flex flex-col">
             <h3>Volume Mount</h3>
             <div>Docker Volumes mounted to the container.</div>
@@ -26,7 +26,7 @@
         </div>
 
     </form>
-    <form class="flex flex-col w-full gap-2 rounded py-4" wire:submit='submitFileStorage'>
+    <form class="flex flex-col w-full gap-2 rounded-sm py-4" wire:submit='submitFileStorage'>
         <div class="flex flex-col">
             <h3>File Mount</h3>
             <div>Actual file mounted from the host system to the container.</div>
@@ -40,7 +40,7 @@
             </x-forms.button>
         </div>
     </form>
-    <form class="flex flex-col w-full gap-2 rounded" wire:submit='submitFileStorageDirectory'>
+    <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submitFileStorageDirectory'>
         <div class="flex flex-col">
             <h3>Directory Mount</h3>
             <div>Directory mounted from the host system to the container.</div>

@@ -61,6 +61,9 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $serverUnreachableSlackNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $serverPatchSlackNotifications = false;
+
     public function mount()
     {
         try {
@@ -91,6 +94,7 @@ class Slack extends Component
             $this->settings->server_disk_usage_slack_notifications = $this->serverDiskUsageSlackNotifications;
             $this->settings->server_reachable_slack_notifications = $this->serverReachableSlackNotifications;
             $this->settings->server_unreachable_slack_notifications = $this->serverUnreachableSlackNotifications;
+            $this->settings->server_patch_slack_notifications = $this->serverPatchSlackNotifications;
 
             $this->settings->save();
             refreshSession();
@@ -110,6 +114,7 @@ class Slack extends Component
             $this->serverDiskUsageSlackNotifications = $this->settings->server_disk_usage_slack_notifications;
             $this->serverReachableSlackNotifications = $this->settings->server_reachable_slack_notifications;
             $this->serverUnreachableSlackNotifications = $this->settings->server_unreachable_slack_notifications;
+            $this->serverPatchSlackNotifications = $this->settings->server_patch_slack_notifications;
         }
     }
 

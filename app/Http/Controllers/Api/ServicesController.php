@@ -380,6 +380,9 @@ class ServicesController extends Controller
 
             $service = new Service;
             $result = $this->upsert_service($request, $service, $teamId);
+            if ($result instanceof \Illuminate\Http\JsonResponse) {
+                return $result;
+            }
 
             return response()->json(serializeApiResponse($result))->setStatusCode(201);
         } else {
@@ -527,6 +530,18 @@ class ServicesController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                    format: 'uuid',
+                )
+            ),
+        ],
         requestBody: new OA\RequestBody(
             description: 'Service updated.',
             required: true,
@@ -596,12 +611,14 @@ class ServicesController extends Controller
         }
 
         $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
-
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
         $result = $this->upsert_service($request, $service, $teamId);
+        if ($result instanceof \Illuminate\Http\JsonResponse) {
+            return $result;
+        }
 
         return response()->json(serializeApiResponse($result))->setStatusCode(200);
     }
@@ -1411,6 +1428,15 @@ class ServicesController extends Controller
                     format: 'uuid',
                 )
             ),
+            new OA\Parameter(
+                name: 'latest',
+                in: 'query',
+                description: 'Pull latest images.',
+                schema: new OA\Schema(
+                    type: 'boolean',
+                    default: false,
+                )
+            ),
         ],
         responses: [
             new OA\Response(
@@ -1456,7 +1482,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
-        RestartService::dispatch($service);
+        $pullLatest = $request->boolean('latest');
+        RestartService::dispatch($service, $pullLatest);
 
         return response()->json(
             [

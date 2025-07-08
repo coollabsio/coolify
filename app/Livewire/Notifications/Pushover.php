@@ -64,6 +64,9 @@ class Pushover extends Component
     #[Validate(['boolean'])]
     public bool $serverUnreachablePushoverNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $serverPatchPushoverNotifications = false;
+
     public function mount()
     {
         try {
@@ -95,6 +98,7 @@ class Pushover extends Component
             $this->settings->server_disk_usage_pushover_notifications = $this->serverDiskUsagePushoverNotifications;
             $this->settings->server_reachable_pushover_notifications = $this->serverReachablePushoverNotifications;
             $this->settings->server_unreachable_pushover_notifications = $this->serverUnreachablePushoverNotifications;
+            $this->settings->server_patch_pushover_notifications = $this->serverPatchPushoverNotifications;
 
             $this->settings->save();
             refreshSession();
@@ -115,6 +119,7 @@ class Pushover extends Component
             $this->serverDiskUsagePushoverNotifications = $this->settings->server_disk_usage_pushover_notifications;
             $this->serverReachablePushoverNotifications = $this->settings->server_reachable_pushover_notifications;
             $this->serverUnreachablePushoverNotifications = $this->settings->server_unreachable_pushover_notifications;
+            $this->serverPatchPushoverNotifications = $this->settings->server_patch_pushover_notifications;
         }
     }
 

@@ -21,7 +21,9 @@ class Index extends Component
         if (! auth()->user()->isAdmin()) {
             abort(403);
         }
-        $this->servers = Server::isReachable()->get();
+        $this->servers = Server::isReachable()->get()->filter(function ($server) {
+            return $server->isTerminalEnabled();
+        });
     }
 
     public function loadContainers()

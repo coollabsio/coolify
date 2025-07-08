@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Database;
 
+use Auth;
 use Livewire\Component;
 
 class Configuration extends Component
@@ -13,6 +14,15 @@ class Configuration extends Component
     public $project;
 
     public $environment;
+
+    public function getListeners()
+    {
+        $teamId = Auth::user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
 
     public function mount()
     {

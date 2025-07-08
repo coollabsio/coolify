@@ -2,7 +2,7 @@
 
 namespace App\Traits;
 
-use DB;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 trait DeletesUserSessions

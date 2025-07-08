@@ -46,6 +46,15 @@ class Show extends Component
     #[Locked]
     public string $task_uuid;
 
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
+
     public function mount(string $task_uuid, string $project_uuid, string $environment_uuid, ?string $application_uuid = null, ?string $service_uuid = null)
     {
         try {

@@ -13,22 +13,41 @@
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/redis'>https://hub.docker.com/_/redis</a>" />
         </div>
         <div class="flex flex-col gap-2">
-            @if (version_compare($redis_version, '6.0', '>='))
-                <x-forms.input label="Username" id="redis_username" required
-                    helper="You can change the Redis Username in the input field below or by editing the value of the REDIS_USERNAME environment variable.
+            @if ($database->started_at)
+                <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here,
+                    otherwise
+                    automations won't work. <br>Changing them here will not change the values in the database.
+                </div>
+                <div class="flex gap-2">
+                    @if (version_compare($redis_version, '6.0', '>='))
+                        <x-forms.input label="Username" id="redis_username"
+                            helper="You can only change this in the database." />
+                    @endif
+                    <x-forms.input label="Password" id="redis_password" type="password"
+                        helper="You can only change this in the database." />
+                </div>
+            @else
+                <div class="pt-2 dark:text-warning">You can only change the username and password in the database after
+                    initial start.</div>
+                <div class="flex gap-2">
+                    @if (version_compare($redis_version, '6.0', '>='))
+                        <x-forms.input label="Username" id="redis_username" required
+                            helper="You can change the Redis Username in the input field below or by editing the value of the REDIS_USERNAME environment variable.
                     <br><br>
                     If you change the Redis Username in the database, please sync it here, otherwise automations (like backups) won't work.
                     <br><br>
                     Note: If the environment variable REDIS_USERNAME is set as a shared variable (environment, project, or team-based), this input field will become read-only."
-                    :disabled="$this->isSharedVariable('REDIS_USERNAME')" />
-            @endif
-            <x-forms.input label="Password" id="redis_password" type="password" required
-                helper="You can change the Redis Password in the input field below or by editing the value of the REDIS_PASSWORD environment variable.
+                            :disabled="$this->isSharedVariable('REDIS_USERNAME')" />
+                    @endif
+                    <x-forms.input label="Password" id="redis_password" type="password" required
+                        helper="You can change the Redis Password in the input field below or by editing the value of the REDIS_PASSWORD environment variable.
                 <br><br>
                 If you change the Redis Password in the database, please sync it here, otherwise automations (like backups) won't work.
                 <br><br>
                 Note: If the environment variable REDIS_PASSWORD is set as a shared variable (environment, project, or team-based), this input field will become read-only."
-                :disabled="$this->isSharedVariable('REDIS_PASSWORD')" />
+                        :disabled="$this->isSharedVariable('REDIS_PASSWORD')" />
+                </div>
+            @endif
         </div>
         <x-forms.input
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"

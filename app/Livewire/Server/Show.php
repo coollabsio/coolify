@@ -86,10 +86,7 @@ class Show extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
             'refreshServerShow' => 'refresh',
         ];
     }
@@ -179,7 +176,7 @@ class Show extends Component
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelEnabled = $this->server->settings->is_sentinel_enabled;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
-            $this->sentinelUpdatedAt = $this->server->settings->updated_at;
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
         }
     }
@@ -187,7 +184,6 @@ class Show extends Component
     public function refresh()
     {
         $this->syncData();
-        $this->dispatch('$refresh');
     }
 
     public function validateServer($install = true)
@@ -211,7 +207,6 @@ class Show extends Component
             $this->server->settings->is_usable = $this->isUsable = true;
             $this->server->settings->save();
             ServerReachabilityChanged::dispatch($this->server);
-            $this->dispatch('proxyStatusUpdated');
         } else {
             $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 

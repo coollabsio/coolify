@@ -1,0 +1,61 @@
+# documentation: https://paymenter.org/docs/guides/docker
+# slogan: Open-Source Billing, Built for Hosting
+# tags: automation, billing, open source
+# logo: svgs/paymenter.svg
+# port: 80
+
+services:
+  paymenter:
+    image: ghcr.io/paymenter/paymenter:latest
+    volumes:
+      - app_logs:/app/storage/logs
+      - app_public:/app/storage/public
+    environment:
+      SERVICE_FQDN_PAYMENTER: ${SERVICE_FQDN_PAYMENTER_80}
+      DB_DATABASE: ${MYSQL_DATABASE:-paymenter-db}
+      DB_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
+      DB_USERNAME: ${SERVICE_USER_MYSQL}
+      APP_ENV: production
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_USERNAME: default
+      REDIS_PASSWORD: ${SERVICE_PASSWORD_64_REDIS}
+      DB_CONNECTION: mariadb
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      APP_KEY: ${SERVICE_BASE64_KEY}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 1s
+      retries: 3
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - paymenter_mariadb_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-paymenter-db}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
+      interval: 10s
+      timeout: 1s
+      retries: 3

@@ -13,17 +13,20 @@ class CleanupRedis extends Command
 
     public function handle()
     {
-        $prefix = config('database.redis.options.prefix');
-
-        $keys = Redis::connection()->keys('*:laravel*');
-        collect($keys)->each(function ($key) use ($prefix) {
+        $redis = Redis::connection('horizon');
+        $keys = $redis->keys('*');
+        $prefix = config('horizon.prefix');
+        foreach ($keys as $key) {
             $keyWithoutPrefix = str_replace($prefix, '', $key);
-            Redis::connection()->del($keyWithoutPrefix);
-        });
+            $type = $redis->command('type', [$keyWithoutPrefix]);
 
-        $queueOverlaps = Redis::connection()->keys('*laravel-queue-overlap*');
-        collect($queueOverlaps)->each(function ($key) {
-            Redis::connection()->del($key);
-        });
+            if ($type === 5) {
+                $data = $redis->command('hgetall', [$keyWithoutPrefix]);
+                $status = data_get($data, 'status');
+                if ($status === 'completed') {
+                    $redis->command('del', [$keyWithoutPrefix]);
+                }
+            }
+        }
     }
 }

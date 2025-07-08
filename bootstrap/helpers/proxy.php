@@ -91,21 +91,17 @@ function connectProxyToNetworks(Server $server)
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             return [
-                "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to $network network.'",
-                "echo 'Proxy started and configured successfully!'",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
             return [
-                "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to $network network.'",
-                "echo 'Proxy started and configured successfully!'",
             ];
         });
     }

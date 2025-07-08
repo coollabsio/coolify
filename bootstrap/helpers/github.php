@@ -52,6 +52,9 @@ function generateGithubToken(GithubApp $source, string $type)
 
             if (! $response->successful()) {
                 $error = data_get($response->json(), 'message', 'no error message found');
+                if ($error === 'Not Found') {
+                    $error = 'Repository not found. Is it moved or deleted?';
+                }
                 throw new RuntimeException("Failed to get installation token for {$source->name} with error: ".$error);
             }
 

@@ -217,6 +217,10 @@ class StartMongodb
         if ($this->database->enable_ssl) {
             $commandParts = ['mongod'];
 
+            if (! empty($this->database->mongo_conf)) {
+                $commandParts = ['mongod', '--config', '/etc/mongo/mongod.conf'];
+            }
+
             $sslConfig = match ($this->database->ssl_mode) {
                 'allow' => [
                     '--tlsMode=allowTLS',

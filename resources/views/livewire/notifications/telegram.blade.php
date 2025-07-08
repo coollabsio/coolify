@@ -27,8 +27,9 @@
             <x-forms.input type="password" autocomplete="new-password"
                 helper="Get it from the <a class='inline-block underline dark:text-white' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
                 required id="telegramToken" label="Bot API Token" />
-            <x-forms.input type="password" autocomplete="new-password" helper="Add your bot to a group chat and add its Chat ID here." required
-                id="telegramChatId" label="Chat ID" />
+            <x-forms.input type="password" autocomplete="new-password"
+                helper="Add your bot to a group chat and add its Chat ID here." required id="telegramChatId"
+                label="Chat ID" />
         </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>
@@ -36,7 +37,7 @@
         Select events for which you would like to receive Telegram notifications.
     </p>
     <div class="flex flex-col gap-4 ">
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -66,7 +67,7 @@
                 </div>
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Backups</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -89,7 +90,7 @@
             </div>
         </div>
 
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Scheduled Tasks</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -112,7 +113,7 @@
             </div>
         </div>
 
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -151,7 +152,6 @@
                         id="telegramNotificationsServerReachableThreadId" />
                 </div>
 
-
                 <div class="pl-1 flex gap-2">
                     <div class="w-96">
                         <x-forms.checkbox instantSave="saveModel" id="serverUnreachableTelegramNotifications"
@@ -159,6 +159,15 @@
                     </div>
                     <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
                         id="telegramNotificationsServerUnreachableThreadId" />
+                </div>
+
+                <div class="pl-1 flex gap-2">
+                    <div class="w-96">
+                        <x-forms.checkbox instantSave="saveModel" id="serverPatchTelegramNotifications"
+                            label="Server Patching" />
+                    </div>
+                    <x-forms.input type="password" placeholder="Custom Telegram Thread ID"
+                        id="telegramNotificationsServerPatchThreadId" />
                 </div>
             </div>
         </div>
