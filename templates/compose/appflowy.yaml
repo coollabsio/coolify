@@ -240,6 +240,7 @@ services:
         condition: service_started
 
   ai:
+    exclude_from_hc: true
     image: appflowyinc/appflowy_ai:${APPFLOWY_AI_VERSION:-latest}
     environment:
       - OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
