@@ -7,7 +7,6 @@
 services:
   nginx:
     image: nginx:latest
-    restart: on-failure
     environment:
       # This is the only FQDN needed. Coolify's Traefik proxy will forward all traffic
       # for your domain to this Nginx container on port 80.
@@ -143,13 +142,11 @@ services:
 
   appflowy_web:
     image: appflowyinc/appflowy_web:${APPFLOWY_WEB_VERSION:-latest}
-    restart: on-failure
     depends_on:
       - appflowy_cloud
 
   appflowy_cloud:
     image: appflowyinc/appflowy_cloud:${APPFLOWY_CLOUD_VERSION:-latest}
-    restart: on-failure
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - APPFLOWY_ENVIRONMENT=production
@@ -188,7 +185,6 @@ services:
 
   gotrue:
     image: appflowyinc/gotrue:${GOTRUE_VERSION:-latest}
-    restart: on-failure
     environment:
       - GOTRUE_API_HOST=0.0.0.0
       - GOTRUE_API_PORT=9999
@@ -226,7 +222,6 @@ services:
 
   admin_frontend:
     image: appflowyinc/admin_frontend:${APPFLOWY_ADMIN_FRONTEND_VERSION:-latest}
-    restart: on-failure
     environment:
       - RUST_LOG=info
       - ADMIN_FRONTEND_REDIS_URL=redis://redis:6379
@@ -246,7 +241,6 @@ services:
 
   ai:
     image: appflowyinc/appflowy_ai:${APPFLOWY_AI_VERSION:-latest}
-    restart: on-failure
     environment:
       - OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
       - APPFLOWY_AI_SERVER_PORT=5001
@@ -258,7 +252,6 @@ services:
 
   appflowy_worker:
     image: appflowyinc/appflowy_worker:${APPFLOWY_WORKER_VERSION:-latest}
-    restart: on-failure
     environment:
       - RUST_LOG=info
       - APPFLOWY_ENVIRONMENT=production
@@ -286,7 +279,6 @@ services:
 
   minio:
     image: minio/minio
-    restart: on-failure
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
@@ -298,7 +290,6 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    restart: on-failure
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-appflowy}
@@ -315,7 +306,6 @@ services:
 
   redis:
     image: redis
-    restart: on-failure
 
 # These named volumes will be created and managed by Docker/Coolify.
 volumes:
