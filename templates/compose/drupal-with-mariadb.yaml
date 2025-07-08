@@ -1,0 +1,58 @@
+# documentation: https://www.drupal.org/about
+# slogan: Drupal is a free and open-source web content management system written in PHP and distributed under the GNU General Public License.
+# tags: cms, blog, content, management, postgresql
+# logo: svgs/drupal.svg
+
+services:
+  drupal:
+    image: 'drupal:10-apache'
+    environment:
+      - SERVICE_FQDN_DRUPAL
+      - DB_HOST=postgres
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      -
+        type: volume
+        source: drupal_modules
+        target: /var/www/html/modules
+        is_directory: true
+      -
+        type: volume
+        source: drupal_profiles
+        target: /var/www/html/profiles
+        is_directory: true
+      -
+        type: volume
+        source: drupal_themes
+        target: /var/www/html/themes
+        is_directory: true
+      -
+        type: volume
+        source: drupal_sites
+        target: /var/www/html/sites
+        is_directory: true
+    depends_on:
+      - mariadb
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -f http://localhost:80 || exit 1'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - drupal-mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
