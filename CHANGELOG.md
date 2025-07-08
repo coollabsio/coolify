@@ -4,14 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(scheduling)* Add command to manually run scheduled database backups and tasks with options for chunking, delays, and dry runs
+
+### 🐛 Bug Fixes
+
+- *(versions)* Update coolify version numbers in versions.json and constants.php to 4.0.0-beta.420.5 and 4.0.0-beta.420.6
+- *(database)* Ensure internal port defaults correctly for unsupported database types in StartDatabaseProxy
+
 ### 🚜 Refactor
 
-- *(popup)* Improve styling and structure of the small popup component
-- *(shared)* Enhance FQDN generation logic for services in newParser function
+- *(postgresql)* Improve layout and spacing in SSL and Proxy configuration sections for better UI consistency
 
-### ⚙️ Miscellaneous Tasks
+## [4.0.0-beta.420.4] - 2025-07-08
 
-- *(versions)* Bump coolify and nightly versions to 4.0.0-beta.420.3 and 4.0.0-beta.420.4 respectively
+### 🐛 Bug Fixes
+
+- *(service)* Update Postiz compose configuration for improved server availability
+- *(install.sh)* Use IPV4_PUBLIC_IP variable in output instead of repeated curl
+- *(env)* Generate literal env variables better
+- *(deployment)* Update x-data initialization in deployment view for improved functionality
+- *(deployment)* Enhance COOLIFY_URL and COOLIFY_FQDN variable generation for better compatibility
+- *(deployment)* Improve docker-compose domain handling and environment variable generation
+- *(deployment)* Refactor domain parsing and environment variable generation using Spatie URL library
+- *(deployment)* Update COOLIFY_URL and COOLIFY_FQDN generation to use Spatie URL library for improved accuracy
+- *(scheduling)* Change redis cleanup command frequency from hourly to weekly for better resource management
+
+### 🚜 Refactor
+
+- *(previews)* Streamline preview URL generation by utilizing application method
+- *(application)* Adjust layout and spacing in general application view for improved UI
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.420.3] - 2025-07-03
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.420.2] - 2025-07-03
 
@@ -36,10 +70,21 @@ All notable changes to this project will be documented in this file.
 - *(terminal)* Simplify command construction for SSH execution
 - *(settings)* Streamline instance admin checks and initialization of settings in Livewire components
 - *(policy)* Optimize team membership checks in S3StoragePolicy
+- *(popup)* Improve styling and structure of the small popup component
+- *(shared)* Enhance FQDN generation logic for services in newParser function
+- *(redis)* Enhance CleanupRedis command with dry-run option and improved key deletion logic
+- *(init)* Standardize method naming conventions and improve command structure in Init.php
+- *(shared)* Improve error handling in getTopLevelNetworks function to return network name on invalid docker-compose.yml
+- *(database)* Improve error handling for unsupported database types in StartDatabaseProxy
 
 ### 📚 Documentation
 
 - Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump coolify and nightly versions to 4.0.0-beta.420.3 and 4.0.0-beta.420.4 respectively
+- *(versions)* Update coolify and nightly versions to 4.0.0-beta.420.4 and 4.0.0-beta.420.5 respectively
 
 ## [4.0.0-beta.420.1] - 2025-06-26
 
