@@ -1,0 +1,20 @@
+on:
+  push:
+    branches:
+      - v4.x
+
+jobs:
+  build:
+    runs-on: Default
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: docker-registry.platformshape.local
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - run: ./.platformshape/build-and-push.sh
