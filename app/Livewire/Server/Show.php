@@ -176,7 +176,7 @@ class Show extends Component
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelEnabled = $this->server->settings->is_sentinel_enabled;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
-            $this->sentinelUpdatedAt = $this->server->settings->updated_at;
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
         }
     }

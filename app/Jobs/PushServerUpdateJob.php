@@ -70,7 +70,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('push-server-update-'.$this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping('push-server-update-'.$this->server->uuid))->expireAfter(30)->dontRelease()];
     }
 
     public function backoff(): int

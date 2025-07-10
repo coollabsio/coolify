@@ -69,7 +69,7 @@
                 <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
                     Configuration</x-forms.button>
             @endif
-            <div class="w-96 pb-8">
+            <div class="w-96 pb-6">
                 @if ($application->could_set_build_commands())
                     <x-forms.checkbox instantSave id="application.settings.is_static" label="Is it a static site?"
                         helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
@@ -176,7 +176,7 @@
                     @endif
                 </div>
             @endif
-            <div class="py-4 border-b dark:border-coolgray-200">
+            <div>
                 <h3>Build</h3>
                 @if ($application->build_pack === 'dockerimage')
                     <x-forms.input
@@ -290,8 +290,11 @@
                 @endif
             </div>
             @if ($application->build_pack === 'dockercompose')
-                <x-forms.button wire:target='initLoadingCompose'
-                    x-on:click="$wire.dispatch('loadCompose', false)">Reload Compose File</x-forms.button>
+                <div class="flex items-center gap-2 pb-4">
+                    <h3>Docker Compose</h3>
+                    <x-forms.button wire:target='initLoadingCompose'
+                        x-on:click="$wire.dispatch('loadCompose', false)">Reload Compose File</x-forms.button>
+                </div>
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
                         label="Docker Compose Content (applicationId: {{ $application->id }})"

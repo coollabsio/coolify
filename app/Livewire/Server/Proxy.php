@@ -19,7 +19,15 @@ class Proxy extends Component
 
     public ?string $redirect_url = null;
 
-    protected $listeners = ['saveConfiguration' => 'submit'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            'saveConfiguration' => 'submit',
+            "echo-private:team.{$teamId},ProxyStatusChangedUI" => '$refresh',
+        ];
+    }
 
     protected $rules = [
         'server.settings.generate_exact_labels' => 'required|boolean',

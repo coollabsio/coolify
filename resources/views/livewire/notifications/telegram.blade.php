@@ -37,7 +37,7 @@
         Select events for which you would like to receive Telegram notifications.
     </p>
     <div class="flex flex-col gap-4 ">
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -67,7 +67,7 @@
                 </div>
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Backups</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -90,7 +90,7 @@
             </div>
         </div>
 
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Scheduled Tasks</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">
@@ -113,7 +113,7 @@
             </div>
         </div>
 
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <div class="pl-1 flex gap-2">

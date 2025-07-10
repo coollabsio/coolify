@@ -111,8 +111,19 @@ class Source extends Component
             $this->application->update([
                 'source_id' => $sourceId,
                 'source_type' => $sourceType,
-                'repository_project_id' => null,
             ]);
+
+            ['repository' => $customRepository] = $this->application->customRepository();
+            $repository = githubApi($this->application->source, "repos/{$customRepository}");
+            $data = data_get($repository, 'data');
+            $repository_project_id = data_get($data, 'id');
+            if (isset($repository_project_id)) {
+                if ($this->application->repository_project_id !== $repository_project_id) {
+                    $this->application->repository_project_id = $repository_project_id;
+                    $this->application->save();
+                }
+            }
+
             $this->application->refresh();
             $this->getSources();
             $this->dispatch('success', 'Source updated!');

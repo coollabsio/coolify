@@ -887,7 +887,7 @@ $schema://$host {
 
     public function muxFilename()
     {
-        return $this->uuid;
+        return 'mux_'.$this->uuid;
     }
 
     public function team()

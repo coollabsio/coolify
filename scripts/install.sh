@@ -253,6 +253,11 @@ if [ "$OS_TYPE" = "endeavouros" ]; then
     OS_TYPE="arch"
 fi
 
+# Check if the OS is Cachy OS, if so, change it to arch
+if [ "$OS_TYPE" = "cachyos" ]; then
+    OS_TYPE="arch"
+fi
+
 # Check if the OS is Asahi Linux, if so, change it to fedora
 if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
     OS_TYPE="fedora"
@@ -844,7 +849,7 @@ IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
 
 echo -e "\nYour instance is ready to use!\n"
 if [ -n "$IPV4_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPV4: http://$(curl -4s https://ifconfig.io):8000"
+    echo -e "You can access Coolify through your Public IPV4: http://[$IPV4_PUBLIC_IP]:8000"
 fi
 if [ -n "$IPV6_PUBLIC_IP" ]; then
     echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"

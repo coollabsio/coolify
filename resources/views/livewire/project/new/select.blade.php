@@ -78,7 +78,7 @@
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
                     </div>
-                    <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
+                    <div class="py-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
                         the
                         respective
                         companies, and use of them does not imply any affiliation or endorsement.<br>Find more services
@@ -253,7 +253,8 @@
     @endif
     @if ($current_step === 'destinations')
         <h2>Select a destination</h2>
-        <div>Destinations are used to segregate resources by network. If you are unsure, select the default
+        <div class="pb-4">Destinations are used to segregate resources by network. If you are unsure, select the
+            default
             Standalone Docker (coolify).</div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($server->isSwarm())

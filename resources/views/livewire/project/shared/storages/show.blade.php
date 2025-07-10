@@ -60,7 +60,7 @@
                         'If the persistent storage/volume is actvily used by a resource data will be lost.',
                     ]" confirmationText="{{ $storage->name }}"
                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
-                    shortConfirmationLabel="Storage Name" step3ButtonText="Permanently Delete" />
+                    shortConfirmationLabel="Storage Name" />
             </div>
         @endif
     </form>

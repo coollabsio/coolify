@@ -46,11 +46,25 @@ return [
         'redirect' => env('AUTHENTIK_REDIRECT_URI'),
     ],
 
+    'clerk' => [
+        'client_id' => env('CLERK_CLIENT_ID'),
+        'client_secret' => env('CLERK_CLIENT_SECRET'),
+        'redirect' => env('CLERK_REDIRECT_URI'),
+        'base_url' => env('CLERK_BASE_URL'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
         'tenant' => env('GOOGLE_TENANT'),
+    ],
+
+    'zitadel' => [
+        'client_id' => env('ZITADEL_CLIENT_ID'),
+        'client_secret' => env('ZITADEL_CLIENT_SECRET'),
+        'redirect' => env('ZITADEL_REDIRECT_URI'),
+        'base_url' => env('ZITADEL_BASE_URL'),
     ],
 
 ];
