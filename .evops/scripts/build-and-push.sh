@@ -14,9 +14,9 @@ coolifyRealtimeVersion=$(getContainerVersion "coolify-realtime")
 coolifyHelperVersion=$(getContainerVersion "coolify-helper")
 
 serviceToDirMapping=(
-  "coolify:production:latest"
   "coolify-helper:coolify-helper:${coolifyHelperVersion}"
   "coolify-helper:coolify-helper:latest"
+  "coolify:production:latest"
   "coolify-realtime:coolify-realtime:${coolifyRealtimeVersion}"
   "coolify-realtime:coolify-realtime:latest"
 )
