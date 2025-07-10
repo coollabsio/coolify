@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, Default, github-actions-runner-scale-set]
+    runs-on: [github-actions-runner-scale-set]
 
     steps:
       - uses: actions/checkout@v4
