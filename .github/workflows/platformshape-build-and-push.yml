@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: [github-actions-runner-scale-set]
+    container: ubuntu:24.04
 
     steps:
       - uses: actions/checkout@v4
