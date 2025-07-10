@@ -777,6 +777,7 @@ All notable changes to this project will be documented in this file.
 - *(proxy-dashboard)* Implement ProxyDashboardCacheService to manage Traefik dashboard cache; clear cache on configuration changes and proxy actions
 - *(terminal-connection)* Enhance terminal connection handling with auto-connect feature and improved status messaging
 - *(terminal)* Implement resize handling with ResizeObserver for improved terminal responsiveness
+- Add GitHub Actions workflow for build and push evops version of coolify
 
 ### 🐛 Bug Fixes
 
@@ -4163,6 +4164,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
