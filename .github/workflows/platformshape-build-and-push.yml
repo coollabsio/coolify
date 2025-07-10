@@ -1,3 +1,5 @@
+name: Build Coolify containers
+
 on:
   push:
     branches:
