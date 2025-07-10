@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: Default
+    runs-on: [self-hosted, Default]
 
     steps:
       - uses: actions/checkout@v4
