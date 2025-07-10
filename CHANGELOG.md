@@ -3309,6 +3309,7 @@ All notable changes to this project will be documented in this file.
 - *(terminal)* Now it should work
 - *(degraded-status)* Remove unnecessary whitespace in badge element for cleaner HTML
 - *(routes)* Add name to security route for improved route management
+- Reorder service mapping for consistent build process
 
 ### 💼 Other
 
@@ -4162,6 +4163,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
