@@ -3315,6 +3315,7 @@ All notable changes to this project will be documented in this file.
 - Update runner configuration to use self-hosted environment for build job
 - Update runner configuration to include github-actions-runner-scale-set
 - Add name to the build workflow for clarity
+- Simplify runner configuration in build workflow
 
 ### 💼 Other
 
@@ -4168,6 +4169,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
