@@ -778,6 +778,7 @@ All notable changes to this project will be documented in this file.
 - *(terminal-connection)* Enhance terminal connection handling with auto-connect feature and improved status messaging
 - *(terminal)* Implement resize handling with ResizeObserver for improved terminal responsiveness
 - Add GitHub Actions workflow for build and push evops version of coolify
+- Add build and push workflow for platformshape and release script
 
 ### 🐛 Bug Fixes
 
@@ -4164,6 +4165,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
