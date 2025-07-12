@@ -79,6 +79,11 @@
                 @endif
                 <div class="flex-1"></div>
                 @if ($isDisabled)
+                    @if (str($key)->startsWith('SERVICE_PASSWORD_HASH_BCRYPT'))
+                        <x-forms.button disabled wire:click="regenerateHash" type="button">
+                            Regenerate Hash
+                        </x-forms.button>
+                    @endif
                     <x-forms.button disabled type="submit">
                         Update
                     </x-forms.button>
@@ -92,6 +97,11 @@
                         shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
                         step2ButtonText="Permanently Delete" />
                 @else
+                    @if (str($key)->startsWith('SERVICE_PASSWORD_HASH_BCRYPT'))
+                        <x-forms.button wire:click="regenerateHash" type="button">
+                            Regenerate Hash
+                        </x-forms.button>
+                    @endif
                     <x-forms.button type="submit">
                         Update
                     </x-forms.button>

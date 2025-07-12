@@ -10,9 +10,17 @@ services:
     environment:
       - SERVICE_FQDN_WIREGUARDEASY_8000
       - WG_HOST=${SERVICE_FQDN_WIREGUARDEASY}
+      - PASSWORD_HASH=${SERVICE_PASSWORD_HASH_BCRYPT_WIREGUARDEASY}
       - LANG=${LANG:-en}
       - PORT=8000
-      - WG_PORT=51820
+      - WG_PORT=${WG_PORT:-51820}
+      - WG_MTU=${WG_MTU:-1420}
+      - WG_DEFAULT_ADDRESS=${WG_DEFAULT_ADDRESS:-10.8.0.x}
+      - WG_DEFAULT_DNS=${WG_DEFAULT_DNS:-1.1.1.1}
+      - WG_ALLOWED_IPS=${WG_ALLOWED_IPS:-0.0.0.0/0,::/0}
+      - WG_PERSISTENT_KEEPALIVE=${WG_PERSISTENT_KEEPALIVE:-0}
+      - WG_DEVICE=${WG_DEVICE:-eth0}
+      
     volumes:
       - wg-easy:/etc/wireguard
     ports:

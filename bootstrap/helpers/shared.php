@@ -782,6 +782,15 @@ function parseCommandFromMagicEnvVariable(Str|string $key): Stringable
             $command = $value->after('SERVICE_')->beforeLast('_');
         }
     }
+    if ($count === 4) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI_1000_EXTRA
+            $command = $value->after('SERVICE_')->before('_');
+        } else {
+            // SERVICE_PASSWORD_HASH_BCRYPT_EXTRA
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
 
     return str($command);
 }
@@ -818,6 +827,20 @@ function parseEnvVariable(Str|string $value)
                 $command = $value->after('SERVICE_')->beforeLast('_');
             }
         }
+        if ($count === 4) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI_1000_EXTRA
+                $command = $value->after('SERVICE_')->before('_');
+                $forService = $value->after('SERVICE_')->after('_')->before('_');
+                $port = $value->afterLast('_');
+                if (filter_var($port, FILTER_VALIDATE_INT) === false) {
+                    $port = null;
+                }
+            } else {
+                // SERVICE_PASSWORD_HASH_BCRYPT_WIREGUARDEASY
+                $command = $value->after('SERVICE_')->beforeLast('_');
+            }
+        }
     }
 
     return [
@@ -827,7 +850,7 @@ function parseEnvVariable(Str|string $value)
         'port' => $port,
     ];
 }
-function generateEnvValue(string $command, Service|Application|null $service = null)
+function generateEnvValue(string $command, Service|Application|null $service = null, ?string $key = null)
 {
     switch ($command) {
         case 'PASSWORD':
@@ -841,6 +864,24 @@ function generateEnvValue(string $command, Service|Application|null $service = n
             break;
         case 'PASSWORDWITHSYMBOLS_64':
             $generatedValue = Str::password(length: 64, symbols: true);
+            break;
+        case 'PASSWORD_HASH_BCRYPT':
+            $plainPassword = Str::password(length: 64, symbols: false);
+            // Store the plain password temporarily for display to user
+            if (auth()->check()) {
+                $generatedPasswords = cache()->get('generated_passwords_'.auth()->id(), []);
+
+                $generatedPasswords[] = [
+                    'password' => $plainPassword,
+                    'variable_key' => $key ?? 'SERVICE_PASSWORD_HASH_BCRYPT',
+                    'timestamp' => now()->toISOString(),
+                ];
+                cache()->put('generated_passwords_'.auth()->id(), $generatedPasswords, now()->addMinutes(5));
+            }
+            // Hash and escape dollar signs so they are interpreted literally by docker-compose
+            $generatedValue = bcrypt($plainPassword);
+            $generatedValue = str_replace('$', '$$', $generatedValue);
+
             break;
             // This is not base64, it's just a random string
         case 'BASE64_64':
@@ -1955,7 +1996,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         }
                                     }
                                 } else {
-                                    $generatedValue = generateEnvValue($command, $resource);
+                                    $generatedValue = generateEnvValue($command, $resource, $key);
                                     if (! $foundEnv) {
                                         EnvironmentVariable::create([
                                             'key' => $key,
@@ -2697,7 +2738,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     ]);
                                 }
                             } else {
-                                $generatedValue = generateEnvValue($command);
+                                $generatedValue = generateEnvValue($command, $resource, $key);
                                 if (! $foundEnv) {
                                     EnvironmentVariable::create([
                                         'key' => $key,
@@ -3184,7 +3225,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 } else {
-                    $value = generateEnvValue($command, $resource);
+                    $value = generateEnvValue($command, $resource, $key->value());
                     $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -3913,6 +3954,26 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     data_forget($resource, 'environment_variables');
     data_forget($resource, 'environment_variables_preview');
     $resource->save();
+
+    // Check if any bcrypt passwords were generated and notify the user
+    if (auth()->check()) {
+        $generatedPasswords = cache()->get('generated_passwords_'.auth()->id(), []);
+        if (count($generatedPasswords) > 0) {
+            // Clear the cache after retrieving
+            cache()->forget('generated_passwords_'.auth()->id());
+
+            // Store in session for the modal to pick up
+            session()->flash('generated_passwords', $generatedPasswords);
+
+            // Also try to broadcast the event
+            try {
+                broadcast(new \App\Events\GeneratedPasswordsEvent($generatedPasswords, auth()->id()))->toOthers();
+            } catch (\Exception $e) {
+                // Broadcasting failed, but we still have the session fallback
+                \Log::warning('Failed to broadcast GeneratedPasswordsEvent: '.$e->getMessage());
+            }
+        }
+    }
 
     return $topLevel;
 }

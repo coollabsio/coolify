@@ -344,7 +344,7 @@ class ServicesController extends Controller
                         $generatedValue = $value;
                         if ($value->contains('SERVICE_')) {
                             $command = $value->after('SERVICE_')->beforeLast('_');
-                            $generatedValue = generateEnvValue($command->value(), $service);
+                            $generatedValue = generateEnvValue($command->value(), $service, $key);
                         }
                         EnvironmentVariable::create([
                             'key' => $key,

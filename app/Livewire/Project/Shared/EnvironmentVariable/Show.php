@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
 use App\Traits\EnvironmentVariableProtection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class Show extends Component
@@ -195,6 +196,38 @@ class Show extends Component
             $this->dispatch('success', 'Environment variable deleted successfully.');
         } catch (\Exception $e) {
             return handleError($e);
+        }
+    }
+
+    public function regenerateHash()
+    {
+        try {
+            if (! Str::of($this->env->key)->startsWith('SERVICE_PASSWORD_HASH_BCRYPT')) {
+                return;
+            }
+            // Generate new password and bcrypt hash
+            $plainPassword = Str::password(symbols: false);
+            $hashed = bcrypt($plainPassword);
+            $escaped = str_replace('$', '$$', $hashed);
+
+            // Update environment variable
+            $this->env->value = $escaped;
+            $this->env->save();
+
+            // Trigger modal with plaintext password
+            $this->dispatch('showGeneratedPasswords', [
+                [
+                    'password' => $plainPassword,
+                    'variable_key' => $this->env->key,
+                    'timestamp' => now()->toISOString(),
+                ],
+            ]);
+
+            // Notify UI and refresh variable list
+            $this->dispatch('success', 'Password regenerated.');
+            $this->dispatch('envsUpdated');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 }

@@ -4,6 +4,12 @@
     @if (isSubscribed() || !isCloud())
         <livewire:layout-popups />
     @endif
+    <livewire:generated-password-modal />
+    @auth
+        <script>
+            window.currentUserId = {{ auth()->id() }};
+        </script>
+    @endauth
     @auth
         <div x-data="{
             open: false,
