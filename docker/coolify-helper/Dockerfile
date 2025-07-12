@@ -10,7 +10,7 @@ ARG DOCKER_BUILDX_VERSION=0.22.0
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.37.0
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.34.1
+ARG NIXPACKS_VERSION=1.39.0
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2025-03-12T17-29-24Z
 
