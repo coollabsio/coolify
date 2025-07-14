@@ -356,7 +356,7 @@ function validate_cron_expression($expression_to_validate): bool
         return false;
     }
     $isValid = false;
-    $expression = new CronExpression($expression_to_validate);
+    $expression = new \Poliander\Cron\CronExpression($expression_to_validate);
     $isValid = $expression->isValid();
 
     if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
