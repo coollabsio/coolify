@@ -85,7 +85,23 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return InstanceSettings::findOrFail(0);
+        $settings = InstanceSettings::find(0);
+        
+        if (!$settings) {
+            // Auto-create the instance settings record if it doesn't exist
+            $settings = InstanceSettings::create([
+                'id' => 0,
+                'is_registration_enabled' => true,
+                'smtp_enabled' => false,
+                'instance_name' => 'Coolify',
+                'fqdn' => null,
+                'public_ipv4' => null,
+                'public_ipv6' => null,
+                'helper_version' => config('constants.coolify.helper_version', '1.0.8'),
+            ]);
+        }
+        
+        return $settings;
     }
 
     // public function getRecipients($notification)

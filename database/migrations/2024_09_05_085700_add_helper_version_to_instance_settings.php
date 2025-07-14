@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->string('helper_version')->default('1.0.0');
+            $table->string('helper_version')->default('1.0.8');
         });
     }
 

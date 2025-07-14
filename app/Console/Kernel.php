@@ -31,7 +31,7 @@ class Kernel extends ConsoleKernel
 
     private Schedule $scheduleInstance;
 
-    private InstanceSettings $settings;
+    private InstanceSettings|\stdClass $settings;
 
     private string $updateCheckFrequency;
 
@@ -42,10 +42,22 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance = $schedule;
         $this->allServers = Server::where('ip', '!=', '1.2.3.4');
 
-        $this->settings = instanceSettings();
-        $this->updateCheckFrequency = $this->settings->update_check_frequency ?: '0 * * * *';
-
-        $this->instanceTimezone = $this->settings->instance_timezone ?: config('app.timezone');
+        try {
+            $this->settings = instanceSettings();
+            $this->updateCheckFrequency = $this->settings->update_check_frequency ?: '0 * * * *';
+            $this->instanceTimezone = $this->settings->instance_timezone ?: config('app.timezone');
+        } catch (\Throwable $e) {
+            Log::error('Failed to load instance settings in scheduler, using defaults', ['error' => $e->getMessage()]);
+            // Use fallback values when instance settings are unavailable
+            $this->updateCheckFrequency = '0 * * * *';
+            $this->instanceTimezone = config('app.timezone');
+            // Create a minimal settings object to prevent further errors
+            $this->settings = new \stdClass();
+            $this->settings->update_check_frequency = $this->updateCheckFrequency;
+            $this->settings->instance_timezone = $this->instanceTimezone;
+            $this->settings->is_auto_update_enabled = false;
+            $this->settings->auto_update_frequency = '0 2 * * *';
+        }
 
         if (validate_timezone($this->instanceTimezone) === false) {
             $this->instanceTimezone = config('app.timezone');

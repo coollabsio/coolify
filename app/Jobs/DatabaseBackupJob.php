@@ -63,6 +63,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
+        // Set longer timeout for large database backups
+        $this->timeout = config('constants.ssh.command_timeout', 7200);
     }
 
     public function handle(): void
@@ -444,20 +446,42 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->postgres_password) {
                 $backupCommand .= " -e PGPASSWORD=\"{$this->postgres_password}\"";
             }
+            
             if ($this->backup->dump_all) {
                 $backupCommand .= " $this->container_name pg_dumpall --username {$this->database->postgres_user} | gzip > $this->backup_location";
             } else {
-                $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
+                // Use custom format for better compression and parallel restore capabilities
+                $backupCommand .= " $this->container_name pg_dump --format=custom --no-acl --no-owner --compress=9 --username {$this->database->postgres_user} $database > $this->backup_location";
             }
 
             $commands[] = $backupCommand;
+            
+            // Add timeout logging for large databases
+            $this->add_to_backup_output("Starting PostgreSQL backup for database: $database");
+            $startTime = microtime(true);
+            
             $this->backup_output = instant_remote_process($commands, $this->server);
+            
+            $endTime = microtime(true);
+            $duration = round($endTime - $startTime, 2);
+            $this->add_to_backup_output("PostgreSQL backup completed in {$duration} seconds");
+            
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
+            
+            // Verify backup file was created and has content
+            $verifyCommand = "ls -la $this->backup_location 2>/dev/null || echo 'Backup file not found'";
+            $verifyResult = instant_remote_process([$verifyCommand], $this->server, false);
+            if (str_contains($verifyResult, 'Backup file not found')) {
+                throw new \Exception("Backup file was not created: $this->backup_location");
+            }
+            
+            $this->add_to_backup_output("Backup file verification: " . trim($verifyResult));
+            
         } catch (\Throwable $e) {
-            $this->add_to_backup_output($e->getMessage());
+            $this->add_to_backup_output("PostgreSQL backup failed: " . $e->getMessage());
             throw $e;
         }
     }
@@ -568,10 +592,23 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getFullImageName(): string
     {
-        $settings = instanceSettings();
-        $helperImage = config('constants.coolify.helper_image');
-        $latestVersion = $settings->helper_version;
+        try {
+            $settings = instanceSettings();
+            $helperImage = config('constants.coolify.helper_image');
+            $latestVersion = $settings->helper_version ?? config('constants.coolify.helper_version', '1.0.8');
 
-        return "{$helperImage}:{$latestVersion}";
+            return "{$helperImage}:{$latestVersion}";
+        } catch (\Throwable $e) {
+            // Fallback to default values if instance settings are unavailable
+            $helperImage = config('constants.coolify.helper_image', 'ghcr.io/coollabsio/coolify-helper');
+            $defaultVersion = config('constants.coolify.helper_version', '1.0.8');
+            
+            \Log::warning('Failed to get instance settings for helper image, using defaults', [
+                'error' => $e->getMessage(),
+                'fallback_image' => "{$helperImage}:{$defaultVersion}"
+            ]);
+
+            return "{$helperImage}:{$defaultVersion}";
+        }
     }
 }

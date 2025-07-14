@@ -47,7 +47,18 @@ class ProductionSeeder extends Seeder
         if (InstanceSettings::find(0) == null) {
             InstanceSettings::create([
                 'id' => 0,
+                'helper_version' => config('constants.coolify.helper_version', '1.0.8'),
+                'instance_name' => 'Coolify',
+                'is_registration_enabled' => true,
             ]);
+        } else {
+            // Ensure existing records have the current helper version
+            $settings = InstanceSettings::find(0);
+            if (empty($settings->helper_version)) {
+                $settings->update([
+                    'helper_version' => config('constants.coolify.helper_version', '1.0.8'),
+                ]);
+            }
         }
 
         if (GithubApp::find(0) == null) {
