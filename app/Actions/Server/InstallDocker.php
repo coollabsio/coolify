@@ -79,6 +79,15 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    'zypper update -y',
+                    'command -v curl >/dev/null || apk add curl',
+                    'command -v wget >/dev/null || apk add wget',
+                    'command -v git >/dev/null || apk add git',
+                    'command -v jq >/dev/null || apk add jq',
+                ]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
