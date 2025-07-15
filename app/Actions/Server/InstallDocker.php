@@ -82,7 +82,7 @@ class InstallDocker
             } elseif ($supported_os_type->contains('alpine')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    'zypper update -y',
+                    'apk update',
                     'command -v curl >/dev/null || apk add curl',
                     'command -v wget >/dev/null || apk add wget',
                     'command -v git >/dev/null || apk add git',
