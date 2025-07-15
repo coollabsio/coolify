@@ -402,6 +402,23 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "chroma": {
+        "documentation": "https://cookbook.chromadb.dev/?utm_source=coolify.io",
+        "slogan": "Chroma is the open-source search and retrieval database for AI applications.",
+        "compose": "c2VydmljZXM6CiAgY2hyb21hZGI6CiAgICBpbWFnZTogJ2Nocm9tYWRiL2Nocm9tYToxLjAuMTUnCiAgICB2b2x1bWVzOgogICAgICAtICdjaHJvbWEtZGF0YTovZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DSFJPTUFfODAwMAogICAgICAtIElTX1BFUlNJU1RFTlQ9VFJVRQogICAgICAtIFBFUlNJU1RfRElSRUNUT1JZPS9kYXRhCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6ODAwMC9hcGkvdjIvaGVhcnRiZWF0JwogICAgICBpbnRlcnZhbDogMzBzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAzCg==",
+        "tags": [
+            "ai",
+            "vector-database",
+            "semantic-search",
+            "machine-learning",
+            "bm25",
+            "embeddings",
+            "llm"
+        ],
+        "logo": "svgs/chroma.svg",
+        "minversion": "0.0.0",
+        "port": "8000"
+    },
     "classicpress-with-mariadb": {
         "documentation": "https://www.classicpress.net/?utm_source=coolify.io",
         "slogan": "A lightweight, stable, instantly familiar free open-source content management system, based on WordPress without the block editor (Gutenberg).",
