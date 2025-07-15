@@ -182,7 +182,7 @@ return [
     'defaults' => [
         's6' => [
             'connection' => 'redis',
-            'queue' => ['high', 'default'],
+            'queue' => explode(',', env('HORIZON_QUEUES', 'high,default')),
             'balance' => env('HORIZON_BALANCE', 'auto'),
             'maxTime' => 0,
             'maxJobs' => 0,
