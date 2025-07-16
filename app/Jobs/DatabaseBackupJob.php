@@ -23,6 +23,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use Throwable;
+use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -60,9 +62,16 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?S3Storage $s3 = null;
 
+    public $timeout = 3600;
+
+    public string $backup_log_uuid;
+
     public function __construct(public ScheduledDatabaseBackup $backup)
     {
         $this->onQueue('high');
+        $this->timeout = $backup->timeout;
+
+        $this->backup_log_uuid = (string) new Cuid2;
     }
 
     public function handle(): void
@@ -219,12 +228,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                                 $this->mongo_root_username = str($rootUsername)->after('MONGO_INITDB_ROOT_USERNAME=')->value();
                             }
                         }
-                        \Log::info('MongoDB credentials extracted from environment', [
-                            'has_username' => filled($this->mongo_root_username),
-                            'has_password' => filled($this->mongo_root_password),
-                        ]);
+
                     } catch (\Throwable $e) {
-                        \Log::warning('Failed to extract MongoDB environment variables', ['error' => $e->getMessage()]);
                         // Continue without env vars - will be handled in backup_standalone_mongodb method
                     }
                 }
@@ -288,6 +293,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
@@ -307,6 +313,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         $this->backup_file = "/mongo-dump-$databaseName-".Carbon::now()->timestamp.'.tar.gz';
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
                             'database_name' => $databaseName,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
@@ -319,6 +326,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
@@ -331,6 +339,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                         $this->backup_location = $this->backup_dir.$this->backup_file;
                         $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
@@ -573,5 +582,19 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = $settings->helper_version;
 
         return "{$helperImage}:{$latestVersion}";
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $log = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->first();
+
+        if ($log) {
+            $log->update([
+                'status' => 'failed',
+                'message' => 'Job failed: '.$exception->getMessage(),
+                'size' => 0,
+                'filename' => null,
+            ]);
+        }
     }
 }
