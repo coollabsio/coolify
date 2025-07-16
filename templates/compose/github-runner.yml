@@ -9,9 +9,8 @@ services:
     environment:
       - REPO_URL=${REPO_URL}
       - RUNNER_NAME=${RUNNER_NAME:-coolify-runner}
-      - RUNNER_TOKEN=${RUNNER_TOKEN}
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
       - RUNNER_WORKDIR=/tmp/runner/work
-      - CONFIGURED_ACTIONS_RUNNER_FILES_DIR=/runner/data
       - DISABLE_AUTOMATIC_DEREGISTRATION=true
       - RUNNER_SCOPE=${RUNNER_SCOPE:-repo}
       - LABELS=${LABELS:-default}
@@ -20,5 +19,7 @@ services:
       - 'label:disable'
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
-      - data:/runner/data
       - runner:/tmp/runner
+
+
+
