@@ -8,10 +8,11 @@ services:
     image: 'myoung34/github-runner:latest'
     environment:
       - REPO_URL=${REPO_URL}
-      - RUNNER_NAME=${RUNNER_NAME:-coolify-runner}
+      - RUNNER_NAME_PREFIX=${RUNNER_NAME_PREFIX:-coolify-runner}
+      - RUNNER_NAME_SUFFIX=${RUNNER_NAME_SUFFIX:-true}
       - ACCESS_TOKEN=${ACCESS_TOKEN}
       - RUNNER_WORKDIR=/tmp/runner/work
-      - DISABLE_AUTOMATIC_DEREGISTRATION=true
+      - DISABLE_AUTOMATIC_DEREGISTRATION=false
       - RUNNER_SCOPE=${RUNNER_SCOPE:-repo}
       - LABELS=${LABELS:-default}
       - ORG_NAME=${ORG_NAME}
