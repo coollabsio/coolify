@@ -13,8 +13,9 @@ services:
       - RUNNER_WORKDIR=/tmp/runner/work
       - CONFIGURED_ACTIONS_RUNNER_FILES_DIR=/runner/data
       - DISABLE_AUTOMATIC_DEREGISTRATION=true
-      - RUNNER_SCOPE=repo
-      - LABELS=linux,x64,gpu
+      - RUNNER_SCOPE=${RUNNER_SCOPE:-repo}
+      - LABELS=${LABELS:-default}
+      - ORG_NAME=${ORG_NAME}
     security_opt:
       - 'label:disable'
     volumes:
