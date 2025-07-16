@@ -20,5 +20,5 @@ services:
       - 'label:disable'
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
-      - '/runner/data:/runner/data'
-      - '/tmp/runner:/tmp/runner'
+      - data:/runner/data
+      - runner:/tmp/runner
