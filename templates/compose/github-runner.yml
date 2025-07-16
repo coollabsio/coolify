@@ -1,0 +1,23 @@
+# documentation: https://github.com/myoung34/docker-github-actions-runner/wiki/Usage
+# slogan: A GitHub Actions runner for Docker
+# tags: github,actions,runner,docker
+# logo: svgs/github-runner.png
+
+services:
+  runner:
+    image: 'myoung34/github-runner:latest'
+    environment:
+      - REPO_URL=${REPO_URL}
+      - RUNNER_NAME=${RUNNER_NAME:-coolify-runner}
+      - RUNNER_TOKEN=${RUNNER_TOKEN}
+      - RUNNER_WORKDIR=/tmp/runner/work
+      - CONFIGURED_ACTIONS_RUNNER_FILES_DIR=/runner/data
+      - DISABLE_AUTOMATIC_DEREGISTRATION=true
+      - RUNNER_SCOPE=repo
+      - LABELS=linux,x64,gpu
+    security_opt:
+      - 'label:disable'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/runner/data:/runner/data'
+      - '/tmp/runner:/tmp/runner'
