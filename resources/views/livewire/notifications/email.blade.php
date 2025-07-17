@@ -14,7 +14,7 @@
                     <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                         <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
                             <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com"
-                                id="testEmailAddress" label="Recipients" required />
+                                id="testEmailAddress" label="Recipient" required />
                             <x-forms.button type="submit" @click="modalOpen=false">
                                 Send Email
                             </x-forms.button>
@@ -34,7 +34,7 @@
             </div>
         @endif
         @if (!$useInstanceEmailSettings)
-            <div class="flex gap-4">
+            <div class="flex gap-2">
                 <x-forms.input required id="smtpFromName" helper="Name used in emails." label="From Name" />
                 <x-forms.input required id="smtpFromAddress" helper="Email address used in emails."
                     label="From Address" />
@@ -54,7 +54,8 @@
     @endif
     @if (!$useInstanceEmailSettings)
         <div class="flex flex-col gap-4">
-            <form wire:submit='submitSmtp' class="p-4 border dark:border-coolgray-300 flex flex-col gap-2">
+            <form wire:submit='submitSmtp'
+                class="p-4 border dark:border-coolgray-300 border-neutral-200 flex flex-col gap-2">
                 <div class="flex items-center gap-2">
                     <h3>SMTP Server</h3>
                     <x-forms.button type="submit">
@@ -85,7 +86,8 @@
                     </div>
                 </div>
             </form>
-            <form wire:submit='submitResend' class="p-4 border dark:border-coolgray-300 flex flex-col gap-2">
+            <form wire:submit='submitResend'
+                class="p-4 border dark:border-coolgray-300 border-neutral-200 flex flex-col gap-2">
                 <div class="flex items-center gap-2">
                     <h3>Resend</h3>
                     <x-forms.button type="submit">
@@ -112,7 +114,7 @@
         Select events for which you would like to receive email notifications.
     </p>
     <div class="flex flex-col gap-4 max-w-2xl">
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessEmailNotifications"
@@ -124,7 +126,7 @@
                     id="statusChangeEmailNotifications" label="Container Status Changes" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Backups</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="backupSuccessEmailNotifications"
@@ -133,7 +135,7 @@
                     label="Backup Failure" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Scheduled Tasks</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="scheduledTaskSuccessEmailNotifications"
@@ -142,7 +144,7 @@
                     label="Scheduled Task Failure" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="dockerCleanupSuccessEmailNotifications"
@@ -155,6 +157,8 @@
                     label="Server Reachable" />
                 <x-forms.checkbox instantSave="saveModel" id="serverUnreachableEmailNotifications"
                     label="Server Unreachable" />
+                <x-forms.checkbox instantSave="saveModel" id="serverPatchEmailNotifications"
+                    label="Server Patching" />
             </div>
         </div>
     </div>

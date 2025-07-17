@@ -20,6 +20,10 @@ class DiscordChannel
             return;
         }
 
+        if (! $discordSettings->discord_ping_enabled) {
+            $message->isCritical = false;
+        }
+
         SendMessageToDiscordJob::dispatch($message, $discordSettings->discord_webhook_url);
     }
 }

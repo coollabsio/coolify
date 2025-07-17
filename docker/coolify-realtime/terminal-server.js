@@ -3,7 +3,9 @@ import http from 'http';
 import pty from 'node-pty';
 import axios from 'axios';
 import cookie from 'cookie';
-import 'dotenv/config'
+import 'dotenv/config';
+
+const userSessions = new Map();
 
 const server = http.createServer((req, res) => {
     if (req.url === '/ready') {
@@ -15,16 +17,20 @@ const server = http.createServer((req, res) => {
     }
 });
 
-const verifyClient = async (info, callback) => {
-    const cookies = cookie.parse(info.req.headers.cookie || '');
-    // const origin = new URL(info.origin);
-    // const protocol = origin.protocol;
+const getSessionCookie = (req) => {
+    const cookies = cookie.parse(req.headers.cookie || '');
     const xsrfToken = cookies['XSRF-TOKEN'];
-
-    // Generate session cookie name based on APP_NAME
     const appName = process.env.APP_NAME || 'laravel';
     const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;
-    const laravelSession = cookies[sessionCookieName];
+    return {
+        sessionCookieName,
+        xsrfToken: xsrfToken,
+        laravelSession: cookies[sessionCookieName]
+    }
+}
+
+const verifyClient = async (info, callback) => {
+    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(info.req);
 
     // Verify presence of required tokens
     if (!laravelSession || !xsrfToken) {
@@ -54,11 +60,24 @@ const verifyClient = async (info, callback) => {
 
 
 const wss = new WebSocketServer({ server, path: '/terminal/ws', verifyClient: verifyClient });
-const userSessions = new Map();
 
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws, req) => {
     const userId = generateUserId();
-    const userSession = { ws, userId, ptyProcess: null, isActive: false };
+    const userSession = { ws, userId, ptyProcess: null, isActive: false, authorizedIPs: [] };
+    const { xsrfToken, laravelSession, sessionCookieName } = getSessionCookie(req);
+
+    // Verify presence of required tokens
+    if (!laravelSession || !xsrfToken) {
+        ws.close(401, 'Unauthorized: Missing required tokens');
+        return;
+    }
+    const response = await axios.post(`http://coolify:8080/terminal/auth/ips`, null, {
+        headers: {
+            'Cookie': `${sessionCookieName}=${laravelSession}`,
+            'X-XSRF-TOKEN': xsrfToken
+        },
+    });
+    userSession.authorizedIPs = response.data.ipAddresses || [];
     userSessions.set(userId, userSession);
 
     ws.on('message', (message) => {
@@ -125,6 +144,20 @@ async function handleCommand(ws, command, userId) {
     const timeout = extractTimeout(commandString);
     const sshArgs = extractSshArgs(commandString);
     const hereDocContent = extractHereDocContent(commandString);
+
+    // Extract target host from SSH command
+    const targetHost = extractTargetHost(sshArgs);
+    if (!targetHost) {
+        ws.send('Invalid SSH command: No target host found');
+        return;
+    }
+
+    // Validate target host against authorized IPs
+    if (!userSession.authorizedIPs.includes(targetHost)) {
+        ws.send(`Unauthorized: Target host ${targetHost} not in authorized list`);
+        return;
+    }
+
     const options = {
         name: 'xterm-color',
         cols: 80,
@@ -152,7 +185,6 @@ async function handleCommand(ws, command, userId) {
         console.error(`Process exited with code ${exitCode} and signal ${signal}`);
         ws.send('pty-exited');
         userSession.isActive = false;
-
     });
 
     if (timeout) {
@@ -160,6 +192,22 @@ async function handleCommand(ws, command, userId) {
             await killPtyProcess(userId);
         }, timeout * 1000);
     }
+}
+
+function extractTargetHost(sshArgs) {
+    // Find the argument that matches the pattern user@host
+    const userAtHost = sshArgs.find(arg => {
+        // Skip paths that contain 'storage/app/ssh/keys/'
+        if (arg.includes('storage/app/ssh/keys/')) {
+            return false;
+        }
+        return /^[^@]+@[^@]+$/.test(arg);
+    });
+    if (!userAtHost) return null;
+
+    // Extract host from user@host
+    const host = userAtHost.split('@')[1];
+    return host;
 }
 
 async function handleError(err, userId) {
@@ -217,11 +265,57 @@ function extractTimeout(commandString) {
 
 function extractSshArgs(commandString) {
     const sshCommandMatch = commandString.match(/ssh (.+?) 'bash -se'/);
-    let sshArgs = sshCommandMatch ? sshCommandMatch[1].split(' ') : [];
+    if (!sshCommandMatch) return [];
+
+    const argsString = sshCommandMatch[1];
+    let sshArgs = [];
+
+    // Parse shell arguments respecting quotes
+    let current = '';
+    let inQuotes = false;
+    let quoteChar = '';
+    let i = 0;
+
+    while (i < argsString.length) {
+        const char = argsString[i];
+        const nextChar = argsString[i + 1];
+
+        if (!inQuotes && (char === '"' || char === "'")) {
+            // Starting a quoted section
+            inQuotes = true;
+            quoteChar = char;
+            current += char;
+        } else if (inQuotes && char === quoteChar) {
+            // Ending a quoted section
+            inQuotes = false;
+            current += char;
+            quoteChar = '';
+        } else if (!inQuotes && char === ' ') {
+            // Space outside quotes - end of argument
+            if (current.trim()) {
+                sshArgs.push(current.trim());
+                current = '';
+            }
+        } else {
+            // Regular character
+            current += char;
+        }
+        i++;
+    }
+
+    // Add final argument if exists
+    if (current.trim()) {
+        sshArgs.push(current.trim());
+    }
+
+    // Replace RequestTTY=no with RequestTTY=yes
     sshArgs = sshArgs.map(arg => arg === 'RequestTTY=no' ? 'RequestTTY=yes' : arg);
-    if (!sshArgs.includes('RequestTTY=yes')) {
+
+    // Add RequestTTY=yes if not present
+    if (!sshArgs.includes('RequestTTY=yes') && !sshArgs.some(arg => arg.includes('RequestTTY='))) {
         sshArgs.push('-o', 'RequestTTY=yes');
     }
+
     return sshArgs;
 }
 

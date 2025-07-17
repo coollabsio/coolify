@@ -16,16 +16,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Visus\Cuid2\Cuid2;
 
-function generate_database_name(string $type): string
-{
-    return $type.'-database-'.(new Cuid2);
-}
-
 function create_standalone_postgresql($environmentId, $destinationUuid, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
 {
     $destination = StandaloneDocker::where('uuid', $destinationUuid)->firstOrFail();
     $database = new StandalonePostgresql;
-    $database->name = generate_database_name('postgresql');
+    $database->uuid = (new Cuid2);
+    $database->name = 'postgresql-database-'.$database->uuid;
     $database->image = $databaseImage;
     $database->postgres_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environmentId;
@@ -43,7 +39,8 @@ function create_standalone_redis($environment_id, $destination_uuid, ?array $oth
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneRedis;
-    $database->name = generate_database_name('redis');
+    $database->uuid = (new Cuid2);
+    $database->name = 'redis-database-'.$database->uuid;
     $redis_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
@@ -76,7 +73,8 @@ function create_standalone_mongodb($environment_id, $destination_uuid, ?array $o
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneMongodb;
-    $database->name = generate_database_name('mongodb');
+    $database->uuid = (new Cuid2);
+    $database->name = 'mongodb-database-'.$database->uuid;
     $database->mongo_initdb_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
@@ -93,7 +91,8 @@ function create_standalone_mysql($environment_id, $destination_uuid, ?array $oth
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneMysql;
-    $database->name = generate_database_name('mysql');
+    $database->uuid = (new Cuid2);
+    $database->name = 'mysql-database-'.$database->uuid;
     $database->mysql_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->mysql_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
@@ -111,7 +110,8 @@ function create_standalone_mariadb($environment_id, $destination_uuid, ?array $o
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneMariadb;
-    $database->name = generate_database_name('mariadb');
+    $database->uuid = (new Cuid2);
+    $database->name = 'mariadb-database-'.$database->uuid;
     $database->mariadb_root_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->mariadb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
@@ -129,7 +129,8 @@ function create_standalone_keydb($environment_id, $destination_uuid, ?array $oth
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneKeydb;
-    $database->name = generate_database_name('keydb');
+    $database->uuid = (new Cuid2);
+    $database->name = 'keydb-database-'.$database->uuid;
     $database->keydb_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
@@ -146,7 +147,8 @@ function create_standalone_dragonfly($environment_id, $destination_uuid, ?array 
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneDragonfly;
-    $database->name = generate_database_name('dragonfly');
+    $database->uuid = (new Cuid2);
+    $database->name = 'dragonfly-database-'.$database->uuid;
     $database->dragonfly_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
@@ -163,7 +165,8 @@ function create_standalone_clickhouse($environment_id, $destination_uuid, ?array
 {
     $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
     $database = new StandaloneClickhouse;
-    $database->name = generate_database_name('clickhouse');
+    $database->uuid = (new Cuid2);
+    $database->name = 'clickhouse-database-'.$database->uuid;
     $database->clickhouse_admin_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
@@ -233,15 +236,29 @@ function deleteEmptyBackupFolder($folderPath, Server $server): void
 function removeOldBackups($backup): void
 {
     try {
-        $processedBackups = deleteOldBackupsLocally($backup);
-
-        if ($backup->save_s3) {
-            $processedBackups = $processedBackups->merge(deleteOldBackupsFromS3($backup));
+        if ($backup->executions) {
+            $localBackupsToDelete = deleteOldBackupsLocally($backup);
+            if ($localBackupsToDelete->isNotEmpty()) {
+                $backup->executions()
+                    ->whereIn('id', $localBackupsToDelete->pluck('id'))
+                    ->update(['local_storage_deleted' => true]);
+            }
         }
 
-        if ($processedBackups->isNotEmpty()) {
-            $backup->executions()->whereIn('id', $processedBackups->pluck('id'))->delete();
+        if ($backup->save_s3 && $backup->executions) {
+            $s3BackupsToDelete = deleteOldBackupsFromS3($backup);
+            if ($s3BackupsToDelete->isNotEmpty()) {
+                $backup->executions()
+                    ->whereIn('id', $s3BackupsToDelete->pluck('id'))
+                    ->update(['s3_storage_deleted' => true]);
+            }
         }
+
+        $backup->executions()
+            ->where('local_storage_deleted', true)
+            ->where('s3_storage_deleted', true)
+            ->delete();
+
     } catch (\Exception $e) {
         throw $e;
     }
@@ -255,6 +272,7 @@ function deleteOldBackupsLocally($backup): Collection
 
     $successfulBackups = $backup->executions()
         ->where('status', 'success')
+        ->where('local_storage_deleted', false)
         ->orderBy('created_at', 'desc')
         ->get();
 
@@ -338,6 +356,7 @@ function deleteOldBackupsFromS3($backup): Collection
 
     $successfulBackups = $backup->executions()
         ->where('status', 'success')
+        ->where('s3_storage_deleted', false)
         ->orderBy('created_at', 'desc')
         ->get();
 

@@ -49,7 +49,6 @@ class FileStorage extends Component
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
         }
-        $this->fileStorage->loadStorageOnServer();
     }
 
     public function convertToDirectory()
@@ -61,6 +60,18 @@ class FileStorage extends Component
             $this->fileStorage->is_based_on_git = false;
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refreshStorages');
+        }
+    }
+
+    public function loadStorageOnServer()
+    {
+        try {
+            $this->fileStorage->loadStorageOnServer();
+            $this->dispatch('success', 'File storage loaded from server.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

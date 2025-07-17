@@ -58,12 +58,9 @@
                 <x-forms.checkbox instantSave id="isConnectToDockerNetworkEnabled" label="Connect To Predefined Network"
                     helper="By default, you do not reach the Coolify defined networks.<br>Starting a docker compose based resource will have an internal network. <br>If you connect to a Coolify defined network, you maybe need to use different internal DNS names to connect to a resource.<br><br>For more information, check <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>this</a>." />
             @endif
-            @if ($isLogDrainEnabled === false)
-                <h3 class="pt-4">Logs</h3>
-                <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                    instantSave id="isLogDrainEnabled" label="Drain Logs" />
-            @endif
-
+            <h3 class="pt-4">Logs</h3>
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave id="isLogDrainEnabled" label="Drain Logs" />
             @if ($application->git_based())
                 <h3>Git</h3>
                 <x-forms.checkbox instantSave id="isGitSubmodulesEnabled" label="Submodules"

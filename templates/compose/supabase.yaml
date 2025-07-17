@@ -279,14 +279,14 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20241202-71e5240
+    image: supabase/studio:2025.06.02-sha-8f2993d
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://127.0.0.1:3000/api/profile', (r) => {if (r.statusCode !== 200) process.exit(1); else process.exit(0); }).on('error', () => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
         ]
       timeout: 5s
       interval: 5s
@@ -318,7 +318,7 @@ services:
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
       - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
   supabase-db:
-    image: supabase/postgres:15.6.1.146
+    image: supabase/postgres:15.8.1.048
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -913,7 +913,7 @@ services:
     command: ["--config", "etc/vector/vector.yml"]
 
   supabase-rest:
-    image: postgrest/postgrest:v12.2.0
+    image: postgrest/postgrest:v12.2.12
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -931,7 +931,7 @@ services:
     command: "postgrest"
     exclude_from_hc: true
   supabase-auth:
-    image: supabase/gotrue:v2.164.0
+    image: supabase/gotrue:v2.174.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1022,7 +1022,7 @@ services:
 
   realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.33.70
+    image: supabase/realtime:v2.34.47
     container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
@@ -1191,7 +1191,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.84.2
+    image: supabase/postgres-meta:v0.89.3
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1207,7 +1207,7 @@ services:
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.65.3
+    image: supabase/edge-runtime:v1.67.4
     depends_on:
       supabase-analytics:
         condition: service_healthy
@@ -1351,7 +1351,7 @@ services:
       - /home/deno/functions/main
 
   supabase-supavisor:
-    image: 'supabase/supavisor:1.1.56'
+    image: 'supabase/supavisor:2.5.1'
     healthcheck:
       test:
         - CMD

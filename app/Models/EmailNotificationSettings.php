@@ -35,6 +35,7 @@ class EmailNotificationSettings extends Model
         'scheduled_task_success_email_notifications',
         'scheduled_task_failure_email_notifications',
         'server_disk_usage_email_notifications',
+        'server_patch_email_notifications',
     ];
 
     protected $casts = [
@@ -61,6 +62,7 @@ class EmailNotificationSettings extends Model
         'scheduled_task_success_email_notifications' => 'boolean',
         'scheduled_task_failure_email_notifications' => 'boolean',
         'server_disk_usage_email_notifications' => 'boolean',
+        'server_patch_email_notifications' => 'boolean',
     ];
 
     public function team()
@@ -70,10 +72,6 @@ class EmailNotificationSettings extends Model
 
     public function isEnabled()
     {
-        if (isCloud()) {
-            return true;
-        }
-
         return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
     }
 }

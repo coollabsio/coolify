@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
-use App\Models\ScheduledTask;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -42,5 +41,4 @@ class All extends Component
     {
         $this->resource->refresh();
     }
-
 }

@@ -7,6 +7,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
+use App\Services\ConfigurationRepository;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -266,7 +267,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function validateServer()
     {
         try {
-            config()->set('constants.ssh.mux_enabled', false);
+            $this->disableSshMux();
 
             // EC2 does not have `uptime` command, lol
             instant_remote_process(['ls /'], $this->createdServer, true);
@@ -374,6 +375,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->privateKeyName = generate_random_name();
         $this->privateKeyDescription = 'Created by Coolify';
         ['private' => $this->privateKey, 'public' => $this->publicKey] = generateSSHKey();
+    }
+
+    private function disableSshMux(): void
+    {
+        $configRepository = app(ConfigurationRepository::class);
+        $configRepository->disableSshMux();
     }
 
     public function render()

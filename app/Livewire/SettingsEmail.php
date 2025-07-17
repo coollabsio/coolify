@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
-use App\Notifications\Test;
+use App\Notifications\TransactionalEmails\Test;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
@@ -114,19 +114,24 @@ class SettingsEmail extends Component
     public function instantSave(string $type)
     {
         try {
+            $currentSmtpEnabled = $this->settings->smtp_enabled;
+            $currentResendEnabled = $this->settings->resend_enabled;
             $this->resetErrorBag();
 
             if ($type === 'SMTP') {
                 $this->submitSmtp();
+                $this->resendEnabled = $this->settings->resend_enabled = false;
             } elseif ($type === 'Resend') {
                 $this->submitResend();
+                $this->smtpEnabled = $this->settings->smtp_enabled = false;
             }
+            $this->settings->save();
 
         } catch (\Throwable $e) {
             if ($type === 'SMTP') {
-                $this->smtpEnabled = false;
+                $this->smtpEnabled = $currentSmtpEnabled;
             } elseif ($type === 'Resend') {
-                $this->resendEnabled = false;
+                $this->resendEnabled = $currentResendEnabled;
             }
 
             return handleError($e, $this);
@@ -156,9 +161,6 @@ class SettingsEmail extends Component
                 'smtpEncryption.required' => 'Encryption type is required.',
             ]);
 
-            $this->resendEnabled = false;
-            $this->settings->resend_enabled = false;
-
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_host = $this->smtpHost;
             $this->settings->smtp_port = $this->smtpPort;
@@ -175,7 +177,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->smtpEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -194,9 +196,6 @@ class SettingsEmail extends Component
                 'smtpFromName.required' => 'From Name is required.',
             ]);
 
-            $this->smtpEnabled = false;
-            $this->settings->smtp_enabled = false;
-
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
@@ -208,7 +207,7 @@ class SettingsEmail extends Component
         } catch (\Throwable $e) {
             $this->resendEnabled = false;
 
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -226,7 +225,7 @@ class SettingsEmail extends Component
                 'test-email:'.$this->team->id,
                 $perMinute = 0,
                 function () {
-                    $this->team?->notify(new Test($this->testEmailAddress, 'email'));
+                    $this->team?->notifyNow(new Test($this->testEmailAddress));
                     $this->dispatch('success', 'Test Email sent.');
                 },
                 $decaySeconds = 10,
@@ -236,7 +235,7 @@ class SettingsEmail extends Component
                 throw new \Exception('Too many messages sent!');
             }
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 }

@@ -8,6 +8,7 @@ use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -30,7 +31,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
         public bool $deleteConfigurations = true,
         public bool $deleteVolumes = true,
         public bool $dockerCleanup = true,
@@ -42,10 +43,15 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            $persistentStorages = collect();
+            // Handle ApplicationPreview instances separately
+            if ($this->resource instanceof ApplicationPreview) {
+                $this->deleteApplicationPreview();
+
+                return;
+            }
+
             switch ($this->resource->type()) {
                 case 'application':
-                    $persistentStorages = $this->resource?->persistentStorages()?->get();
                     StopApplication::run($this->resource, previewDeployments: true);
                     break;
                 case 'standalone-postgresql':
@@ -56,46 +62,105 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-keydb':
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
-                    $persistentStorages = $this->resource?->persistentStorages()?->get();
                     StopDatabase::run($this->resource, true);
                     break;
                 case 'service':
                     StopService::run($this->resource, true);
                     DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->dockerCleanup, $this->deleteConnectedNetworks);
-                    break;
+
+                    return;
             }
 
-            if ($this->deleteVolumes && $this->resource->type() !== 'service') {
-                $this->resource?->delete_volumes($persistentStorages);
-            }
             if ($this->deleteConfigurations) {
-                $this->resource?->delete_configurations();
+                $this->resource->deleteConfigurations();
             }
+            if ($this->deleteVolumes) {
+                $this->resource->deleteVolumes();
+                $this->resource->persistentStorages()->delete();
+            }
+            $this->resource->fileStorages()->delete();
 
             $isDatabase = $this->resource instanceof StandalonePostgresql
-                || $this->resource instanceof StandaloneRedis
-                || $this->resource instanceof StandaloneMongodb
-                || $this->resource instanceof StandaloneMysql
-                || $this->resource instanceof StandaloneMariadb
-                || $this->resource instanceof StandaloneKeydb
-                || $this->resource instanceof StandaloneDragonfly
-                || $this->resource instanceof StandaloneClickhouse;
-            $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
-            if (($this->dockerCleanup || $isDatabase) && $server) {
-                CleanupDocker::dispatch($server, true);
-            }
+            || $this->resource instanceof StandaloneRedis
+            || $this->resource instanceof StandaloneMongodb
+            || $this->resource instanceof StandaloneMysql
+            || $this->resource instanceof StandaloneMariadb
+            || $this->resource instanceof StandaloneKeydb
+            || $this->resource instanceof StandaloneDragonfly
+            || $this->resource instanceof StandaloneClickhouse;
 
-            if ($this->deleteConnectedNetworks && ! $isDatabase) {
-                $this->resource?->delete_connected_networks($this->resource->uuid);
+            if ($isDatabase) {
+                $this->resource->sslCertificates()->delete();
+                $this->resource->scheduledBackups()->delete();
+                $this->resource->tags()->detach();
+            }
+            $this->resource->environment_variables()->delete();
+
+            if ($this->deleteConnectedNetworks && $this->resource->type() === 'application') {
+                $this->resource->deleteConnectedNetworks();
             }
         } catch (\Throwable $e) {
             throw $e;
         } finally {
             $this->resource->forceDelete();
             if ($this->dockerCleanup) {
-                CleanupDocker::dispatch($server, true);
+                $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+                if ($server) {
+                    CleanupDocker::dispatch($server, true);
+                }
             }
             Artisan::queue('cleanup:stucked-resources');
         }
+    }
+
+    private function deleteApplicationPreview()
+    {
+        $application = $this->resource->application;
+        $server = $application->destination->server;
+        $pull_request_id = $this->resource->pull_request_id;
+
+        // Ensure the preview is soft deleted (may already be done in Livewire component)
+        if (! $this->resource->trashed()) {
+            $this->resource->delete();
+        }
+
+        try {
+            if ($server->isSwarm()) {
+                instant_remote_process(["docker stack rm {$application->uuid}-{$pull_request_id}"], $server);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($server, $application->id, $pull_request_id)->toArray();
+                $this->stopPreviewContainers($containers, $server);
+            }
+        } catch (\Throwable $e) {
+            // Log the error but don't fail the job
+            ray('Error stopping preview containers: '.$e->getMessage());
+        }
+
+        // Finally, force delete to trigger resource cleanup
+        $this->resource->forceDelete();
+    }
+
+    private function stopPreviewContainers(array $containers, $server, int $timeout = 30)
+    {
+        if (empty($containers)) {
+            return;
+        }
+
+        $containerNames = [];
+        foreach ($containers as $container) {
+            $containerNames[] = str_replace('/', '', $container['Names']);
+        }
+
+        $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
+        $commands = [
+            "docker stop --time=$timeout $containerList",
+            "docker rm -f $containerList",
+        ];
+
+        instant_remote_process(
+            command: $commands,
+            server: $server,
+            throwError: false
+        );
     }
 }

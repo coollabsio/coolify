@@ -6,7 +6,8 @@
     <div class="pb-4">Define how your resource's health should be checked.</div>
     <div class="flex flex-col gap-4">
         @if ($resource->custom_healthcheck_found)
-            <div class="text-warning">A custom health check has been found and will be used until you enable this.</div>
+            <div class="dark:text-warning">A custom health check has been found and will be used until you enable this.
+            </div>
         @endif
         <div class="w-32">
             <x-forms.checkbox instantSave id="resource.health_check_enabled" label="Enabled" />
@@ -25,8 +26,8 @@
             <x-forms.input id="resource.health_check_response_text" placeholder="OK" label="Response Text" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input min=1 type="number" id="resource.health_check_interval" placeholder="30" label="Interval (s)"
-                required />
+            <x-forms.input min="1" type="number" id="resource.health_check_interval" placeholder="30"
+                label="Interval (s)" required />
             <x-forms.input type="number" id="resource.health_check_timeout" placeholder="30" label="Timeout (s)"
                 required />
             <x-forms.input type="number" id="resource.health_check_retries" placeholder="3" label="Retries" required />

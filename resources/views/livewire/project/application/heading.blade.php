@@ -1,23 +1,23 @@
-<nav wire:poll.10000ms="check_status">
+<nav wire:poll.10000ms="checkStatus" class="pb-6">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
     <div class="navbar-main">
-        <nav class="flex flex-shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
+        <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.application.configuration') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.configuration', $parameters) }}">
+                href="{{ route('project.application.configuration', $parameters) }}">
                 Configuration
             </a>
             <a class="{{ request()->routeIs('project.application.deployment.index') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.deployment.index', $parameters) }}">
-                <button>Deployments</button>
+                href="{{ route('project.application.deployment.index', $parameters) }}">
+                Deployments
             </a>
             <a class="{{ request()->routeIs('project.application.logs') ? 'dark:text-white' : '' }}"
-                wire:navigate href="{{ route('project.application.logs', $parameters) }}">
-                <button>Logs</button>
+                href="{{ route('project.application.logs', $parameters) }}">
+                Logs
             </a>
             @if (!$application->destination->server->isSwarm())
                 <a class="{{ request()->routeIs('project.application.command') ? 'dark:text-white' : '' }}"
-                 href="{{ route('project.application.command', $parameters) }}">
-                    <button>Terminal</button>
+                    href="{{ route('project.application.command', $parameters) }}">
+                    Terminal
                 </a>
             @endif
             <x-applications.links :application="$application" />
@@ -81,8 +81,7 @@
                                 'This application will be stopped.',
                                 'All non-persistent data of this application will be deleted.',
                             ]" :confirmWithText="false" :confirmWithPassword="false"
-                            step1ButtonText="Continue" step2ButtonText="Confirm" :dispatchEvent="true"
-                            dispatchEventType="stopEvent">
+                            step1ButtonText="Continue" step2ButtonText="Confirm">
                             <x-slot:button-title>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                     stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -112,14 +111,5 @@
                 </div>
             @endif
         </div>
-
     </div>
-    @script
-        <script>
-            $wire.$on('stopEvent', () => {
-                $wire.$dispatch('info', 'Stopping application.');
-                $wire.$call('stop');
-            });
-        </script>
-    @endscript
 </nav>

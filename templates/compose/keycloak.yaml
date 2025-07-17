@@ -6,14 +6,14 @@
 
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.1
     command:
       - start
     environment:
       - SERVICE_FQDN_KEYCLOAK_8080
       - TZ=${TIMEZONE:-UTC}
-      - KEYCLOAK_ADMIN=${SERVICE_USER_ADMIN}
-      - KEYCLOAK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${SERVICE_USER_ADMIN}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
       - KC_HOSTNAME=${SERVICE_FQDN_KEYCLOAK}
       - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
       - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}

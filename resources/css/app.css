@@ -1,69 +1,93 @@
-@import 'fonts';
+@import "./fonts.css" layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+@import "./utilities.css";
+
+@plugin 'tailwind-scrollbar';
+@plugin '@tailwindcss/typography';
+@plugin '@tailwindcss/forms';
+
+
+@source '../../storage/framework/views/*.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --font-sans: Inter, sans-serif;
+
+    --color-base: #101010;
+    --color-warning: #fcd452;
+    --color-success: #16a34a;
+    --color-error: #dc2626;
+    --color-coollabs: #6b16ed;
+    --color-coollabs-100: #7317ff;
+    --color-coolgray-100: #181818;
+    --color-coolgray-200: #202020;
+    --color-coolgray-300: #242424;
+    --color-coolgray-400: #282828;
+    --color-coolgray-500: #323232;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-coolgray-200, currentcolor);
+    }
+}
+
+@keyframes lds-heart {
+    0% {
+        transform: scale(1);
+    }
+
+    5% {
+        transform: scale(1.2);
+    }
+
+    39% {
+        transform: scale(0.85);
+    }
+
+    45% {
+        transform: scale(1);
+    }
+
+    60% {
+        transform: scale(0.95);
+    }
+
+    100% {
+        transform: scale(0.9);
+    }
+}
+
+/*
+* Base styles
+*/
 html,
 body {
-    @apply min-h-full bg-neutral-50 dark:bg-base dark:text-neutral-400 w-full;
+    @apply w-full min-h-full bg-neutral-50 dark:bg-base dark:text-neutral-400;
 }
 
 body {
-    @apply text-sm antialiased scrollbar min-h-screen;
-}
-
-.apexcharts-tooltip {
-    @apply dark:text-white dark:border-coolgray-300 dark:bg-coolgray-200 shadow-none !important;
-}
-
-.apexcharts-tooltip-title {
-    @apply hidden !important;
-}
-
-.apexcharts-xaxistooltip {
-    @apply hidden !important;
-}
-
-.input,
-.select {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300;
-}
-
-.input-sticky {
-    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400 block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
-}
-
-.input-sticky-active {
-    @apply border-2 border-coollabs text-black dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
-}
-
-/* Readonly */
-.input {
-    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
-}
-
-/* Focus */
-.input,
-.select {
-    @apply focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400;
-}
-
-.input,
-.select {
-    @apply block w-full py-1.5 rounded border-0 text-sm ring-1 ring-inset;
-}
-
-.input[type="password"] {
-    @apply pr-10;
+    @apply min-h-screen text-sm antialiased scrollbar;
 }
 
 option {
     @apply dark:text-white dark:bg-coolgray-100;
-}
-
-.button {
-    @apply flex items-center justify-center gap-2 px-2 py-1 text-sm text-black normal-case border rounded cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600 disabled:border-none disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
 }
 
 button[isError]:not(:disabled) {
@@ -119,7 +143,7 @@ tr th {
 }
 
 tr th:first-child {
-    @apply py-3.5 pl-4 pr-3 sm:pl-6;
+    @apply py-3.5 pr-3 pl-4 sm:pl-6;
 }
 
 tr td {
@@ -127,203 +151,20 @@ tr td {
 }
 
 tr td:first-child {
-    @apply pl-4 pr-3 font-bold sm:pl-6;
+    @apply pr-3 pl-4 font-bold sm:pl-6;
 }
 
 section {
     @apply mb-12;
 }
 
-.alert-success {
-    @apply flex items-center gap-2 text-success;
-}
-
-.alert-error {
-    @apply flex items-center gap-2 text-error;
-}
-
-.tag {
-    @apply px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200;
-}
-
-.add-tag {
-    @apply flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 group-hover:dark:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200;
-}
-
-.dropdown-item {
-    @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
-}
-
-.dropdown-item-no-padding {
-    @apply relative flex cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs items-center py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
-}
-
-.badge {
-    @apply inline-block w-3 h-3 text-xs font-bold leading-none border rounded-full border-neutral-200 dark:border-black;
-}
-
-.badge-absolute {
-    @apply absolute top-0 right-0 w-2 h-2 border-none rounded-t-none rounded-r-none;
-}
-
-.badge-success {
-    @apply bg-success;
-}
-
-.badge-warning {
-    @apply bg-warning;
-}
-
-.badge-error {
-    @apply bg-error;
-}
-
-.menu {
-    @apply flex items-center gap-1;
-}
-
-.menu-item {
-    @apply flex items-center w-full gap-3 px-2 py-1 text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64;
-}
-
-.menu-item-active {
-    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
-}
-
-.heading-item-active {
-    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning;
-}
-
-.icon {
-    @apply w-6 h-6 dark:hover:text-white;
-}
-
-.scrollbar {
-    @apply scrollbar-thumb-coollabs-100 dark:scrollbar-track-coolgray-200 scrollbar-track-neutral-200 scrollbar-thin;
-}
-
-.main {
-    @apply pt-4 pl-24 pr-10 lg:pr-32 lg:pl-44;
-}
-
-.custom-modal {
-    @apply z-50 flex flex-col gap-2 px-8 py-4 border dark:bg-coolgray-100 dark:border-coolgray-200;
-}
-
-.navbar-main {
-    @apply flex flex-col gap-4 pb-2 border-b-2 border-solid h-fit md:flex-row justify-items-start sm:justify-between dark:border-coolgray-200 md:items-center;
-}
-
-.loading {
-    @apply w-4 dark:text-warning text-coollabs;
-}
-
-.kbd-custom {
-    @apply px-2 text-xs border border-dashed rounded border-neutral-700 dark:text-warning;
-}
-
-.box {
-    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
-}
-
-.box-boarding {
-    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
-}
-
-.box-without-bg {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] border border-neutral-200 dark:border-black;
-}
-
-.box-without-bg-without-border {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
-}
-
-.on-box {
-    @apply rounded hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
-}
-
-.box-title {
-    @apply font-bold text-black dark:text-white group-hover:dark:text-white;
-}
-
-.box-description {
-    @apply text-xs font-bold text-neutral-500 group-hover:dark:text-white group-hover:text-black;
-}
-
-.description {
-    @apply text-xs font-bold text-neutral-500 group-hover:dark:text-white group-hover:text-black;
+/*
+* Utility classes
+*/
+.input[type="password"] {
+    @apply pr-[2.4rem];
 }
 
 .lds-heart {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-
-@keyframes lds-heart {
-    0% {
-        transform: scale(1);
-    }
-
-    5% {
-        transform: scale(1.2);
-    }
-
-    39% {
-        transform: scale(0.85);
-    }
-
-    45% {
-        transform: scale(1);
-    }
-
-    60% {
-        transform: scale(0.95);
-    }
-
-    100% {
-        transform: scale(0.9);
-    }
-}
-
-.bg-coollabs-gradient {
-    @apply text-transparent text-white bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
-}
-
-.text-helper {
-    @apply inline-block font-bold text-coollabs dark:text-warning;
-}
-
-.info-helper {
-    @apply cursor-pointer text-coollabs dark:text-warning;
-}
-
-.info-helper-popup {
-    @apply absolute z-40 hidden text-xs rounded text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300;
-}
-
-.buyme {
-    @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-sm hover:text-white bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200 hover:no-underline;
-}
-
-.title {
-    @apply hidden pb-0 lg:block lg:pb-8;
-}
-
-.subtitle {
-    @apply pt-2 pb-9;
-}
-
-.fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] dark:bg-coolgray-100 bg-white overflow-y-auto scrollbar;
-}
-
-.toast {
-    z-index: 1;
-}
-
-.dz-button {
-    @apply w-full p-4 py-10 my-4 font-bold bg-white border dark:border-coolgray-400 dark:text-white dark:bg-transparent hover:dark:bg-coolgray-400;
-}
-
-.xterm {
-    @apply p-2;
 }

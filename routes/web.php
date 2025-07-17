@@ -3,7 +3,6 @@
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\UploadController;
-use App\Http\Middleware\ApiAllowed;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
@@ -38,8 +37,9 @@ use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\Server\Advanced as ServerAdvanced;
+use App\Livewire\Server\CaCertificate\Show as CaCertificateShow;
 use App\Livewire\Server\Charts as ServerCharts;
-use App\Livewire\Server\CloudflareTunnels;
+use App\Livewire\Server\CloudflareTunnel;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\DockerCleanup;
@@ -50,8 +50,11 @@ use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfiguration
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
+use App\Livewire\Server\Security\Patches;
 use App\Livewire\Server\Show as ServerShow;
+use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
+use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
 use App\Livewire\SettingsOauth;
@@ -78,13 +81,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use ThreeSidedCube\LaravelRedoc\Http\Controllers\DefinitionController;
-use ThreeSidedCube\LaravelRedoc\Http\Controllers\DocumentationController;
-
-Route::group(['middleware' => ['auth:sanctum', ApiAllowed::class]], function () {
-    Route::get('/docs/api', DocumentationController::class)->name('redoc.documentation');
-    Route::get('/docs/api/definition', DefinitionController::class)->name('redoc.definition');
-});
 
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
@@ -99,15 +95,6 @@ Route::middleware(['throttle:login'])->group(function () {
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
-// Route::prefix('magic')->middleware(['auth'])->group(function () {
-//     Route::get('/servers', [MagicController::class, 'servers']);
-//     Route::get('/destinations', [MagicController::class, 'destinations']);
-//     Route::get('/projects', [MagicController::class, 'projects']);
-//     Route::get('/environments', [MagicController::class, 'environments']);
-//     Route::get('/project/new', [MagicController::class, 'newProject']);
-//     Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
-// });
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
@@ -120,6 +107,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
 
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
+    Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
+    Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
@@ -166,9 +156,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json(['authenticated' => false], 401);
     })->name('terminal.auth');
 
+    Route::post('/terminal/auth/ips', function () {
+        if (auth()->check()) {
+            $team = auth()->user()->currentTeam();
+            $ipAddresses = $team->servers->where('settings.is_terminal_enabled', true)->pluck('ip')->toArray();
+
+            return response()->json(['ipAddresses' => $ipAddresses], 200);
+        }
+
+        return response()->json(['ipAddresses' => []], 401);
+    })->name('terminal.auth.ips');
+
     Route::prefix('invitations')->group(function () {
         Route::get('/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
-        Route::get('/{uuid}/revoke', [Controller::class, 'revoke_invitation'])->name('team.invitation.revoke');
+        Route::get('/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
@@ -247,8 +248,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/advanced', ServerAdvanced::class)->name('server.advanced');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
+        Route::get('/ca-certificate', CaCertificateShow::class)->name('server.ca-certificate');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
-        Route::get('/cloudflare-tunnels', CloudflareTunnels::class)->name('server.cloudflare-tunnels');
+        Route::get('/cloudflare-tunnel', CloudflareTunnel::class)->name('server.cloudflare-tunnel');
         Route::get('/destinations', ServerDestinations::class)->name('server.destinations');
         Route::get('/log-drains', LogDrains::class)->name('server.log-drains');
         Route::get('/metrics', ServerCharts::class)->name('server.charts');
@@ -258,6 +260,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
+        Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security');
+        Route::get('/security/patches', Patches::class)->name('server.security.patches');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
@@ -292,9 +296,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
     Route::get('/download/backup/{executionId}', function () {
         try {
-            $team = auth()->user()->currentTeam();
+            $user = auth()->user();
+            $team = $user->currentTeam();
             if (is_null($team)) {
                 return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if ($user->isAdminFromSession() === false) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
             }
             $exeuctionId = request()->route('executionId');
             $execution = ScheduledDatabaseBackupExecution::where('id', $exeuctionId)->firstOrFail();

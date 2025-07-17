@@ -3,14 +3,11 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use Carbon\Carbon;
-use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Livewire\Component;
-use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
 class Previews extends Component
@@ -90,18 +87,9 @@ class Previews extends Component
             return;
         }
 
-        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
-        $url = Url::fromString($fqdn);
-        $template = $this->application->preview_url_template;
-        $host = $url->getHost();
-        $schema = $url->getScheme();
-        $random = new Cuid2;
-        $preview_fqdn = str_replace('{{random}}', $random, $template);
-        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-        $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
-        $preview_fqdn = "$schema://$preview_fqdn";
-        $preview->fqdn = $preview_fqdn;
-        $preview->save();
+        $preview->generate_preview_fqdn();
+        $this->application->refresh();
+        $this->dispatch('update_links');
         $this->dispatch('success', 'Domain generated.');
     }
 
@@ -131,7 +119,7 @@ class Previews extends Component
                         'pull_request_html_url' => $pull_request_html_url,
                     ]);
                 }
-                $this->application->generate_preview_fqdn($pull_request_id);
+                $found->generate_preview_fqdn();
                 $this->application->refresh();
                 $this->dispatch('update_links');
                 $this->dispatch('success', 'Preview added.');
@@ -141,13 +129,18 @@ class Previews extends Component
         }
     }
 
+    public function force_deploy_without_cache(int $pull_request_id, ?string $pull_request_html_url = null)
+    {
+        $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true);
+    }
+
     public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         $this->add($pull_request_id, $pull_request_html_url);
         $this->deploy($pull_request_id, $pull_request_html_url);
     }
 
-    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null)
+    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false)
     {
         try {
             $this->setDeploymentUuid();
@@ -159,13 +152,18 @@ class Previews extends Component
                     'pull_request_html_url' => $pull_request_html_url,
                 ]);
             }
-            queue_application_deployment(
+            $result = queue_application_deployment(
                 application: $this->application,
                 deployment_uuid: $this->deployment_uuid,
-                force_rebuild: false,
+                force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
             );
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
 
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
@@ -188,13 +186,12 @@ class Previews extends Component
     {
         try {
             $server = $this->application->destination->server;
-            $timeout = 300;
 
             if ($this->application->destination->server->isSwarm()) {
                 instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
             } else {
                 $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
-                $this->stopContainers($containers, $server, $timeout);
+                $this->stopContainers($containers, $server);
             }
 
             GetContainersStatus::run($server);
@@ -209,71 +206,28 @@ class Previews extends Component
     public function delete(int $pull_request_id)
     {
         try {
-            $server = $this->application->destination->server;
-            $timeout = 300;
+            $preview = ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->first();
 
-            if ($this->application->destination->server->isSwarm()) {
-                instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
-            } else {
-                $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
-                $this->stopContainers($containers, $server, $timeout);
+            if (! $preview) {
+                $this->dispatch('error', 'Preview not found.');
+
+                return;
             }
 
-            ApplicationPreview::where('application_id', $this->application->id)
-                ->where('pull_request_id', $pull_request_id)
-                ->first()
-                ->delete();
+            // Soft delete immediately for instant UI feedback
+            $preview->delete();
 
-            $this->application->refresh();
+            // Dispatch the job for async cleanup (container stopping + force delete)
+            DeleteResourceJob::dispatch($preview);
+
+            // Refresh the application and its previews relationship to reflect the soft delete
+            $this->application->load('previews');
             $this->dispatch('update_links');
-            $this->dispatch('success', 'Preview deleted.');
+            $this->dispatch('success', 'Preview deletion started. It may take a few moments to complete.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        }
-    }
-
-    private function stopContainers(array $containers, $server, int $timeout)
-    {
-        $processes = [];
-        foreach ($containers as $container) {
-            $containerName = str_replace('/', '', $container['Names']);
-            $processes[$containerName] = $this->stopContainer($containerName, $timeout);
-        }
-
-        $startTime = Carbon::now()->getTimestamp();
-        while (count($processes) > 0) {
-            $finishedProcesses = array_filter($processes, function ($process) {
-                return ! $process->running();
-            });
-            foreach (array_keys($finishedProcesses) as $containerName) {
-                unset($processes[$containerName]);
-                $this->removeContainer($containerName, $server);
-            }
-
-            if (Carbon::now()->getTimestamp() - $startTime >= $timeout) {
-                $this->forceStopRemainingContainers(array_keys($processes), $server);
-                break;
-            }
-
-            usleep(100000);
-        }
-    }
-
-    private function stopContainer(string $containerName, int $timeout): InvokedProcess
-    {
-        return Process::timeout($timeout)->start("docker stop --time=$timeout $containerName");
-    }
-
-    private function removeContainer(string $containerName, $server)
-    {
-        instant_remote_process(["docker rm -f $containerName"], $server, throwError: false);
-    }
-
-    private function forceStopRemainingContainers(array $containerNames, $server)
-    {
-        foreach ($containerNames as $containerName) {
-            instant_remote_process(["docker kill $containerName"], $server, throwError: false);
-            $this->removeContainer($containerName, $server);
         }
     }
 }

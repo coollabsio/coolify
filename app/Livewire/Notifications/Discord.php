@@ -56,6 +56,12 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $serverUnreachableDiscordNotifications = true;
 
+    #[Validate(['boolean'])]
+    public bool $serverPatchDiscordNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $discordPingEnabled = true;
+
     public function mount()
     {
         try {
@@ -86,6 +92,9 @@ class Discord extends Component
             $this->settings->server_disk_usage_discord_notifications = $this->serverDiskUsageDiscordNotifications;
             $this->settings->server_reachable_discord_notifications = $this->serverReachableDiscordNotifications;
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
+            $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
+
+            $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
             $this->settings->save();
             refreshSession();
@@ -105,12 +114,31 @@ class Discord extends Component
             $this->serverDiskUsageDiscordNotifications = $this->settings->server_disk_usage_discord_notifications;
             $this->serverReachableDiscordNotifications = $this->settings->server_reachable_discord_notifications;
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
+            $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
+
+            $this->discordPingEnabled = $this->settings->discord_ping_enabled;
+        }
+    }
+
+    public function instantSaveDiscordPingEnabled()
+    {
+        try {
+            $original = $this->discordPingEnabled;
+            $this->validate([
+                'discordPingEnabled' => 'required',
+            ]);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->discordPingEnabled = $original;
+
+            return handleError($e, $this);
         }
     }
 
     public function instantSaveDiscordEnabled()
     {
         try {
+            $original = $this->discordEnabled;
             $this->validate([
                 'discordWebhookUrl' => 'required',
             ], [
@@ -118,7 +146,7 @@ class Discord extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->discordEnabled = false;
+            $this->discordEnabled = $original;
 
             return handleError($e, $this);
         }

@@ -37,9 +37,8 @@
         @endif
         @if ($fileStorage->count() > 0)
             <div class="flex flex-col gap-2">
-                @foreach ($fileStorage->sort() as $fileStorage)
-                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                        wire:key="resource-{{ $fileStorage->uuid }}" />
+                @foreach ($fileStorage as $fs)
+                    <livewire:project.service.file-storage :fileStorage="$fs" wire:key="resource-{{ $fs->uuid }}" />
                 @endforeach
             </div>
         @endif

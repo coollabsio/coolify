@@ -142,19 +142,28 @@ class Gitlab extends Controller
                         $is_watch_path_triggered = $application->isWatchPathsTriggered($changed_files);
                         if ($is_watch_path_triggered || is_null($application->watch_paths)) {
                             $deployment_uuid = new Cuid2;
-                            queue_application_deployment(
+                            $result = queue_application_deployment(
                                 application: $application,
                                 deployment_uuid: $deployment_uuid,
                                 commit: data_get($payload, 'after', 'HEAD'),
                                 force_rebuild: false,
                                 is_webhook: true,
                             );
-                            $return_payloads->push([
-                                'status' => 'success',
-                                'message' => 'Deployment queued.',
-                                'application_uuid' => $application->uuid,
-                                'application_name' => $application->name,
-                            ]);
+                            if ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'status' => $result['status'],
+                                    'message' => $result['message'],
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                ]);
+                            } else {
+                                $return_payloads->push([
+                                    'status' => 'success',
+                                    'message' => 'Deployment queued.',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                ]);
+                            }
                         } else {
                             $paths = str($application->watch_paths)->explode("\n");
                             $return_payloads->push([
@@ -193,15 +202,16 @@ class Gitlab extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    ApplicationPreview::create([
+                                    $pr_app = ApplicationPreview::create([
                                         'git_type' => 'gitlab',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
                                         'pull_request_html_url' => $pull_request_html_url,
                                     ]);
+                                    $pr_app->generate_preview_fqdn();
                                 }
                             }
-                            queue_application_deployment(
+                            $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,
                                 deployment_uuid: $deployment_uuid,
@@ -210,11 +220,19 @@ class Gitlab extends Controller
                                 is_webhook: true,
                                 git_type: 'gitlab'
                             );
-                            $return_payloads->push([
-                                'application' => $application->name,
-                                'status' => 'success',
-                                'message' => 'Preview Deployment queued',
-                            ]);
+                            if ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => $result['message'],
+                                ]);
+                            } else {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'success',
+                                    'message' => 'Preview Deployment queued',
+                                ]);
+                            }
                         } else {
                             $return_payloads->push([
                                 'application' => $application->name,

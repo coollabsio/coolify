@@ -1,14 +1,14 @@
 <div>
     <div class="flex items-start gap-2 pb-10">
         <div>
-            <h1>Tags</h1>
+            <h1 class="pb-2">Tags</h1>
             <div>Tags help you to perform actions on multiple resources.</div>
         </div>
     </div>
     <div class="flex flex-wrap gap-2 ">
         @forelse ($tags as $oneTag)
-            <a wire:navigate :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs hover:bg-coollabs-100'"
-                class="w-64 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold"
+            <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs'"
+                class="w-32 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold  dark:hover:bg-coollabs-100 flex justify-center items-center"
                 href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
         @empty
             <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
@@ -16,7 +16,7 @@
     </div>
     @if (isset($tag))
         <div>
-            <h3 class="py-4">Details</h3>
+            <h3 class="py-4">Tag Details</h3>
             <div class="flex items-end gap-2 ">
                 <div class="w-[500px]">
                     <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />
@@ -34,8 +34,8 @@
             <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 @if (isset($applications) && count($applications) > 0)
                     @foreach ($applications as $application)
-                        <a wire:navigate href="{{ $application->link() }}" class="box group">
-                            <div class="flex flex-col">
+                        <a href="{{ $application->link() }}" class="box group">
+                            <div class="flex flex-col justify-center">
                                 <div class="box-title">
                                     {{ $application->project()->name }}/{{ $application->environment->name }}
                                 </div>
@@ -47,7 +47,7 @@
                 @endif
                 @if (isset($services) && count($services) > 0)
                     @foreach ($services as $service)
-                        <a wire:navigate href="{{ $service->link() }}" class="flex flex-col box group">
+                        <a href="{{ $service->link() }}" class="flex flex-col box group">
                             <div class="flex flex-col">
                                 <div class="box-title">
                                     {{ $service->project()->name }}/{{ $service->environment->name }}
@@ -70,7 +70,7 @@
                     <h4 class="py-4">{{ $serverName }}</h4>
                     <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                         @foreach ($deployments as $deployment)
-                            <a wire:navigate href="{{ data_get($deployment, 'deployment_url') }}" @class([
+                            <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
                                 'gap-2 cursor-pointer box group border-l-2 border-dotted',
                                 'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
                                 'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',

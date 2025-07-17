@@ -8,6 +8,7 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
@@ -98,7 +99,7 @@ function format_docker_envs_to_json($rawOutput)
         $outputLines = json_decode($rawOutput, true, flags: JSON_THROW_ON_ERROR);
 
         return collect(data_get($outputLines[0], 'Config.Env', []))->mapWithKeys(function ($env) {
-            $env = explode('=', $env);
+            $env = explode('=', $env, 2);
 
             return [$env[0] => $env[1]];
         });
@@ -295,7 +296,8 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
     return $payload;
 }
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null)
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -303,6 +305,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     } else {
         $labels->push("caddy_ingress_network={$network}");
     }
+
+    $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
+    if ($is_http_basic_auth_enabled) {
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    }
+
     foreach ($domains as $loop => $domain) {
         $url = Url::fromString($domain);
         $host = $url->getHost();
@@ -339,19 +347,32 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
             $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
         }
-        if (isDev()) {
-            // $labels->push("caddy_{$loop}.tls=internal");
+        if ($is_http_basic_auth_enabled) {
+            $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$hashedPassword}\"");
         }
     }
 
     return $labels->sort();
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both')
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
-    $labels->push('traefik.http.middlewares.gzip.compress=true');
+    if ($is_gzip_enabled) {
+        $labels->push('traefik.http.middlewares.gzip.compress=true');
+    }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
+
+    $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;
+    $http_basic_auth_label = "http-basic-auth-{$uuid}";
+    if ($is_http_basic_auth_enabled) {
+        $hashedPassword = password_hash($http_basic_auth_password, PASSWORD_BCRYPT, ['cost' => 10]);
+    }
+
+    if ($is_http_basic_auth_enabled) {
+        $labels->push("traefik.http.middlewares.{$http_basic_auth_label}.basicauth.users={$http_basic_auth_username}:{$hashedPassword}");
+    }
 
     $middlewares_from_labels = collect([]);
 
@@ -438,6 +459,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -460,6 +484,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
+                    }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
                     }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
@@ -510,6 +537,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
                     }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -532,6 +562,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
                         $labels = $labels->merge($redirect_to_www);
                         $middlewares->push($to_www_name);
+                    }
+                    if ($is_http_basic_auth_enabled) {
+                        $middlewares->push($http_basic_auth_label);
                     }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
@@ -576,7 +609,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                            redirect_direction: $application->redirect
+                            redirect_direction: $application->redirect,
+                            is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                            http_basic_auth_username: $application->http_basic_auth_username,
+                            http_basic_auth_password: $application->http_basic_auth_password,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -588,7 +624,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_force_https_enabled: $application->isForceHttpsEnabled(),
                             is_gzip_enabled: $application->isGzipEnabled(),
                             is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                            redirect_direction: $application->redirect
+                            redirect_direction: $application->redirect,
+                            is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                            http_basic_auth_username: $application->http_basic_auth_username,
+                            http_basic_auth_password: $application->http_basic_auth_password,
                         ));
                         break;
                 }
@@ -600,7 +639,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                    redirect_direction: $application->redirect
+                    redirect_direction: $application->redirect,
+                    is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                    http_basic_auth_username: $application->http_basic_auth_username,
+                    http_basic_auth_password: $application->http_basic_auth_password,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -610,7 +652,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_force_https_enabled: $application->isForceHttpsEnabled(),
                     is_gzip_enabled: $application->isGzipEnabled(),
                     is_stripprefix_enabled: $application->isStripprefixEnabled(),
-                    redirect_direction: $application->redirect
+                    redirect_direction: $application->redirect,
+                    is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                    http_basic_auth_username: $application->http_basic_auth_username,
+                    http_basic_auth_password: $application->http_basic_auth_password,
                 ));
             }
         }
@@ -630,7 +675,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                        is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                        http_basic_auth_username: $application->http_basic_auth_username,
+                        http_basic_auth_password: $application->http_basic_auth_password,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -641,7 +689,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         onlyPort: $onlyPort,
                         is_force_https_enabled: $application->isForceHttpsEnabled(),
                         is_gzip_enabled: $application->isGzipEnabled(),
-                        is_stripprefix_enabled: $application->isStripprefixEnabled()
+                        is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                        is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                        http_basic_auth_username: $application->http_basic_auth_username,
+                        http_basic_auth_password: $application->http_basic_auth_password,
                     ));
                     break;
             }
@@ -652,7 +703,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                http_basic_auth_username: $application->http_basic_auth_username,
+                http_basic_auth_password: $application->http_basic_auth_password,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -661,7 +715,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 onlyPort: $onlyPort,
                 is_force_https_enabled: $application->isForceHttpsEnabled(),
                 is_gzip_enabled: $application->isGzipEnabled(),
-                is_stripprefix_enabled: $application->isStripprefixEnabled()
+                is_stripprefix_enabled: $application->isStripprefixEnabled(),
+                is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
+                http_basic_auth_username: $application->http_basic_auth_username,
+                http_basic_auth_password: $application->http_basic_auth_password,
             ));
         }
     }
@@ -669,11 +726,12 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     return $labels->all();
 }
 
-function isDatabaseImage(?string $image = null)
+function isDatabaseImage(?string $image = null, ?array $serviceConfig = null)
 {
     if (is_null($image)) {
         return false;
     }
+
     $image = str($image);
     if ($image->contains(':')) {
         $image = str($image);
@@ -681,11 +739,170 @@ function isDatabaseImage(?string $image = null)
         $image = str($image)->append(':latest');
     }
     $imageName = $image->before(':');
-    if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
+
+    // First check if it's a known database image
+    $isKnownDatabase = false;
+    foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
+        if (str($imageName)->contains($database_docker_image)) {
+            $isKnownDatabase = true;
+            break;
+        }
+    }
+
+    // If no database pattern found, it's definitely not a database
+    if (! $isKnownDatabase) {
+        return false;
+    }
+
+    // If we have service configuration, use additional context to make better decisions
+    if (! is_null($serviceConfig)) {
+        return isDatabaseImageWithContext($imageName, $serviceConfig);
+    }
+
+    // Fallback to original behavior for backward compatibility
+    return $isKnownDatabase;
+}
+
+function isDatabaseImageWithContext(string $imageName, array $serviceConfig): bool
+{
+    // Known application images that contain database names but are not databases
+    $knownApplicationPatterns = [
+        // SuperTokens authentication
+        'supertokens/supertokens-mysql',
+        'supertokens/supertokens-postgresql',
+        'supertokens/supertokens-mongodb',
+        'registry.supertokens.io/supertokens/supertokens-mysql',
+        'registry.supertokens.io/supertokens/supertokens-postgresql',
+        'registry.supertokens.io/supertokens/supertokens-mongodb',
+        'registry.supertokens.io/supertokens',
+
+        // Analytics and BI tools
+        'metabase/metabase', // Uses databases but is not a database
+        'amancevice/superset', // Uses databases but is not a database
+        'nocodb/nocodb', // Uses databases but is not a database
+        'ghcr.io/umami-software/umami', // Web analytics with postgresql variant
+
+        // Secret management
+        'infisical/infisical', // Secret management with postgres variant
+
+        // Development tools
+        'postgrest/postgrest', // REST API for PostgreSQL
+        'supabase/postgres-meta', // PostgreSQL metadata API
+        'bluewaveuptime/uptime_redis', // Uptime monitoring with Redis
+    ];
+
+    foreach ($knownApplicationPatterns as $pattern) {
+        if (str($imageName)->contains($pattern)) {
+            return false;
+        }
+    }
+
+    // Check for database-like ports (common database ports indicate it's likely a database)
+    $databasePorts = ['3306', '5432', '27017', '6379', '8086', '9200', '7687', '8123'];
+    $ports = data_get($serviceConfig, 'ports', []);
+    $hasStandardDbPort = false;
+
+    if (is_array($ports)) {
+        foreach ($ports as $port) {
+            $portStr = is_string($port) ? $port : (string) $port;
+            foreach ($databasePorts as $dbPort) {
+                if (str($portStr)->contains($dbPort)) {
+                    $hasStandardDbPort = true;
+                    break 2;
+                }
+            }
+        }
+    }
+
+    // Check environment variables for database-specific patterns
+    $environment = data_get($serviceConfig, 'environment', []);
+    $hasDbEnvVars = false;
+    $hasAppEnvVars = false;
+
+    if (is_array($environment)) {
+        foreach ($environment as $env) {
+            $envStr = is_string($env) ? $env : (string) $env;
+            $envUpper = strtoupper($envStr);
+
+            // Database-specific environment variables
+            if (str($envUpper)->contains(['MYSQL_ROOT_PASSWORD', 'POSTGRES_PASSWORD', 'MONGO_INITDB_ROOT_PASSWORD', 'REDIS_PASSWORD'])) {
+                $hasDbEnvVars = true;
+            }
+
+            // Application-specific environment variables
+            if (str($envUpper)->contains(['SERVICE_FQDN', 'API_KEYS', 'APP_', 'APPLICATION_'])) {
+                $hasAppEnvVars = true;
+            }
+        }
+    }
+
+    // Check healthcheck patterns
+    $healthcheck = data_get($serviceConfig, 'healthcheck.test', []);
+    $hasDbHealthcheck = false;
+    $hasAppHealthcheck = false;
+
+    if (is_array($healthcheck)) {
+        $healthcheckStr = implode(' ', $healthcheck);
+    } else {
+        $healthcheckStr = is_string($healthcheck) ? $healthcheck : '';
+    }
+
+    if (! empty($healthcheckStr)) {
+        $healthcheckUpper = strtoupper($healthcheckStr);
+
+        // Database-specific healthcheck patterns
+        if (str($healthcheckUpper)->contains(['PG_ISREADY', 'MYSQLADMIN PING', 'MONGO', 'REDIS-CLI PING'])) {
+            $hasDbHealthcheck = true;
+        }
+
+        // Application-specific healthcheck patterns (HTTP endpoints)
+        if (str($healthcheckUpper)->contains(['CURL', 'WGET', 'HTTP://', 'HTTPS://', '/HEALTH', '/API/', '/HELLO'])) {
+            $hasAppHealthcheck = true;
+        }
+    }
+
+    // Check if service depends on other database services
+    $dependsOn = data_get($serviceConfig, 'depends_on', []);
+    $dependsOnDatabases = false;
+
+    if (is_array($dependsOn)) {
+        foreach ($dependsOn as $serviceName => $config) {
+            $serviceNameStr = is_string($serviceName) ? $serviceName : (string) $serviceName;
+            if (str($serviceNameStr)->contains(['mysql', 'postgres', 'mongo', 'redis', 'mariadb'])) {
+                $dependsOnDatabases = true;
+                break;
+            }
+        }
+    }
+
+    // Decision logic:
+    // 1. If it has app-specific patterns and depends on databases, it's likely an application
+    if ($hasAppEnvVars && $dependsOnDatabases) {
+        return false;
+    }
+
+    // 2. If it has HTTP healthchecks, it's likely an application
+    if ($hasAppHealthcheck) {
+        return false;
+    }
+
+    // 3. If it has standard database ports AND database healthchecks, it's likely a database
+    if ($hasStandardDbPort && $hasDbHealthcheck) {
         return true;
     }
 
-    return false;
+    // 4. If it has database environment variables, it's likely a database
+    if ($hasDbEnvVars) {
+        return true;
+    }
+
+    // 5. Default: if it depends on databases but doesn't have database characteristics, it's an application
+    if ($dependsOnDatabases) {
+        return false;
+    }
+
+    // 6. Fallback: assume it's a database if we can't determine otherwise
+    return true;
 }
 
 function convertDockerRunToCompose(?string $custom_docker_run_options = null)
@@ -714,6 +931,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ip' => 'ip',
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
+        '--hostname' => 'hostname',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -723,6 +941,16 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $value = $device_matches[1] ?? 'all';
             $options[$option][] = $value;
             $options[$option] = array_unique($options[$option]);
+        }
+        if ($option === '--hostname') {
+            // Match --hostname=value or --hostname value
+            $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
+            preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
+            $value = $hostname_matches[1] ?? null;
+            if ($value && ! empty(trim($value))) {
+                $options[$option][] = $value;
+                $options[$option] = array_unique($options[$option]);
+            }
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
@@ -760,8 +988,8 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 }
             });
             $compose_options->put($mapping[$option], $ulimits);
-        } elseif ($option === '--shm-size') {
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+        } elseif ($option === '--shm-size' || $option === '--hostname') {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -769,7 +997,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 'driver' => 'nvidia',
                 'capabilities' => ['gpu'],
             ];
-            if (! is_null($value) && is_array($value) && count($value) > 0) {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 if (str($value[0]) != 'all') {
                     if (str($value[0])->contains(',')) {
                         $payload['device_ids'] = str($value[0])->explode(',')->toArray();
@@ -799,7 +1027,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 
                 continue;
             }
-            $compose_options->forget($option);
         }
     }
 
@@ -834,7 +1061,15 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         if (! $server) {
             throw new \Exception('Server not found');
         }
-        $base64_compose = base64_encode($compose);
+        $yaml_compose = Yaml::parse($compose);
+        foreach ($yaml_compose['services'] as $service_name => $service) {
+            foreach ($service['volumes'] as $volume_name => $volume) {
+                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
+                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
+                }
+            }
+        }
+        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
         instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
             "chmod 600 /tmp/{$uuid}.yml",

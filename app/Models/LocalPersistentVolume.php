@@ -24,11 +24,6 @@ class LocalPersistentVolume extends Model
         return $this->morphTo('resource');
     }
 
-    public function standalone_postgresql()
-    {
-        return $this->morphTo('resource');
-    }
-
     protected function name(): Attribute
     {
         return Attribute::make(

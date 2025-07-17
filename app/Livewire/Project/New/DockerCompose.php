@@ -7,7 +7,6 @@ use App\Models\Project;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Str;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
@@ -26,21 +25,7 @@ class DockerCompose extends Component
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         if (isDev()) {
-            $this->dockerComposeRaw = 'services:
-            appsmith:
-              build:
-                context: .
-                dockerfile_inline: |
-                  FROM nginx
-                  ARG GIT_COMMIT
-                  ARG GIT_BRANCH
-                  RUN echo "Hello World ${GIT_COMMIT} ${GIT_BRANCH}"
-                args:
-                  - GIT_COMMIT=cdc3b19
-                  - GIT_BRANCH=${GIT_BRANCH}
-              environment:
-                - APPSMITH_MAIL_ENABLED=${APPSMITH_MAIL_ENABLED}
-          ';
+            $this->dockerComposeRaw = file_get_contents(base_path('templates/test-database-detection.yaml'));
         }
     }
 
@@ -66,7 +51,6 @@ class DockerCompose extends Component
             $destination_class = $destination->getMorphClass();
 
             $service = Service::create([
-                'name' => 'service'.Str::random(10),
                 'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
                 'server_id' => (int) $server_id,
@@ -85,8 +69,6 @@ class DockerCompose extends Component
                     'resourceable_type' => $service->getMorphClass(),
                 ]);
             }
-            $service->name = "service-$service->uuid";
-
             $service->parse(isNew: true);
 
             return redirect()->route('project.service.configuration', [

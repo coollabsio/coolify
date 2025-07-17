@@ -16,7 +16,7 @@
                     {{ $tag->name }}
                     <svg wire:click="deleteTag('{{ $tag->id }}')" xmlns="http://www.w3.org/2000/svg" fill="none"
                         viewBox="0 0 24 24"
-                        class="inline-block w-3 h-3 rounded cursor-pointer stroke-current hover:bg-red-500">
+                        class="inline-block w-3 h-3 rounded-sm cursor-pointer stroke-current hover:bg-red-500">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
                         </path>
                     </svg>
@@ -25,7 +25,7 @@
         </div>
     @endif
     @if (count($filteredTags) > 0)
-        <h3 class="pt-4">Exisiting Tags</h3>
+        <h3 class="pt-4">Existing Tags</h3>
         <div>Click to add quickly</div>
         <div class="flex flex-wrap gap-2 pt-4">
             @foreach ($filteredTags as $tag)

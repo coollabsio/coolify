@@ -22,7 +22,7 @@ class Test extends Notification implements ShouldQueue
 
     public $tries = 5;
 
-    public function __construct(public ?string $emails = null, public ?string $channel = null)
+    public function __construct(public ?string $emails = null, public ?string $channel = null, public ?bool $ping = false)
     {
         $this->onQueue('high');
     }
@@ -68,6 +68,7 @@ class Test extends Notification implements ShouldQueue
             title: ':white_check_mark: Test Success',
             description: 'This is a test Discord notification from Coolify. :cross_mark: :warning: :information_source:',
             color: DiscordMessage::successColor(),
+            isCritical: $this->ping,
         );
 
         $message->addField(name: 'Dashboard', value: '[Link]('.base_url().')', inline: true);
@@ -82,7 +83,7 @@ class Test extends Notification implements ShouldQueue
             'buttons' => [
                 [
                     'text' => 'Go to your dashboard',
-                    'url' => base_url(),
+                    'url' => isDev() ? 'https://staging-but-dev.coolify.io' : base_url(),
                 ],
             ],
         ];

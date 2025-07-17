@@ -6,7 +6,7 @@
 
 services:
   odoo:
-    image: odoo:17
+    image: odoo:18
     environment:
       - SERVICE_FQDN_ODOO_8069
       - HOST=postgresql
@@ -14,6 +14,7 @@ services:
       - PASSWORD=$SERVICE_PASSWORD_POSTGRES
     volumes:
       - odoo-web-data:/var/lib/odoo
+      - odoo-extra-addons:/mnt/extra-addons
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8069"]
       interval: 2s

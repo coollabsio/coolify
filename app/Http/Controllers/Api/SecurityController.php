@@ -368,6 +368,20 @@ class SecurityController extends Controller
                 response: 404,
                 description: 'Private Key not found.',
             ),
+            new OA\Response(
+                response: 422,
+                description: 'Private Key is in use and cannot be deleted.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Private Key is in use and cannot be deleted.'],
+                            ]
+                        )
+                    ),
+                ]),
         ]
     )]
     public function delete_key(Request $request)
@@ -384,6 +398,14 @@ class SecurityController extends Controller
         if (is_null($key)) {
             return response()->json(['message' => 'Private Key not found.'], 404);
         }
+
+        if ($key->isInUse()) {
+            return response()->json([
+                'message' => 'Private Key is in use and cannot be deleted.',
+                'details' => 'This private key is currently being used by servers, applications, or Git integrations.',
+            ], 422);
+        }
+
         $key->forceDelete();
 
         return response()->json([
