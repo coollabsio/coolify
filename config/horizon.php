@@ -189,7 +189,7 @@ return [
             'memory' => 128,
             'tries' => 1,
             'nice' => 0,
-            'sleep' => 5,
+            'sleep' => 3,
             'timeout' => 3600,
         ],
     ],
