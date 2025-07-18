@@ -21,8 +21,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Laravel\Horizon\Contracts\Silenced;
 
-class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
+class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

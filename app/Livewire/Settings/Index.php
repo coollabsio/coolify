@@ -44,17 +44,16 @@ class Index extends Component
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
-        } else {
-            $this->settings = instanceSettings();
-            $this->server = Server::findOrFail(0);
-            $this->fqdn = $this->settings->fqdn;
-            $this->public_port_min = $this->settings->public_port_min;
-            $this->public_port_max = $this->settings->public_port_max;
-            $this->instance_name = $this->settings->instance_name;
-            $this->public_ipv4 = $this->settings->public_ipv4;
-            $this->public_ipv6 = $this->settings->public_ipv6;
-            $this->instance_timezone = $this->settings->instance_timezone;
         }
+        $this->settings = instanceSettings();
+        $this->server = Server::findOrFail(0);
+        $this->fqdn = $this->settings->fqdn;
+        $this->public_port_min = $this->settings->public_port_min;
+        $this->public_port_max = $this->settings->public_port_max;
+        $this->instance_name = $this->settings->instance_name;
+        $this->public_ipv4 = $this->settings->public_ipv4;
+        $this->public_ipv6 = $this->settings->public_ipv6;
+        $this->instance_timezone = $this->settings->instance_timezone;
     }
 
     #[Computed]
