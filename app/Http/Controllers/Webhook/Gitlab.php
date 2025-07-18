@@ -202,12 +202,13 @@ class Gitlab extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    ApplicationPreview::create([
+                                    $pr_app = ApplicationPreview::create([
                                         'git_type' => 'gitlab',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
                                         'pull_request_html_url' => $pull_request_html_url,
                                     ]);
+                                    $pr_app->generate_preview_fqdn();
                                 }
                             }
                             $result = queue_application_deployment(
