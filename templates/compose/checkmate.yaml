@@ -1,0 +1,46 @@
+# documentation: https://bluewavelabs.gitbook.io/checkmate
+# slogan: An open source server monitoring application
+# tags: monitoring,server,uptime,healthcheck
+# logo: svgs/checkmate.png
+# port: 80
+
+services:
+  client:
+    image: bluewaveuptime/uptime_client:latest
+    environment:
+      - SERVICE_FQDN_CHECKMATE_80
+      - UPTIME_APP_API_BASE_URL=${SERVICE_FQDN_CHECKMATESERVER_5000}/api/v1
+    depends_on:
+      - server
+  server:
+    image: bluewaveuptime/uptime_server:latest
+    environment:
+      - SERVICE_FQDN_CHECKMATESERVER_5000
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - REFRESH_TOKEN_SECRET=${SERVICE_PASSWORD_64_REFRESH}
+      - SYSTEM_EMAIL_ADDRESS=${SYSTEM_EMAIL_ADDRESS:-test@example.com}
+      - SYSTEM_EMAIL_PASSWORD=${SERVICE_PASSWORD_64_EMAIL}
+      - SYSTEM_EMAIL_HOST=${SYSTEM_EMAIL_HOST}
+      - SYSTEM_EMAIL_PORT=${SYSTEM_EMAIL_PORT}
+      - PAGESPEED_API_KEY=${PAGESPEED_API_KEY}
+      - DB_CONNECTION_STRING=${DB_CONNECTION_STRING:-mongodb://mongodb:27017/uptime_db}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - DB_TYPE=${DB_TYPE:-MongoDB}
+      - TOKEN_TTL=${TOKEN_TTL:-99d}
+      - REFRESH_TOKEN_TTL=${REFRESH_TOKEN_TTL:-99d}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - redis
+      - mongodb
+  redis:
+    image: bluewaveuptime/uptime_redis:latest
+    volumes:
+      - redis:/data
+  mongodb:
+    image: bluewaveuptime/uptime_database_mongo:latest
+    volumes:
+      - mongodb:/data/db
+    command: ["mongod", "--quiet"]
+

@@ -11,20 +11,22 @@
 |
 */
 
-use App\Models\Application;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('team.{teamId}', function (User $user, int $teamId) {
     if ($user->teams->pluck('id')->contains($teamId)) {
         return true;
     }
+
     return false;
 });
 
 Broadcast::channel('user.{userId}', function (User $user) {
-    if ($user->id === auth()->user()->id) {
+    if ($user->id === Auth::id()) {
         return true;
     }
+
     return false;
 });

@@ -2,42 +2,59 @@
 
 namespace App\Actions\Application;
 
+use App\Actions\Server\CleanupDocker;
+use App\Events\ServiceStatusChanged;
 use App\Models\Application;
-use App\Models\StandaloneDocker;
-use App\Notifications\Application\StatusChanged;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
 {
     use AsAction;
-    public function handle(Application $application)
-    {
-        if ($application->destination->server->isSwarm()) {
-            instant_remote_process(["docker stack rm {$application->uuid}"], $application->destination->server);
-            return;
-        }
 
-        $servers = collect([]);
-        $servers->push($application->destination->server);
-        $application->additional_servers->map(function ($server) use ($servers) {
-            $servers->push($server);
-        });
+    public string $jobQueue = 'high';
+
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
+    {
+        $servers = collect([$application->destination->server]);
+        if ($application?->additional_servers?->count() > 0) {
+            $servers = $servers->merge($application->additional_servers);
+        }
         foreach ($servers as $server) {
-            if (!$server->isFunctional()) {
-                return 'Server is not functional';
-            }
-            $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
-            if ($containers->count() > 0) {
-                foreach ($containers as $container) {
-                    $containerName = data_get($container, 'Names');
-                    if ($containerName) {
-                        instant_remote_process(
-                            ["docker rm -f {$containerName}"],
-                            $server
-                        );
-                    }
+            try {
+                if (! $server->isFunctional()) {
+                    return 'Server is not functional';
                 }
+
+                if ($server->isSwarm()) {
+                    instant_remote_process(["docker stack rm {$application->uuid}"], $server);
+
+                    return;
+                }
+
+                $containers = $previewDeployments
+                    ? getCurrentApplicationContainerStatus($server, $application->id, includePullrequests: true)
+                    : getCurrentApplicationContainerStatus($server, $application->id, 0);
+
+                $containersToStop = $containers->pluck('Names')->toArray();
+
+                foreach ($containersToStop as $containerName) {
+                    instant_remote_process(command: [
+                        "docker stop --time=30 $containerName",
+                        "docker rm -f $containerName",
+                    ], server: $server, throwError: false);
+                }
+
+                if ($application->build_pack === 'dockercompose') {
+                    $application->deleteConnectedNetworks();
+                }
+
+                if ($dockerCleanup) {
+                    CleanupDocker::dispatch($server, true);
+                }
+            } catch (\Exception $e) {
+                return $e->getMessage();
             }
         }
+        ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }
 }

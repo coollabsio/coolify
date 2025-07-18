@@ -1,0 +1,22 @@
+# documentation: https://help.sonatype.com/en/sonatype-nexus-repository.html
+# slogan: Open source Universal Repository Manager (x86_64 version, official), default credentials: admin/admin123
+# tags: repository, manager, open source, docker, docker, registry, container
+# logo: svgs/nexus.png
+# port: 8081
+
+services:
+  nexus:
+    image: sonatype/nexus3
+    platform: linux/amd64
+    environment:
+      - SERVICE_FQDN_NEXUS_8081
+      - NEXUS_SECURITY_RANDOMPASSWORD=${NEXUS_SECURITY_RANDOMPASSWORD:-false}
+      - INSTALL4J_ADD_VM_PARAMS=-Xms2703m -Xmx2703m -XX:MaxDirectMemorySize=2703m -Djava.util.prefs.userRoot=/nexus-data/javaprefs
+    volumes:
+      - nexus_data:/nexus-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/service/rest/v1/status"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

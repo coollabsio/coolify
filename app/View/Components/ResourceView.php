@@ -16,10 +16,7 @@ class ResourceView extends Component
         public ?string $logo = null,
         public ?string $documentation = null,
         public bool $upgrade = false,
-    )
-    {
-
-    }
+    ) {}
 
     /**
      * Get the view / contents that represent the component.

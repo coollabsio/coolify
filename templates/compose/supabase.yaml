@@ -14,8 +14,9 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPABASE_8000
-      - JWT_SERCET=${SERVICE_PASSWORD_JWT}
+      - SERVICE_FQDN_SUPABASEKONG_8000
+      - KONG_PORT_MAPS=443:8000
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
       # https://github.com/supabase/cli/issues/14
@@ -169,14 +170,35 @@ services:
                       - anon
 
             ## Secure Realtime routes
-            - name: realtime-v1
+            - name: realtime-v1-ws
               _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
-              url: http://realtime-dev.supabase-realtime:4000/socket/
+              url: http://realtime-dev:4000/socket
+              protocol: ws
               routes:
-                - name: realtime-v1-all
+                - name: realtime-v1-ws
                   strip_path: true
                   paths:
                     - /realtime/v1/
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+            - name: realtime-v1-rest
+              _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
+              url: http://realtime-dev:4000/api
+              protocol: http
+              routes:
+                - name: realtime-v1-rest
+                  strip_path: true
+                  paths:
+                    - /realtime/v1/api
               plugins:
                 - name: cors
                 - name: key-auth
@@ -257,14 +279,14 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240301-0942bfe
+    image: supabase/studio:2025.06.02-sha-8f2993d
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://localhost:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
+          "fetch('http://127.0.0.1:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
         ]
       timeout: 5s
       interval: 5s
@@ -280,22 +302,25 @@ services:
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
-      - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASE_8000}
+      - 'SUPABASE_URL=http://supabase-kong:8000'
+      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
 
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
+      - 'SUPABASE_PUBLIC_API=${SERVICE_FQDN_SUPABASEKONG}'
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
       # Uncomment to use Big Query backend for analytics
       # NEXT_ANALYTICS_BACKEND_PROVIDER=bigquery
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY}'
   supabase-db:
-    image: supabase/postgres:15.1.0.147
+    image: supabase/postgres:15.8.1.048
     healthcheck:
-      test: pg_isready -U postgres -h localhost
+      test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
       timeout: 5s
       retries: 10
@@ -308,15 +333,14 @@ services:
       - config_file=/etc/postgresql/postgresql.conf
       - -c
       - log_min_messages=fatal
-    restart: unless-stopped
     environment:
       - POSTGRES_HOST=/var/run/postgresql
       - PGPORT=${POSTGRES_PORT:-5432}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - PGDATABASE=${POSTGRES_DB:-supabase}
-      - POSTGRES_DB=${POSTGRES_DB:-supabase}
+      - PGDATABASE=${POSTGRES_DB:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - JWT_EXP=${JWT_EXPIRY:-3600}
     volumes:
@@ -329,6 +353,22 @@ services:
 
           create schema if not exists _realtime;
           alter schema _realtime owner to :pguser;
+      - type: bind
+        source: ./volumes/db/_supabase.sql
+        target: /docker-entrypoint-initdb.d/migrations/97-_supabase.sql
+        content: |
+          \set pguser `echo "$POSTGRES_USER"`
+
+          CREATE DATABASE _supabase WITH OWNER :pguser;
+      - type: bind
+        source: ./volumes/db/pooler.sql
+        target: /docker-entrypoint-initdb.d/migrations/99-pooler.sql
+        content: |
+          \set pguser `echo "supabase_admin"`
+          \c _supabase
+          create schema if not exists _supavisor;
+          alter schema _supavisor owner to :pguser;
+          \c postgres
       - type: bind
         source: ./volumes/db/webhooks.sql
         target: /docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql
@@ -559,26 +599,30 @@ services:
         content: |
           \set jwt_secret `echo "$JWT_SECRET"`
           \set jwt_exp `echo "$JWT_EXP"`
+          \set db_name `echo "${POSTGRES_DB:-postgres}"`
 
-          ALTER DATABASE postgres SET "app.settings.jwt_secret" TO :'jwt_secret';
-          ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
+          ALTER DATABASE :db_name SET "app.settings.jwt_secret" TO :'jwt_secret';
+          ALTER DATABASE :db_name SET "app.settings.jwt_exp" TO :'jwt_exp';
 
       - type: bind
         source: ./volumes/db/logs.sql
         target: /docker-entrypoint-initdb.d/migrations/99-logs.sql
         content: |
           \set pguser `echo "supabase_admin"`
-
+          \c _supabase
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
+          \c postgres
+      # Use named volume to persist pgsodium decryption key between restarts
+      - supabase-db-config:/etc/postgresql-custom
+
   supabase-analytics:
     image: supabase/logflare:1.4.0
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
       timeout: 5s
       interval: 5s
       retries: 10
-    restart: unless-stopped
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -590,8 +634,8 @@ services:
     environment:
       - LOGFLARE_NODE_HOST=127.0.0.1
       - DB_USERNAME=supabase_admin
-      - DB_DATABASE=${POSTGRES_DB:-supabase}
-      - DB_HOSTNAME=${POSTGRES_HOST:-supabase-db}
+      - DB_DATABASE=_supabase
+      - DB_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_SCHEMA=_analytics
@@ -599,9 +643,10 @@ services:
       - LOGFLARE_SINGLE_TENANT=true
       - LOGFLARE_SINGLE_TENANT_MODE=true
       - LOGFLARE_SUPABASE_MODE=true
+      - LOGFLARE_MIN_CLUSTER_SIZE=1
 
       # Comment variables to use Big Query backend for analytics
-      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - POSTGRES_BACKEND_URL=postgresql://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase
       - POSTGRES_BACKEND_SCHEMA=_analytics
       - LOGFLARE_FEATURE_FLAG_OVERRIDE=multibackend=true
 
@@ -664,7 +709,7 @@ services:
                 kong: 'starts_with(string!(.appname), "supabase-kong")'
                 auth: 'starts_with(string!(.appname), "supabase-auth")'
                 rest: 'starts_with(string!(.appname), "supabase-rest")'
-                realtime: 'starts_with(string!(.appname), "realtime-dev.supabase-realtime")'
+                realtime: 'starts_with(string!(.appname), "realtime-dev")'
                 storage: 'starts_with(string!(.appname), "supabase-storage")'
                 functions: 'starts_with(string!(.appname), "supabase-functions")'
                 db: 'starts_with(string!(.appname), "supabase-db")'
@@ -796,7 +841,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_realtime:
               type: 'http'
               inputs:
@@ -806,7 +851,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_rest:
               type: 'http'
               inputs:
@@ -816,7 +861,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_db:
               type: 'http'
               inputs:
@@ -829,7 +874,7 @@ services:
               # We must route the sink through kong because ingesting logs before logflare is fully initialised will
               # lead to broken queries from studio. This works by the assumption that containers are started in the
               # following order: vector > db > logflare > kong
-              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_functions:
               type: 'http'
               inputs:
@@ -839,7 +884,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=deno-relay-logs&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=deno-relay-logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_storage:
               type: 'http'
               inputs:
@@ -849,7 +894,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
             logflare_kong:
               type: 'http'
               inputs:
@@ -860,7 +905,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
 
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -868,25 +913,25 @@ services:
     command: ["--config", "etc/vector/vector.yml"]
 
   supabase-rest:
-    image: postgrest/postgrest:v12.0.1
+    image: postgrest/postgrest:v12.2.12
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
         condition: service_healthy
       supabase-analytics:
         condition: service_healthy
-    restart: unless-stopped
     environment:
-      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
-      - PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public}
+      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      - 'PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public,storage,graphql_public}'
       - PGRST_DB_ANON_ROLE=anon
       - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_DB_USE_LEGACY_GUCS=false
       - PGRST_APP_SETTINGS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
+    exclude_from_hc: true
   supabase-auth:
-    image: supabase/gotrue:v2.143.0
+    image: supabase/gotrue:v2.174.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -901,7 +946,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:9999/health",
+          "http://127.0.0.1:9999/health",
         ]
       timeout: 5s
       interval: 5s
@@ -912,9 +957,10 @@ services:
       - API_EXTERNAL_URL=${API_EXTERNAL_URL:-http://supabase-kong:8000}
 
       - GOTRUE_DB_DRIVER=postgres
-      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
-
-      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASE_8000}
+      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      # The base URL your site is located at. Currently used in combination with other settings to construct URLs used in emails.
+      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASEKONG}
+      # A comma separated list of URIs (e.g. "https://foo.example.com,https://*.foo.example.com,https://bar.example.com") which are permitted as valid redirect_to destinations.
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
 
@@ -925,6 +971,7 @@ services:
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
 
       - GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}
+      - GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=${ENABLE_ANONYMOUS_USERS:-false}
       - GOTRUE_MAILER_AUTOCONFIRM=${ENABLE_EMAIL_AUTOCONFIRM:-false}
       # GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED=true
       # GOTRUE_SMTP_MAX_FREQUENCY=1s
@@ -952,9 +999,31 @@ services:
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
-  realtime-dev.supabase-realtime:
+      # Uncomment to enable custom access token hook. You'll need to create a public.custom_access_token_hook function and grant necessary permissions.
+      # See: https://supabase.com/docs/guides/auth/auth-hooks#hook-custom-access-token for details
+      # GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED="true"
+      # GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI="pg-functions://postgres/public/custom_access_token_hook"
+
+      # GOTRUE_HOOK_MFA_VERIFICATION_ATTEMPT_ENABLED="true"
+      # GOTRUE_HOOK_MFA_VERIFICATION_ATTEMPT_URI="pg-functions://postgres/public/mfa_verification_attempt"
+
+      # GOTRUE_HOOK_PASSWORD_VERIFICATION_ATTEMPT_ENABLED="true"
+      # GOTRUE_HOOK_PASSWORD_VERIFICATION_ATTEMPT_URI="pg-functions://postgres/public/password_verification_attempt"
+
+      # Uncomment to enable common OAuth Variables
+      #- 'GOTRUE_EXTERNAL_GITHUB_CLIENT_ID=${GOTRUE_EXTERNAL_GITHUB_CLIENT_ID}'
+      #- 'GOTRUE_EXTERNAL_GITHUB_ENABLED=${GOTRUE_EXTERNAL_GITHUB_ENABLED}'
+      #- 'GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI=${GOTRUE_EXTERNAL_GITHUB_REDIRECT_URI}'
+      #- 'GOTRUE_EXTERNAL_GITHUB_SECRET=${GOTRUE_EXTERNAL_GITHUB_SECRET}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_ENABLED=${GOTRUE_EXTERNAL_GOOGLE_ENABLED}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=${GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI}'
+      #- 'GOTRUE_EXTERNAL_GOOGLE_SECRET=${GOTRUE_EXTERNAL_GOOGLE_SECRET}'
+
+  realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.25.66
+    image: supabase/realtime:v2.34.47
+    container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -962,17 +1031,28 @@ services:
       supabase-analytics:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/localhost/4000"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-sSfL",
+          "--head",
+          "-o",
+          "/dev/null",
+          "-H",
+          "Authorization: Bearer ${SERVICE_SUPABASEANON_KEY}",
+          "http://127.0.0.1:4000/api/tenants/realtime-dev/health",
+        ]
       timeout: 5s
       interval: 5s
       retries: 3
     environment:
       - PORT=4000
-      - DB_HOST=${POSTGRES_HOST:-supabase-db}
+      - DB_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - DB_PORT=${POSTGRES_PORT:-5432}
       - DB_USER=supabase_admin
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - DB_NAME=${POSTGRES_DB:-supabase}
+      - DB_NAME=${POSTGRES_DB:-postgres}
       - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
       - DB_ENC_KEY=supabaserealtime
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -982,6 +1062,12 @@ services:
       - ERL_AFLAGS=-proto_dist inet_tcp
       - ENABLE_TAILSCALE=false
       - DNS_NODES=''
+      - RLIMIT_NOFILE=10000
+      - APP_NAME=realtime
+      - SEED_SELF_HOST=true
+      - LOG_LEVEL=error
+      - RUN_JANITOR=true
+      - JANITOR_INTERVAL=60000
     command: >
       sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
   supabase-minio:
@@ -1015,11 +1101,11 @@ services:
         content: |
           #!/bin/sh
           /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
-          /usr/bin/mc mb supabase-minio/stub;
+          /usr/bin/mc mb --ignore-existing supabase-minio/stub;
           exit 0
 
   supabase-storage:
-    image: supabase/storage-api:v0.46.4
+    image: supabase/storage-api:v1.14.6
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1036,7 +1122,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:5000/status",
+          "http://127.0.0.1:5000/status",
         ]
       timeout: 5s
       interval: 5s
@@ -1046,7 +1132,7 @@ services:
       - SERVER_REGION=local
       - MULTI_TENANT=false
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       - DB_INSTALL_ROLES=false
       - STORAGE_BACKEND=s3
       - STORAGE_S3_BUCKET=stub
@@ -1058,18 +1144,20 @@ services:
       - UPLOAD_FILE_SIZE_LIMIT=524288000
       - UPLOAD_FILE_SIZE_LIMIT_STANDARD=524288000
       - UPLOAD_SIGNED_URL_EXPIRATION_TIME=120
-      - TUS_URL_PATH=/upload/resumable
+      - TUS_URL_PATH=upload/resumable
       - TUS_MAX_SIZE=3600000
-      - IMAGE_TRANSFORMATION_ENABLED=true
+      - ENABLE_IMAGE_TRANSFORMATION=true
       - IMGPROXY_URL=http://imgproxy:8080
       - IMGPROXY_REQUEST_TIMEOUT=15
       - DATABASE_SEARCH_PATH=storage
+      - NODE_ENV=production
+      - REQUEST_ALLOW_X_FORWARDED_PATH=true
 
       # - ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
       # - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
       # - POSTGREST_URL=http://supabase-rest:3000
       # - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # - FILE_SIZE_LIMIT=52428800
       # - STORAGE_BACKEND=s3
       # - STORAGE_S3_BUCKET=stub
@@ -1103,7 +1191,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.79.0
+    image: supabase/postgres-meta:v0.89.3
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1112,23 +1200,28 @@ services:
         condition: service_healthy
     environment:
       - PG_META_PORT=8080
-      - PG_META_DB_HOST=${POSTGRES_HOST:-supabase-db}
+      - PG_META_DB_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - PG_META_DB_PORT=${POSTGRES_PORT:-5432}
-      - PG_META_DB_NAME=${POSTGRES_DB:-supabase}
+      - PG_META_DB_NAME=${POSTGRES_DB:-postgres}
       - PG_META_DB_USER=supabase_admin
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.38.0
+    image: supabase/edge-runtime:v1.67.4
     depends_on:
       supabase-analytics:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "echo", "Edge Functions is healthy"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
     environment:
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_URL=${SERVICE_FQDN_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
-      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # TODO: Allow configuring VERIFY_JWT per function. This PR might help: https://github.com/supabase/cli/pull/786
       - VERIFY_JWT=${FUNCTIONS_VERIFY_JWT:-false}
     volumes:
@@ -1256,3 +1349,81 @@ services:
       - start
       - --main-service
       - /home/deno/functions/main
+
+  supabase-supavisor:
+    image: 'supabase/supavisor:2.5.1'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-sSfL"
+        - "-o"
+        - /dev/null
+        - "http://127.0.0.1:4000/api/health"
+      timeout: 5s
+      interval: 5s
+      retries: 10
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-analytics:
+        condition: service_healthy
+    environment:
+      - POOLER_TENANT_ID=dev_tenant
+      - POOLER_POOL_MODE=transaction
+      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-20}
+      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-100}
+      - PORT=4000
+      - 'POSTGRES_PORT=${POSTGRES_PORT:-5432}'
+      - 'POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'DATABASE_URL=ecto://supabase_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/_supabase'
+      - CLUSTER_POSTGRES=true
+      - 'SECRET_KEY_BASE=${SERVICE_PASSWORD_SUPAVISORSECRET}'
+      - 'VAULT_ENC_KEY=${SERVICE_PASSWORD_VAULTENC}'
+      - 'API_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - 'METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - REGION=local
+      - 'ERL_AFLAGS=-proto_dist inet_tcp'
+    command:
+      - /bin/sh
+      - "-c"
+      - '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server'
+    volumes:
+      - type: bind
+        source: ./volumes/pooler/pooler.exs
+        target: /etc/pooler/pooler.exs
+        content: |
+          {:ok, _} = Application.ensure_all_started(:supavisor)
+          {:ok, version} =
+              case Supavisor.Repo.query!("select version()") do
+              %{rows: [[ver]]} -> Supavisor.Helpers.parse_pg_version(ver)
+              _ -> nil
+              end
+          params = %{
+              "external_id" => System.get_env("POOLER_TENANT_ID"),
+              "db_host" => System.get_env("POSTGRES_HOSTNAME"),
+              "db_port" => System.get_env("POSTGRES_PORT") |> String.to_integer(),
+              "db_database" => System.get_env("POSTGRES_DB"),
+              "require_user" => false,
+              "auth_query" => "SELECT * FROM pgbouncer.get_auth($1)",
+              "default_max_clients" => System.get_env("POOLER_MAX_CLIENT_CONN"),
+              "default_pool_size" => System.get_env("POOLER_DEFAULT_POOL_SIZE"),
+              "default_parameter_status" => %{"server_version" => version},
+              "users" => [%{
+              "db_user" => "pgbouncer",
+              "db_password" => System.get_env("POSTGRES_PASSWORD"),
+              "mode_type" => System.get_env("POOLER_POOL_MODE"),
+              "pool_size" => System.get_env("POOLER_DEFAULT_POOL_SIZE"),
+              "is_manager" => true
+              }]
+          }
+
+          tenant = Supavisor.Tenants.get_tenant_by_external_id(params["external_id"])
+
+          if tenant do
+            {:ok, _} = Supavisor.Tenants.update_tenant(tenant, params)
+          else
+            {:ok, _} = Supavisor.Tenants.create_tenant(params)
+          end

@@ -1,0 +1,120 @@
+# documentation: https://www.mautic.org/
+# slogan: Mautic v5 Open Source Marketing Automation
+# tags: php,mautic,marketing,automation,email,service,5,open,source,crm
+# logo: svgs/mautic.svg
+# port: 80
+
+services:
+  mysql:
+    image: 'mysql:8.0'
+    environment:
+      - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MYSQLROOT}'
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE:-mautic}'
+      - 'MYSQL_USER=${SERVICE_USER_MYSQL}'
+      - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+    healthcheck:
+      test: 'mysqladmin ping --silent --user=$$SERVICE_USER_MYSQL --password=$$SERVICE_PASSWORD_64_MYSQL'
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  rabbitmq:
+    image: 'rabbitmq:3'
+    environment:
+      - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-mautic}'
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 30s
+      retries: 10
+    volumes:
+      - 'rabbitmq-data:/var/lib/rabbitmq'
+  mautic_web:
+    image: 'mautic/mautic:latest'
+    volumes:
+      - 'mautic_data/config:/var/www/html/config:z'
+      - 'mautic_data/logs:/var/www/html/var/logs:z'
+      - 'mautic_data/media/files:/var/www/html/docroot/media/files:z'
+      - 'mautic_data/media/images:/var/www/html/docroot/media/images:z'
+      - 'mautic_data/plugins:/var/www/html/docroot/plugins:z'
+      - 'mautic_data/vendor:/var/www/html/vendor:z'
+      - 'mautic_data/bin:/var/www/html/bin:z'
+      - 'mautic_data/cron:/opt/mautic/cron:z'
+    environment:
+      - SERVICE_FQDN_MAUTIC_80
+      - 'DOCKER_MAUTIC_LOAD_TEST_DATA=${MAUTIC_LOAD_TEST_DATA:-false}'
+      - 'DOCKER_MAUTIC_RUN_MIGRATIONS=${MAUTIC_RUN_MIGRATIONS:-false}'
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'
+      - 'MAUTIC_DB_PORT=${MYSQL_PORT:-3306}'
+      - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
+      - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
+      - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost'
+      interval: 15s
+      timeout: 10s
+      retries: 15
+  mautic_cron:
+    image: 'mautic/mautic:latest'
+    volumes:
+      - 'mautic_data/config:/var/www/html/config:z'
+      - 'mautic_data/logs:/var/www/html/var/logs:z'
+      - 'mautic_data/media/files:/var/www/html/docroot/media/files:z'
+      - 'mautic_data/media/images:/var/www/html/docroot/media/images:z'
+      - 'mautic_data/plugins:/var/www/html/docroot/plugins:z'
+      - 'mautic_data/vendor:/var/www/html/vendor:z'
+      - 'mautic_data/bin:/var/www/html/bin:z'
+      - 'mautic_data/cron:/opt/mautic/cron:z'
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_cron
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'
+      - 'MAUTIC_DB_PORT=${MYSQL_PORT:-3306}'
+      - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
+      - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
+      - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+    depends_on:
+      mautic_web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+  mautic_worker:
+    image: 'mautic/mautic:latest'
+    volumes:
+      - 'mautic_data/config:/var/www/html/config:z'
+      - 'mautic_data/logs:/var/www/html/var/logs:z'
+      - 'mautic_data/media/files:/var/www/html/docroot/media/files:z'
+      - 'mautic_data/media/images:/var/www/html/docroot/media/images:z'
+      - 'mautic_data/plugins:/var/www/html/docroot/plugins:z'
+      - 'mautic_data/vendor:/var/www/html/vendor:z'
+      - 'mautic_data/bin:/var/www/html/bin:z'
+      - 'mautic_data/cron:/opt/mautic/cron:z'
+    environment:
+      - DOCKER_MAUTIC_ROLE=mautic_worker
+      - 'MAUTIC_DB_HOST=${MYSQL_HOST:-mysql}'
+      - 'MAUTIC_DB_PORT=${MYSQL_PORT:-3306}'
+      - 'MAUTIC_DB_DATABASE=${MYSQL_DATABASE:-mautic}'
+      - 'MAUTIC_DB_USER=${SERVICE_USER_MYSQL}'
+      - 'MAUTIC_DB_PASSWORD=${SERVICE_PASSWORD_64_MYSQL}'
+      - 'MAUTIC_MESSENGER_DSN_EMAIL=${MAUTIC_MESSENGER_DSN_EMAIL:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+      - 'MAUTIC_MESSENGER_DSN_HIT=${MAUTIC_MESSENGER_DSN_HIT:-amqp://guest:guest@rabbitmq:5672/mautic/messages}'
+    depends_on:
+      mautic_web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
+      timeout: 10s
+      retries: 15

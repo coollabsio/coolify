@@ -6,7 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
-use App\Models\InstanceSettings;
+use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -31,6 +31,7 @@ class FortifyServiceProvider extends ServiceProvider
                 if ($request->user()->currentTeam->id === 0) {
                     return redirect()->route('settings.index');
                 }
+
                 return redirect(RouteServiceProvider::HOME);
             }
         });
@@ -43,31 +44,36 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            $settings = InstanceSettings::get();
-            if (!$settings->is_registration_enabled) {
+            $isFirstUser = User::count() === 0;
+
+            $settings = instanceSettings();
+            if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
-            if (config('coolify.waitlist')) {
-                return redirect()->route('waitlist.index');
-            } else {
-                return view('auth.register');
-            }
+
+            return view('auth.register', [
+                'isFirstUser' => $isFirstUser,
+            ]);
         });
 
         Fortify::loginView(function () {
-            $settings = InstanceSettings::get();
+            $settings = instanceSettings();
+            $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
             if ($users == 0) {
                 // If there are no users, redirect to registration
                 return redirect()->route('register');
             }
+
             return view('auth.login', [
-                'is_registration_enabled' => $settings->is_registration_enabled
+                'is_registration_enabled' => $settings->is_registration_enabled,
+                'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });
 
         Fortify::authenticateUsing(function (Request $request) {
-            $user = User::where('email', $request->email)->with('teams')->first();
+            $email = strtolower($request->email);
+            $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&
                 Hash::check($request->password, $user->password)
@@ -75,10 +81,11 @@ class FortifyServiceProvider extends ServiceProvider
                 $user->updated_at = now();
                 $user->save();
                 $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                if (!$user->currentTeam) {
+                if (! $user->currentTeam) {
                     $user->currentTeam = $user->recreate_personal_team();
                 }
                 session(['currentTeam' => $user->currentTeam]);
+
                 return $user;
             }
         });
@@ -110,9 +117,9 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
-            $email = (string)$request->email;
+            $email = (string) $request->email;
 
-            return Limit::perMinute(5)->by($email . $request->ip());
+            return Limit::perMinute(5)->by($email.$request->ip());
         });
 
         RateLimiter::for('two-factor', function (Request $request) {

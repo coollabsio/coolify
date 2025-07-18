@@ -1,0 +1,37 @@
+# documentation: https://docs.requarks.io
+# slogan: The most powerful and extensible open source Wiki software.
+# tags: wiki, collaboration, documentation
+# logo: svgs/wikijs.svg
+# port: 80
+
+services:
+  wikijs:
+    image: ghcr.io/requarks/wiki:2
+    depends_on:
+      - postgres
+    environment:
+      - SERVICE_FQDN_WIKIJS_3000
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${SERVICE_USER_POSTGRES}
+      - DB_PASS=${SERVICE_PASSWORD_POSTGRES}
+      - DB_NAME=${POSTGRESQL_DATABASE:-wiki-db}
+    healthcheck:
+      test: curl --fail http://localhost:3000 || exit 1
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-wiki-db}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    logging:
+      driver: none
+    volumes:
+      - wikijs-postgresql-data:/var/lib/postgresql/data

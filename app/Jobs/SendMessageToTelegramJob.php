@@ -11,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
+class SendMessageToTelegramJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,8 +32,9 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
         public array $buttons,
         public string $token,
         public string $chatId,
-        public ?string $topicId = null,
+        public ?string $threadId = null,
     ) {
+        $this->onQueue('high');
     }
 
     /**
@@ -41,9 +42,9 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
      */
     public function handle(): void
     {
-        $url = 'https://api.telegram.org/bot' . $this->token . '/sendMessage';
+        $url = 'https://api.telegram.org/bot'.$this->token.'/sendMessage';
         $inlineButtons = [];
-        if (!empty($this->buttons)) {
+        if (! empty($this->buttons)) {
             foreach ($this->buttons as $button) {
                 $buttonUrl = data_get($button, 'url');
                 $text = data_get($button, 'text', 'Click here');
@@ -57,7 +58,7 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
             }
         }
         $payload = [
-            'parse_mode' => 'markdown',
+            // 'parse_mode' => 'markdown',
             'reply_markup' => json_encode([
                 'inline_keyboard' => [
                     [...$inlineButtons],
@@ -66,12 +67,12 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
             'chat_id' => $this->chatId,
             'text' => $this->text,
         ];
-        if ($this->topicId) {
-            $payload['message_thread_id'] = $this->topicId;
+        if ($this->threadId) {
+            $payload['message_thread_id'] = $this->threadId;
         }
         $response = Http::post($url, $payload);
         if ($response->failed()) {
-            throw new \Exception('Telegram notification failed with ' . $response->status() . ' status code.' . $response->body());
+            throw new \RuntimeException('Telegram notification failed with '.$response->status().' status code.'.$response->body());
         }
     }
 }

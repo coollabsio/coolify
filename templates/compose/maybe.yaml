@@ -1,0 +1,91 @@
+# documentation: https://github.com/maybe-finance/maybe
+# slogan: Maybe, the OS for your personal finances.
+# tags: finances,wallets,coins,stocks,investments,open,source
+# logo: svgs/maybe.svg
+# port: 3000
+
+services:
+  maybe:
+    image: ghcr.io/maybe-finance/maybe:latest
+    volumes:
+      - app_storage:/rails/storage
+    environment:
+      - SERVICE_FQDN_MAYBE
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - DB_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-maybe-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_PORT=5432
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://localhost:3000"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  worker:
+    image: ghcr.io/maybe-finance/maybe:latest
+    command: bundle exec sidekiq
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe-db}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_SECRETKEYBASE}
+      - SELF_HOSTED=true
+      - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
+      - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}
+      - GOOD_JOB_EXECUTION_MODE=${GOOD_JOB_EXECUTION_MODE:-async}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379/1
+      - OPENAI_ACCESS_TOKEN=${OPENAI_ACCESS_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    exclude_from_hc: true
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - maybe_postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-maybe-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    command: redis-server --appendonly yes --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - REDIS_PORT=6379
+      - REDIS_DB=1
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${SERVICE_PASSWORD_REDIS}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

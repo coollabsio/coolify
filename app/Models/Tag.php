@@ -8,7 +8,6 @@ class Tag extends BaseModel
 {
     protected $guarded = [];
 
-
     public function name(): Attribute
     {
         return Attribute::make(
@@ -16,14 +15,17 @@ class Tag extends BaseModel
             set: fn ($value) => strtolower($value)
         );
     }
-    static public function ownedByCurrentTeam()
+
+    public static function ownedByCurrentTeam()
     {
         return Tag::whereTeamId(currentTeam()->id)->orderBy('name');
     }
+
     public function applications()
     {
         return $this->morphedByMany(Application::class, 'taggable');
     }
+
     public function services()
     {
         return $this->morphedByMany(Service::class, 'taggable');

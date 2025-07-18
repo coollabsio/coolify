@@ -35,6 +35,7 @@ class RootChangeEmail extends Command
             $this->info('Root user\'s email updated successfully.');
         } catch (\Exception $e) {
             $this->error('Failed to update root user\'s email.');
+
             return;
         }
     }

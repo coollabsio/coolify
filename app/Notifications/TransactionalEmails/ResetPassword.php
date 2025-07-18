@@ -3,19 +3,23 @@
 namespace App\Notifications\TransactionalEmails;
 
 use App\Models\InstanceSettings;
+use Exception;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class ResetPassword extends Notification
 {
     public static $createUrlCallback;
+
     public static $toMailCallback;
+
     public $token;
+
     public InstanceSettings $settings;
 
-    public function __construct($token)
+    public function __construct($token, public bool $isTransactionalEmail = true)
     {
-        $this->settings = InstanceSettings::get();
+        $this->settings = instanceSettings();
         $this->token = $token;
     }
 
@@ -32,9 +36,10 @@ class ResetPassword extends Notification
     public function via($notifiable)
     {
         $type = set_transanctional_email_settings();
-        if (!$type) {
-            throw new \Exception('No email settings found.');
+        if (blank($type)) {
+            throw new Exception('No email settings found.');
         }
+
         return ['mail'];
     }
 
@@ -49,9 +54,10 @@ class ResetPassword extends Notification
 
     protected function buildMailMessage($url)
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject('Coolify: Reset Password');
-        $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.' . config('auth.defaults.passwords') . '.expire')]);
+        $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
+
         return $mail;
     }
 

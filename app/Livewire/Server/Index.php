@@ -10,9 +10,11 @@ class Index extends Component
 {
     public ?Collection $servers = null;
 
-    public function mount () {
+    public function mount()
+    {
         $this->servers = Server::ownedByCurrentTeam()->get();
     }
+
     public function render()
     {
         return view('livewire.server.index');

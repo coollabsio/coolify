@@ -1,15 +1,20 @@
 <div>
+    <x-slot:title>
+        Team Members | Coolify
+    </x-slot>
     <x-team.navbar />
     <h2>Members</h2>
-
+    <div class="subtitle">
+        Manage or invite members of this team.
+    </div>
     <div class="flex flex-col">
         <div class="flex flex-col">
             <div class="overflow-x-auto">
                 <div class="inline-block min-w-full">
                     <div class="overflow-hidden">
-                        <table class="min-w-full divide-y divide-coolgray-400">
+                        <table class="min-w-full">
                             <thead>
-                                <tr class="text-neutral-500">
+                                <tr>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
                                     </th>
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email</th>
@@ -17,7 +22,7 @@
                                     <th class="px-5 py-3 text-xs font-medium text-left uppercase">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-coolgray-400">
+                            <tbody>
                                 @foreach (currentTeam()->members as $member)
                                     <livewire:team.member :member="$member" :wire:key="$member->id" />
                                 @endforeach
@@ -30,13 +35,13 @@
     </div>
     @if (auth()->user()->isAdminFromSession())
         <div class="py-4">
-            @if (is_transactional_emails_active())
+            @if (is_transactional_emails_enabled())
                 <h2 class="pb-4">Invite New Member</h2>
             @else
                 <h2>Invite New Member</h2>
                 @if (isInstanceAdmin())
-                    <div class="pb-4 text-xs text-warning">You need to configure (as root team) <a href="/settings#smtp"
-                            class="underline text-warning">Transactional
+                    <div class="pb-4 text-xs dark:text-warning">You need to configure (as root team) <a
+                            href="/settings#smtp" class="underline dark:text-warning">Transactional
                             Emails</a>
                         before
                         you can invite a

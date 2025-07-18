@@ -1,6 +1,6 @@
 <tr @class([
-    'text-white bg-coolblack hover:bg-coolgray-100',
-    'bg-coolgray-100' => $member->id == auth()->user()->id,
+    'dark:text-white text-black dark:bg-coolblack dark:hover:bg-coolgray-100',
+    'dark:bg-coolgray-100 bg-neutral-200' => $member->id == Auth::id(),
 ])>
     <td class="px-5 py-4 text-sm whitespace-nowrap">
         {{ $member->name }}
@@ -11,10 +11,10 @@
     <td class="px-5 py-4 text-sm whitespace-nowrap">
         {{ data_get($member, 'pivot.role') }}
     </td>
-    <td class="px-5 py-4 text-sm whitespace-nowrap">
-        @if (auth()->user()->isAdminFromSession())
-            @if ($member->id !== auth()->user()->id)
-                @if (auth()->user()->isOwner())
+    <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
+        @if (Auth::user()->isAdminFromSession())
+            @if ($member->id !== Auth::id())
+                @if (Auth::user()->isOwner())
                     @if (data_get($member, 'pivot.role') === 'owner')
                         <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
                         <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
@@ -30,7 +30,7 @@
                         <x-forms.button wire:click="makeAdmin">To Admin</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
                     @endif
-                @elseif (auth()->user()->isAdmin())
+                @elseif (Auth::user()->isAdmin())
                     @if (data_get($member, 'pivot.role') === 'admin')
                         <x-forms.button wire:click="makeReadonly">To Member</x-forms.button>
                         <x-forms.button isError wire:click="remove">Remove</x-forms.button>
@@ -41,7 +41,7 @@
                     @endif
                 @endif
             @else
-                <div class="text-neutral-500">(This is you)</div>
+                <div>(This is you)</div>
             @endif
         @endif
     </td>

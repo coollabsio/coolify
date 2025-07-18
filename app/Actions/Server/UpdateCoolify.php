@@ -2,72 +2,62 @@
 
 namespace App\Actions\Server;
 
-use Lorisleiva\Actions\Concerns\AsAction;
-use App\Models\InstanceSettings;
+use App\Jobs\PullHelperImageJob;
 use App\Models\Server;
+use Illuminate\Support\Sleep;
+use Lorisleiva\Actions\Concerns\AsAction;
 
 class UpdateCoolify
 {
     use AsAction;
+
     public ?Server $server = null;
+
     public ?string $latestVersion = null;
+
     public ?string $currentVersion = null;
 
-    public function handle(bool $force)
+    public function handle($manual_update = false)
     {
-        try {
-            $settings = InstanceSettings::get();
-            ray('Running InstanceAutoUpdateJob');
-            $this->server = Server::find(0);
-            if (!$this->server) {
+        if (isDev()) {
+            Sleep::for(10)->seconds();
+
+            return;
+        }
+        $settings = instanceSettings();
+        $this->server = Server::find(0);
+        if (! $this->server) {
+            return;
+        }
+        CleanupDocker::dispatch($this->server);
+        $this->latestVersion = get_latest_version_of_coolify();
+        $this->currentVersion = config('constants.coolify.version');
+        if (! $manual_update) {
+            if (! $settings->is_auto_update_enabled) {
                 return;
             }
-            CleanupDocker::run($this->server, false);
-            $this->latestVersion = get_latest_version_of_coolify();
-            $this->currentVersion = config('version');
-            if ($settings->next_channel) {
-                ray('next channel enabled');
-                $this->latestVersion = 'next';
+            if ($this->latestVersion === $this->currentVersion) {
+                return;
             }
-            if ($force) {
-                $this->update();
-            } else {
-                if (!$settings->is_auto_update_enabled) {
-                    return 'Auto update is disabled';
-                }
-                if ($this->latestVersion === $this->currentVersion) {
-                    return 'Already on latest version';
-                }
-                if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
-                    return 'Latest version is lower than current version?!';
-                }
-                $this->update();
+            if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
+                return;
             }
-            send_internal_notification("Instance updated from {$this->currentVersion} -> {$this->latestVersion}");
-        } catch (\Throwable $e) {
-            ray('InstanceAutoUpdateJob failed');
-            ray($e->getMessage());
-            send_internal_notification('InstanceAutoUpdateJob failed: ' . $e->getMessage());
-            throw $e;
         }
+        $this->update();
+        $settings->new_version_available = false;
+        $settings->save();
     }
 
     private function update()
     {
-        if (isDev()) {
-            ray("Running update on local docker container. Updating to $this->latestVersion");
-            remote_process([
-                "sleep 10"
-            ], $this->server);
-            ray('Update done');
-            return;
-        } else {
-            ray('Running update on production server');
-            remote_process([
-                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                "bash /data/coolify/source/upgrade.sh $this->latestVersion"
-            ], $this->server);
-            return;
-        }
+        PullHelperImageJob::dispatch($this->server);
+
+        $image = config('constants.coolify.registry_url').'/coollabsio/coolify:'.$this->latestVersion;
+        instant_remote_process(["docker pull -q $image"], $this->server, false);
+
+        remote_process([
+            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
+            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
+        ], $this->server);
     }
 }

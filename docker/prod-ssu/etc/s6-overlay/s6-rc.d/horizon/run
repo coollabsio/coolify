@@ -1,2 +1,0 @@
-#!/command/execlineb -P
-su - webuser -c "php /var/www/html/artisan horizon"

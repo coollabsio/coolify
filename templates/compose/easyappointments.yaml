@@ -1,0 +1,35 @@
+# documentation: https://easyappointments.org/
+# slogan: Schedule Anything. Let's start with easy! Get the best free online appointment scheduler on your server, today.
+# tags: calendar, scheduling, database
+# logo: svgs/easyappointments.png
+# port: 80
+
+services:
+  easyappointments:
+    image: alextselegidis/easyappointments:latest
+    environment:
+      - SERVICE_FQDN_EASYAPPOINTMENTS_80
+      - BASE_URL=${SERVICE_FQDN_EASYAPPOINTMENTS}
+      - DB_HOST=mysql
+      - DB_NAME=easyappointments
+      - DB_USERNAME=root
+      - DB_PASSWORD=${SERVICE_PASSWORD_EASYAPPOINTMENTS}
+    depends_on:
+      - mysql
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 2s
+      timeout: 10s
+      retries: 30
+  mysql:
+    image: mysql:8
+    volumes:
+      - easyappointments-mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_EASYAPPOINTMENTS}
+      - MYSQL_DATABASE=easyappointments
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

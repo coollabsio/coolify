@@ -3,36 +3,123 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
-use App\Models\S3Storage;
-use App\Models\StandalonePostgresql;
+use App\Models\Server;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Index extends Component
 {
     public InstanceSettings $settings;
-    public StandalonePostgresql $database;
-    public $s3s;
-    public function mount()
-    {
-        if (isInstanceAdmin()) {
-            $settings = InstanceSettings::get();
-            $database = StandalonePostgresql::whereName('coolify-db')->first();
-            $s3s = S3Storage::whereTeamId(0)->get() ?? [];
-            if ($database) {
-                if ($database->status !== 'running') {
-                    $database->status = 'running';
-                    $database->save();
-                }
-                $this->database = $database;
-            }
-            $this->settings = $settings;
-            $this->s3s = $s3s;
-        } else {
-            return redirect()->route('dashboard');
-        }
-    }
+
+    public Server $server;
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $fqdn = null;
+
+    #[Validate('required|integer|min:1025|max:65535')]
+    public int $public_port_min;
+
+    #[Validate('required|integer|min:1025|max:65535')]
+    public int $public_port_max;
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $instance_name = null;
+
+    #[Validate('nullable|string')]
+    public ?string $public_ipv4 = null;
+
+    #[Validate('nullable|string')]
+    public ?string $public_ipv6 = null;
+
+    #[Validate('required|string|timezone')]
+    public string $instance_timezone;
+
     public function render()
     {
         return view('livewire.settings.index');
+    }
+
+    public function mount()
+    {
+        if (! isInstanceAdmin()) {
+            return redirect()->route('dashboard');
+        }
+        $this->settings = instanceSettings();
+        $this->server = Server::findOrFail(0);
+        $this->fqdn = $this->settings->fqdn;
+        $this->public_port_min = $this->settings->public_port_min;
+        $this->public_port_max = $this->settings->public_port_max;
+        $this->instance_name = $this->settings->instance_name;
+        $this->public_ipv4 = $this->settings->public_ipv4;
+        $this->public_ipv6 = $this->settings->public_ipv6;
+        $this->instance_timezone = $this->settings->instance_timezone;
+    }
+
+    #[Computed]
+    public function timezones(): array
+    {
+        return collect(timezone_identifiers_list())
+            ->sort()
+            ->values()
+            ->toArray();
+    }
+
+    public function instantSave($isSave = true)
+    {
+        $this->validate();
+        $this->settings->fqdn = $this->fqdn;
+        $this->settings->public_port_min = $this->public_port_min;
+        $this->settings->public_port_max = $this->public_port_max;
+        $this->settings->instance_name = $this->instance_name;
+        $this->settings->public_ipv4 = $this->public_ipv4;
+        $this->settings->public_ipv6 = $this->public_ipv6;
+        $this->settings->instance_timezone = $this->instance_timezone;
+        if ($isSave) {
+            $this->settings->save();
+            $this->dispatch('success', 'Settings updated!');
+        }
+    }
+
+    public function submit()
+    {
+        try {
+            $error_show = false;
+            $this->resetErrorBag();
+
+            if (! validate_timezone($this->instance_timezone)) {
+                $this->instance_timezone = config('app.timezone');
+                throw new \Exception('Invalid timezone.');
+            } else {
+                $this->settings->instance_timezone = $this->instance_timezone;
+            }
+
+            if ($this->settings->public_port_min > $this->settings->public_port_max) {
+                $this->addError('settings.public_port_min', 'The minimum port must be lower than the maximum port.');
+
+                return;
+            }
+            $this->validate();
+
+            if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
+                if (! validate_dns_entry($this->fqdn, $this->server)) {
+                    $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    $error_show = true;
+                }
+            }
+            if ($this->fqdn) {
+                check_domain_usage(domain: $this->fqdn);
+            }
+
+            $this->instantSave(isSave: false);
+
+            $this->settings->save();
+            $this->server->setupDynamicProxyConfiguration();
+            if (! $error_show) {
+                $this->dispatch('success', 'Instance settings updated successfully!');
+            }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 }

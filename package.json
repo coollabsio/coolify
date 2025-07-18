@@ -1,4 +1,5 @@
 {
+    "name": "coolify",
     "private": true,
     "type": "module",
     "scripts": {
@@ -6,22 +7,23 @@
         "build": "vite build"
     },
     "devDependencies": {
-        "@vitejs/plugin-vue": "4.5.1",
-        "autoprefixer": "10.4.18",
-        "axios": "1.6.7",
-        "laravel-echo": "1.16.0",
-        "laravel-vite-plugin": "0.8.1",
-        "postcss": "8.4.35",
-        "pusher-js": "8.4.0-rc2",
-        "tailwindcss": "3.4.1",
-        "vite": "4.5.2",
-        "vue": "3.4.21"
+        "@tailwindcss/postcss": "4.1.10",
+        "@vitejs/plugin-vue": "5.2.4",
+        "axios": "1.9.0",
+        "laravel-echo": "2.1.5",
+        "laravel-vite-plugin": "1.3.0",
+        "postcss": "8.5.5",
+        "pusher-js": "8.4.0",
+        "tailwind-scrollbar": "4.0.2",
+        "tailwindcss": "4.1.10",
+        "vite": "6.3.5",
+        "vue": "3.5.16"
     },
     "dependencies": {
-        "@tailwindcss/typography": "0.5.10",
-        "alpinejs": "3.13.5",
-        "daisyui": "4.7.2",
-        "ioredis": "5.3.2",
-        "tailwindcss-scrollbar": "0.1.0"
+        "@tailwindcss/forms": "0.5.10",
+        "@tailwindcss/typography": "0.5.16",
+        "@xterm/addon-fit": "0.10.0",
+        "@xterm/xterm": "5.5.0",
+        "ioredis": "5.6.1"
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class ServiceDatabase extends BaseModel
 {
     use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
     protected static function booted()
@@ -15,36 +16,83 @@ class ServiceDatabase extends BaseModel
         static::deleting(function ($service) {
             $service->persistentStorages()->delete();
             $service->fileStorages()->delete();
+            $service->scheduledBackups()->delete();
+        });
+        static::saving(function ($service) {
+            if ($service->isDirty('status')) {
+                $service->forceFill(['last_online_at' => now()]);
+            }
         });
     }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', $teamId)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeam()
+    {
+        return ServiceDatabase::whereRelation('service.environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    public function restart()
+    {
+        $container_id = $this->name.'-'.$this->service->uuid;
+        remote_process(["docker restart {$container_id}"], $this->service->server);
+    }
+
+    public function isRunning()
+    {
+        return str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return str($this->status)->contains('exited');
+    }
+
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
+
     public function isStripprefixEnabled()
     {
         return data_get($this, 'is_stripprefix_enabled', true);
     }
+
     public function isGzipEnabled()
     {
         return data_get($this, 'is_gzip_enabled', true);
     }
+
     public function type()
     {
         return 'service';
     }
+
     public function serviceType()
     {
         return null;
     }
+
     public function databaseType()
     {
-        $image = str($this->image)->before(':');
-        if ($image->value() === 'postgres') {
-            $image = 'postgresql';
+        if (filled($this->custom_type)) {
+            return 'standalone-'.$this->custom_type;
         }
-        return "standalone-$image";
+        $image = str($this->image)->before(':');
+        if ($image->contains('supabase/postgres')) {
+            $finalImage = 'supabase/postgres';
+        } elseif ($image->contains('postgres') || $image->contains('postgis')) {
+            $finalImage = 'postgresql';
+        } else {
+            $finalImage = $image;
+        }
+
+        return "standalone-$finalImage";
     }
+
     public function getServiceDatabaseUrl()
     {
         $port = $this->public_port;
@@ -52,27 +100,52 @@ class ServiceDatabase extends BaseModel
         if ($this->service->server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
-        $url = "{$realIp}:{$port}";
-        return $url;
+
+        return "{$realIp}:{$port}";
     }
+
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
+
+    public function workdir()
+    {
+        return service_configuration_dir()."/{$this->service->uuid}";
+    }
+
     public function service()
     {
         return $this->belongsTo(Service::class);
     }
+
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
+
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
     }
+
     public function getFilesFromServer(bool $isInit = false)
     {
         getFilesystemVolumesFromServer($this, $isInit);
     }
+
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return str($this->databaseType())->contains('mysql') ||
+            str($this->databaseType())->contains('postgres') ||
+            str($this->databaseType())->contains('postgis') ||
+            str($this->databaseType())->contains('mariadb') ||
+            str($this->databaseType())->contains('mongo') ||
+            filled($this->custom_type);
     }
 }

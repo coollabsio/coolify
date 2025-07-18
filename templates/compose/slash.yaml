@@ -1,0 +1,17 @@
+# documentation: https://github.com/yourselfhosted/slash
+# slogan: An open source, self-hosted links shortener and sharing platform.
+# tags: links, shortener, sharing, url, short, link, sharing
+# port: 5231
+
+services:
+  slash:
+    image: yourselfhosted/slash
+    environment:
+      - SERVICE_FQDN_SLASH_5231
+    volumes:
+      - slash-data:/var/opt/slash
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5231"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

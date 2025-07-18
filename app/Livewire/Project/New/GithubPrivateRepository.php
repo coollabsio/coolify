@@ -7,41 +7,63 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use App\Traits\SaveFromRedirect;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class GithubPrivateRepository extends Component
 {
-    use SaveFromRedirect;
     public $current_step = 'github_apps';
+
     public $github_apps;
+
     public GithubApp $github_app;
+
     public $parameters;
+
     public $currentRoute;
+
     public $query;
+
     public $type;
 
     public int $selected_repository_id;
+
     public int $selected_github_app_id;
+
     public string $selected_repository_owner;
+
     public string $selected_repository_repo;
 
     public string $selected_branch_name = 'main';
 
     public string $token;
-    public $repositories;
-    public int $total_repositories_count = 0;
-    public $branches;
-    public int $total_branches_count = 0;
-    public int $port = 3000;
-    public bool $is_static = false;
-    public string|null $publish_directory = null;
-    protected int $page = 1;
-    public $build_pack = 'nixpacks';
-    public bool $show_is_static = true;
 
+    public $repositories;
+
+    public int $total_repositories_count = 0;
+
+    public $branches;
+
+    public int $total_branches_count = 0;
+
+    public int $port = 3000;
+
+    public bool $is_static = false;
+
+    public ?string $publish_directory = null;
+
+    // In case of docker compose
+    public ?string $base_directory = null;
+
+    public ?string $docker_compose_location = '/docker-compose.yaml';
+    // End of docker compose
+
+    protected int $page = 1;
+
+    public $build_pack = 'nixpacks';
+
+    public bool $show_is_static = true;
 
     public function mount()
     {
@@ -51,12 +73,23 @@ class GithubPrivateRepository extends Component
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
     }
+
+    public function updatedBaseDirectory()
+    {
+        if ($this->base_directory) {
+            $this->base_directory = rtrim($this->base_directory, '/');
+            if (! str($this->base_directory)->startsWith('/')) {
+                $this->base_directory = '/'.$this->base_directory;
+            }
+        }
+    }
+
     public function updatedBuildPack()
     {
         if ($this->build_pack === 'nixpacks') {
             $this->show_is_static = true;
             $this->port = 3000;
-        } else if ($this->build_pack === 'static') {
+        } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->is_static = false;
             $this->port = 80;
@@ -65,18 +98,23 @@ class GithubPrivateRepository extends Component
             $this->is_static = false;
         }
     }
+
     public function loadRepositories($github_app_id)
     {
         $this->repositories = collect();
         $this->page = 1;
         $this->selected_github_app_id = $github_app_id;
         $this->github_app = GithubApp::where('id', $github_app_id)->first();
-        $this->token = generate_github_installation_token($this->github_app);
-        $this->loadRepositoryByPage();
+        $this->token = generateGithubInstallationToken($this->github_app);
+        $repositories = loadRepositoryByPage($this->github_app, $this->token, $this->page);
+        $this->total_repositories_count = $repositories['total_count'];
+        $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
         if ($this->repositories->count() < $this->total_repositories_count) {
             while ($this->repositories->count() < $this->total_repositories_count) {
                 $this->page++;
-                $this->loadRepositoryByPage();
+                $repositories = loadRepositoryByPage($this->github_app, $this->token, $this->page);
+                $this->total_repositories_count = $repositories['total_count'];
+                $this->repositories = $this->repositories->concat(collect($repositories['repositories']));
             }
         }
         $this->repositories = $this->repositories->sortBy('name');
@@ -84,21 +122,6 @@ class GithubPrivateRepository extends Component
             $this->selected_repository_id = data_get($this->repositories->first(), 'id');
         }
         $this->current_step = 'repository';
-    }
-
-    protected function loadRepositoryByPage()
-    {
-        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100&page={$this->page}");
-        $json = $response->json();
-        if ($response->status() !== 200) {
-            return $this->dispatch('error', $json['message']);
-        }
-
-        if ($json['total_count'] === 0) {
-            return;
-        }
-        $this->total_repositories_count = $json['total_count'];
-        $this->repositories = $this->repositories->concat(collect($json['repositories']));
     }
 
     public function loadBranches()
@@ -119,7 +142,6 @@ class GithubPrivateRepository extends Component
 
     protected function loadBranchByPage()
     {
-        ray('Loading page ' . $this->page);
         $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
         $json = $response->json();
         if ($response->status() !== 200) {
@@ -135,44 +157,50 @@ class GithubPrivateRepository extends Component
         try {
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-            if (!$destination) {
+            if (! $destination) {
                 $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
-            if (!$destination) {
+            if (! $destination) {
                 throw new \Exception('Destination not found. What?!');
             }
             $destination_class = $destination->getMorphClass();
 
-
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
 
             $application = Application::create([
-                'name' => generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name),
+                'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
-                'build_pack' => 'nixpacks',
+                'build_pack' => $this->build_pack,
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
                 'environment_id' => $environment->id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
-                'source_type' => $this->github_app->getMorphClass()
+                'source_type' => $this->github_app->getMorphClass(),
             ]);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
+            if ($this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+                $application->health_check_enabled = false;
+            }
+            if ($this->build_pack === 'dockercompose') {
+                $application['docker_compose_location'] = $this->docker_compose_location;
+                $application['base_directory'] = $this->base_directory;
+            }
             $fqdn = generateFqdn($destination->server, $application->uuid);
             $application->fqdn = $fqdn;
 
-            $application->name = generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
+            $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
 
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
         } catch (\Throwable $e) {

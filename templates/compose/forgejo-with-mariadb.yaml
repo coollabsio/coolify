@@ -1,0 +1,50 @@
+# documentation: https://forgejo.org/docs
+# slogan: Forgejo is a self-hosted lightweight software forge. Easy to install and low maintenance, it just does the job.
+# tags: version control, collaboration, code, hosting, lightweight, mariadb
+# logo: svgs/forgejo.svg
+# port: 3000
+
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:8
+    environment:
+      - SERVICE_FQDN_FORGEJO_3000
+      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO_3000}
+      - FORGEJO__migrations__ALLOWED_DOMAINS=${FORGEJO__migrations__ALLOWED_DOMAINS}
+      - FORGEJO__migrations__ALLOW_LOCALNETWORKS=${FORGEJO__migrations__ALLOW_LOCALNETWORKS-false}
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__database__DB_TYPE=mysql
+      - FORGEJO__database__HOST=mariadb
+      - FORGEJO__database__NAME=${MYSQL_DATABASE-forgejo}
+      - FORGEJO__database__USER=$SERVICE_USER_MYSQL
+      - FORGEJO__database__PASSWD=$SERVICE_PASSWORD_MYSQL
+    volumes:
+      - forgejo-data:/data
+      - forgejo-timezone:/etc/timezone:ro
+      - forgejo-localtime:/etc/localtime:ro
+    ports:
+      - 22222:22
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - forgejo-mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

@@ -1,7 +1,10 @@
-import { createApp } from "vue";
-import MagicBar from "./components/MagicBar.vue";
-import "../../vendor/wire-elements/modal/resources/js/modal";
+import { initializeTerminalComponent } from './terminal.js';
 
-const app = createApp({});
-app.component("magic-bar", MagicBar);
-app.mount("#vue");
+['livewire:navigated', 'alpine:init'].forEach((event) => {
+    document.addEventListener(event, () => {
+        // tree-shaking
+        if (document.getElementById('terminal-container')) {
+            initializeTerminalComponent()
+        }
+    });
+});

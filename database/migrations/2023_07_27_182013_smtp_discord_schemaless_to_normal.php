@@ -163,7 +163,7 @@ return new class extends Migration
             $table->schemalessAttributes('smtp');
         });
 
-        $instance_setting = InstanceSettings::get();
+        $instance_setting = instanceSettings();
         $instance_setting->smtp = [
             'enabled' => $instance_setting->smtp_enabled,
             'from_address' => $instance_setting->smtp_from_address,

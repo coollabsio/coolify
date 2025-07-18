@@ -16,6 +16,7 @@ class ApplicationSetting extends Model
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
     ];
+
     protected $guarded = [];
 
     public function isStatic(): Attribute
@@ -26,6 +27,7 @@ class ApplicationSetting extends Model
                     $this->application->ports_exposes = 80;
                 }
                 $this->application->save();
+
                 return $value;
             }
         );

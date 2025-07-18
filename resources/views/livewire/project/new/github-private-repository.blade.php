@@ -1,11 +1,11 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <x-forms.button wire:click="saveFromRedirect('source.new')" class="group-hover:text-white">
-            + Add New GitHub App
-        </x-forms.button>
+        <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
+            <livewire:source.github.create />
+        </x-modal-input>
         @if ($repositories->count() > 0)
-            <a target="_blank" class="flex hover:no-underline" href="{{ get_installation_path($github_app) }}">
+            <a target="_blank" class="flex hover:no-underline" href="{{ getInstallationPath($github_app) }}">
                 <x-forms.button>
                     Change Repositories on GitHub
                     <x-external-link />
@@ -15,59 +15,56 @@
     </div>
     <div class="pb-4">Deploy any public or private Git repositories through a GitHub App.</div>
     @if ($github_apps->count() !== 0)
-        <div class="flex flex-col gap-2 pt-10">
+        <div class="flex flex-col gap-2">
             @if ($current_step === 'github_apps')
-                <ul class="pb-10 steps">
-                    <li class="step step-secondary">Select a GitHub App</li>
-                    <li class="step">Select a Repository, Branch & Save</li>
-                </ul>
-                <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
+                <h2 class="pt-4 pb-4">Select a Github App</h2>
+                <div class="flex flex-col justify-center gap-2 text-left">
                     @foreach ($github_apps as $ghapp)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                            wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
-                            <div class="flex mr-4">
-                                <div class="flex flex-col mx-6">
-                                    <div class="group-hover:text-white">
-                                        {{ data_get($ghapp, 'name') }}
+                        <div class="flex">
+                            <div class="w-full gap-2 py-4 bg-white cursor-pointer group hover:bg-coollabs dark:bg-coolgray-200 box"
+                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                                wire:key="{{ $ghapp->id }}">
+                                <div class="flex mr-4">
+                                    <div class="flex flex-col mx-6">
+                                        <div class="box-title">
+                                            {{ data_get($ghapp, 'name') }}
+                                        </div>
+                                        <div class="box-description">
+                                            {{ data_get($ghapp, 'html_url') }}</div>
                                     </div>
-                                    <div class="text-xs text-gray-400 group-hover:text-white">
-                                        {{ data_get($ghapp, 'html_url') }}</div>
-
                                 </div>
-                                <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
-                                    class="loading loading-xs text-warning loading-spinner"></span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center">
+                                <x-loading wire:loading wire:target="loadRepositories({{ $ghapp->id }})" />
                             </div>
                         </div>
                     @endforeach
                 </div>
             @endif
             @if ($current_step === 'repository')
-                <ul class="pb-10 steps">
-                    <li class="step step-secondary">Select a GitHub App</li>
-                    <li class="step step-secondary">Select a Repository, Branch & Save</li>
-                </ul>
                 @if ($repositories->count() > 0)
-                    <div class="flex items-end gap-2">
-                        <x-forms.select class="w-full" label="Repository URL" helper="{!! __('repository.url') !!}"
-                            wire:model="selected_repository_id">
-                            @foreach ($repositories as $repo)
-                                @if ($loop->first)
-                                    <option selected value="{{ data_get($repo, 'id') }}">
-                                        {{ data_get($repo, 'name') }}
-                                    </option>
-                                @else
-                                    <option value="{{ data_get($repo, 'id') }}">{{ data_get($repo, 'name') }}
-                                    </option>
-                                @endif
-                            @endforeach
-                        </x-forms.select>
+                    <div class="flex flex-col gap-2 pb-6">
+                        <div class="flex gap-2">
+                            <x-forms.select class="w-full" label="Repository" wire:model="selected_repository_id">
+                                @foreach ($repositories as $repo)
+                                    @if ($loop->first)
+                                        <option selected value="{{ data_get($repo, 'id') }}">
+                                            {{ data_get($repo, 'name') }}
+                                        </option>
+                                    @else
+                                        <option value="{{ data_get($repo, 'id') }}">{{ data_get($repo, 'name') }}
+                                        </option>
+                                    @endif
+                                @endforeach
+                            </x-forms.select>
+                        </div>
                         <x-forms.button wire:click.prevent="loadBranches"> Load Repository </x-forms.button>
-
                     </div>
                 @else
                     <div>No repositories found. Check your GitHub App configuration.</div>
                 @endif
                 @if ($branches->count() > 0)
+                    <h2 class="text-lg font-bold">Configuration</h2>
                     <div class="flex flex-col gap-2 pb-6">
                         <form class="flex flex-col" wire:submit='submit'>
                             <div class="flex flex-col gap-2 pb-6">
@@ -97,6 +94,16 @@
                                             helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                                     @endif
                                 </div>
+                                @if ($build_pack === 'dockercompose')
+                                    <x-forms.input placeholder="/" wire:model.blur-sm="base_directory"
+                                        label="Base Directory"
+                                        helper="Directory to use as root. Useful for monorepos." />
+                                    <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
+                                        label="Docker Compose Location"
+                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
+                                    Compose file location in your repository:<span
+                                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
+                                @endif
                                 @if ($show_is_static)
                                     <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
                                         helper="The port your application listens on." />

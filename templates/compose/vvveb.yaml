@@ -1,0 +1,18 @@
+# documentation: https://docs.vvveb.com
+# slogan: Powerful and easy to use cms to build websites, blogs or ecommerce stores.
+# tags: cms, blog, content, management, ecommerce, page-builder, nocode, mysql, sqlite, pgsql
+# logo: svgs/vvveb.svg
+# port: 80
+
+services:
+  vvveb:
+    image: vvveb/vvvebcms:latest
+    volumes:
+      - vvveb-data:/var/www/html
+    environment:
+      - SERVICE_FQDN_VVVEB_80
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1"]
+      interval: 2s
+      timeout: 10s
+      retries: 10

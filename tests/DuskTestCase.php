@@ -19,7 +19,7 @@ abstract class DuskTestCase extends BaseTestCase
      */
     public static function prepare(): void
     {
-        if (!static::runningInSail()) {
+        if (! static::runningInSail()) {
             static::startChromeDriver();
         }
     }
@@ -39,7 +39,7 @@ abstract class DuskTestCase extends BaseTestCase
         })->all());
 
         return RemoteWebDriver::create(
-            $_ENV['DUSK_DRIVER_URL'] ?? 'http://localhost:9515',
+            'http://localhost:4444',
             DesiredCapabilities::chrome()->setCapability(
                 ChromeOptions::CAPABILITY,
                 $options
@@ -50,23 +50,8 @@ abstract class DuskTestCase extends BaseTestCase
     /**
      * Determine if the browser window should start maximized.
      */
-    protected function shouldStartMaximized(): bool
-    {
-        return isset($_SERVER['DUSK_START_MAXIMIZED']) ||
-            isset($_ENV['DUSK_START_MAXIMIZED']);
-    }
-
-    /**
-     * Determine whether the Dusk command has disabled headless mode.
-     */
-    protected function hasHeadlessDisabled(): bool
-    {
-        return isset($_SERVER['DUSK_HEADLESS_DISABLED']) ||
-            isset($_ENV['DUSK_HEADLESS_DISABLED']);
-    }
-
     protected function baseUrl()
     {
-        return rtrim(config('app.url'), '/');
+        return 'http://localhost:8000';
     }
 }

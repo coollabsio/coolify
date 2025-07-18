@@ -1,16 +1,29 @@
-FROM alpine:3.17
+# Versions
+# https://hub.docker.com/_/alpine
+ARG BASE_IMAGE=alpine:3.21
+# https://download.docker.com/linux/static/stable/
+ARG DOCKER_VERSION=28.0.0
+# https://github.com/docker/compose/releases
+ARG DOCKER_COMPOSE_VERSION=2.34.0
+# https://github.com/docker/buildx/releases
+ARG DOCKER_BUILDX_VERSION=0.22.0
+# https://github.com/buildpacks/pack/releases
+ARG PACK_VERSION=0.37.0
+# https://github.com/railwayapp/nixpacks/releases
+ARG NIXPACKS_VERSION=1.34.1
+# https://github.com/minio/mc/releases
+ARG MINIO_VERSION=RELEASE.2025-03-12T17-29-24Z
+
+FROM minio/mc:${MINIO_VERSION} AS minio-client
+
+FROM ${BASE_IMAGE} AS base
 
 ARG TARGETPLATFORM
-# https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=24.0.5
-# https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.21.0
-# https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.11.2
-# https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=0.32.1
-# https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.20.0
+ARG DOCKER_VERSION
+ARG DOCKER_COMPOSE_VERSION
+ARG DOCKER_BUILDX_VERSION
+ARG PACK_VERSION
+ARG NIXPACKS_VERSION
 
 USER root
 WORKDIR /artifacts
@@ -34,9 +47,8 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 
-COPY --from=minio/mc /usr/bin/mc /usr/bin/mc
+COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["tail", "-f", "/dev/null"]
-

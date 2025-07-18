@@ -3,50 +3,61 @@
 namespace App\Livewire\Project\Application\Preview;
 
 use App\Models\Application;
-use Illuminate\Support\Str;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class Form extends Component
 {
     public Application $application;
-    public string $preview_url_template;
-    protected $rules = [
-        'application.preview_url_template' => 'required',
-    ];
-    protected $validationAttributes = [
-        'application.preview_url_template' => 'preview url template',
-    ];
 
-    public function resetToDefault()
-    {
-        $this->application->preview_url_template = '{{pr_id}}.{{domain}}';
-        $this->preview_url_template = $this->application->preview_url_template;
-        $this->application->save();
-        $this->generate_real_url();
-    }
-
-    public function generate_real_url()
-    {
-        if (data_get($this->application, 'fqdn')) {
-            $firstFqdn = Str::of($this->application->fqdn)->before(',');
-            $url = Url::fromString($firstFqdn);
-            $host = $url->getHost();
-            $this->preview_url_template = Str::of($this->application->preview_url_template)->replace('{{domain}}', $host);
-        }
-    }
+    #[Validate('required')]
+    public string $previewUrlTemplate;
 
     public function mount()
     {
-        $this->generate_real_url();
+        try {
+            $this->previewUrlTemplate = $this->application->preview_url_template;
+            $this->generateRealUrl();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
     {
-        $this->validate();
-        $this->application->preview_url_template = str_replace(' ', '', $this->application->preview_url_template);
-        $this->application->save();
-        $this->dispatch('success', 'Preview url template updated.');
-        $this->generate_real_url();
+        try {
+            $this->resetErrorBag();
+            $this->validate();
+            $this->application->preview_url_template = str_replace(' ', '', $this->previewUrlTemplate);
+            $this->application->save();
+            $this->dispatch('success', 'Preview url template updated.');
+            $this->generateRealUrl();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function resetToDefault()
+    {
+        try {
+            $this->application->preview_url_template = '{{pr_id}}.{{domain}}';
+            $this->previewUrlTemplate = $this->application->preview_url_template;
+            $this->application->save();
+            $this->generateRealUrl();
+            $this->dispatch('success', 'Preview url template updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function generateRealUrl()
+    {
+        if (data_get($this->application, 'fqdn')) {
+            $firstFqdn = str($this->application->fqdn)->before(',');
+            $url = Url::fromString($firstFqdn);
+            $host = $url->getHost();
+            $this->previewUrlTemplate = str($this->application->preview_url_template)->replace('{{domain}}', $host);
+        }
     }
 }

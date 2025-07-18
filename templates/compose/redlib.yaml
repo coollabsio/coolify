@@ -1,0 +1,42 @@
+# documentation: https://github.com/redlib-org/redlib
+# slogan: An alternative private front-end to Reddit, with its origins in Libreddit.
+# tags: frontend, feed
+# logo: svgs/redlib.svg
+# port: 8080
+
+services:
+  redlib:
+    image: quay.io/redlib/redlib:latest
+    environment:
+      - SERVICE_FQDN_REDLIB_8080
+      - REDLIB_SFW_ONLY=${REDLIB_SFW_ONLY:-off}
+      - REDLIB_BANNER=${REDLIB_BANNER:-""}
+      - REDLIB_ROBOTS_DISABLE_INDEXING=${REDLIB_ROBOTS_DISABLE_INDEXING:-off}
+      - REDLIB_DEFAULT_FRONT_PAGE=${REDLIB_DEFAULT_FRONT_PAGE:-worldnews}
+      - REDLIB_PUSHSHIFT_FRONTEND=${REDLIB_PUSHSHIFT_FRONTEND:-undelete.pullpush.io}
+      - REDLIB_DEFAULT_LAYOUT=${REDLIB_DEFAULT_LAYOUT:-card}
+      - REDLIB_DEFAULT_WIDE=${REDLIB_DEFAULT_WIDE:-off}
+      - REDLIB_DEFAULT_POST_SORT=${REDLIB_DEFAULT_POST_SORT:-hot}
+      - REDLIB_DEFAULT_COMMENT_SORT=${REDLIB_DEFAULT_COMMENT_SORT:-confidence}
+      - REDLIB_DEFAULT_BLUR_SPOILER=${REDLIB_DEFAULT_BLUR_SPOILER:-off}
+      - REDLIB_DEFAULT_SHOW_NSFW=${REDLIB_DEFAULT_SHOW_NSFW:-off}
+      - REDLIB_DEFAULT_BLUR_NSFW=${REDLIB_DEFAULT_BLUR_NSFW:-off}
+      - REDLIB_DEFAULT_USE_HLS=${REDLIB_DEFAULT_USE_HLS:-off}
+      - REDLIB_DEFAULT_HIDE_HLS_NOTIFICATION=${REDLIB_DEFAULT_HIDE_HLS_NOTIFICATION:-off}
+      - REDLIB_DEFAULT_AUTOPLAY_VIDEOS=${REDLIB_DEFAULT_AUTOPLAY_VIDEOS:-off}
+      - REDLIB_DEFAULT_SUBSCRIPTIONS=${REDLIB_DEFAULT_SUBSCRIPTIONS:-""}
+      - REDLIB_DEFAULT_HIDE_AWARDS=${REDLIB_DEFAULT_HIDE_AWARDS:-off}
+      - REDLIB_DEFAULT_HIDE_SIDEBAR_AND_SUMMARY=${REDLIB_DEFAULT_HIDE_SIDEBAR_AND_SUMMARY:-off}
+      - REDLIB_DEFAULT_DISABLE_VISIT_REDDIT_CONFIRMATION=${REDLIB_DEFAULT_DISABLE_VISIT_REDDIT_CONFIRMATION:-off}
+      - REDLIB_DEFAULT_HIDE_SCORE=${REDLIB_DEFAULT_HIDE_SCORE:-off}
+      - REDLIB_DEFAULT_FIXED_NAVBAR=${REDLIB_DEFAULT_FIXED_NAVBAR:-on}
+    user: nobody
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

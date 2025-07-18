@@ -9,7 +9,7 @@ trait SaveFromRedirect
     public function saveFromRedirect(string $route, ?Collection $parameters = null)
     {
         session()->forget('from');
-        if (!$parameters || $parameters->count() === 0) {
+        if (! $parameters || $parameters->count() === 0) {
             $parameters = $this->parameters;
         }
         $parameters = collect($parameters) ?? collect([]);
@@ -18,8 +18,9 @@ trait SaveFromRedirect
         session(['from' => [
             'back' => $this->currentRoute,
             'route' => $route,
-            'parameters' => $parameters
+            'parameters' => $parameters,
         ]]);
+
         return redirect()->route($route);
     }
 }

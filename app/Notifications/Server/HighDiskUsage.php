@@ -3,63 +3,89 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
-use Illuminate\Bus\Queueable;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Notifications\CustomEmailNotification;
+use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 
-class HighDiskUsage extends Notification implements ShouldQueue
+class HighDiskUsage extends CustomEmailNotification
 {
-    use Queueable;
-
-    public $tries = 1;
-    public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage)
+    public function __construct(public Server $server, public int $disk_usage, public int $server_disk_usage_notification_threshold)
     {
+        $this->onQueue('high');
     }
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isEmailEnabled) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-        return $channels;
+        return $notifiable->getEnabledChannels('server_disk_usage');
     }
 
     public function toMail(): MailMessage
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $mail->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
         $mail->view('emails.high-disk-usage', [
             'name' => $this->server->name,
             'disk_usage' => $this->disk_usage,
-            'threshold' => $this->cleanup_after_percentage,
+            'threshold' => $this->server_disk_usage_notification_threshold,
         ]);
+
         return $mail;
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        $message = "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/automated-cleanup.";
+        $message = new DiscordMessage(
+            title: ':cross_mark: High disk usage detected',
+            description: "Server '{$this->server->name}' high disk usage detected!",
+            color: DiscordMessage::errorColor(),
+            isCritical: true,
+        );
+
+        $message->addField('Disk usage', "{$this->disk_usage}%", true);
+        $message->addField('Threshold', "{$this->server_disk_usage_notification_threshold}%", true);
+        $message->addField('What to do?', '[Link](https://coolify.io/docs/knowledge-base/server/automated-cleanup)', true);
+        $message->addField('Change Settings', '[Threshold]('.base_url().'/server/'.$this->server->uuid.'#advanced) | [Notification]('.base_url().'/notifications/discord)');
+
         return $message;
     }
+
     public function toTelegram(): array
     {
         return [
-            "message" => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->cleanup_after_percentage}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/automated-cleanup."
+            'message' => "Coolify: Server '{$this->server->name}' high disk usage detected!\nDisk usage: {$this->disk_usage}%. Threshold: {$this->server_disk_usage_notification_threshold}%.\nPlease cleanup your disk to prevent data-loss.\nHere are some tips: https://coolify.io/docs/knowledge-base/server/automated-cleanup.",
         ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: 'High disk usage detected',
+            level: 'warning',
+            message: "Server '{$this->server->name}' high disk usage detected!<br/><br/><b>Disk usage:</b> {$this->disk_usage}%.<br/><b>Threshold:</b> {$this->server_disk_usage_notification_threshold}%.<br/>Please cleanup your disk to prevent data-loss.",
+            buttons: [
+                'Change settings' => base_url().'/server/'.$this->server->uuid.'#advanced',
+                'Tips for cleanup' => 'https://coolify.io/docs/knowledge-base/server/automated-cleanup',
+            ],
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        $description = "Server '{$this->server->name}' high disk usage detected!\n";
+        $description .= "Disk usage: {$this->disk_usage}%\n";
+        $description .= "Threshold: {$this->server_disk_usage_notification_threshold}%\n\n";
+        $description .= "Please cleanup your disk to prevent data-loss.\n";
+        $description .= "Tips for cleanup: https://coolify.io/docs/knowledge-base/server/automated-cleanup\n";
+        $description .= "Change settings:\n";
+        $description .= '- Threshold: '.base_url().'/server/'.$this->server->uuid."#advanced\n";
+        $description .= '- Notifications: '.base_url().'/notifications/slack';
+
+        return new SlackMessage(
+            title: 'High disk usage detected',
+            description: $description,
+            color: SlackMessage::errorColor()
+        );
     }
 }

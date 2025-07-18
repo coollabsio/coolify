@@ -6,11 +6,12 @@
 
 services:
   directus:
-    image: directus/directus:10
+    image: directus/directus:11
     volumes:
-      - directus-uploads:/directus/uploads
       - directus-database:/directus/database
+      - directus-uploads:/directus/uploads
       - directus-extensions:/directus/extensions
+      - directus-templates:/directus/templates
     environment:
       - SERVICE_FQDN_DIRECTUS_8055
       - KEY=$SERVICE_BASE64_64_KEY
@@ -20,3 +21,9 @@ services:
       - DB_CLIENT=sqlite3
       - DB_FILENAME=/directus/database/data.db
       - WEBSOCKETS_ENABLED=true
+    healthcheck:
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8055/admin/login"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

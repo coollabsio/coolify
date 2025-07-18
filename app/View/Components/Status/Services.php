@@ -17,7 +17,7 @@ class Services extends Component
         public string $complexStatus = 'exited',
         public bool $showRefreshButton = true
     ) {
-        $this->complexStatus = $service->status();
+        $this->complexStatus = $service->status;
     }
 
     /**

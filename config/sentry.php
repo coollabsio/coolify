@@ -3,11 +3,12 @@
 return [
 
     // @see https://docs.sentry.io/product/sentry-basics/dsn-explainer/
-    'dsn' => 'https://f0b0e6be13926d4ac68d68d51d38db8f@o1082494.ingest.us.sentry.io/4505347448045568',
+    'dsn' => config('constants.sentry.sentry_dsn'),
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => '4.0.0-beta.241',
+    'release' => config('constants.coolify.version'),
+
     // When left empty or `null` the Laravel environment will be used
     'environment' => config('app.env'),
 
@@ -79,6 +80,6 @@ return [
     'enable_tracing' => env('SENTRY_ENABLE_TRACING', false),
     'traces_sample_rate' => 0.2,
 
-    'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float)env('SENTRY_PROFILES_SAMPLE_RATE'),
+    'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float) env('SENTRY_PROFILES_SAMPLE_RATE'),
 
 ];

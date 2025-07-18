@@ -22,7 +22,6 @@ return new class extends Migration
             $table->boolean('is_logdrain_axiom_enabled')->default(false);
             $table->string('logdrain_axiom_dataset_name')->nullable();
             $table->string('logdrain_axiom_api_key')->nullable();
-
         });
     }
 

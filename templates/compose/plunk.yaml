@@ -1,0 +1,61 @@
+# documentation: https://docs.useplunk.com/getting-started/introduction
+# slogan: Plunk, The Open-Source Email Platform for AWS
+# tags: plunk,email,automation,aws
+# logo: svgs/plunk.svg
+# port: 3000
+
+services:
+  plunk:
+    image: driaug/plunk:latest
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - SERVICE_FQDN_PLUNK_3000
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql/plunk-db?schema=public
+      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
+      - AWS_REGION=${AWS_REGION:?}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:?}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:?}
+      - AWS_SES_CONFIGURATION_SET=${AWS_SES_CONFIGURATION_SET:?}
+      - NEXT_PUBLIC_API_URI=${SERVICE_FQDN_PLUNK}/api
+      - APP_URI=${SERVICE_FQDN_PLUNK}
+      - API_URI=${SERVICE_FQDN_PLUNK}/api
+      - DISABLE_SIGNUPS=${DISABLE_SIGNUPS:-False}
+      - NODE_OPTIONS=--no-network-family-autoselection
+    entrypoint: [ "/app/entry.sh" ]
+    healthcheck:
+      test: ["CMD-SHELL", "(wget -S --spider http://127.0.0.1:3000/api/health 2>&1 | grep -q \"HTTP/1.1 [1-3]\")"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-plunk-db}
+    volumes:
+      - plunk-postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    volumes:
+      - plunk-redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20

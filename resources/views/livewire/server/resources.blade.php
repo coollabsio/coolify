@@ -1,103 +1,123 @@
 <div>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
-
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex h-full">
-        <div class="flex flex-col gap-4 xl:w-32">
-            <a :class="activeTab === 'managed' && 'text-white'"
-                @click.prevent="activeTab = 'managed'; window.location.hash = 'managed'" href="#">Managed</a>
-            <a :class="activeTab === 'unmanaged' && 'text-white'"
-                @click.prevent="activeTab = 'unmanaged'; window.location.hash = 'unmanaged'" href="#">Unmanaged</a>
-        </div>
-        <div class="w-full pl-8">
-            <div x-cloak x-show="activeTab === 'managed'" class="h-full">
-                <div class="flex flex-col">
-                    <div class="flex gap-2">
-                        <h2>Resources</h2>
-                        <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
-                    </div>
-                    <div class="pb-4 title">Here you can find all resources that are managed by Coolify.</div>
+    <x-slot:title>
+        {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
+    </x-slot>
+    <livewire:server.navbar :server="$server" />
+    <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
+        <div class="w-full">
+            <div class="flex flex-col">
+                <div class="flex gap-2">
+                    <h2>Resources</h2>
+                    <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
                 </div>
-                <div class="flex flex-col">
-                    <div class="flex flex-col">
-                        <div class="overflow-x-auto">
-                            <div class="inline-block min-w-full">
-                                <div class="overflow-hidden">
-                                    <table class="min-w-full divide-y divide-coolgray-400">
-                                        <thead>
-                                            <tr class="text-neutral-500">
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Project
-                                                </th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">
-                                                    Environment</th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type</th>
-                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Status
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-coolgray-400">
-                                            @forelse ($server->definedResources()->sortBy('name',SORT_NATURAL) as $resource)
-                                                <tr class="text-white bg-coolblack hover:bg-coolgray-100">
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                        {{ data_get($resource->project(), 'name') }}
-                                                    </td>
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                        {{ data_get($resource, 'environment.name') }}
-                                                    </td>
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap"><a class=""
-                                                            href="{{ $resource->link() }}">{{ $resource->name }}
-                                                            <x-internal-link /></a>
-                                                    </td>
-                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                                        {{ str($resource->type())->headline() }}</td>
-                                                    <td class="px-5 py-4 text-sm font-medium whitespace-nowrap">
-                                                        @if ($resource->type() === 'service')
-                                                            <x-status.services :service="$resource" :showRefreshButton="false" />
-                                                        @else
-                                                            <x-status.index :resource="$resource" :showRefreshButton="false" />
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                <div>Here you can find all resources that are managed by Coolify.</div>
+                <div class="flex flex-row gap-4 py-10">
+                    <div @class([
+                        'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
+                        'dark:bg-coollabs bg-coollabs text-white' => $activeTab === 'managed',
+                    ]) wire:click="loadManagedContainers">
+                        Managed
+                        <div class="flex flex-col items-center justify-center">
+                            <x-loading wire:loading wire:target="loadManagedContainers" />
+                        </div>
+                    </div>
+                    <div @class([
+                        'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
+                        'dark:bg-coollabs bg-coollabs text-white' => $activeTab === 'unmanaged',
+                    ]) wire:click="loadUnmanagedContainers">
+                        Unmanaged
+                        <div class="flex flex-col items-center justify-center">
+                            <x-loading wire:loading wire:target="loadUnmanagedContainers" />
                         </div>
                     </div>
                 </div>
             </div>
-            <div x-cloak x-show="activeTab === 'unmanaged'" class="h-full">
-                <div class="flex flex-col" x-init="$wire.loadUnmanagedContainers()">
-                    <div class="flex gap-2">
-                        <h2>Resources</h2>
-                        <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
-                    </div>
-                    <div class="pb-4 title">Here you can find all other containers running on the server.</div>
-                </div>
-                @if ($unmanagedContainers->count() > 0)
+            @if ($containers->count() > 0)
+                @if ($activeTab === 'managed')
                     <div class="flex flex-col">
                         <div class="flex flex-col">
                             <div class="overflow-x-auto">
                                 <div class="inline-block min-w-full">
                                     <div class="overflow-hidden">
-                                        <table class="min-w-full divide-y divide-coolgray-400">
+                                        <table class="min-w-full">
                                             <thead>
-                                                <tr class="text-neutral-500">
-                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name
+                                                <tr>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Project
                                                     </th>
-                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Image
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Environment</th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Name
                                                     </th>
-                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Status
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Type
                                                     </th>
-                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Action
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Status
                                                     </th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="divide-y divide-coolgray-400">
-                                                @forelse ($unmanagedContainers->sortBy('name',SORT_NATURAL) as $resource)
-                                                    <tr class="text-white bg-coolblack hover:bg-coolgray-100">
+                                            <tbody>
+                                                @forelse ($server->definedResources()->sortBy('name',SORT_NATURAL) as $resource)
+                                                    <tr>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                            {{ data_get($resource->project(), 'name') }}
+                                                        </td>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                            {{ data_get($resource, 'environment.name') }}
+                                                        </td>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap hover:underline">
+                                                            <a class=""
+                                                                href="{{ $resource->link() }}">{{ $resource->name }}
+                                                                <x-internal-link /></a>
+                                                        </td>
+                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                            {{ str($resource->type())->headline() }}</td>
+                                                        <td class="px-5 py-4 text-sm font-medium whitespace-nowrap">
+                                                            @if ($resource->type() === 'service')
+                                                                <x-status.services :service="$resource"
+                                                                    :showRefreshButton="false" />
+                                                            @else
+                                                                <x-status.index :resource="$resource" :showRefreshButton="false" />
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @elseif ($activeTab === 'unmanaged')
+                    <div class="flex flex-col">
+                        <div class="flex flex-col">
+                            <div class="overflow-x-auto">
+                                <div class="inline-block min-w-full">
+                                    <div class="overflow-hidden">
+                                        <table class="min-w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Name
+                                                    </th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Image
+                                                    </th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Status
+                                                    </th>
+                                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                        Action
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse ($containers->sortBy('name',SORT_NATURAL) as $resource)
+                                                    <tr>
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource, 'Names') }}
                                                         </td>
@@ -107,7 +127,7 @@
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource, 'State') }}
                                                         </td>
-                                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                        <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
                                                             @if (data_get($resource, 'State') === 'running')
                                                                 <x-forms.button
                                                                     wire:click="restartUnmanaged('{{ data_get($resource, 'ID') }}')"
@@ -134,9 +154,14 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
                 @endif
-            </div>
+            @else
+                @if ($activeTab === 'managed')
+                    <div>No managed resources found.</div>
+                @elseif ($activeTab === 'unmanaged')
+                    <div>No unmanaged resources found.</div>
+                @endif
+            @endif
         </div>
     </div>
 </div>

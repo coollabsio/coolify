@@ -7,13 +7,38 @@ use Livewire\Component;
 
 class Storage extends Component
 {
-    protected $listeners = ['addNewVolume'];
     public $resource;
 
-    public function render()
+    public $fileStorage;
+
+    public function getListeners()
     {
-        return view('livewire.project.service.storage');
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},FileStorageChanged" => 'refreshStoragesFromEvent',
+            'refreshStorages',
+            'addNewVolume',
+        ];
     }
+
+    public function mount()
+    {
+        $this->refreshStorages();
+    }
+
+    public function refreshStoragesFromEvent()
+    {
+        $this->refreshStorages();
+        $this->dispatch('warning', 'File storage changed. Usually it means that the file / directory is already defined on the server, so Coolify set it up for you properly on the UI.');
+    }
+
+    public function refreshStorages()
+    {
+        $this->fileStorage = $this->resource->fileStorages()->get();
+        $this->dispatch('$refresh');
+    }
+
     public function addNewVolume($data)
     {
         try {
@@ -31,5 +56,10 @@ class Storage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function render()
+    {
+        return view('livewire.project.service.storage');
     }
 }

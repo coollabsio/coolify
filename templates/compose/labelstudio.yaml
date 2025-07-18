@@ -1,0 +1,49 @@
+# documentation: https://labelstud.io/guide/
+# slogan: Label Studio is a multi-type data labeling and annotation tool with standardized output format
+# tags: workflow, orchestration, data-pipeline, python, labelstudio, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp, images, vision
+# logo: svgs/labelstudio.png
+# port: 8080
+
+services:
+  labelstudio:
+    image: heartexlabs/label-studio:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_LABELSTUDIO_8080
+      - CSRF_TRUSTED_ORIGINS=${SERVICE_FQDN_LABELSTUDIO}
+      - EXPERIMENTAL_FEATURES=${EXPERIMENTAL_FEATURES:-false}
+      - DJANGO_DB=${DJANGO_DB:-default}
+      - POSTGRE_NAME=${POSTGRES_DB:-labelstudio}
+      - POSTGRE_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRE_PORT=5432
+      - POSTGRE_HOST=postgres
+      - LABEL_STUDIO_HOST=${SERVICE_FQDN_LABELSTUDIO}
+      - SSRF_PROTECTION_ENABLED=${SSRF_PROTECTION_ENABLED:-true}
+      - LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK=${LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK:-true}
+      - DATA_UPLOAD_MAX_NUMBER_FILES=${DATA_UPLOAD_MAX_NUMBER_FILES:-10000}
+      - LABEL_STUDIO_USERNAME=${LABEL_STUDIO_USERNAME:-admin@example.com}
+      - LABEL_STUDIO_PASSWORD=${SERVICE_PASSWORD_LABELSTUDIO}
+      - LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK=${LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK:-true}
+    volumes:
+      - labelstudio-data:/label-studio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-labelstudio}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 3

@@ -1,0 +1,126 @@
+# ignore: true
+# documentation: https://jitsi.github.io/handbook/docs/intro
+# slogan: World's easiest way to add meetings to your apps
+# logo: svgs/jitsi.svg
+# tags: video, conferencing, meetings, communication, open-source
+
+services:
+  jitsi-web:
+    image: "jitsi/web:${JITSI_IMAGE_VERSION:-unstable}"
+    container_name: jitsi-web
+    restart: unless-stopped
+    ports:
+      - "8001:80"
+      - "8443:443"
+    volumes:
+      - ~/.jitsi-meet-cfg/web:/config:Z
+      - ~/.jitsi-meet-cfg/web/crontabs:/var/spool/cron/crontabs:Z
+      - ~/.jitsi-meet-cfg/transcripts:/usr/share/jitsi-meet/transcripts:Z
+    environment:
+      - SERVICE_FQDN_JITSI
+      - PUBLIC_URL=$SERVICE_FQDN_JITSI
+      - JITSI_IMAGE_VERSION=unstable
+      - JIBRI_RECORDER_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JIBRI_XMPP_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JICOFO_AUTH_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JIGASI_XMPP_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - JVB_AUTH_PASSWORD=$SERVICE_PASSWORD_JITSI
+      - TZ=UTC
+    networks:
+      meet.jitsi:
+        aliases:
+          - meet.jitsi
+    depends_on:
+      - jvb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  prosody:
+    image: "jitsi/prosody:${JITSI_IMAGE_VERSION:-unstable}"
+    expose:
+      - '5222'
+      - '5347'
+      - '5280'
+    container_name: jitsi-xmpp
+    restart: unless-stopped
+    volumes:
+      - ~/.jitsi-meet-cfg/prosody/config:/config:Z
+      - ~/.jitsi-meet-cfg/prosody/prosody-plugins-custom:/prosody-plugins-custom:Z
+    environment:
+      - JICOFO_AUTH_PASSWORD
+      - JVB_AUTH_PASSWORD
+      - PUBLIC_URL=$SERVICE_FQDN_JITSI
+      - TZ
+    networks:
+      meet.jitsi:
+        aliases:
+          - xmpp.meet.jitsi
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5280/http-bind"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  jicofo:
+    image: "jitsi/jicofo:${JITSI_IMAGE_VERSION:-unstable}"
+    container_name: jitsi-jicofo
+    restart: unless-stopped
+    volumes:
+      - ~/.jitsi-meet-cfg/jicofo:/config:Z
+    environment:
+      - XMPP_SERVER=prosody
+      - JICOFO_AUTH_PASSWORD
+      - TZ
+      - JICOFO_ENABLE_HEALTH_CHECKS=1
+    depends_on:
+      - prosody
+    networks:
+      meet.jitsi:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/about/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  jvb:
+    image: "jitsi/jvb:${JITSI_IMAGE_VERSION:-unstable}"
+    container_name: jitsi-jvb
+    restart: unless-stopped
+    expose:
+      - '10000:10000/udp'
+      - '8080:8080'
+      - '10000'
+    volumes:
+      - ~/.jitsi-meet-cfg/jvb:/config:Z
+    environment:
+      - JVB_ADVERTISE_IPS
+      - JVB_AUTH_PASSWORD
+      - PUBLIC_URL=$SERVICE_FQDN_JITSI
+      - TZ
+      - XMPP_SERVER=prosody
+    depends_on:
+      - prosody
+    networks:
+      meet.jitsi:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.udp.routers.my-udp-router.entrypoints=video"
+      - "traefik.udp.routers.my-udp-router.service=my-udp-service"
+      - "traefik.udp.services.my-udp-service.loadbalancer.server.port=10000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/about/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+networks:
+  meet.jitsi:
+
+volumes:
+  jitsi-web:
+  jitsi-xmpp:
+  jitsi-jicofo:
+  jitsi-jvb:

@@ -29,20 +29,27 @@ class RootResetPassword extends Command
      */
     public function handle()
     {
-        //
         $this->info('You are about to reset the root password.');
         $password = password('Give me a new password for root user: ');
         $passwordAgain = password('Again');
         if ($password != $passwordAgain) {
             $this->error('Passwords do not match.');
+
             return;
         }
         $this->info('Updating root password...');
         try {
-            User::find(0)->update(['password' => Hash::make($password)]);
+            $user = User::find(0);
+            if (! $user) {
+                $this->error('Root user not found.');
+
+                return;
+            }
+            $user->update(['password' => Hash::make($password)]);
             $this->info('Root password updated successfully.');
         } catch (\Exception $e) {
             $this->error('Failed to update root password.');
+
             return;
         }
     }

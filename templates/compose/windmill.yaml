@@ -1,0 +1,126 @@
+# documentation: https://www.windmill.dev/docs/
+# slogan: Windmill is a developer platform to build production-grade multi-steps automations and internal apps.
+# tags: windmill,workflow,automation,developer,platform
+# logo: svgs/windmill.svg
+# port: 8000
+
+services:
+  db:
+    image: postgres:16
+    shm_size: 1g
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-windmill-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  windmill-server:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - SERVICE_FQDN_WINDMILL_8000
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
+      - MODE=server
+      - BASE_URL=${SERVICE_FQDN_WINDMILL}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - worker-logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  windmill-worker-1:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker-dependency-cache:/tmp/windmill/cache
+      - worker-logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  windmill-worker-2:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker-dependency-cache:/tmp/windmill/cache
+      - worker-logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  windmill-worker-3:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - worker-dependency-cache:/tmp/windmill/cache
+      - worker-logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  windmill-worker-native:
+    image: ghcr.io/windmill-labs/windmill:main
+    environment:
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db/${POSTGRES_DB:-windmill-db}
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NUM_WORKERS=8
+      - SLEEP_QUEUE=200
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - worker-logs:/tmp/windmill/logs
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  lsp:
+    image: ghcr.io/windmill-labs/windmill-lsp:latest
+    volumes:
+      - lsp-cache:/root/.cache
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

@@ -12,14 +12,14 @@ class Modal extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public string      $modalId,
-        public ?string     $submitWireAction = null,
-        public ?string     $modalTitle = null,
-        public ?string     $modalBody = null,
-        public ?string     $modalSubmit = null,
-        public bool        $noSubmit = false,
-        public bool        $yesOrNo = false,
-        public string      $action = 'delete'
+        public string $modalId,
+        public ?string $submitWireAction = null,
+        public ?string $modalTitle = null,
+        public ?string $modalBody = null,
+        public ?string $modalSubmit = null,
+        public bool $noSubmit = false,
+        public bool $yesOrNo = false,
+        public string $action = 'delete'
     ) {
         //
     }

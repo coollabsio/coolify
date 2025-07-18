@@ -6,9 +6,9 @@
                 <div class="overflow-x-auto">
                     <div class="inline-block min-w-full">
                         <div class="overflow-hidden">
-                            <table class="min-w-full divide-y divide-coolgray-400">
+                            <table class="min-w-full">
                                 <thead>
-                                    <tr class="text-neutral-500">
+                                    <tr>
                                         <th class="px-5 py-3 text-xs font-medium text-left uppercase">Email
                                         </th>
                                         <th class="px-5 py-3 text-xs font-medium text-left uppercase">
@@ -20,21 +20,27 @@
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-coolgray-400">
+                                <tbody>
                                     @foreach ($invitations as $invite)
-                                        <tr class="text-white bg-coolblack hover:bg-coolgray-100/40">
+                                        <tr>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->email }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->via }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->role }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap" x-data="checkProtocol">
                                                 <template x-if="isHttps">
-                                                    <x-forms.button
-                                                        x-on:click="copyToClipboard('{{ $invite->link }}')">Copy
-                                                        Invitation
-                                                        Link</x-forms.button>
+                                                    <div class="flex gap-2">
+                                                        <x-forms.input id="null" type="password"
+                                                            value="{{ $invite->link }}" />
+                                                        <x-forms.button
+                                                            x-on:click="copyToClipboard('{{ $invite->link }}')">Copy
+                                                            Invitation
+                                                            Link</x-forms.button>
+                                                    </div>
                                                 </template>
-                                                <x-forms.input id="null" type="password"
-                                                    value="{{ $invite->link }}" />
+                                                <template x-if="!isHttps">
+                                                    <x-forms.input id="null" type="password"
+                                                        value="{{ $invite->link }}" />
+                                                </template>
                                             </td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                 <x-forms.button

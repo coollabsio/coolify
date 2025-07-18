@@ -1,0 +1,36 @@
+# ignore: true
+# documentation: https://github.com/bluesky-social/pds
+# slogan: A social network for the decentralized web
+# tags: pds, bluesky, social, network, decentralized
+# logo:
+# port: 3000
+
+services:
+  pds:
+    image: ghcr.io/bluesky-social/pds:0.4
+    volumes:
+      - pds-data:/pds
+    environment:
+      - SERVICE_FQDN_PDS_3000
+      - PDS_JWT_SECRET=${SERVICE_BASE64_PDS}
+      - PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_PDS}
+      - PDS_ADMIN_EMAIL=${PDS_ADMIN_EMAIL:-admin@example.com}
+      - PDS_DATADIR=${PDS_DATADIR:-/pds}
+      - PDS_BLOBSTORE_DISK_LOCATION=${PDS_DATADIR:-/pds}/blocks
+      - PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-52428800}
+      - PDS_HOSTNAME=${SERVICE_URL_PDS}
+      - PDS_DID_PLC_URL=https://plc.directory
+      - PDS_BSKY_APP_VIEW_URL=https://api.bsky.app
+      - PDS_BSKY_APP_VIEW_DID=did:web:api.bsky.app
+      - PDS_REPORT_SERVICE_URL=https://mod.bsky.app
+      - PDS_REPORT_SERVICE_DID=did:plc:ar7c4by46qjdydhdevvrndac
+      - PDS_CRAWLERS=https://bsky.network
+      - LOG_ENABLED=${LOG_ENABLED:-true}
+      - PDS_EMAIL_SMTP_URL=${PDS_EMAIL_SMTP_URL:-smtp://localhost:8025}
+      - PDS_EMAIL_FROM_ADDRESS=${PDS_EMAIL_FROM_ADDRESS:-admin@example.com}
+      - PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${SERVICE_HEX_32_ROTATIONKEY}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:3000/xrpc/_health"]
+      interval: 2s
+      timeout: 10s
+      retries: 10

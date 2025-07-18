@@ -4,48 +4,88 @@ namespace App\Livewire\Server;
 
 use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
-use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
-use Illuminate\Support\Str;
 
 class Proxy extends Component
 {
     public Server $server;
 
     public ?string $selectedProxy = null;
+
     public $proxy_settings = null;
+
+    public bool $redirect_enabled = true;
+
     public ?string $redirect_url = null;
 
-    protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            'saveConfiguration' => 'submit',
+            "echo-private:team.{$teamId},ProxyStatusChangedUI" => '$refresh',
+        ];
+    }
+
+    protected $rules = [
+        'server.settings.generate_exact_labels' => 'required|boolean',
+    ];
 
     public function mount()
     {
         $this->selectedProxy = $this->server->proxyType();
+        $this->redirect_enabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
     }
 
-    public function proxyStatusUpdated()
-    {
-        $this->dispatch('refresh')->self();
-    }
+    // public function proxyStatusUpdated()
+    // {
+    //     $this->dispatch('refresh')->self();
+    // }
 
-    public function change_proxy()
+    public function changeProxy()
     {
         $this->server->proxy = null;
         $this->server->save();
+
+        $this->dispatch('reloadWindow');
     }
 
-    public function select_proxy($proxy_type)
+    public function selectProxy($proxy_type)
     {
-        $this->server->proxy->set('status', 'exited');
-        $this->server->proxy->set('type', $proxy_type);
-        $this->server->save();
-        $this->selectedProxy = $this->server->proxy->type;
-        if ($this->selectedProxy !== 'NONE') {
-            StartProxy::run($this->server, false);
+        try {
+            $this->server->changeProxy($proxy_type, async: false);
+            $this->selectedProxy = $this->server->proxy->type;
+
+            $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('proxyStatusUpdated');
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->validate();
+            $this->server->settings->save();
+            $this->dispatch('success', 'Settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSaveRedirect()
+    {
+        try {
+            $this->server->proxy->redirect_enabled = $this->redirect_enabled;
+            $this->server->save();
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Proxy configuration saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
@@ -54,7 +94,7 @@ class Proxy extends Component
             SaveConfiguration::run($this->server, $this->proxy_settings);
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
-            $this->server->setupDefault404Redirect();
+            $this->server->setupDefaultRedirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -77,12 +117,6 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server);
-            if (Str::of($this->proxy_settings)->contains('--api.dashboard=true') && Str::of($this->proxy_settings)->contains('--api.insecure=true')) {
-                $this->dispatch('traefikDashboardAvailable', true);
-            } else {
-                $this->dispatch('traefikDashboardAvailable', false);
-            }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

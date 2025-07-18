@@ -1,56 +1,60 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($resource, 'name')->limit(10) }} > Commands | Coolify
+    </x-slot>
     @if ($type === 'application')
-        <h1>Execute Command</h1>
+        <livewire:project.shared.configuration-checker :resource="$resource" />
+        <h1>Terminal</h1>
         <livewire:project.application.heading :application="$resource" />
-        <h2 class="pt-4">Command Details</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'database')
-        <h1>Execute Command</h1>
+        <livewire:project.shared.configuration-checker :resource="$resource" />
+        <h1>Terminal</h1>
         <livewire:project.database.heading :database="$resource" />
-        <h2 class="pt-4">Command Details</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
-        <h2>Execute Command</h2>
+        <livewire:project.shared.configuration-checker :resource="$resource" />
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
     @endif
-    <div x-init="$wire.loadContainers">
-        <div class="pt-4" wire:loading wire:target='loadContainers'>
-            Loading containers...
-        </div>
-        <div wire:loading.remove wire:target='loadContainers'>
-            @if (count($containers) > 0)
-                <form class="flex flex-col gap-2 pt-4" wire:submit='runCommand'>
-                    <div class="flex gap-2">
-                        <x-forms.input placeholder="ls -l" autofocus id="command" label="Command" required />
-                        <x-forms.input id="workDir" label="Working directory" />
-                    </div>
-                    <x-forms.select label="Container" id="container" required>
-                        <option disabled selected>Select container</option>
-                        @if (data_get($this->parameters, 'application_uuid'))
-                            @foreach ($containers as $container)
-                                <option value="{{ data_get($container, 'container.Names') }}">
-                                    {{ data_get($container, 'container.Names') }}
-                                </option>
-                            @endforeach
-                        @elseif(data_get($this->parameters, 'service_uuid'))
-                            @foreach ($containers as $container)
-                                <option value="{{ $container }}">
-                                    {{ $container }}
-                                </option>
-                            @endforeach
-                        @else
-                            <option value="{{ $container }}">
-                                {{ $container }}
-                            </option>
+
+    @if ($type === 'application' || $type === 'database' || $type === 'service')
+        <h2 class="pb-4">Terminal</h2>
+        @if (count($containers) === 0)
+            <div>No containers are running or terminal access is disabled on this server.</div>
+        @else
+            <form class="w-full flex gap-2 items-end" wire:submit="$dispatchSelf('connectToContainer')">
+                <x-forms.select label="Container" id="container" required wire:model="selected_container">
+                    @foreach ($containers as $container)
+                        @if ($loop->first)
+                            <option disabled value="default">Select a container</option>
                         @endif
-                    </x-forms.select>
-                    <x-forms.button type="submit">Run</x-forms.button>
-                </form>
-            @else
-                <div class="pt-4">No containers are not running.</div>
-            @endif
-        </div>
-    </div>
-    <div class="container w-full pt-10 mx-auto">
-        <livewire:activity-monitor header="Command output" />
-    </div>
+                        <option value="{{ data_get($container, 'container.Names') }}">
+                            {{ data_get($container, 'container.Names') }}
+                            ({{ data_get($container, 'server.name') }})
+                        </option>
+                    @endforeach
+                </x-forms.select>
+                <x-forms.button :disabled="$isConnecting"
+                    type="submit">{{ $isConnecting ? 'Connecting...' : 'Connect' }}</x-forms.button>
+            </form>
+            <div class="mx-auto w-full">
+                <livewire:project.shared.terminal />
+            </div>
+        @endif
+    @endif
+
+    @if ($type === 'server')
+        <livewire:server.navbar :server="$servers->first()" />
+        @if ($servers->first()->isTerminalEnabled() && $servers->first()->isFunctional())
+            <form class="w-full flex gap-2 items-start" wire:submit="$dispatchSelf('connectToServer')"
+                wire:init="$dispatchSelf('connectToServer')">
+                <h2 class="pb-4">Terminal</h2>
+                <x-forms.button :disabled="$isConnecting"
+                    type="submit">{{ $isConnecting ? 'Connecting...' : 'Connect' }}</x-forms.button>
+            </form>
+            <div class="mx-auto w-full">
+                <livewire:project.shared.terminal />
+            </div>
+        @else
+            <div>Server is not functional or terminal access is disabled.</div>
+        @endif
+    @endif
 </div>

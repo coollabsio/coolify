@@ -2,7 +2,11 @@
 
 namespace App\Actions\Database;
 
-use App\Events\DatabaseStatusChanged;
+use App\Actions\Server\CleanupDocker;
+use App\Events\ServiceStatusChanged;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -14,20 +18,39 @@ class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $isDeleteOperation = false, bool $dockerCleanup = true)
+    {
+        try {
+            $server = $database->destination->server;
+            if (! $server->isFunctional()) {
+                return 'Server is not functional';
+            }
+
+            $this->stopContainer($database, $database->uuid, 30);
+
+            if ($dockerCleanup) {
+                CleanupDocker::dispatch($server, true);
+            }
+
+            if ($database->is_public) {
+                StopDatabaseProxy::run($database);
+            }
+
+            return 'Database stopped successfully';
+        } catch (\Exception $e) {
+            return 'Database stop failed: '.$e->getMessage();
+        } finally {
+            ServiceStatusChanged::dispatch($database->environment->project->team->id);
+        }
+
+    }
+
+    private function stopContainer($database, string $containerName, int $timeout = 30): void
     {
         $server = $database->destination->server;
-        if (!$server->isFunctional()) {
-            return 'Server is not functional';
-        }
-        instant_remote_process(
-            ["docker rm -f {$database->uuid}"],
-            $server
-        );
-        if ($database->is_public) {
-            StopDatabaseProxy::run($database);
-        }
-        // TODO: make notification for services
-        // $database->environment->project->team->notify(new StatusChanged($database));
+        instant_remote_process(command: [
+            "docker stop --time=$timeout $containerName",
+            "docker rm -f $containerName",
+        ], server: $server, throwError: false);
     }
 }

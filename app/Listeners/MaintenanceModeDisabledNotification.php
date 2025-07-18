@@ -9,13 +9,10 @@ use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 class MaintenanceModeDisabledNotification
 {
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function handle(EventsMaintenanceModeDisabled $event): void
     {
-        ray('Maintenance mode disabled!');
         $files = Storage::disk('webhooks-during-maintenance')->files();
         $files = collect($files);
         $files = $files->sort();
@@ -37,13 +34,12 @@ class MaintenanceModeDisabledNotification
             }
             $request = Request::createFromBase($symfonyRequest);
             $endpoint = str($file)->after('_')->beforeLast('_')->value();
-            $class =  "App\Http\Controllers\Webhook\\" . ucfirst(str($endpoint)->before('::')->value());
+            $class = "App\Http\Controllers\Webhook\\".ucfirst(str($endpoint)->before('::')->value());
             $method = str($endpoint)->after('::')->value();
             try {
-                $instance = new $class();
+                $instance = new $class;
                 $instance->$method($request);
             } catch (\Throwable $th) {
-                ray($th);
             } finally {
                 Storage::disk('webhooks-during-maintenance')->delete($file);
             }

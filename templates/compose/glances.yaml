@@ -1,0 +1,31 @@
+# documentation: https://nicolargo.github.io/glances/
+# slogan: An Eye on your system
+# tags: monitoring tool python cross platform
+# logo: svgs/glances.png
+# port: 61208
+
+services:
+  glances:
+    image: nicolargo/glances:latest
+    restart: unless-stopped
+    environment:
+      - GLANCES_OPT=-w
+      - SERVICE_FQDN_GLANCES_61208
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:ro
+    pid: "host"
+    privileged: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:61208"]
+      interval: 2s
+      timeout: 10s
+      retries: 30
+    # Uncomment for GPU compatibilty (Nvidia) inside the container
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

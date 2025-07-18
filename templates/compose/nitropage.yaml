@@ -1,0 +1,21 @@
+# documentation: https://nitropage.org
+# slogan: Nitropage is an extensible, visual website builder, offering a growing library of versatile building blocks, focal-point image cropping and sovereign font management.
+# tags: nitropage, builder, editor, wysiwyg, cms, content, management
+# logo: svgs/nitropage.svg
+# port: 3000
+
+services:
+  nitropage:
+    image: codeberg.org/nitropage/nitropage:sqlite
+    environment:
+      - SERVICE_FQDN_NITROPAGE_3000
+      - NP_AUTH_SALT=${SERVICE_BASE64_SALT}
+      - NP_AUTH_PASSWORD=${SERVICE_PASSWORD_64_SESSION}
+      - DATABASE_URL=file:../../.data/dev.db
+    volumes:
+      - nitropage-data:/app/.data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/admin"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

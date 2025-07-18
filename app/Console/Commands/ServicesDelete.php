@@ -48,11 +48,13 @@ class ServicesDelete extends Command
             $this->deleteServer();
         }
     }
+
     private function deleteServer()
     {
         $servers = Server::all();
         if ($servers->count() === 0) {
             $this->error('There are no applications to delete.');
+
             return;
         }
         $serversToDelete = multiselect(
@@ -64,19 +66,21 @@ class ServicesDelete extends Command
             $toDelete = $servers->where('id', $server)->first();
             if ($toDelete) {
                 $this->info($toDelete);
-                $confirmed = confirm("Are you sure you want to delete all selected resources?");
-                if (!$confirmed) {
+                $confirmed = confirm('Are you sure you want to delete all selected resources?');
+                if (! $confirmed) {
                     break;
                 }
                 $toDelete->delete();
             }
         }
     }
+
     private function deleteApplication()
     {
         $applications = Application::all();
         if ($applications->count() === 0) {
             $this->error('There are no applications to delete.');
+
             return;
         }
         $applicationsToDelete = multiselect(
@@ -88,19 +92,21 @@ class ServicesDelete extends Command
             $toDelete = $applications->where('id', $application)->first();
             if ($toDelete) {
                 $this->info($toDelete);
-                $confirmed = confirm("Are you sure you want to delete all selected resources? ");
-                if (!$confirmed) {
+                $confirmed = confirm('Are you sure you want to delete all selected resources? ');
+                if (! $confirmed) {
                     break;
                 }
                 DeleteResourceJob::dispatch($toDelete);
             }
         }
     }
+
     private function deleteDatabase()
     {
         $databases = StandalonePostgresql::all();
         if ($databases->count() === 0) {
             $this->error('There are no databases to delete.');
+
             return;
         }
         $databasesToDelete = multiselect(
@@ -112,19 +118,21 @@ class ServicesDelete extends Command
             $toDelete = $databases->where('id', $database)->first();
             if ($toDelete) {
                 $this->info($toDelete);
-                $confirmed = confirm("Are you sure you want to delete all selected resources?");
-                if (!$confirmed) {
+                $confirmed = confirm('Are you sure you want to delete all selected resources?');
+                if (! $confirmed) {
                     return;
                 }
                 DeleteResourceJob::dispatch($toDelete);
             }
         }
     }
+
     private function deleteService()
     {
         $services = Service::all();
         if ($services->count() === 0) {
             $this->error('There are no services to delete.');
+
             return;
         }
         $servicesToDelete = multiselect(
@@ -136,8 +144,8 @@ class ServicesDelete extends Command
             $toDelete = $services->where('id', $service)->first();
             if ($toDelete) {
                 $this->info($toDelete);
-                $confirmed = confirm("Are you sure you want to delete all selected resources?");
-                if (!$confirmed) {
+                $confirmed = confirm('Are you sure you want to delete all selected resources?');
+                if (! $confirmed) {
                     return;
                 }
                 DeleteResourceJob::dispatch($toDelete);

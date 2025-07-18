@@ -2,43 +2,58 @@
 
 namespace App\Livewire\Project\Database;
 
-use App\Actions\Database\StartMariadb;
-use App\Actions\Database\StartMongodb;
-use App\Actions\Database\StartMysql;
-use App\Actions\Database\StartPostgresql;
-use App\Actions\Database\StartRedis;
+use App\Actions\Database\RestartDatabase;
+use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
-use App\Events\DatabaseStatusChanged;
-use App\Jobs\ContainerStatusJob;
+use App\Actions\Docker\GetContainersStatus;
+use App\Events\ServiceStatusChanged;
 use Livewire\Component;
 
 class Heading extends Component
 {
     public $database;
+
     public array $parameters;
+
+    public $docker_cleanup = true;
 
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $teamId = auth()->user()->currentTeam()->id;
+
         return [
-            "echo-private:user.{$userId},DatabaseStatusChanged" => 'activityFinished',
+            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
+            "echo-private:team.{$teamId},ServiceChecked" => 'activityFinished',
+            'refresh' => '$refresh',
+            'compose_loaded' => '$refresh',
+            'update_links' => '$refresh',
         ];
     }
 
     public function activityFinished()
     {
-        $this->database->update([
-            'started_at' => now(),
-        ]);
-        $this->dispatch('refresh');
-        $this->check_status();
+        try {
+            $this->database->started_at ??= now();
+            $this->database->save();
+
+            if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
+                $this->database->isConfigurationChanged(true);
+            }
+            $this->dispatch('configurationChanged');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
     }
 
-    public function check_status($showNotification = false)
+    public function checkStatus()
     {
-        dispatch_sync(new ContainerStatusJob($this->database->destination->server));
-        $this->database->refresh();
-        if ($showNotification) $this->dispatch('success', 'Database status updated.');
+        if ($this->database->destination->server->isFunctional()) {
+            GetContainersStatus::dispatch($this->database->destination->server);
+        } else {
+            $this->dispatch('error', 'Server is not functional.');
+        }
     }
 
     public function mount()
@@ -48,29 +63,32 @@ class Heading extends Component
 
     public function stop()
     {
-        StopDatabase::run($this->database);
-        $this->database->status = 'exited';
-        $this->database->save();
-        $this->check_status();
+        try {
+            $this->dispatch('info', 'Gracefully stopping database.');
+            StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
+        } catch (\Exception $e) {
+            $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    public function restart()
+    {
+        $activity = RestartDatabase::run($this->database);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function start()
     {
-        if ($this->database->type() === 'standalone-postgresql') {
-            $activity = StartPostgresql::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-redis') {
-            $activity = StartRedis::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-mongodb') {
-            $activity = StartMongodb::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-mysql') {
-            $activity = StartMysql::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        } else if ($this->database->type() === 'standalone-mariadb') {
-            $activity = StartMariadb::run($this->database);
-            $this->dispatch('activityMonitor', $activity->id);
-        }
+        $activity = StartDatabase::run($this->database);
+        $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
+    }
+
+    public function render()
+    {
+        return view('livewire.project.database.heading', [
+            'checkboxes' => [
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+            ],
+        ]);
     }
 }

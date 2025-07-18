@@ -15,7 +15,7 @@ services:
     volumes:
       - meilisearch-data:/meili_data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
       interval: 2s
       timeout: 10s
       retries: 15

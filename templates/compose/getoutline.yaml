@@ -1,0 +1,101 @@
+# documentation: https://docs.getoutline.com/s/hosting/doc/hosting-outline-nipGaCRBDu
+# slogan: Your team’s knowledge base
+# tags: knowledge base, documentation
+# logo: svgs/getoutline.jpeg
+# port: 3000
+
+services:
+  outline:
+    image: docker.getoutline.com/outlinewiki/outline:latest
+    volumes:
+      - storage-data:/var/lib/outline/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_OUTLINE_3000
+      - NODE_ENV=production
+      - SECRET_KEY=${SERVICE_BASE64_OUTLINE}
+      - UTILS_SECRET=${SERVICE_PASSWORD_64_OUTLINE}
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/${POSTGRES_DATABASE:-outline}
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_64_REDIS}@redis:6379
+      - URL=${SERVICE_FQDN_OUTLINE_3000}
+      - PORT=${OUTLINE_PORT:-3000}
+      - FILE_STORAGE=${FILE_STORAGE:-local}
+      - FILE_STORAGE_LOCAL_ROOT_DIR=${FILE_STORAGE_LOCAL_ROOT_DIR:-/var/lib/outline/data}
+      - FILE_STORAGE_UPLOAD_MAX_SIZE=${FILE_STORAGE_UPLOAD_MAX_SIZE:-2000}
+      - FILE_STORAGE_IMPORT_MAX_SIZE=${FILE_STORAGE_IMPORT_MAX_SIZE:-100}
+      - FILE_STORAGE_WORKSPACE_IMPORT_MAX_SIZE=${FILE_STORAGE_WORKSPACE_IMPORT_MAX_SIZE}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_ACCELERATE_URL=${AWS_S3_ACCELERATE_URL}
+      - AWS_S3_UPLOAD_BUCKET_URL=${AWS_S3_UPLOAD_BUCKET_URL}
+      - AWS_S3_UPLOAD_BUCKET_NAME=${AWS_S3_UPLOAD_BUCKET_NAME}
+      - AWS_S3_FORCE_PATH_STYLE=${AWS_S3_FORCE_PATH_STYLE:-true}
+      - AWS_S3_ACL=${AWS_S3_ACL:-private}
+      - SLACK_CLIENT_ID=${SLACK_CLIENT_ID}
+      - SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      - AZURE_RESOURCE_APP_ID=${AZURE_RESOURCE_APP_ID}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_AUTH_URI=${OIDC_AUTH_URI}
+      - OIDC_TOKEN_URI=${OIDC_TOKEN_URI}
+      - OIDC_USERINFO_URI=${OIDC_USERINFO_URI}
+      - OIDC_LOGOUT_URI=${OIDC_LOGOUT_URI}
+      - OIDC_USERNAME_CLAIM=${OIDC_USERNAME_CLAIM}
+      - OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME}
+      - OIDC_SCOPES=${OIDC_SCOPES}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}    
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_APP_NAME=${GITHUB_APP_NAME}
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - DISCORD_SERVER_ID=${DISCORD_SERVER_ID}
+      - DISCORD_SERVER_ROLES=${DISCORD_SERVER_ROLES}
+      - PGSSLMODE=${PGSSLMODE:-disable}
+      - FORCE_HTTPS=${FORCE_HTTPS:-true}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+      - SMTP_REPLY_EMAIL=${SMTP_REPLY_EMAIL}
+      - SMTP_TLS_CIPHERS=${SMTP_TLS_CIPHERS}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_NAME=${SMTP_NAME}
+    healthcheck:
+      disable: true
+
+  redis:
+    image: redis:alpine
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_64_REDIS}
+    command: ["redis-server", "--requirepass", "${SERVICE_PASSWORD_64_REDIS}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_64_REDIS}", "PING"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+
+  postgres:
+    image: postgres:12-alpine
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DATABASE:-outline}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${SERVICE_USER_POSTGRES}", "-d", "${POSTGRES_DATABASE:-outline}"]
+      interval: 30s
+      timeout: 20s
+      retries: 3

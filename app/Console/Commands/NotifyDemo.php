@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+
 use function Termwind\ask;
 use function Termwind\render;
 use function Termwind\style;
@@ -32,10 +33,9 @@ class NotifyDemo extends Command
 
         if (blank($channel)) {
             $this->showHelp();
+
             return;
         }
-
-        ray($channel);
     }
 
     private function showHelp()
@@ -59,9 +59,10 @@ class NotifyDemo extends Command
                 <div class="text-yellow-500"> Channels: </div>
                 <ul class="text-coolify">
                     <li>email</li>
-                    <li>slack</li>
                     <li>discord</li>
                     <li>telegram</li>
+                    <li>slack</li>
+                    <li>pushover</li>
                 </ul>
             </div>
         </div>
@@ -72,6 +73,6 @@ class NotifyDemo extends Command
         <div class="mr-1">
             In which manner you wish a <strong class="text-coolify">coolified</strong> notification?
         </div>
-        HTML, ['email', 'slack', 'discord', 'telegram']);
+        HTML, ['email', 'discord', 'telegram', 'slack', 'pushover']);
     }
 }

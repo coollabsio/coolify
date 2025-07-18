@@ -49,22 +49,22 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->string('limits_cpuset')->nullable()->default("0")->change();
+            $table->string('limits_cpuset')->nullable()->default('0')->change();
         });
         Schema::table('standalone_postgresqls', function (Blueprint $table) {
-            $table->string('limits_cpuset')->nullable()->default("0")->change();
+            $table->string('limits_cpuset')->nullable()->default('0')->change();
         });
         Schema::table('standalone_redis', function (Blueprint $table) {
-            $table->string('limits_cpuset')->nullable()->default("0")->change();
+            $table->string('limits_cpuset')->nullable()->default('0')->change();
         });
         Schema::table('standalone_mariadbs', function (Blueprint $table) {
-            $table->string('limits_cpuset')->nullable()->default("0")->change();
+            $table->string('limits_cpuset')->nullable()->default('0')->change();
         });
         Schema::table('standalone_mysqls', function (Blueprint $table) {
-            $table->string('limits_cpuset')->nullable()->default("0")->change();
+            $table->string('limits_cpuset')->nullable()->default('0')->change();
         });
         Schema::table('standalone_mongodbs', function (Blueprint $table) {
-            $table->string('limits_cpuset')->nullable()->default("0")->change();
+            $table->string('limits_cpuset')->nullable()->default('0')->change();
         });
         Application::where('limits_cpuset', null)->update(['limits_cpuset' => '0']);
         StandalonePostgresql::where('limits_cpuset', null)->update(['limits_cpuset' => '0']);

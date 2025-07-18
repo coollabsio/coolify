@@ -13,6 +13,6 @@ class PreventRequestsDuringMaintenance extends Middleware
      */
     protected $except = [
         'webhooks/*',
-        '/api/health'
+        '/api/health',
     ];
 }

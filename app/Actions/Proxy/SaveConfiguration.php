@@ -3,7 +3,6 @@
 namespace App\Actions\Proxy;
 
 use App\Models\Server;
-use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class SaveConfiguration
@@ -18,12 +17,12 @@ class SaveConfiguration
         $proxy_path = $server->proxyPath();
         $docker_compose_yml_base64 = base64_encode($proxy_settings);
 
-        $server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+        $server->proxy->last_saved_settings = str($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
 
         return instant_remote_process([
             "mkdir -p $proxy_path",
-            "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
+            "echo '$docker_compose_yml_base64' | base64 -d | tee $proxy_path/docker-compose.yml > /dev/null",
         ], $server);
     }
 }

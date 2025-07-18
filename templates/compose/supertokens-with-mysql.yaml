@@ -1,0 +1,40 @@
+# documentation: https://supertokens.com/docs/guides
+# slogan: An open-source authentication solution that simplifies the implementation of secure user authentication and session management for web and mobile applications.
+# tags: supertokens,login,authentication,authorization,oauth,user-management,session-management,access-control,otp,magic-link,passwordless
+# logo: svgs/supertokens.svg
+# port: 3567
+
+services:
+  supertokens:
+    image: 'registry.supertokens.io/supertokens/supertokens-mysql:latest'
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_SUPERTOKENS_3567
+      - API_KEYS=${API_KEYS:-}
+      - MYSQL_CONNECTION_URI=mysql://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@mysql:3306/${MYSQL_DATABASE:-supertokens}
+    healthcheck:
+      test: "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e \"GET /hello HTTP/1.1\\r\\nhost: 127.0.0.1:3567\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | grep \"Hello\"'\n"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: 'mysql:latest'
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - MYSQL_USER=$SERVICE_USER_MYSQL
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-supertokens}
+    volumes:
+      - 'supertokens-mysql-data:/var/lib/mysql'
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - '-h'
+        - localhost
+      timeout: 20s
+      retries: 10

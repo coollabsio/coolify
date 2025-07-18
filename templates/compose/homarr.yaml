@@ -1,0 +1,21 @@
+# documentation: https://homarr.dev
+# slogan: Homarr is a self-hosted homepage for your services.
+# tags: homarr,self-hosted,homepage
+# logo: svgs/homarr.svg
+# port: 7575
+
+services:
+  homarr:
+    image: ghcr.io/ajnart/homarr:latest
+    environment:
+      - SERVICE_FQDN_HOMARR_7575
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./homarr/configs:/app/data/configs
+      - ./homarr/icons:/app/public/icons
+      - ./homarr/data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7575"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

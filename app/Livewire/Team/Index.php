@@ -4,28 +4,35 @@ namespace App\Livewire\Team;
 
 use App\Models\Team;
 use App\Models\TeamInvitation;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Index extends Component
 {
     public $invitations = [];
+
     public Team $team;
+
     protected $rules = [
         'team.name' => 'required|min:3|max:255',
         'team.description' => 'nullable|min:3|max:255',
     ];
+
     protected $validationAttributes = [
         'team.name' => 'name',
         'team.description' => 'description',
     ];
-    public function mount() {
+
+    public function mount()
+    {
         $this->team = currentTeam();
 
         if (auth()->user()->isAdminFromSession()) {
             $this->invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
         }
     }
+
     public function render()
     {
         return view('livewire.team.index');
@@ -49,7 +56,7 @@ class Index extends Component
         $currentTeam->delete();
 
         $currentTeam->members->each(function ($user) use ($currentTeam) {
-            if ($user->id === auth()->user()->id) {
+            if ($user->id === Auth::id()) {
                 return;
             }
             $user->teams()->detach($currentTeam);
@@ -60,6 +67,7 @@ class Index extends Component
         });
 
         refreshSession();
+
         return redirect()->route('team.index');
     }
 }

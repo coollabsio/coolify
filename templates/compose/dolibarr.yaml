@@ -1,0 +1,43 @@
+# documentation: https://www.dolibarr.org/documentation-home.php
+# slogan: Dolibarr is a modern software package to manage your organization's activity (contacts, quotes, invoices, orders, stocks, agenda, hr, expense reports, accountancy, ecm, manufacturing, ...).
+# tags: crm,ERP
+# logo: svgs/dolibarr.png
+# port: 80
+
+services:
+  dolibarr:
+    image: dolibarr/dolibarr:latest
+    environment:
+      - SERVICE_FQDN_DOLIBARR_80
+      - WWW_USER_ID=${WWW_USER_ID:-1000}
+      - WWW_GROUP_ID=${WWW_GROUP_ID:-1000}
+      - DOLI_DB_HOST=mariadb
+      - DOLI_DB_NAME=${MYSQL_DATABASE:-dolibarr-db}
+      - DOLI_DB_USER=${SERVICE_USER_MYSQL}
+      - DOLI_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - DOLI_URL_ROOT=${SERVICE_URL_DOLIBARR}
+      - DOLI_ADMIN_LOGIN=${SERVICE_USER_DOLIBARR}
+      - DOLI_ADMIN_PASSWORD=${SERVICE_PASSWORD_DOLIBARR}
+      - DOLI_CRON=${DOLI_CRON:-0}
+      - DOLI_INIT_DEMO=${DOLI_INIT_DEMO:-0}
+      - DOLI_COMPANY_NAME=${DOLI_COMPANY_NAME:-MyBigCompany}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  mariadb:
+    image: mariadb:latest
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-dolibarr-db}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+    volumes:
+      - dolibarr_mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

@@ -3,69 +3,82 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class CreateScheduledBackup extends Component
 {
-    public $database;
+    #[Validate(['required', 'string'])]
     public $frequency;
-    public bool $enabled = true;
-    public bool $save_s3 = false;
-    public $s3_storage_id;
-    public $s3s;
 
-    protected $rules = [
-        'frequency' => 'required|string',
-        'save_s3' => 'required|boolean',
-    ];
-    protected $validationAttributes = [
-        'frequency' => 'Backup Frequency',
-        'save_s3' => 'Save to S3',
-    ];
+    #[Validate(['required', 'boolean'])]
+    public bool $saveToS3 = false;
+
+    #[Locked]
+    public $database;
+
+    public bool $enabled = true;
+
+    #[Validate(['nullable', 'integer'])]
+    public ?int $s3StorageId = null;
+
+    public Collection $definedS3s;
+
     public function mount()
     {
-        if ($this->s3s->count() > 0) {
-            $this->s3_storage_id = $this->s3s->first()->id;
+        try {
+            $this->definedS3s = currentTeam()->s3s;
+            if ($this->definedS3s->count() > 0) {
+                $this->s3StorageId = $this->definedS3s->first()->id;
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
-    public function submit(): void
+    public function submit()
     {
         try {
             $this->validate();
+
             $isValid = validate_cron_expression($this->frequency);
-            if (!$isValid) {
+            if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
+
                 return;
             }
+
             $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
-                'save_s3' => $this->save_s3,
-                's3_storage_id' => $this->s3_storage_id,
+                'save_s3' => $this->saveToS3,
+                's3_storage_id' => $this->s3StorageId,
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
             ];
+
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;
-            } else if ($this->database->type() === 'standalone-mysql') {
+            } elseif ($this->database->type() === 'standalone-mysql') {
                 $payload['databases_to_backup'] = $this->database->mysql_database;
-            } else if ($this->database->type() === 'standalone-mariadb') {
+            } elseif ($this->database->type() === 'standalone-mariadb') {
                 $payload['databases_to_backup'] = $this->database->mariadb_database;
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
-            if ($this->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
                 $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
             } else {
                 $this->dispatch('refreshScheduledBackups');
             }
+
         } catch (\Throwable $e) {
-            handleError($e, $this);
+            return handleError($e, $this);
         } finally {
             $this->frequency = '';
-            $this->save_s3 = true;
         }
     }
 }

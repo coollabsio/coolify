@@ -54,13 +54,13 @@ return new class extends Migration
             $table->integer('health_check_retries')->default(10);
             $table->integer('health_check_start_period')->default(5);
 
-            $table->string('limits_memory')->default("0");
-            $table->string('limits_memory_swap')->default("0");
+            $table->string('limits_memory')->default('0');
+            $table->string('limits_memory_swap')->default('0');
             $table->integer('limits_memory_swappiness')->default(60);
-            $table->string('limits_memory_reservation')->default("0");
+            $table->string('limits_memory_reservation')->default('0');
 
-            $table->string('limits_cpus')->default("0");
-            $table->string('limits_cpuset')->nullable()->default("0");
+            $table->string('limits_cpus')->default('0');
+            $table->string('limits_cpuset')->nullable()->default('0');
             $table->integer('limits_cpu_shares')->default(1024);
 
             $table->string('status')->default('exited');

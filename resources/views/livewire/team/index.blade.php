@@ -1,16 +1,21 @@
 <div>
+    <x-slot:title>
+        Teams | Coolify
+    </x-slot>
     <x-team.navbar />
 
-    <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
-        <div class="flex items-end gap-2">
-            <h2>General</h2>
+    <form class="flex flex-col" wire:submit='submit'>
+        <h2>General</h2>
+        <div class="subtitle">
+            Manage the general settings of this team.
+        </div>
+
+        <div class="flex items-end gap-2 pb-6">
+            <x-forms.input id="team.name" label="Name" required />
+            <x-forms.input id="team.description" label="Description" />
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-        </div>
-        <div class="flex gap-2">
-            <x-forms.input id="team.name" label="Name" required />
-            <x-forms.input id="team.description" label="Description" />
         </div>
     </form>
 
@@ -22,15 +27,17 @@
             <div>This is the default team. You can't delete it.</div>
         @elseif(auth()->user()->teams()->get()->count() === 1 || auth()->user()->currentTeam()->personal_team)
             <div>You can't delete your last / personal team.</div>
-        @elseif(currentTeam()->subscription && currentTeam()->subscription?->lemon_status !== 'cancelled')
-            <div>Please cancel your subscription <a class="text-white underline"
-                    href="{{ route('subscription.show') }}">here</a> before delete this team.</div>
+        @elseif(currentTeam()->subscription)
+            <div>Please cancel your subscription <a class="underline dark:text-white"
+                    href="{{ route('subscription.show') }}">here</a> before deleting this team.</div>
         @else
             @if (currentTeam()->isEmpty())
                 <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
-                <x-new-modal isErrorButton buttonTitle="Delete">
-                    This team be deleted. It is not reversible. <br>Please think again.
-                </x-new-modal>
+                <x-modal-confirmation title="Confirm Team Deletion?" buttonTitle="Delete" isErrorButton
+                    submitAction="delete({{ currentTeam()->id }})" :actions="['The current team will be permanently deleted from Coolify and the database.']"
+                    confirmationText="{{ currentTeam()->name }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Team Name below"
+                    shortConfirmationLabel="Team Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
             @else
                 <div>
                     <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>

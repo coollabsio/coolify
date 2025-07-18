@@ -1,0 +1,10 @@
+#!/command/execlineb -P
+
+# Use with-contenv to ensure environment variables are available
+with-contenv
+cd /var/www/html
+foreground {
+    php
+    artisan
+    start:scheduler
+}

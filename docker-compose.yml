@@ -1,17 +1,16 @@
-version: '3.8'
 services:
     coolify:
         container_name: coolify
         restart: always
         working_dir: /var/www/html
         extra_hosts:
-            - 'host.docker.internal:host-gateway'
+            - host.docker.internal:host-gateway
         networks:
             - coolify
         depends_on:
             - postgres
             - redis
-
+            - soketi
     postgres:
         image: postgres:15-alpine
         container_name: coolify-db
@@ -19,14 +18,15 @@ services:
         networks:
             - coolify
     redis:
-        image: redis:alpine
+        image: redis:7-alpine
         container_name: coolify-redis
         restart: always
         networks:
             - coolify
     soketi:
-        image: 'quay.io/soketi/soketi:1.6-16-alpine'
         container_name: coolify-realtime
+        extra_hosts:
+            - host.docker.internal:host-gateway
         restart: always
         networks:
             - coolify
@@ -34,4 +34,4 @@ networks:
     coolify:
         name: coolify
         driver: bridge
-        external: true
+        external: false

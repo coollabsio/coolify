@@ -20,7 +20,7 @@
 <div x-cloak x-show="open" x-transition class="fixed inset-0 z-50 flex pt-10">
     <div @click.away="open = false" class="w-screen h-20 max-w-xl mx-auto bg-black rounded-lg">
         <div class="flex flex-col items-center justify-center h-full">
-            <div class="pb-5 text-white" x-text="message"></div>
+            <div class="pb-5 dark:text-white" x-text="message"></div>
             <div>
                 <x-forms.button x-on:click='confirmed()'>Confirm</x-forms.button>
                 <x-forms.button x-on:click="open = false">Cancel</x-forms.button>

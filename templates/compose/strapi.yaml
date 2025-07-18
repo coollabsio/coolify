@@ -1,0 +1,60 @@
+# documentation: https://docs.strapi.io/
+# slogan: Open-source headless CMS to build powerful APIs with built-in content management.
+# tags: cms, headless, mysql, api
+# logo: svgs/strapi.svg
+# port: 1337
+
+services:
+  strapi:
+    image: "elestio/strapi-development:latest"
+    environment:
+      - SERVICE_FQDN_STRAPI_1337
+      - DATABASE_CLIENT=postgres
+      - DATABASE_HOST=postgresql
+      - DATABASE_PORT=5432
+      - "DATABASE_NAME=${POSTGRESQL_DATABASE:-strapi}"
+      - DATABASE_USERNAME=$SERVICE_USER_POSTGRESQL
+      - DATABASE_PASSWORD=$SERVICE_PASSWORD_POSTGRESQL
+      - JWT_SECRET=$SERVICE_BASE64_64_SECRET
+      - ADMIN_JWT_SECRET=$SERVICE_BASE64_64_SECRET
+      - APP_KEYS=$SERVICE_BASE64_64_KEY
+      - STRAPI_TELEMETRY_DISABLED=${STRAPI_TELEMETRY_DISABLED:-true}
+      - STRAPI_LICENSE=${STRAPI_LICENSE}
+      - NODE_ENV=${NODE_ENV:-development}
+      - BROWSER=${BROWSER:-true}
+      - STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE=${STRAPI_PLUGIN_I18N_INIT_LOCALE_CODE:-en}
+      - STRAPI_ENFORCE_SOURCEMAPS=${STRAPI_ENFORCE_SOURCEMAPS:-false}
+      - FAST_REFRESH=${FAST_REFRESH:-true}
+    volumes:
+      - "strapi-config:/opt/app/config"
+      - "strapi-src:/opt/app/src"
+      - "strapi-uploads:/opt/app/public/uploads"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:1337/"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      postgresql:
+        condition: service_healthy
+  postgresql:
+    image: "elestio/postgres:latest"
+    environment:
+      - "POSTGRES_DB=${POSTGRESQL_DATABASE:-strapi}"
+      - POSTGRES_USER=$SERVICE_USER_POSTGRESQL
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRESQL
+      - PGDATA=/var/lib/postgresql/data
+    volumes:
+      - "strapi-postgresql-data:/var/lib/postgresql/data"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 20s
+      retries: 10

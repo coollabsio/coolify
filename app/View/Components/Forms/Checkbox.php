@@ -12,16 +12,20 @@ class Checkbox extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public string|null $id = null,
-        public string|null $name = null,
-        public string|null $value = null,
-        public string|null $label = null,
-        public string|null $helper = null,
-        public string|bool        $instantSave = false,
-        public bool        $disabled = false,
-        public string      $defaultClass = "toggle toggle-xs toggle-warning rounded disabled:bg-coolgray-200 disabled:opacity-50 placeholder:text-neutral-700",
+        public ?string $id = null,
+        public ?string $name = null,
+        public ?string $value = null,
+        public ?string $domValue = null,
+        public ?string $label = null,
+        public ?string $helper = null,
+        public string|bool|null $checked = false,
+        public string|bool $instantSave = false,
+        public bool $disabled = false,
+        public string $defaultClass = 'dark:border-neutral-700 text-coolgray-400 focus:ring-warning dark:bg-coolgray-100 rounded-sm cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed',
     ) {
-        //
+        if ($this->disabled) {
+            $this->defaultClass .= ' opacity-40';
+        }
     }
 
     /**

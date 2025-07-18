@@ -1,0 +1,33 @@
+# documentation: https://docs.anythingllm.com/installation-docker/overview
+# slogan: AnythingLLM is the easiest to use, all-in-one AI application that can do RAG, AI Agents, and much more with no code or infrastructure headaches.
+# tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot
+# logo: svgs/anythingllm.svg
+# port: 3001
+
+services:
+  anything-llm:
+    image: mintplexlabs/anythingllm
+    environment:
+      - SERVICE_FQDN_ANYTHINGLLM_3001
+      - STORAGE_DIR=/app/server/storage
+      - DISABLE_TELEMETRY=${DISABLE_TELEMETRY:-true}
+      - PASSWORDLOWERCASE=${PASSWORDLOWERCASE:-1}
+      - PASSWORDMAXCHAR=${PASSWORDMAXCHAR:-250}
+      - PASSWORDMINCHAR=${PASSWORDMINCHAR:-6}
+      - PASSWORDNUMERIC=${PASSWORDNUMERIC:-1}
+      - PASSWORDREQUIREMENTS=${PASSWORDREQUIREMENTS:-1}
+      - PASSWORDSYMBOL=${PASSWORDSYMBOL:-1}
+      - PASSWORDUPPERCASE=${PASSWORDUPPERCASE:-1}
+      - SIG_KEY=${SERVICE_PASSWORD_SIGKEY}
+      - SIG_SALT=${SERVICE_PASSWORD_SIGSALT}
+      - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
+      - AUTH_TOKEN=${SERVICE_PASSWORD_AUTHTOKEN}
+      - SERVER_PORT=${SERVER_PORT:-3001}
+      - VECTOR_DB=lancedb
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - "anythingllm-storage:/app/server/storage"
+      - "anythingllm-hot:/app/collector/hotdir"
+      - "anythingllm-outputs:/app/collector/outputs"
+    user: "${UID:-1000}:${GID:-1000}"

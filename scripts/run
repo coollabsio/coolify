@@ -20,72 +20,33 @@ function help {
     compgen -A function | cat -n
 }
 
-# function dev:init {
-#     docker exec coolify bash -c "php artisan migrate --seed"
-#     echo "Need to update privileges on a few files. I need your password for that."
-#     sudo chmod -R o+rwx .
-# }
+function logs {
+    docker exec -t coolify tail -f storage/logs/laravel.log
+}
+function test {
+    docker exec -t coolify php artisan test --testsuite=Feature -p
+}
 
-# function sync:v3 {
-#     if [ -z "$1" ]; then
-#         echo -e "Please provide a version.\n\nExample: run sync:v3 3.12.32"
-#         exit 1
-#     fi
-#     skopeo copy --all docker://ghcr.io/coollabsio/coolify:$1 docker://coollabsio/coolify:$1
-# }
 function sync:bunny {
     php artisan sync:bunny --env=secrets
 }
 
-# function queue {
-#     bash spin exec -u webuser coolify php artisan queue:listen
-# }
-
-# function horizon {
-#     bash spin exec -u webuser coolify php artisan horizon -vvv
-# }
-
-# function schedule {
-#     bash spin exec -u webuser coolify php artisan schedule:work
-# }
-
-# function schedule:run {
-#     bash spin exec -u webuser coolify php artisan schedule:run
-# }
-
-
-# function db {
-#     bash spin exec -u webuser coolify php artisan db
-# }
-# function db:seed {
-#     bash spin exec -u webuser coolify php artisan migrate --seed
-# }
-
-# function db:migrate {
-#     bash spin exec -u webuser coolify php artisan migrate --step
-# }
-
 function db:reset {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
+    bash spin exec -u www-data coolify php artisan migrate:fresh --seed
 }
 function db:reset-prod {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    bash spin exec -u www-data coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
-
-function mfs {
-    db:reset
-}
-
 function coolify {
-    bash spin exec -u webuser coolify bash
+    bash spin exec -u www-data coolify sh
 }
 
 function coolify:root {
-    bash spin exec coolify bash
+    bash spin exec coolify sh
 }
 function coolify:proxy {
-   docker exec -ti coolify-proxy sh
+    docker exec -ti coolify-proxy sh
 }
 
 function redis {
@@ -97,13 +58,9 @@ function vite {
 }
 
 function tinker {
-    bash spin exec -u webuser coolify php artisan tinker
+    bash spin exec -u www-data coolify php artisan tinker
 }
 
-
-# function build:helper {
-#     act -W .github/workflows/coolify-helper.yml --secret-file .env.secrets
-# }
 function default {
     help
 }

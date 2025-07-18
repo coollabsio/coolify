@@ -3,20 +3,17 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class AddEmpty extends Component
 {
-    public string $name = '';
+    #[Validate(['required', 'string', 'min:3'])]
+    public string $name;
+
+    #[Validate(['nullable', 'string'])]
     public string $description = '';
-    protected $rules = [
-        'name' => 'required|string|min:3',
-        'description' => 'nullable|string',
-    ];
-    protected $validationAttributes = [
-        'name' => 'Project Name',
-        'description' => 'Project Description',
-    ];
 
     public function submit()
     {
@@ -26,12 +23,12 @@ class AddEmpty extends Component
                 'name' => $this->name,
                 'description' => $this->description,
                 'team_id' => currentTeam()->id,
+                'uuid' => (string) new Cuid2,
             ]);
+
             return redirect()->route('project.show', $project->uuid);
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        } finally {
-            $this->name = '';
         }
     }
 }

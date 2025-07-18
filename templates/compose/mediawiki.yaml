@@ -1,0 +1,21 @@
+# documentation: https://www.mediawiki.org
+# slogan: MediaWiki is a collaboration and documentation platform brought to you by a vibrant community.
+# tags: wiki, collaboration, documentation
+# logo: svgs/mediawiki.ico
+# port: 80
+ 
+services:
+  mediawiki:
+    image: mediawiki:latest
+    environment:
+      - SERVICE_FQDN_MEDIAWIKI_80
+    volumes:
+      - mediawiki-images:/var/www/html/images
+      - mediawiki-sqlite:/var/www/html/data
+    # Follow the instructions in https://coolify.io/docs/services/mediawiki#installation-steps for the following line
+    # - ./LocalSettings.php:/var/www/html/LocalSettings.php
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

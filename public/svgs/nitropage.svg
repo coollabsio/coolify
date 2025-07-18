@@ -1,0 +1,8 @@
+<svg width="64" height="64" version="1.1" viewBox="0 0 16.933 16.933" xmlns="http://www.w3.org/2000/svg">
+  <rect transform="matrix(1 0 -.16885 .98564 0 0)" x="2.6887" y="1.2563" width="14.457" height="14.667" fill="#581c87" style="paint-order:stroke fill markers"/>
+  <text x="0.74027044" y="12.170821" display="none" fill="#ffffff" font-family="'Liberation Sans'" font-size="10.583px" font-weight="bold" letter-spacing="-.66146px" stroke-width="4.2333" word-spacing="0px" xml:space="preserve"><tspan x="0.74027044" y="12.170821" fill="#ffffff" font-family="'Jost*'" font-size="10.583px" font-style="italic" font-weight="900" stroke-width="4.2333" style="paint-order:stroke fill markers">NP</tspan></text>
+  <g fill="#fff" stroke-width="4.2333" aria-label="NP">
+    <path d="m7.1008 4.7625-0.59266 3.3655-4.0322-3.7147-1.3229 7.7576h2.1907l0.58208-3.3655 4.0428 3.7147 1.3229-7.7576z" style="paint-order:stroke fill markers"/>
+    <path d="m10.027 4.7625-1.27 7.4083h2.2966l0.39158-2.3283h0.62442c1.9156-0.021167 3.2385-0.89958 3.3867-2.54 0.14817-1.6192-0.79375-2.5188-2.6564-2.54zm2.5717 1.8415c0.48683 0.010583 0.75141 0.26458 0.67733 0.68791-0.08467 0.45508-0.508 0.6985-1.016 0.6985h-0.49742l0.24342-1.3864z" style="paint-order:stroke fill markers"/>
+  </g>
+</svg>

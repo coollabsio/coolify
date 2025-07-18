@@ -1,2 +1,4 @@
-<a {{ $attributes->merge(['class' => 'text-xs cursor-pointer opacity-60 hover:opacity-100 hover:text-white z-50']) }}
-    href="https://github.com/coollabsio/coolify/releases/tag/v{{ config('version') }}">v{{ config('version') }}</a>
+<a {{ $attributes->merge(['class' => 'text-xs cursor-pointer opacity-90 hover:opacity-100 dark:hover:text-white hover:text-black']) }}
+    href="https://github.com/coollabsio/coolify/releases/tag/v{{ config('constants.coolify.version') }}" target="_blank">
+    v{{ config('constants.coolify.version') }}
+</a>

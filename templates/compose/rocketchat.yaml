@@ -1,0 +1,49 @@
+# documentation: https://github.com/RocketChat/Rocket.Chat
+# slogan: Self-hosted, secure and highly customizable open-source communication platform for organizations with sophisticated security and privacy concerns.
+# tags: rocketchat,chat,communication,privacy,mongodb,open,source
+# logo: svgs/rocketchat.svg
+# port: 3000
+
+services:
+  rocketchat:
+    image: registry.rocket.chat/rocketchat/rocket.chat:latest
+    environment:
+      - SERVICE_FQDN_ROCKETCHAT_3000
+      - MONGO_URL=mongodb://${MONGODB_ADVERTISED_HOSTNAME:-mongodb}:${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}/${MONGODB_DATABASE:-rocketchat}?replicaSet=${MONGODB_REPLICA_SET_NAME:-rs0}
+      - MONGO_OPLOG_URL=mongodb://${MONGODB_ADVERTISED_HOSTNAME:-mongodb}:${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}/local?replicaSet=${MONGODB_REPLICA_SET_NAME:-rs0}
+      - ROOT_URL=$SERVICE_FQDN_ROCKETCHAT
+      - DEPLOY_METHOD=docker
+      - REG_TOKEN=$REG_TOKEN
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "--eval",
+          "const http = require('http'); const options = { host: '0.0.0.0', port: 3000, timeout: 2000, path: '/health' }; const healthCheck = http.request(options, (res) => { console.log('HEALTHCHECK STATUS:', res.statusCode); if (res.statusCode == 200) { process.exit(0); } else { process.exit(1); } }); healthCheck.on('error', function (err) { console.error('ERROR'); process.exit(1); }); healthCheck.end();",
+        ]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  mongodb:
+    image: docker.io/bitnami/mongodb:5.0
+    volumes:
+      - mongodb_data:/bitnami/mongodb
+    environment:
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_REPLICA_SET_NAME=${MONGODB_REPLICA_SET_NAME:-rs0}
+      - MONGODB_PORT_NUMBER=${MONGODB_PORT_NUMBER:-27017}
+      - MONGODB_INITIAL_PRIMARY_HOST=${MONGODB_INITIAL_PRIMARY_HOST:-mongodb}
+      - MONGODB_INITIAL_PRIMARY_PORT_NUMBER=${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}
+      - MONGODB_ADVERTISED_HOSTNAME=${MONGODB_ADVERTISED_HOSTNAME:-mongodb}
+      - MONGODB_ENABLE_JOURNAL=${MONGODB_ENABLE_JOURNAL:-true}
+      - ALLOW_EMPTY_PASSWORD=${ALLOW_EMPTY_PASSWORD:-yes}
+    healthcheck:
+      test: echo 'db.stats().ok' | mongo localhost:27017/test --quiet
+      interval: 2s
+      timeout: 10s
+      retries: 15

@@ -19,13 +19,25 @@ class TeamInvitation extends Model
     {
         return $this->belongsTo(Team::class);
     }
-    public function isValid() {
+
+    public static function ownedByCurrentTeam()
+    {
+        return TeamInvitation::whereTeamId(currentTeam()->id);
+    }
+
+    public function isValid()
+    {
         $createdAt = $this->created_at;
-        $diff = $createdAt->diffInMinutes(now());
-        if ($diff <= config('constants.invitation.link.expiration')) {
+        $diff = $createdAt->diffInDays(now());
+        if ($diff <= config('constants.invitation.link.expiration_days')) {
             return true;
         } else {
             $this->delete();
+            $user = User::whereEmail($this->email)->first();
+            if (filled($user)) {
+                $user->deleteIfNotVerifiedAndForcePasswordReset();
+            }
+
             return false;
         }
     }

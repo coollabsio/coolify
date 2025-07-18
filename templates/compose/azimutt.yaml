@@ -1,0 +1,103 @@
+# ignore: true
+# documentation: https://docs.azimutt.app/
+# slogan: Next-Gen ERD: Design, Explore, Document and Analyze your database.
+# tags: erd, entity-relationship diagram, database tool, database schema, diagram
+# logo: svgs/azimutt.png
+# port: 4000
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-azimutt}
+    volumes:
+      - azimutt-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    volumes:
+      - azimutt-minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  createbuckets:
+    image: minio/mc:latest
+    restart: no
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        /usr/bin/mc config host add myminio http://minio:9000 $SERVICE_USER_MINIO $SERVICE_PASSWORD_MINIO;
+        /usr/bin/mc mb -p myminio/azimutt;
+        /usr/bin/mc policy download myminio/azimutt;
+        exit 0;
+      "
+
+  smtp:
+    image: bytemark/smtp:latest
+    platform: linux/amd64
+    environment:
+      - SERVICE_FQDN_SMTP
+      - RELAY_HOST=$SERVICE_FQDN_SMTP
+      - RELAY_PORT=${RELAY_PORT:-587}
+      - RELAY_USERNAME=$SERVICE_EMAIL_SMTP
+      - RELAY_PASSWORD=$SERVICE_PASSWORD_SMTP
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/25' || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  backend:
+    container_name: azimutt-backend
+    platform: linux/amd64
+    image: ghcr.io/azimuttapp/azimutt:main
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_AZIMUTT_4000
+      - SENTRY=false
+      - PHX_SERVER=true
+      - PHX_HOST=$SERVICE_URL_AZIMUTT
+      - PORT=${PORT:-4000}
+      - DATABASE_URL=ecto://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres/${POSTGRES_DB:-azimutt}
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_AZIMUTT}
+      - FILE_STORAGE_ADAPTER=${FILE_STORAGE_ADAPTER:-s3}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-true}
+      - SKIP_ONBOARDING_FUNNEL=${SKIP_ONBOARDING_FUNNEL:-true}
+      - SKIP_EMAIL_CONFIRMATION=${SKIP_EMAIL_CONFIRMATION:-true}
+      - PUBLIC_SITE=${PUBLIC_SITE:-false}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_HOST=${S3_HOST}
+      - S3_KEY_ID=${S3_KEY_ID}
+      - S3_KEY_SECRET=${S3_KEY_SECRET}
+      - EMAIL_ADAPTER=${EMAIL_ADAPTER:-smtp}
+      - SMTP_RELAY=$SERVICE_FQDN_SMTP
+      - SMTP_USERNAME=$SERVICE_EMAIL_SMTP
+      - SMTP_PASSWORD=$SERVICE_PASSWORD_SMTP
+      - SMTP_PORT=${SMTP_PORT:-587}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="Layer_2" data-name="Layer 2" viewBox="0 0 503.18 149.2">
+  <defs>
+    <style>
+      .cls-1 {
+        letter-spacing: -.03em;
+      }
+
+      .cls-1, .cls-2 {
+        fill: #fff;
+        font-family: Aileron-Black, Aileron;
+        font-size: 67.77px;
+        font-weight: 800;
+      }
+
+      .cls-2 {
+        letter-spacing: -.03em;
+      }
+
+      .cls-3 {
+        fill: #ed1c24;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <text class="cls-2"><tspan x="93.62" y="115.07">Networks</tspan></text>
+    <text class="cls-1" transform="translate(94.99 61.31)"><tspan x="0" y="0">Fractal</tspan></text>
+    <g id="_Group_" data-name="&amp;lt;Group&amp;gt;">
+      <path class="cls-3" d="m15.81,91.71l-7.51,4.22c-3.1,1.73-5.04,4.99-5.08,8.53l-.12,8.6c-.05,3.82,4.05,6.27,7.39,4.42l7.51-4.22c3.1-1.73,5.04-4.99,5.08-8.53l.12-8.6c.05-3.82-4.05-6.27-7.39-4.42Z"/>
+      <path class="cls-3" d="m36.24,49.91l-27.53,15.41c-3.1,1.73-5.04,4.99-5.08,8.53l-.12,8.6c-.05,3.82,4.05,6.27,7.39,4.42l27.53-15.41c3.1-1.73,5.04-4.99,5.08-8.53l.12-8.6c.05-3.82-4.05-6.27-7.39-4.42Z"/>
+      <path class="cls-3" d="m56.68,8.1L9.12,34.73c-3.1,1.73-5.04,4.99-5.08,8.53l-.12,8.6c-.05,3.82,4.05,6.27,7.39,4.42l47.56-26.63c3.1-1.73,5.04-4.99,5.08-8.53l.12-8.6c.05-3.82-4.05-6.27-7.39-4.42Z"/>
+    </g>
+  </g>
+<style xmlns="" class="darkreader darkreader--fallback">html, body, body :not(iframe) {
+    background-color: #181a1b !important;
+    border-color: #776e62 !important;
+    color: #e8e6e3 !important;
+}
+div[style*="background-color: rgb(135, 135, 135)"] {
+    background-color: #878787 !important;
+}</style></svg>

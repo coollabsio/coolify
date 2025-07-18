@@ -1,41 +1,47 @@
 <x-layout>
-    <div class="flex items-start gap-2">
+    <x-slot:title>
+        Sources | Coolify
+    </x-slot>
+    <div class="flex items-center gap-2">
         <h1>Sources</h1>
-        <a class="text-white hover:no-underline" href="{{ route('source.new') }}">
-            <x-forms.button class="btn">+ Add</x-forms.button>
-        </a>
+        <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
+            <livewire:source.github.create />
+        </x-modal-input>
     </div>
-    <div class="subtitle ">All Sources</div>
-    <div class="grid gap-2 lg:grid-cols-2">
+    <div class="subtitle">Git sources for your applications.</div>
+    <div class="grid gap-4 lg:grid-cols-2">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
-                <a  class="flex gap-4 text-center hover:no-underline box group"
+                <a class="flex gap-2 text-center hover:no-underline box group"
                     href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
-                    <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
-                    <div class="text-left group-hover:text-white">
-                        <div>{{ $source->name }}</div>
+                    {{-- <x-git-icon class="dark:text-white w-8 h-8 mt-1" git="{{ $source->getMorphClass() }}" /> --}}
+                    <div class="text-left dark:group-hover:text-white flex flex-col justify-center mx-6">
+                        <div class="box-title">{{ $source->name }}</div>
                         @if (is_null($source->app_id))
-                            <span class="text-error">Configuration is not finished</span>
+                            <span class="box-description text-error! ">Configuration is not finished.</span>
+                        @else
+                            @if ($source->organization)
+                                <span class="box-description">Organization: {{ $source->organization }}</span>
+                            @endif
                         @endif
                     </div>
                 </a>
             @endif
-            @if ($source->getMorphClass() === 'App\Models\GitlabApp')
-                <a  class="flex gap-4 text-center hover:no-underline box group"
+            {{-- @if ($source->getMorphClass() === 'App\Models\GitlabApp')
+                <a class="flex gap-4 text-center hover:no-underline box group"
                     href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
-                    <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
-                    <div class="text-left group-hover:text-white">
+                    <x-git-icon class="dark:text-white w-8 h-8" git="{{ $source->getMorphClass() }}" />
+                    <div class="text-left dark:group-hover:text-white">
                         <div>{{ $source->name }}</div>
                         @if (is_null($source->app_id))
                             <span class="text-error">Configuration is not finished</span>
                         @endif
                     </div>
                 </a>
-            @endif
+            @endif --}}
         @empty
             <div>
                 <div>No sources found.</div>
-                <x-use-magic-bar link="/source/new" />
             </div>
         @endforelse
     </div>

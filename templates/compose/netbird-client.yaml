@@ -1,0 +1,26 @@
+# documentation: https://docs.netbird.io/how-to/examples#net-bird-client-in-docker
+# slogan: Connect your devices into a secure WireGuard®-based overlay network with SSO, MFA and granular access controls.
+# tags: wireguard, mesh-networks, vpn, zero-trust-network-access, open source
+# logo: svgs/netbird.png
+
+services:
+  netbird-client:
+    image: 'netbirdio/netbird:latest'
+    environment:
+      - 'NB_SETUP_KEY=${NB_SETUP_KEY}'
+      - 'NB_ENABLE_ROSENPASS=${NB_ENABLE_ROSENPASS:-false}'
+      - 'NB_ENABLE_EXPERIMENTAL_LAZY_CONN=${NB_ENABLE_EXPERIMENTAL_LAZY_CONN:-false}'
+    volumes:
+      - 'netbird-client:/etc/netbird'
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+    healthcheck:
+      test:
+        - CMD
+        - netbird
+        - 'version'
+      interval: 5s
+      timeout: 20s
+      retries: 10

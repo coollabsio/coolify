@@ -11,12 +11,18 @@ services:
       - SONAR_JDBC_URL=jdbc:postgresql://postgresql:5432/${POSTGRES_DB:-sonar}
       - SONAR_JDBC_USERNAME=$SERVICE_USER_POSTGRES
       - SONAR_JDBC_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
     volumes:
       - sonarqube-data:/opt/sonarqube
       - sonarqube-conf:/opt/sonarqube/conf
       - sonarqube-extensions:/opt/sonarqube/extensions
       - sonarqube-logs:/opt/sonarqube/logs
       - sonarqube-bundled-plugins:/opt/sonarqube/lib/bundled-plugins
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9000"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
     depends_on:
       postgresql:
         condition: service_healthy

@@ -1,0 +1,61 @@
+# documentation: https://docs.nextcloud.com
+# slogan: NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.
+# tags: cloud, collaboration, communication, filestorage, data
+# logo: svgs/nextcloud.svg
+# port: 80
+
+services:
+  nextcloud:
+    image: lscr.io/linuxserver/nextcloud:latest
+    environment:
+      - SERVICE_FQDN_NEXTCLOUD_80
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Paris}
+      - MYSQL_DATABASE=${MARIADB_DATABASE:-nextcloud}
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+      - MYSQL_HOST=nextcloud-db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - nextcloud-config:/config
+      - nextcloud-data:/data
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  nextcloud-db:
+    image: mariadb:11
+    volumes:
+      - nextcloud-mariadb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_ROOT}
+      - MYSQL_DATABASE=${MARIADB_DATABASE:-nextcloud}
+      - MYSQL_USER=${SERVICE_USER_MARIADB}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MARIADB}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: "redis:7.4-alpine"
+    volumes:
+      - "nextcloud-redis-data:/data"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20

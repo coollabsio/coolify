@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::table('environment_variables', function (Blueprint $table) {
             $table->foreignId('service_id')->nullable();
-
         });
     }
 

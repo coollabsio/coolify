@@ -1,0 +1,58 @@
+# documentation: https://faradaysec.com/
+# slogan: Faraday is a powerful, open-source, web-based vulnerability management tool.
+# tags: vulnerability, management, tool
+# logo: svgs/faraday.png
+# port: 5985
+
+services:
+  postgresql:
+    image: postgres:latest
+    volumes:
+      - faraday-db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRES_DB:-faraday}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}'
+      interval: 15s
+      timeout: 10s
+      retries: 15
+  redis:
+    image: redis:alpine
+    command: '--save 60 1 --loglevel warning'
+    volumes:
+      - redis:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli ping | grep PONG'
+      interval: 15s
+      timeout: 10s
+      retries: 15
+
+  faraday:
+    image: faradaysec/faraday:latest
+    entrypoint: /entrypoint.sh
+    environment:
+      - SERVICE_FQDN_FARADAY_5985
+      - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - PGSQL_USER=${SERVICE_USER_POSTGRESQL}
+      - PGSQL_PASSWD=${SERVICE_PASSWORD_POSTGRESQL}
+      - PGSQL_DBNAME=${POSTGRES_DB}
+      - PGSQL_HOST=postgresql
+      - REDIS_SERVER=redis
+    volumes:
+      - faraday:/home/faraday/.faraday:rw
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5985"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

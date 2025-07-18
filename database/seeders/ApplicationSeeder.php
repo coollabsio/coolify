@@ -19,7 +19,7 @@ class ApplicationSeeder extends Seeder
             'fqdn' => 'http://nodejs.127.0.0.1.sslip.io',
             'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
-            'git_branch' => 'main',
+            'git_branch' => 'v4.x',
             'base_directory' => '/nodejs',
             'build_pack' => 'nixpacks',
             'ports_exposes' => '3000',
@@ -27,14 +27,14 @@ class ApplicationSeeder extends Seeder
             'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
             'source_id' => 1,
-            'source_type' => GithubApp::class
+            'source_type' => GithubApp::class,
         ]);
         Application::create([
             'name' => 'Dockerfile Example',
             'fqdn' => 'http://dockerfile.127.0.0.1.sslip.io',
             'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
-            'git_branch' => 'main',
+            'git_branch' => 'v4.x',
             'base_directory' => '/dockerfile',
             'build_pack' => 'dockerfile',
             'ports_exposes' => '80',
@@ -42,13 +42,13 @@ class ApplicationSeeder extends Seeder
             'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
             'source_id' => 0,
-            'source_type' => GithubApp::class
+            'source_type' => GithubApp::class,
         ]);
         Application::create([
             'name' => 'Pure Dockerfile Example',
             'fqdn' => 'http://pure-dockerfile.127.0.0.1.sslip.io',
             'git_repository' => 'coollabsio/coolify',
-            'git_branch' => 'main',
+            'git_branch' => 'v4.x',
             'git_commit_sha' => 'HEAD',
             'build_pack' => 'dockerfile',
             'ports_exposes' => '80',
@@ -60,7 +60,7 @@ class ApplicationSeeder extends Seeder
             'dockerfile' => 'FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-'
+',
         ]);
     }
 }

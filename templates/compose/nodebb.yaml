@@ -1,0 +1,54 @@
+# documentation: https://docs.nodebb.org/
+# slogan: A next-generation discussion platform.
+# tags: communication, forums, discussion
+# logo: svgs/nodebb.svg
+# port: 4567
+
+services:
+  nodebb:
+    image: ghcr.io/nodebb/nodebb:latest
+    environment:
+      - SERVICE_FQDN_NODEBB_4567
+    volumes:
+      - nodebb_build:/usr/src/app/build
+      - nodebb_uploads:/usr/src/app/public/uploads
+      - nodebb_config:/opt/config
+    command: >
+      /bin/bash -c "
+      cat > /usr/src/app/setup.json <<EOL
+      {
+          \"defaults\": {
+              \"postgres\": {
+                  \"host\": \"postgres\",
+                  \"port\": 5432,
+                  \"database\": \"nodebb\",
+                  \"username\": \"${SERVICE_USER_POSTGRES}\",
+                  \"password\": \"${SERVICE_PASSWORD_POSTGRES}\"
+              }
+          }
+      }
+      EOL
+      && tini -- entrypoint.sh
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/4567' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+
+  postgres:
+    image: postgres:17.2-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=nodebb
+    volumes:
+      - nodebb_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

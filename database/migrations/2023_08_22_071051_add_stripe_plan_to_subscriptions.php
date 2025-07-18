@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::table('subscriptions', function (Blueprint $table) {
             $table->string('stripe_plan_id')->nullable()->after('stripe_cancel_at_period_end');
-
         });
     }
 

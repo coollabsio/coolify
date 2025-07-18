@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', null),
+    'default' => env('MAIL_MAILER', 'array'),
 
     /*
     |--------------------------------------------------------------------------
@@ -44,8 +44,8 @@ return [
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
-        'resend'=> [
-            'transport' => 'resend'
+        'resend' => [
+            'transport' => 'resend',
         ],
         'ses' => [
             'transport' => 'ses',

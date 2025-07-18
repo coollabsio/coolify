@@ -19,14 +19,20 @@ class Textarea extends Component
         public ?string $value = null,
         public ?string $label = null,
         public ?string $placeholder = null,
-        public bool    $required = false,
-        public bool    $disabled = false,
-        public bool    $readonly = false,
+        public ?string $monacoEditorLanguage = '',
+        public bool $useMonacoEditor = false,
+        public bool $required = false,
+        public bool $disabled = false,
+        public bool $readonly = false,
+        public bool $allowTab = false,
+        public bool $spellcheck = false,
         public ?string $helper = null,
-        public bool    $realtimeValidation = false,
-        public bool    $allowToPeak = true,
-        public string  $defaultClass = "textarea leading-normal bg-coolgray-100 rounded text-white w-full scrollbar disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50",
-        public string  $defaultClassInput = "input input-sm bg-coolgray-100 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+        public bool $realtimeValidation = false,
+        public bool $allowToPeak = true,
+        public string $defaultClass = 'input scrollbar font-mono',
+        public string $defaultClassInput = 'input',
+        public ?int $minlength = null,
+        public ?int $maxlength = null,
     ) {
         //
     }
@@ -36,8 +42,12 @@ class Textarea extends Component
      */
     public function render(): View|Closure|string
     {
-        if (is_null($this->id)) $this->id = new Cuid2(7);
-        if (is_null($this->name)) $this->name = $this->id;
+        if (is_null($this->id)) {
+            $this->id = new Cuid2;
+        }
+        if (is_null($this->name)) {
+            $this->name = $this->id;
+        }
 
         // $this->label = Str::title($this->label);
         return view('components.forms.textarea');

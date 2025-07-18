@@ -1,94 +1,51 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "./fonts.css" layer(base);
 
-html {
-    @apply text-neutral-400;
+@import "tailwindcss";
+
+@import "./utilities.css";
+
+@plugin 'tailwind-scrollbar';
+@plugin '@tailwindcss/typography';
+@plugin '@tailwindcss/forms';
+
+
+@source '../../storage/framework/views/*.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --font-sans: Inter, sans-serif;
+
+    --color-base: #101010;
+    --color-warning: #fcd452;
+    --color-success: #16a34a;
+    --color-error: #dc2626;
+    --color-coollabs: #6b16ed;
+    --color-coollabs-100: #7317ff;
+    --color-coolgray-100: #181818;
+    --color-coolgray-200: #202020;
+    --color-coolgray-300: #242424;
+    --color-coolgray-400: #282828;
+    --color-coolgray-500: #323232;
 }
 
-body {
-    @apply text-sm antialiased scrollbar;
-}
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
 
-button[isError] {
-    @apply bg-red-600 hover:bg-red-700;
-}
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
 
-button[isHighlighted] {
-    @apply bg-coollabs hover:bg-coollabs-100;
-}
-
-.scrollbar {
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
-}
-
-.main {
-    @apply pt-4 pl-24 pr-10 lg:pr-32 lg:pl-44;
-}
-
-.custom-modal {
-    @apply flex flex-col gap-2 px-8 py-4 border bg-base-100 border-coolgray-200;
-}
-
-.label-text,
-label {
-    @apply text-neutral-400;
-}
-
-.navbar-main {
-    @apply flex items-end gap-6 py-2 border-b-2 border-solid border-coolgray-200;
-}
-
-.loading {
-    @apply w-4 text-warning;
-}
-
-h1 {
-    @apply text-3xl font-bold text-white;
-}
-
-h2 {
-    @apply text-2xl font-bold text-white;
-}
-
-h3 {
-    @apply text-xl font-bold text-white;
-}
-
-h4 {
-    @apply text-base font-bold text-white;
-}
-
-a {
-    @apply text-neutral-400 hover:text-white link link-hover hover:bg-transparent;
-}
-
-.kbd-custom {
-    @apply px-2 text-xs border border-dashed rounded border-neutral-700 text-warning;
-}
-
-.icon {
-    @apply w-6 h-6;
-}
-
-.icon:hover {
-    @apply text-white;
-}
-
-.box {
-    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] bg-coolgray-100 hover:bg-coollabs-100 hover:text-white hover:no-underline;
-}
-
-.box-without-bg {
-    @apply flex p-2 transition-colors hover:text-white hover:no-underline min-h-[4rem];
-}
-
-.description {
-    @apply text-xs font-bold text-neutral-500 group-hover:text-white;
-}
-
-.lds-heart {
-    animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-coolgray-200, currentcolor);
+    }
 }
 
 @keyframes lds-heart {
@@ -117,16 +74,56 @@ a {
     }
 }
 
-.bg-coollabs-gradient {
-    @apply text-transparent text-white bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
+/*
+* Base styles
+*/
+html,
+body {
+    @apply w-full min-h-full bg-neutral-50 dark:bg-base dark:text-neutral-400;
 }
 
-.text-helper {
-    @apply inline-block font-bold text-warning;
+body {
+    @apply min-h-screen text-sm antialiased scrollbar;
+}
+
+option {
+    @apply dark:text-white dark:bg-coolgray-100;
+}
+
+button[isError]:not(:disabled) {
+    @apply text-white bg-red-600 hover:bg-red-700;
+}
+
+button[isHighlighted]:not(:disabled) {
+    @apply text-white bg-coollabs hover:bg-coollabs-100;
+}
+
+h1 {
+    @apply text-3xl font-bold dark:text-white;
+}
+
+h2 {
+    @apply text-xl font-bold dark:text-white;
+}
+
+h3 {
+    @apply text-lg font-bold dark:text-white;
+}
+
+h4 {
+    @apply text-base font-bold dark:text-white;
+}
+
+a {
+    @apply hover:text-black dark:hover:text-white;
+}
+
+label {
+    @apply dark:text-neutral-400;
 }
 
 table {
-    @apply min-w-full divide-y divide-coolgray-200;
+    @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300;
 }
 
 thead {
@@ -134,19 +131,19 @@ thead {
 }
 
 tbody {
-    @apply divide-y divide-coolgray-200;
+    @apply divide-y dark:divide-coolgray-200 divide-neutral-300;
 }
 
 tr {
-    @apply text-neutral-400;
+    @apply text-black dark:text-neutral-400 dark:hover:bg-black hover:bg-neutral-200;
 }
 
 tr th {
-    @apply px-3 py-3.5 text-left text-white;
+    @apply px-3 py-3.5 text-left text-black dark:text-white;
 }
 
 tr th:first-child {
-    @apply py-3.5 pl-4 pr-3 sm:pl-6;
+    @apply py-3.5 pr-3 pl-4 sm:pl-6;
 }
 
 tr td {
@@ -154,24 +151,20 @@ tr td {
 }
 
 tr td:first-child {
-    @apply pl-4 pr-3 font-bold sm:pl-6;
+    @apply pr-3 pl-4 font-bold sm:pl-6;
 }
 
-.buyme {
-    @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-sm bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200 hover:no-underline;
+section {
+    @apply mb-12;
 }
 
-.subtitle {
-    @apply pt-2 pb-10;
+/*
+* Utility classes
+*/
+.input[type="password"] {
+    @apply pr-[2.4rem];
 }
 
-.fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-100 overflow-y-auto scrollbar pb-4;
-}
-
-input.input-sm {
-    @apply pr-10;
-}
-option{
-    @apply text-white;
+.lds-heart {
+    animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }

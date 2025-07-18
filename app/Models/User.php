@@ -4,31 +4,51 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
-use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'User model',
+    type: 'object',
+    properties: [
+        'id' => ['type' => 'integer', 'description' => 'The user identifier in the database.'],
+        'name' => ['type' => 'string', 'description' => 'The user name.'],
+        'email' => ['type' => 'string', 'description' => 'The user email.'],
+        'email_verified_at' => ['type' => 'string', 'description' => 'The date when the user email was verified.'],
+        'created_at' => ['type' => 'string', 'description' => 'The date when the user was created.'],
+        'updated_at' => ['type' => 'string', 'description' => 'The date when the user was updated.'],
+        'two_factor_confirmed_at' => ['type' => 'string', 'description' => 'The date when the user two factor was confirmed.'],
+        'force_password_reset' => ['type' => 'boolean', 'description' => 'The flag to force the user to reset the password.'],
+        'marketing_emails' => ['type' => 'boolean', 'description' => 'The flag to receive marketing emails.'],
+    ],
+)]
 class User extends Authenticatable implements SendsEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     protected $guarded = [];
+
     protected $hidden = [
         'password',
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
     ];
+
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
@@ -38,11 +58,12 @@ class User extends Authenticatable implements SendsEmail
     protected static function boot()
     {
         parent::boot();
+
         static::created(function (User $user) {
             $team = [
-                'name' => $user->name . "'s Team",
+                'name' => $user->name."'s Team",
                 'personal_team' => true,
-                'show_boarding' => true
+                'show_boarding' => true,
             ];
             if ($user->id === 0) {
                 $team['id'] = 0;
@@ -51,13 +72,101 @@ class User extends Authenticatable implements SendsEmail
             $new_team = Team::create($team);
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
+
+        static::deleting(function (User $user) {
+            \DB::transaction(function () use ($user) {
+                $teams = $user->teams;
+                foreach ($teams as $team) {
+                    $user_alone_in_team = $team->members->count() === 1;
+
+                    // Prevent deletion if user is alone in root team
+                    if ($team->id === 0 && $user_alone_in_team) {
+                        throw new \Exception('User is alone in the root team, cannot delete');
+                    }
+
+                    if ($user_alone_in_team) {
+                        static::finalizeTeamDeletion($user, $team);
+                        // Delete any pending team invitations for this user
+                        TeamInvitation::whereEmail($user->email)->delete();
+
+                        continue;
+                    }
+
+                    // Load the user's role for this team
+                    $userRole = $team->members->where('id', $user->id)->first()?->pivot?->role;
+
+                    if ($userRole === 'owner') {
+                        $found_other_owner_or_admin = $team->members->filter(function ($member) use ($user) {
+                            return ($member->pivot->role === 'owner' || $member->pivot->role === 'admin') && $member->id !== $user->id;
+                        })->first();
+
+                        if ($found_other_owner_or_admin) {
+                            $team->members()->detach($user->id);
+
+                            continue;
+                        } else {
+                            $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
+                                return $member->pivot->role === 'member';
+                            })->first();
+
+                            if ($found_other_member_who_is_not_owner) {
+                                $found_other_member_who_is_not_owner->pivot->role = 'owner';
+                                $found_other_member_who_is_not_owner->pivot->save();
+                                $team->members()->detach($user->id);
+                            } else {
+                                static::finalizeTeamDeletion($user, $team);
+                            }
+
+                            continue;
+                        }
+                    } else {
+                        $team->members()->detach($user->id);
+                    }
+                }
+            });
+        });
     }
+
+    /**
+     * Finalize team deletion by cleaning up all associated resources
+     */
+    private static function finalizeTeamDeletion(User $user, Team $team)
+    {
+        $servers = $team->servers;
+        foreach ($servers as $server) {
+            $resources = $server->definedResources();
+            foreach ($resources as $resource) {
+                $resource->forceDelete();
+            }
+            $server->forceDelete();
+        }
+
+        $projects = $team->projects;
+        foreach ($projects as $project) {
+            $project->forceDelete();
+        }
+
+        $team->members()->detach($user->id);
+        $team->delete();
+    }
+
+    /**
+     * Delete the user if they are not verified and have a force password reset.
+     * This is used to clean up users that have been invited, did not accept the invitation (and did not verify their email and have a force password reset).
+     */
+    public function deleteIfNotVerifiedAndForcePasswordReset()
+    {
+        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
+            $this->delete();
+        }
+    }
+
     public function recreate_personal_team()
     {
         $team = [
-            'name' => $this->name . "'s Team",
+            'name' => $this->name."'s Team",
             'personal_team' => true,
-            'show_boarding' => true
+            'show_boarding' => true,
         ];
         if ($this->id === 0) {
             $team['id'] = 0;
@@ -65,9 +174,11 @@ class User extends Authenticatable implements SendsEmail
         }
         $new_team = Team::create($team);
         $this->teams()->attach($new_team, ['role' => 'owner']);
+
         return $new_team;
     }
-    public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null)
+
+    public function createToken(string $name, array $abilities = ['*'], ?DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(
             '%s%s%s',
@@ -81,24 +192,25 @@ class User extends Authenticatable implements SendsEmail
             'token' => hash('sha256', $plainTextToken),
             'abilities' => $abilities,
             'expires_at' => $expiresAt,
-            'team_id' => session('currentTeam')->id
+            'team_id' => session('currentTeam')->id,
         ]);
 
-        return new NewAccessToken($token, $token->getKey() . '|' . $plainTextToken);
+        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
     }
+
     public function teams()
     {
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
-    public function getRecepients($notification)
+    public function getRecipients(): array
     {
-        return $this->email;
+        return [$this->email];
     }
 
     public function sendVerificationEmail()
     {
-        $mail = new MailMessage();
+        $mail = new MailMessage;
         $url = Url::temporarySignedRoute(
             'verify.verify',
             Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
@@ -113,6 +225,7 @@ class User extends Authenticatable implements SendsEmail
         $mail->subject('Coolify: Verify your email.');
         send_user_an_email($mail, $this->email);
     }
+
     public function sendPasswordResetNotification($token): void
     {
         $this?->notify(new TransactionalEmailsResetPassword($token));
@@ -127,9 +240,15 @@ class User extends Authenticatable implements SendsEmail
     {
         return $this->role() === 'owner';
     }
+
+    public function isMember()
+    {
+        return $this->role() === 'member';
+    }
+
     public function isAdminFromSession()
     {
-        if (auth()->user()->id === 0) {
+        if (Auth::id() === 0) {
             return true;
         }
         $teams = $this->teams()->get();
@@ -143,33 +262,41 @@ class User extends Authenticatable implements SendsEmail
         }
         $team = $teams->where('id', session('currentTeam')->id)->first();
         $role = data_get($team, 'pivot.role');
+
         return $role === 'admin' || $role === 'owner';
     }
 
     public function isInstanceAdmin()
     {
-        $found_root_team = auth()->user()->teams->filter(function ($team) {
+        $found_root_team = Auth::user()->teams->filter(function ($team) {
             if ($team->id == 0) {
+                if (! Auth::user()->isAdmin()) {
+                    return false;
+                }
+
                 return true;
             }
+
             return false;
         });
+
         return $found_root_team->count() > 0;
     }
 
     public function currentTeam()
     {
-        return Cache::remember('team:' . auth()->user()->id, 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id')) && auth()->user()->teams->count() > 0){
-                return auth()->user()->teams[0];
+        return Cache::remember('team:'.Auth::id(), 3600, function () {
+            if (is_null(data_get(session('currentTeam'), 'id')) && Auth::user()->teams->count() > 0) {
+                return Auth::user()->teams[0];
             }
+
             return Team::find(session('currentTeam')->id);
         });
     }
 
     public function otherTeams()
     {
-        return auth()->user()->teams->filter(function ($team) {
+        return Auth::user()->teams->filter(function ($team) {
             return $team->id != currentTeam()->id;
         });
     }
@@ -179,6 +306,8 @@ class User extends Authenticatable implements SendsEmail
         if (data_get($this, 'pivot')) {
             return $this->pivot->role;
         }
-        return auth()->user()->teams->where('id', currentTeam()->id)->first()->pivot->role;
+        $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
+
+        return data_get($user, 'pivot.role');
     }
 }

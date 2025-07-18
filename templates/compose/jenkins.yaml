@@ -1,0 +1,20 @@
+# documentation: https://www.jenkins.io/doc/
+# slogan: Jenkins is an open source automation server, Jenkins provides hundreds of plugins to support building, deploying and automating any project.
+# tags: jenkins, automation, open-source
+# logo: svgs/jenkins.svg
+# port: 8080
+
+services:
+  jenkins:
+    image: jenkins/jenkins:latest
+    environment:
+      - SERVICE_FQDN_JENKINS_8080
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

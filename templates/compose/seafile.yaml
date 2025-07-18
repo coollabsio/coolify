@@ -1,0 +1,68 @@
+# documentation: https://manual.seafile.com
+# slogan: Open source cloud storage system for file sync, share and document collaboration
+# tags: file-manager,file-sharing,storage
+# logo: svgs/seafile.svg
+# port: 80
+
+services:
+  seafile:
+    image: seafileltd/seafile-mc:12.0-latest
+    volumes:
+      - seafile-data:/shared
+    environment:
+      - SERVICE_FQDN_SEAFILE_80
+      - SEAFILE_SERVER_HOSTNAME=${SERVICE_URL_SEAFILE_80}
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_ROOT_PASSWD=${SERVICE_PASSWORD_MYSQLROOT}
+      - DB_USER=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - SEAFILE_MYSQL_DB_CCNET_DB_NAME=${SEAFILE_MYSQL_DB_CCNET_DB_NAME:-ccnet_db}
+      - SEAFILE_MYSQL_DB_SEAFILE_DB_NAME=${SEAFILE_MYSQL_DB_SEAFILE_DB_NAME:-seafile_db}
+      - SEAFILE_MYSQL_DB_SEAHUB_DB_NAME=${SEAFILE_MYSQL_DB_SEAHUB_DB_NAME:-seahub_db}
+      - TIME_ZONE=${TIME_ZONE:-UTC}
+      - INIT_SEAFILE_ADMIN_EMAIL=${INIT_SEAFILE_ADMIN_EMAIL:-test@example.com}
+      - INIT_SEAFILE_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - SEAFILE_SERVER_PROTOCOL=${SEAFILE_SERVER_PROTOCOL:-http}
+      - SITE_ROOT=${SITE_ROOT:-/}
+      - NON_ROOT=${NON_ROOT:-false}
+      - JWT_PRIVATE_KEY=${SERVICE_PASSWORD_64_JWT}
+      - SEAFILE_LOG_TO_STDOUT=${SEAFILE_LOG_TO_STDOUT:-true}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/api2/ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - seafile_mariadb_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-seafile-db}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  memcached:
+    image: memcached:latest
+    entrypoint: memcached -m 256
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'bash -c "echo version | (exec 3<>/dev/tcp/localhost/11211; cat >&3; timeout 0.5 cat <&3; exec 3<&-)"',
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10

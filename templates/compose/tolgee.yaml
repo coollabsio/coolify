@@ -1,0 +1,42 @@
+# documentation: https://tolgee.io/
+# slogan: Tolgee is a localization management platform for developers and translators.
+# tags: localization,translation,management,platform
+# logo: svgs/tolgee.svg
+# port: 8080
+
+services:
+  tolgee:
+    image: tolgee/tolgee
+    environment:
+      - SERVICE_FQDN_TOLGEE_8080
+      - TOLGEE_AUTHENTICATION_ENABLED=true
+      - TOLGEE_AUTHENTICATION_INITIAL_PASSWORD=$SERVICE_PASSWORD_TOLGEE
+      - TOLGEE_AUTHENTICATION_INITIAL_USERNAME=admin
+      - TOLGEE_AUTHENTICATION_JWT_SECRET=$SERVICE_PASSWORD_JWT
+      - TOLGEE_POSTGRES_AUTOSTART_ENABLED=false
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/${POSTGRES_DB:-tolgee}
+      - SPRING_DATASOURCE_USERNAME=${SERVICE_USER_POSTGRESQL}
+      - SPRING_DATASOURCE_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+    volumes:
+      - tolgee-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      postgresql:
+        condition: service_healthy
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - tolgee-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-tolgee}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

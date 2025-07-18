@@ -1,0 +1,27 @@
+# documentation: https://docs.getunleash.io
+# slogan: Open source feature flag management for enterprises.
+# tags: unleash,feature flags,feature toggles,ab testing,open source
+# logo: svgs/unleash.svg
+# port: 4242
+
+services:
+  unleash:
+    image: 'unleashorg/unleash-server:latest'
+    environment:
+      - SERVICE_FQDN_UNLEASH_4242
+      - UNLEASH_URL=${SERVICE_FQDN_UNLEASH}
+      - UNLEASH_DEFAULT_ADMIN_PASSWORD=${SERVICE_PASSWORD_UNLEASH}
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_SSL=${DATABASE_SSL:-false}
+      - LOG_LEVEL=warn
+      - INIT_FRONTEND_API_TOKENS=default:default:development.unleash-insecure-frontend-api-token
+      - INIT_CLIENT_API_TOKENS=default:development.unleash-insecure-api-token
+    command:
+      - node
+      - index.js
+    healthcheck:
+      test: 'wget --no-verbose --tries=1 --spider http://127.0.0.1:4242/health || exit 1'
+      interval: 1s
+      timeout: 1m
+      retries: 5
+      start_period: 15s

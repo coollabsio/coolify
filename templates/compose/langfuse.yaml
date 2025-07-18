@@ -1,0 +1,55 @@
+# documentation: https://langfuse.com/docs
+# slogan: Langfuse is an open-source LLM engineering platform that helps teams collaboratively debug, analyze, and iterate on their LLM applications.
+# tags: ai, qdrant, weaviate, langchain, openai, gpt, llm, lmops, langfuse, llmops, tracing, observation, metrics
+# logo: svgs/langfuse.png
+# port: 3000
+
+services:
+  langfuse:
+    image: langfuse/langfuse:2
+    environment:
+      - SERVICE_FQDN_LANGFUSE_3000
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse}
+      - DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse}
+      - SALT=$SERVICE_PASSWORD_SALT
+      - AUTH_DISABLE_SIGNUP=${AUTH_DISABLE_SIGNUP:-false}
+      - NEXTAUTH_URL=$SERVICE_FQDN_LANGFUSE_3000
+      - NEXTAUTH_SECRET=${SERVICE_BASE64_64_NEXTAUTHSECRET}
+      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
+      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
+      - HOSTNAME=${HOSTNAME:-0.0.0.0}
+      - LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME:-Admin}
+      - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-admin@example.com}
+      - LANGFUSE_INIT_USER_PASSWORD=${SERVICE_PASSWORD_LANGFUSE}
+      - LANGFUSE_INIT_ORG_ID=${LANGFUSE_INIT_ORG_ID:-my-org}
+      - LANGFUSE_INIT_ORG_NAME=${LANGFUSE_INIT_ORG_NAME:-My Org}
+      - LANGFUSE_INIT_PROJECT_ID=${LANGFUSE_INIT_PROJECT_ID:-my-project}
+      - LANGFUSE_INIT_PROJECT_NAME=${LANGFUSE_INIT_PROJECT_NAME:-My Project}
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - "-q"
+        - "--spider"
+        - "http://127.0.0.1:3000/api/public/health"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: "postgres:16-alpine"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-langfuse}
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+    volumes:
+      - "pg-data:/var/lib/postgresql/data"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 10

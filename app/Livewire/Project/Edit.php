@@ -3,53 +3,48 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Edit extends Component
 {
     public Project $project;
-    protected $rules = [
-        'project.name' => 'required|min:3|max:255',
-        'project.description' => 'nullable|string|max:255',
-    ];
-    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
 
-    public function saveKey($data)
+    #[Validate(['required', 'string', 'min:3', 'max:255'])]
+    public string $name;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $description = null;
+
+    public function mount(string $project_uuid)
     {
         try {
-            $found = $this->project->environment_variables()->where('key', $data['key'])->first();
-            if ($found) {
-                throw new \Exception('Variable already exists.');
-            }
-            $this->project->environment_variables()->create([
-                'key' => $data['key'],
-                'value' => $data['value'],
-                'is_multiline' => $data['is_multiline'],
-                'type' => 'project',
-                'team_id' => currentTeam()->id,
-            ]);
-            $this->project->refresh();
+            $this->project = Project::where('team_id', currentTeam()->id)->where('uuid', $project_uuid)->firstOrFail();
+            $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
-    public function mount()
+
+    public function syncData(bool $toModel = false)
     {
-        $projectUuid = request()->route('project_uuid');
-        $teamId = currentTeam()->id;
-        $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
+        if ($toModel) {
+            $this->validate();
+            $this->project->update([
+                'name' => $this->name,
+                'description' => $this->description,
+            ]);
+        } else {
+            $this->name = $this->project->name;
+            $this->description = $this->project->description;
         }
-        $this->project = $project;
     }
 
     public function submit()
     {
-        $this->validate();
         try {
-            $this->project->save();
-            $this->dispatch('saved');
+            $this->syncData(true);
+            $this->dispatch('success', 'Project updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

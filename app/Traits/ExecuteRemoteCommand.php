@@ -3,16 +3,18 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Str;
 
 trait ExecuteRemoteCommand
 {
     public ?string $save = null;
+
     public static int $batch_counter = 0;
+
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
@@ -34,29 +36,57 @@ trait ExecuteRemoteCommand
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $append = data_get($single_command, 'append', true);
             $this->save = data_get($single_command, 'save');
-
-            $remote_command = generateSshCommand($this->server, $command);
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
-                $output = Str::of($output)->trim();
-                if ($output->startsWith('╔')) {
-                    $output = "\n" . $output;
+            if ($this->server->isNonRoot()) {
+                if (str($command)->startsWith('docker exec')) {
+                    $command = str($command)->replace('docker exec', 'sudo docker exec');
+                } else {
+                    $command = parseLineForSudo($command, $this->server);
                 }
+            }
+            $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+                $output = str($output)->trim();
+                if ($output->startsWith('╔')) {
+                    $output = "\n".$output;
+                }
+
+                // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
+                $sanitized_output = sanitize_utf8_text($output);
+
                 $new_log_entry = [
                     'command' => remove_iip($command),
-                    'output' => remove_iip($output),
+                    'output' => remove_iip($sanitized_output),
                     'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
                     'timestamp' => Carbon::now('UTC'),
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-                if (!$this->application_deployment_queue->logs) {
+                if (! $this->application_deployment_queue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                    $new_log_entry['order'] = count($previous_logs) + 1;
+                    try {
+                        $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        // If existing logs are corrupted, start fresh
+                        $previous_logs = [];
+                        $new_log_entry['order'] = 1;
+                    }
+                    if (is_array($previous_logs)) {
+                        $new_log_entry['order'] = count($previous_logs) + 1;
+                    } else {
+                        $previous_logs = [];
+                        $new_log_entry['order'] = 1;
+                    }
                 }
                 $previous_logs[] = $new_log_entry;
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+
+                try {
+                    $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    // If JSON encoding still fails, use fallback with invalid sequences replacement
+                    $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+
                 $this->application_deployment_queue->save();
 
                 if ($this->save) {
@@ -64,10 +94,10 @@ trait ExecuteRemoteCommand
                         data_set($this->saved_outputs, $this->save, str());
                     }
                     if ($append) {
-                        $this->saved_outputs[$this->save] .= str($output)->trim();
+                        $this->saved_outputs[$this->save] .= str($sanitized_output)->trim();
                         $this->saved_outputs[$this->save] = str($this->saved_outputs[$this->save]);
                     } else {
-                        $this->saved_outputs[$this->save] = str($output)->trim();
+                        $this->saved_outputs[$this->save] = str($sanitized_output)->trim();
                     }
                 }
             });
@@ -77,7 +107,7 @@ trait ExecuteRemoteCommand
 
             $process_result = $process->wait();
             if ($process_result->exitCode() !== 0) {
-                if (!$ignore_errors) {
+                if (! $ignore_errors) {
                     $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
                     $this->application_deployment_queue->save();
                     throw new \RuntimeException($process_result->errorOutput());

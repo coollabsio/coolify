@@ -3,6 +3,9 @@
 namespace App\Actions\Database;
 
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -15,54 +18,43 @@ class StartDatabaseProxy
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database)
+    public string $jobQueue = 'high';
+
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
-        $internalPort = null;
-        $type = $database->getMorphClass();
+        $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
         $server = data_get($database, 'destination.server');
         $containerName = data_get($database, 'uuid');
         $proxyContainerName = "{$database->uuid}-proxy";
-        if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
+        $isSSLEnabled = $database->enable_ssl ?? false;
+
+        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
-            $network = data_get($database, 'service.destination.network');
+            $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
             $proxyContainerName = "{$database->service->uuid}-proxy";
-            switch ($databaseType) {
-                case 'standalone-mariadb':
-                    $type = 'App\Models\StandaloneMariadb';
-                    $containerName = "mariadb-{$database->service->uuid}";
-                    break;
-                case 'standalone-mongodb':
-                    $type = 'App\Models\StandaloneMongodb';
-                    $containerName = "mongodb-{$database->service->uuid}";
-                    break;
-                case 'standalone-mysql':
-                    $type = 'App\Models\StandaloneMysql';
-                    $containerName = "mysql-{$database->service->uuid}";
-                    break;
-                case 'standalone-postgresql':
-                    $type = 'App\Models\StandalonePostgresql';
-                    $containerName = "postgresql-{$database->service->uuid}";
-                    break;
-                case 'standalone-redis':
-                    $type = 'App\Models\StandaloneRedis';
-                    $containerName = "redis-{$database->service->uuid}";
-                    break;
-            }
+            $containerName = "{$database->name}-{$database->service->uuid}";
         }
-        if ($type === 'App\Models\StandaloneRedis') {
-            $internalPort = 6379;
-        } else if ($type === 'App\Models\StandalonePostgresql') {
-            $internalPort = 5432;
-        } else if ($type === 'App\Models\StandaloneMongodb') {
-            $internalPort = 27017;
-        } else if ($type === 'App\Models\StandaloneMysql') {
-            $internalPort = 3306;
-        } else if ($type === 'App\Models\StandaloneMariadb') {
-            $internalPort = 3306;
+        $internalPort = match ($databaseType) {
+            'standalone-mariadb', 'standalone-mysql' => 3306,
+            'standalone-postgresql', 'standalone-supabase/postgres' => 5432,
+            'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
+            'standalone-clickhouse' => 9000,
+            'standalone-mongodb' => 27017,
+            default => throw new \Exception("Unsupported database type: $databaseType"),
+        };
+        if ($isSSLEnabled) {
+            $internalPort = match ($databaseType) {
+                'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6380,
+                default => $internalPort,
+            };
         }
+
         $configuration_dir = database_proxy_dir($database->uuid);
+        if (isDev()) {
+            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+        }
         $nginxconf = <<<EOF
     user  nginx;
     worker_processes  auto;
@@ -79,20 +71,10 @@ class StartDatabaseProxy
        }
     }
     EOF;
-        $dockerfile = <<< EOF
-    FROM nginx:stable-alpine
-
-    COPY nginx.conf /etc/nginx/nginx.conf
-    EOF;
         $docker_compose = [
-            'version' => '3.8',
             'services' => [
                 $proxyContainerName => [
-                    'build' => [
-                        'context' => $configuration_dir,
-                        'dockerfile' => 'Dockerfile',
-                    ],
-                    'image' => "nginx:stable-alpine",
+                    'image' => 'nginx:stable-alpine',
                     'container_name' => $proxyContainerName,
                     'restart' => RESTART_MODE,
                     'ports' => [
@@ -100,6 +82,13 @@ class StartDatabaseProxy
                     ],
                     'networks' => [
                         $network,
+                    ],
+                    'volumes' => [
+                        [
+                            'type' => 'bind',
+                            'source' => "$configuration_dir/nginx.conf",
+                            'target' => '/etc/nginx/nginx.conf',
+                        ],
                     ],
                     'healthcheck' => [
                         'test' => [
@@ -109,28 +98,27 @@ class StartDatabaseProxy
                         'interval' => '5s',
                         'timeout' => '5s',
                         'retries' => 3,
-                        'start_period' => '1s'
+                        'start_period' => '1s',
                     ],
-                ]
+                ],
             ],
             'networks' => [
                 $network => [
                     'external' => true,
                     'name' => $network,
                     'attachable' => true,
-                ]
-            ]
+                ],
+            ],
         ];
         $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
         $nginxconf_base64 = base64_encode($nginxconf);
-        $dockerfile_base64 = base64_encode($dockerfile);
+        instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
         instant_remote_process([
             "mkdir -p $configuration_dir",
-            "echo '{$dockerfile_base64}' | base64 -d > $configuration_dir/Dockerfile",
-            "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
-            "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
+            "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
+            "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
             "docker compose --project-directory {$configuration_dir} pull",
-            "docker compose --project-directory {$configuration_dir} up --build -d",
+            "docker compose --project-directory {$configuration_dir} up -d",
         ], $server);
     }
 }
