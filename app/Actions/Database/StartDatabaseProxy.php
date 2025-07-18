@@ -47,6 +47,7 @@ class StartDatabaseProxy
         if ($isSSLEnabled) {
             $internalPort = match ($databaseType) {
                 'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6380,
+                default => $internalPort,
             };
         }
 

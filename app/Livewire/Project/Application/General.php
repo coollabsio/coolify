@@ -156,6 +156,14 @@ class General extends Component
             $this->application->settings->save();
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
+        // Convert service names with dots to use underscores for HTML form binding
+        $sanitizedDomains = [];
+        foreach ($this->parsedServiceDomains as $serviceName => $domain) {
+            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $sanitizedDomains[$sanitizedKey] = $domain;
+        }
+        $this->parsedServiceDomains = $sanitizedDomains;
+
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
@@ -242,8 +250,26 @@ class General extends Component
     {
         $uuid = new Cuid2;
         $domain = generateFqdn($this->application->destination->server, $uuid);
-        $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
-        $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+        $sanitizedKey = str($serviceName)->slug('_')->toString();
+        $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
+
+        // Convert back to original service names for storage
+        $originalDomains = [];
+        foreach ($this->parsedServiceDomains as $key => $value) {
+            // Find the original service name by checking parsed services
+            $originalServiceName = $key;
+            if (isset($this->parsedServices['services'])) {
+                foreach ($this->parsedServices['services'] as $originalName => $service) {
+                    if (str($originalName)->slug('_')->toString() === $key) {
+                        $originalServiceName = $originalName;
+                        break;
+                    }
+                }
+            }
+            $originalDomains[$originalServiceName] = $value;
+        }
+
+        $this->application->docker_compose_domains = json_encode($originalDomains);
         $this->application->save();
         $this->dispatch('success', 'Domain generated.');
         if ($this->application->build_pack === 'dockercompose') {
@@ -429,9 +455,25 @@ class General extends Component
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
             if ($this->application->build_pack === 'dockercompose') {
-                $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+                // Convert sanitized service names back to original names for storage
+                $originalDomains = [];
+                foreach ($this->parsedServiceDomains as $key => $value) {
+                    // Find the original service name by checking parsed services
+                    $originalServiceName = $key;
+                    if (isset($this->parsedServices['services'])) {
+                        foreach ($this->parsedServices['services'] as $originalName => $service) {
+                            if (str($originalName)->slug('_')->toString() === $key) {
+                                $originalServiceName = $originalName;
+                                break;
+                            }
+                        }
+                    }
+                    $originalDomains[$originalServiceName] = $value;
+                }
 
-                foreach ($this->parsedServiceDomains as $serviceName => $service) {
+                $this->application->docker_compose_domains = json_encode($originalDomains);
+
+                foreach ($originalDomains as $serviceName => $service) {
                     $domain = data_get($service, 'domain');
                     if ($domain) {
                         if (! validate_dns_entry($domain, $this->application->destination->server)) {
