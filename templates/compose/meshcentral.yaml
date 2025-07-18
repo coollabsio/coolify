@@ -1,0 +1,30 @@
+# documentation: https://github.com/Ylianst/MeshCentral/wiki
+# slogan: MeshCentral is an open-source, web-based remote management platform that lets you monitor, control, and transfer files to devices across Windows, Linux, macOS, and IoT.
+# tags: meshcentral, remote-management, open-source, remote-desktop
+# logo: svgs/meshcentral.png
+# port: 443
+
+services:
+  meshcentral:
+    image: "typhonragewind/meshcentral:latest"
+    environment:
+      - SERVICE_FQDN_MESHCENTRAL_80
+      - SERVICE_FQDN_MESHCENTRAL_443
+      - HOSTNAME=${SERVICE_FQDN_MESHCENTRAL}
+      - REVERSE_PROXY=false
+      - REVERSE_PROXY_TLS_PORT=
+      - IFRAME=false
+      - ALLOW_NEW_ACCOUNTS=${ALLOW_NEW_ACCOUNTS:-false}
+      - WEBRTC=false
+      - BACKUPS_PW=${SERVICE_BACKUP_PASSWORD}
+      - BACKUP_INTERVAL=24
+      - BACKUP_KEEP_DAYS=7
+    volumes:
+      - "./meshcentral/data:/opt/meshcentral/meshcentral-data"
+      - "./meshcentral/user_files:/opt/meshcentral/meshcentral-files"
+      - "./meshcentral/backups:/opt/meshcentral/meshcentral-backups"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health.ashx"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
