@@ -1,0 +1,18 @@
+# documentation: https://github.com/dockur/chrony
+# slogan: Chrony is a versatile implementation of the Network Time Protocol (NTP).
+# tags: chrony, ntp, open-source
+# logo: svgs/chrony.jpg
+
+services:
+  ntp:
+    image: dockurr/chrony
+    restart: always
+    ports:
+      - "123:123/udp"
+    environment:
+      - NTP_SERVERS=${NTP_SERVERS:-pool.ntp.org}
+      - TZ=Europe/Lisbon
+      - LOG_LEVEL=0
+      - ENABLE_SYSCLK=true
+    cap_add:
+      - SYS_TIME
