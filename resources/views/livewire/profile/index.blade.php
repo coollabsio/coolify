@@ -19,7 +19,7 @@
             <h2>Change Password</h2>
             <x-forms.button type="submit" label="Save">Save</x-forms.button>
         </div>
-        <div class="text-xs font-bold text-warning pb-2">Resetting the password will logout all sessions.</div>
+        <div class="text-xs font-bold dark:text-warning pb-2">Resetting the password will logout all sessions.</div>
         <div class="flex flex-col gap-2">
             <x-forms.input id="current_password" label="Current Password" required type="password" />
             <div class="flex gap-2">

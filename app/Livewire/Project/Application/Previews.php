@@ -7,7 +7,6 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
 class Previews extends Component
@@ -87,18 +86,9 @@ class Previews extends Component
             return;
         }
 
-        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
-        $url = Url::fromString($fqdn);
-        $template = $this->application->preview_url_template;
-        $host = $url->getHost();
-        $schema = $url->getScheme();
-        $random = new Cuid2;
-        $preview_fqdn = str_replace('{{random}}', $random, $template);
-        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-        $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
-        $preview_fqdn = "$schema://$preview_fqdn";
-        $preview->fqdn = $preview_fqdn;
-        $preview->save();
+        $this->application->generate_preview_fqdn($preview->pull_request_id);
+        $this->application->refresh();
+        $this->dispatch('update_links');
         $this->dispatch('success', 'Domain generated.');
     }
 

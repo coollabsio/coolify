@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'throttle' => env('API_THROTTLE', 200),
+    'rate_limit' => env('API_RATE_LIMIT', 200),
 ];

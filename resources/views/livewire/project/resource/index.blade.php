@@ -72,6 +72,9 @@
                                     <template x-if="item.status.startsWith('exited')">
                                         <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
+                                    <template x-if="item.status.startsWith('starting')">
+                                        <div title="starting" class="bg-warning badge-dashboard"></div>
+                                    </template>
                                     <template x-if="item.status.startsWith('restarting')">
                                         <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
@@ -118,6 +121,9 @@
                                     <template x-if="item.status.startsWith('exited')">
                                         <div title="exited" class="bg-error badge-dashboard"></div>
                                     </template>
+                                    <template x-if="item.status.startsWith('starting')">
+                                        <div title="starting" class="bg-warning badge-dashboard"></div>
+                                    </template>
                                     <template x-if="item.status.startsWith('restarting')">
                                         <div title="restarting" class="bg-warning badge-dashboard"></div>
                                     </template>
@@ -163,6 +169,9 @@
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
                                         <div title="exited" class="bg-error badge-dashboard"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('starting')">
+                                        <div title="starting" class="bg-warning badge-dashboard"></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
                                         <div title="restarting" class="bg-warning badge-dashboard"></div>

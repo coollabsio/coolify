@@ -7,7 +7,7 @@
 version: '3.8'
 services:
   api:
-    image: 'atendai/evolution-api:latest' # Change to specific version if needed.
+    image: 'evoapicloud/evolution-api:latest' # Change to specific version if needed.
     restart: always
     depends_on:
       - redis
@@ -105,7 +105,7 @@ services:
       - WEBHOOK_EVENTS_ERRORS_WEBHOOK=${WEBHOOK_EVENTS_ERRORS_WEBHOOK:-}
       - 'CONFIG_SESSION_PHONE_CLIENT=${CONFIG_SESSION_PHONE_CLIENT:-Evolution API V2}'
       - CONFIG_SESSION_PHONE_NAME=${CONFIG_SESSION_PHONE_NAME:-Chrome}
-      - CONFIG_SESSION_PHONE_VERSION=${CONFIG_SESSION_PHONE_VERSION:-2.3000.1015901307}
+      - CONFIG_SESSION_PHONE_VERSION=${CONFIG_SESSION_PHONE_VERSION:-2.3000.1020885143}
       - QRCODE_LIMIT=${QRCODE_LIMIT:-30}
       - OPENAI_ENABLED=${OPENAI_ENABLED:-true}
       - DIFY_ENABLED=${DIFY_ENABLED:-true}

@@ -52,24 +52,38 @@ class ApplicationPreview extends BaseModel
 
     public function generate_preview_fqdn_compose()
     {
-        $domains = collect(json_decode($this->application->docker_compose_domains)) ?? collect();
-        foreach ($domains as $service_name => $domain) {
-            $domain = data_get($domain, 'domain');
-            $url = Url::fromString($domain);
-            $template = $this->application->preview_url_template;
-            $host = $url->getHost();
-            $schema = $url->getScheme();
-            $random = new Cuid2;
-            $preview_fqdn = str_replace('{{random}}', $random, $template);
-            $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-            $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-            $preview_fqdn = "$schema://$preview_fqdn";
-            $docker_compose_domains = data_get($this, 'docker_compose_domains');
-            $docker_compose_domains = json_decode($docker_compose_domains, true);
-            $docker_compose_domains[$service_name]['domain'] = $preview_fqdn;
-            $docker_compose_domains = json_encode($docker_compose_domains);
-            $this->docker_compose_domains = $docker_compose_domains;
-            $this->save();
+        $services = collect(json_decode($this->application->docker_compose_domains)) ?? collect();
+        $docker_compose_domains = data_get($this, 'docker_compose_domains');
+        $docker_compose_domains = json_decode($docker_compose_domains, true) ?? [];
+
+        foreach ($services as $service_name => $service_config) {
+            $domain_string = data_get($service_config, 'domain');
+            $service_domains = str($domain_string)->explode(',')->map(fn ($d) => trim($d));
+
+            $preview_domains = [];
+            foreach ($service_domains as $domain) {
+                if (empty($domain)) {
+                    continue;
+                }
+
+                $url = Url::fromString($domain);
+                $template = $this->application->preview_url_template;
+                $host = $url->getHost();
+                $schema = $url->getScheme();
+                $random = new Cuid2;
+                $preview_fqdn = str_replace('{{random}}', $random, $template);
+                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
+                $preview_fqdn = "$schema://$preview_fqdn";
+                $preview_domains[] = $preview_fqdn;
+            }
+
+            if (! empty($preview_domains)) {
+                $docker_compose_domains[$service_name]['domain'] = implode(',', $preview_domains);
+            }
         }
+
+        $this->docker_compose_domains = json_encode($docker_compose_domains);
+        $this->save();
     }
 }

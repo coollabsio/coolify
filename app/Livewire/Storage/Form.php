@@ -31,7 +31,7 @@ class Form extends Component
         'storage.endpoint' => 'Endpoint',
     ];
 
-    public function test_s3_connection()
+    public function testConnection()
     {
         try {
             $this->storage->testConnection(shouldSave: true);
@@ -45,6 +45,8 @@ class Form extends Component
     public function delete()
     {
         try {
+            $this->authorize('delete', $this->storage);
+
             $this->storage->delete();
 
             return redirect()->route('storage.index');
@@ -57,7 +59,7 @@ class Form extends Component
     {
         $this->validate();
         try {
-            $this->test_s3_connection();
+            $this->testConnection();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
