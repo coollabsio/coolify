@@ -12,7 +12,6 @@ services:
       - RUNNER_NAME_SUFFIX=${RUNNER_NAME_SUFFIX:-true}
       - ACCESS_TOKEN=${ACCESS_TOKEN}
       - RUNNER_WORKDIR=/tmp/runner/work
-      - DISABLE_AUTOMATIC_DEREGISTRATION=false
       - RUNNER_SCOPE=${RUNNER_SCOPE:-repo}
       - LABELS=${LABELS:-default}
       - ORG_NAME=${ORG_NAME}
@@ -21,6 +20,3 @@ services:
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
       - runner:/tmp/runner
-
-
-
