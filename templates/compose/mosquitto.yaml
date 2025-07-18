@@ -14,8 +14,8 @@ services:
       - REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}
       - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-true}
     volumes:
-      - mosquitto-config:/mosquitto/config
-      - mosquitto-certs:/certs
+      - "./mosquitto/config:/mosquitto/config"
+      - "./certs:/certs"
     healthcheck:
       test: ["CMD-SHELL", "exit 0"]
       interval: 30s
