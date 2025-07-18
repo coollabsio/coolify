@@ -7,86 +7,101 @@
         <div class="subtitle ">Quickly clone all resources to a new project or environment.</div>
     </div>
     <x-forms.input required id="newName" label="New Name" />
-    <x-forms.button isHighlighted wire:click="clone('project')" class="mt-4">Clone to a new Project</x-forms.button>
-    <x-forms.button isHighlighted wire:click="clone('environment')" class="mt-4">Clone to a new Environment</x-forms.button>
-{{-- 
-    <div class="mt-8">
-        <h3 class="text-lg font-bold mb-2">Clone Volume Data</h3>
-        <div class="text-sm text-gray-600 dark:text-gray-300 mb-4">
-            Clone your volume data to the new resources volumes. This process requires a brief container downtime to ensure data consistency.
-        </div>
-        <div wire:poll>
-            @if(!$cloneVolumeData)
-                <div wire:key="volume-disabled">
-                    <x-modal-confirmation 
-                        title="Enable Volume Data Cloning?" 
-                        buttonTitle="Enable Volume Cloning" 
-                        submitAction="toggleVolumeCloning(true)"
-                        :actions="['This will temporarily stop all the containers to copy the volume data to the new resources to ensure data consistency.', 'The process runs in the background and may take a few minutes.']" 
-                        :confirmWithPassword="false"
-                        :confirmWithText="false"
-                    />
-                </div>
-            @else
-                <div wire:key="volume-enabled" class="max-w-md">
-                    <x-forms.checkbox 
-                        label="Clone Volume Data" 
-                        id="cloneVolumeData" 
-                        wire:model="cloneVolumeData"
-                        wire:change="toggleVolumeCloning(false)"
-                        :checked="$cloneVolumeData"
-                        helper="Volume Data will be cloned to the new resources. Containers will be temporarily stopped during the cloning process." />
-                </div>
-            @endif
-        </div>
-    </div> --}}
-
-    <h3 class="pt-8 pb-2">Servers</h3>
-    <div>Choose the server and network to clone the resources to.</div>
-    <div class="flex flex-col gap-4">
-        @foreach ($servers->sortBy('id') as $server)
-            <div class="p-4">
-                <h4>{{ $server->name }}</h4>
-                <div class="pt-4 pb-2">Docker Networks</div>
-                <div class="grid grid-cols-1 gap-2 pb-4 lg:grid-cols-4">
-                    @foreach ($server->destinations() as $destination)
-                        <div class="cursor-pointer box-without-bg group"
-                            :class="'{{ $selectedDestination === $destination->id }}' ? 'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'"
-                            wire:click="selectServer('{{ $server->id }}', '{{ $destination->id }}')">
-                            {{ $destination->name }}
-                        </div>
-                    @endforeach
+    <h3 class="pt-8 ">Destination Server</h3>
+    <div class="pb-2">Choose the server and network to clone the resources to.</div>
+    <div class="flex flex-col">
+        <div class="flex flex-col">
+            <div class="overflow-x-auto">
+                <div class="inline-block min-w-full">
+                    <div class="overflow-hidden">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Server</th>
+                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Network</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($servers->sortBy('id') as $server)
+                                    @foreach ($server->destinations() as $destination)
+                                        <tr class="cursor-pointer hover:bg-coolgray-50 dark:hover:bg-coolgray-200"
+                                            wire:click="selectServer('{{ $server->id }}', '{{ $destination->id }}')">
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white"
+                                                :class="'{{ $selectedDestination === $destination->id }}' ?
+                                                'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'">
+                                                {{ $server->name }}</td>
+                                            <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white "
+                                                :class="'{{ $selectedDestination === $destination->id }}' ?
+                                                'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'">
+                                                {{ $destination->name }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        @endforeach
+        </div>
     </div>
 
-    <h3 class="pt-8 pb-2">Resources</h3>
-    <div>These will be cloned to the new project</div>
-    <div class="grid grid-cols-1 gap-2 pt-4 opacity-95 lg:grid-cols-2 xl:grid-cols-3">
-        @foreach ($environment->applications->sortBy('name') as $application)
-            <div class="bg-white cursor-default box-without-bg dark:bg-coolgray-100 group">
-                <div class="flex flex-col">
-                    <div class="font-bold dark:text-white">{{ $application->name }}</div>
-                    <div class="description">{{ $application->description }}</div>
+    <h3 class="pt-8">Resources</h3>
+    <div class="pb-2">These will be cloned to the new project</div>
+    <div class="flex flex-col pt-4">
+        <div class="flex flex-col">
+            <div class="overflow-x-auto">
+                <div class="inline-block min-w-full">
+                    <div class="overflow-hidden">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
+                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type</th>
+                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($environment->applications->sortBy('name') as $application)
+                                    <tr>
+                                        <td class="px-5 py-4 text-sm whitespace-nowrap font-bold dark:text-white">
+                                            {{ $application->name }}</td>
+                                        <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white">Application</td>
+                                        <td class="px-5 py-4 text-sm dark:text-white">
+                                            {{ $application->description ?: '-' }}</td>
+                                    </tr>
+                                @endforeach
+                                @foreach ($environment->databases()->sortBy('name') as $database)
+                                    <tr>
+                                        <td class="px-5 py-4 text-sm whitespace-nowrap font-bold dark:text-white">
+                                            {{ $database->name }}
+                                        </td>
+                                        <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white">Database</td>
+                                        <td class="px-5 py-4 text-sm dark:text-white">
+                                            {{ $database->description ?: '-' }}</td>
+                                    </tr>
+                                @endforeach
+                                @foreach ($environment->services->sortBy('name') as $service)
+                                    <tr>
+                                        <td class="px-5 py-4 text-sm whitespace-nowrap font-bold dark:text-white">
+                                            {{ $service->name }}
+                                        </td>
+                                        <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white">Service</td>
+                                        <td class="px-5 py-4 text-sm dark:text-white">
+                                            {{ $service->description ?: '-' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        @endforeach
-        @foreach ($environment->databases()->sortBy('name') as $database)
-            <div class="bg-white cursor-default box-without-bg dark:bg-coolgray-100 group">
-                <div class="flex flex-col">
-                    <div class="font-bold dark:text-white">{{ $database->name }}</div>
-                    <div class="description">{{ $database->description }}</div>
-                </div>
-            </div>
-        @endforeach
-        @foreach ($environment->services->sortBy('name') as $service)
-            <div class="bg-white cursor-default box-without-bg dark:bg-coolgray-100 group">
-                <div class="flex flex-col">
-                    <div class="font-bold dark:text-white">{{ $service->name }}</div>
-                    <div class="description">{{ $service->description }}</div>
-                </div>
-            </div>
-        @endforeach
+        </div>
+    </div>
+    <div class="flex gap-4 pt-4 w-full">
+        <x-forms.button isHighlighted class="w-full" wire:click="clone('project')" :disabled="!filled($selectedDestination)">Clone to new
+            Project</x-forms.button>
+        <x-forms.button isHighlighted class="w-full" wire:click="clone('environment')" :disabled="!filled($selectedDestination)">Clone to new
+            Environment</x-forms.button>
     </div>
 </form>

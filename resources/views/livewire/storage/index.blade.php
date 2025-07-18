@@ -9,10 +9,10 @@
         </x-modal-input>
     </div>
     <div class="subtitle">S3 storages for backups.</div>
-    <div class="grid gap-2 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2">
         @forelse ($s3 as $storage)
-            <a href="/storages/{{ $storage->uuid }}" @class(['gap-2 border cursor-pointer box group border-transparent'])>
-                <div class="flex flex-col mx-6">
+            <a href="/storages/{{ $storage->uuid }}" @class(['gap-2 border cursor-pointer box group'])>
+                <div class="flex flex-col justify-center mx-6">
                     <div class="box-title">
                         {{ $storage->name }}
                     </div>
@@ -20,7 +20,10 @@
                         {{ $storage->description }}
                     </div>
                     @if (!$storage->is_usable)
-                        <div class="text-red-500">Not Usable</div>
+                        <span
+                            class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded dark:text-red-100 dark:bg-red-800">
+                            Not Usable
+                        </span>
                     @endif
                 </div>
             </a>

@@ -170,6 +170,7 @@ class Show extends Component
             $this->syncData(true);
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
+            $this->dispatch('configurationChanged');
         } catch (\Exception $e) {
             return handleError($e);
         }
