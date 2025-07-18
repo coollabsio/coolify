@@ -9,14 +9,13 @@
             <div>API is disabled. If you want to use the API, please enable it in the <a
                     href="{{ route('settings.index') }}" class="underline dark:text-white">Settings</a> menu.</div>
         @else
-            <div>Tokens are created with the current team as scope. You will only have access to this team's resources.
-            </div>
+            <div>Tokens are created with the current team as scope.</div>
     </div>
     <h3>New Token</h3>
-    <form class="flex flex-col gap-2 pt-4" wire:submit='addNewToken'>
-        <div class="flex gap-2 items-end">
+    <form class="flex flex-col gap-2" wire:submit='addNewToken'>
+        <div class="flex gap-2 items-end w-96">
             <x-forms.input required id="description" label="Description" />
-            <x-forms.button type="submit">Create New Token</x-forms.button>
+            <x-forms.button type="submit">Create</x-forms.button>
         </div>
         <div class="flex">
             Permissions
@@ -37,18 +36,18 @@
                 helper="Root access, be careful!" :checked="in_array('root', $permissions)"></x-forms.checkbox>
             @if (!in_array('root', $permissions))
                 <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write"
-                    helper="Write access to all resources" :checked="in_array('write', $permissions)"></x-forms.checkbox>
+                    helper="Write access to all resources." :checked="in_array('write', $permissions)"></x-forms.checkbox>
                 <x-forms.checkbox label="deploy" wire:model.live="permissions" domValue="deploy"
-                    helper="Can trigger deploy webhooks" :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
+                    helper="Can trigger deploy webhooks." :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
                 <x-forms.checkbox label="read" domValue="read" wire:model.live="permissions" domValue="read"
                     :checked="in_array('read', $permissions)"></x-forms.checkbox>
                 <x-forms.checkbox label="read:sensitive" wire:model.live="permissions" domValue="read:sensitive"
-                    helper="Responses will include secrets, logs, passwords, and compose file contents"
+                    helper="Responses will include secrets, logs, passwords, and compose file contents."
                     :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
             @endif
         </div>
         @if (in_array('root', $permissions))
-            <div class="font-bold text-warning">Root access, be careful!</div>
+            <div class="font-bold dark:text-warning">Root access, be careful!</div>
         @endif
     </form>
     @if (session()->has('token'))

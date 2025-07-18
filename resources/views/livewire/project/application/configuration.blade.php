@@ -6,7 +6,7 @@
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
 
-    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">General</a>
@@ -51,9 +51,11 @@
                 Tasks</a>
             <a class="menu-item" wire:current.exact="menu-item-active"
                 href="{{ route('project.application.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Webhooks</a>
-            <a class="menu-item" wire:current.exact="menu-item-active"
-                href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Preview
-                Deployments</a>
+            @if ($application->deploymentType() !== 'deploy_key')
+                <a class="menu-item" wire:current.exact="menu-item-active"
+                    href="{{ route('project.application.preview-deployments', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Preview
+                    Deployments</a>
+            @endif
             @if ($application->build_pack !== 'dockercompose')
                 <a class="menu-item" wire:current.exact="menu-item-active"
                     href="{{ route('project.application.healthcheck', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]) }}">Healthcheck</a>

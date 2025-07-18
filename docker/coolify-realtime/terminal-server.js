@@ -265,11 +265,57 @@ function extractTimeout(commandString) {
 
 function extractSshArgs(commandString) {
     const sshCommandMatch = commandString.match(/ssh (.+?) 'bash -se'/);
-    let sshArgs = sshCommandMatch ? sshCommandMatch[1].split(' ') : [];
+    if (!sshCommandMatch) return [];
+
+    const argsString = sshCommandMatch[1];
+    let sshArgs = [];
+
+    // Parse shell arguments respecting quotes
+    let current = '';
+    let inQuotes = false;
+    let quoteChar = '';
+    let i = 0;
+
+    while (i < argsString.length) {
+        const char = argsString[i];
+        const nextChar = argsString[i + 1];
+
+        if (!inQuotes && (char === '"' || char === "'")) {
+            // Starting a quoted section
+            inQuotes = true;
+            quoteChar = char;
+            current += char;
+        } else if (inQuotes && char === quoteChar) {
+            // Ending a quoted section
+            inQuotes = false;
+            current += char;
+            quoteChar = '';
+        } else if (!inQuotes && char === ' ') {
+            // Space outside quotes - end of argument
+            if (current.trim()) {
+                sshArgs.push(current.trim());
+                current = '';
+            }
+        } else {
+            // Regular character
+            current += char;
+        }
+        i++;
+    }
+
+    // Add final argument if exists
+    if (current.trim()) {
+        sshArgs.push(current.trim());
+    }
+
+    // Replace RequestTTY=no with RequestTTY=yes
     sshArgs = sshArgs.map(arg => arg === 'RequestTTY=no' ? 'RequestTTY=yes' : arg);
-    if (!sshArgs.includes('RequestTTY=yes')) {
+
+    // Add RequestTTY=yes if not present
+    if (!sshArgs.includes('RequestTTY=yes') && !sshArgs.some(arg => arg.includes('RequestTTY='))) {
         sshArgs.push('-o', 'RequestTTY=yes');
     }
+
     return sshArgs;
 }
 

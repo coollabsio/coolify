@@ -23,11 +23,15 @@
     'dispatchEventType' => 'success',
     'dispatchEventMessage' => '',
     'ignoreWire' => true,
+    'temporaryDisableTwoStepConfirmation' => false,
 ])
 
 @php
     use App\Models\InstanceSettings;
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
+    if ($temporaryDisableTwoStepConfirmation) {
+        $disableTwoStepConfirmation = false;
+    }
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -38,7 +42,7 @@
     deleteText: '',
     password: '',
     actions: @js($actions),
-    confirmationText: @js($confirmationText),
+    confirmationText: @js(html_entity_decode($confirmationText, ENT_QUOTES, 'UTF-8')),
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
     confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
@@ -254,7 +258,7 @@
                                     <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2">
-                                        <x-forms.copy-button text="{{ $confirmationText }}" />
+                                        <x-forms.copy-button :text="html_entity_decode($confirmationText, ENT_QUOTES, 'UTF-8')" />
                                     </div>
 
                                     <label for="userConfirmationText"
@@ -262,7 +266,7 @@
                                         {{ $shortConfirmationLabel }}
                                     </label>
                                     <input type="text" x-model="userConfirmationText"
-                                        class="p-2 mt-1 w-full text-black rounded-sm input">
+                                        class="p-2 mt-1 px-3 w-full  rounded-sm input">
                                 </div>
                             @endif
                         @endif

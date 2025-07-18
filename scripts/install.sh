@@ -20,7 +20,7 @@ DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 ENV_FILE="/data/coolify/source/.env"
-VERSION="20"
+VERSION="21"
 DOCKER_VERSION="27.0"
 # TODO: Ask for a user
 CURRENT_USER=$USER
@@ -253,6 +253,11 @@ if [ "$OS_TYPE" = "endeavouros" ]; then
     OS_TYPE="arch"
 fi
 
+# Check if the OS is Cachy OS, if so, change it to arch
+if [ "$OS_TYPE" = "cachyos" ]; then
+    OS_TYPE="arch"
+fi
+
 # Check if the OS is Asahi Linux, if so, change it to fedora
 if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
     OS_TYPE="fedora"
@@ -438,7 +443,7 @@ fi
 if [ -x "$(command -v snap)" ]; then
     SNAP_DOCKER_INSTALLED=$(snap list docker >/dev/null 2>&1 && echo "true" || echo "false")
     if [ "$SNAP_DOCKER_INSTALLED" = "true" ]; then
-        echo " - Docker is installed via snap."
+        echo "Docker is installed via snap."
         echo "   Please note that Coolify does not support Docker installed via snap."
         echo "   Please remove Docker with snap (snap remove docker) and reexecute this script."
         exit 1
@@ -446,15 +451,45 @@ if [ -x "$(command -v snap)" ]; then
 fi
 
 install_docker() {
+    set +e
     curl -s https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh 2>&1 || true
     if ! [ -x "$(command -v docker)" ]; then
         curl -s https://get.docker.com | sh -s -- --version ${DOCKER_VERSION} 2>&1
         if ! [ -x "$(command -v docker)" ]; then
-            echo " - Docker installation failed."
-            echo "   Maybe your OS is not supported?"
-            echo " - Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-            exit 1
+            echo "Automated Docker installation failed. Trying manual installation."
+            install_docker_manually
         fi
+    fi
+    set -e
+}
+
+install_docker_manually() {
+    case "$OS_TYPE" in
+    "ubuntu" | "debian" | "raspbian")
+        apt-get update
+        apt-get install -y ca-certificates curl
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/$OS_TYPE/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+
+        # Add the repository to Apt sources
+        echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS_TYPE \
+                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
+            tee /etc/apt/sources.list.d/docker.list
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        ;;
+    *)
+        exit 1
+        ;;
+    esac
+    if ! [ -x "$(command -v docker)" ]; then
+        echo "Docker installation failed."
+        echo "   Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+        exit 1
+    else
+        echo "Docker installed successfully."
     fi
 }
 echo -e "3. Check Docker Installation. "
@@ -522,34 +557,18 @@ if ! [ -x "$(command -v docker)" ]; then
         systemctl enable docker >/dev/null 2>&1
         ;;
     "ubuntu" | "debian" | "raspbian")
-        if [ "$OS_TYPE" = "ubuntu" ] && [ "$OS_VERSION" = "24.10" ]; then
-            echo " - Installing Docker for Ubuntu 24.10..."
-            apt-get update >/dev/null
-            apt-get install -y ca-certificates curl >/dev/null
-            install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-            chmod a+r /etc/apt/keyrings/docker.asc
-
-            # Add the repository to Apt sources
-            echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
-                tee /etc/apt/sources.list.d/docker.list >/dev/null
-            apt-get update >/dev/null
-            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null
-
-            if ! [ -x "$(command -v docker)" ]; then
-                echo " - Docker installation failed."
-                echo "   Please visit https://docs.docker.com/engine/install/ubuntu/ and install Docker manually to continue."
-                exit 1
-            fi
-            echo " - Docker installed successfully for Ubuntu 24.10."
-        else
-            install_docker
+        install_docker
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Automated Docker installation failed. Trying manual installation."
+            install_docker_manually
         fi
         ;;
     *)
         install_docker
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Automated Docker installation failed. Trying manual installation."
+            install_docker_manually
+        fi
         ;;
     esac
     echo " - Docker installed successfully."
@@ -787,6 +806,8 @@ set -e
 
 if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     echo " - Generating SSH key."
+    test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
     sed -i "/coolify/d" ~/.ssh/authorized_keys
@@ -828,7 +849,7 @@ IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
 
 echo -e "\nYour instance is ready to use!\n"
 if [ -n "$IPV4_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPV4: http://$(curl -4s https://ifconfig.io):8000"
+    echo -e "You can access Coolify through your Public IPV4: http://$IPV4_PUBLIC_IP:8000"
 fi
 if [ -n "$IPV6_PUBLIC_IP" ]; then
     echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"

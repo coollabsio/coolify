@@ -110,7 +110,7 @@ class Heading extends Component
 
     public function stop()
     {
-        $this->dispatch('info', 'Gracefully stopping application, it could take a while depending on the application.');
+        $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
         StopApplication::dispatch($this->application, false, $this->docker_cleanup);
     }
 

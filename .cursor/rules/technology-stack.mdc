@@ -90,7 +90,7 @@ alwaysApply: false
 - **Purpose**: OAuth provider integration
 - **Providers**:
   - GitHub, GitLab, Google
-  - Microsoft Azure, Authentik
+  - Microsoft Azure, Authentik, Discord, Clerk
   - Custom OAuth implementations
 
 ## Background Processing

@@ -27,7 +27,7 @@ class StartSentinel
         $mountDir = '/data/coolify/sentinel';
         $image = config('constants.coolify.registry_url').'/coollabsio/sentinel:'.$version;
         if (! $endpoint) {
-            throw new \Exception('You should set FQDN in Instance Settings.');
+            throw new \RuntimeException('You should set FQDN in Instance Settings.');
         }
         $environments = [
             'TOKEN' => $token,
