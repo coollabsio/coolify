@@ -56,7 +56,6 @@ class CloneMe extends Component
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()
             ->servers()
-            ->with('destinations')
             ->get()
             ->reject(fn ($server) => $server->isBuildServer());
         $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();

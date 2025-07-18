@@ -29,7 +29,7 @@
                     @endif
                     <div wire:loading wire:target="checkProxy" class="badge badge-warning"></div>
                     <div wire:loading wire:target="checkProxy"
-                        class="pl-2 pr-1 text-xs font-bold tracking-wider text-warning">
+                        class="pl-2 pr-1 text-xs font-bold tracking-wider dark:text-warning">
                         Checking Ports Availability...
                     </div>
                     @if ($proxyStatus !== 'exited')
@@ -60,7 +60,7 @@
                 href="{{ route('server.show', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
-                <button>Configuration</button>
+                Configuration
             </a>
 
             @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
@@ -68,26 +68,26 @@
                     href="{{ route('server.proxy', [
                         'server_uuid' => data_get($server, 'uuid'),
                     ]) }}">
-                    <button>Proxy</button>
+                    Proxy
                 </a>
             @endif
             <a class="{{ request()->routeIs('server.resources') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.resources', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
-                <button>Resources</button>
+                Resources
             </a>
             <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.command', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
-                <button>Terminal</button>
+                Terminal
             </a>
             <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
                 href="{{ route('server.security.patches', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}">
-                <button>Security</button>
+                Security
             </a>
         </nav>
         <div class="order-first sm:order-last">
