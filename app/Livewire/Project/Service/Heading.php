@@ -63,7 +63,7 @@ class Heading extends Component
             $this->service->databases->each(function ($database) {
                 $database->refresh();
             });
-            if (is_null($this->service->config_hash) || $this->service->isConfigurationChanged()) {
+            if (is_null($this->service->config_hash)) {
                 $this->service->isConfigurationChanged(true);
             }
             $this->dispatch('configurationChanged');
