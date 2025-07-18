@@ -254,10 +254,9 @@ class Email extends Component
                 'smtpEncryption.required' => 'Encryption type is required.',
             ]);
 
-            $this->settings->resend_enabled = false;
-            $this->settings->use_instance_email_settings = false;
-            $this->resendEnabled = false;
-            $this->useInstanceEmailSettings = false;
+            if ($this->smtpEnabled) {
+                $this->settings->resend_enabled = $this->resendEnabled = false;
+            }
 
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
@@ -293,11 +292,9 @@ class Email extends Component
                 'smtpFromAddress.email' => 'Please enter a valid email address.',
                 'smtpFromName.required' => 'From Name is required.',
             ]);
-
-            $this->settings->smtp_enabled = false;
-            $this->settings->use_instance_email_settings = false;
-            $this->smtpEnabled = false;
-            $this->useInstanceEmailSettings = false;
+            if ($this->resendEnabled) {
+                $this->settings->smtp_enabled = $this->smtpEnabled = false;
+            }
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;

@@ -2,7 +2,179 @@
 
 All notable changes to this project will be documented in this file.
 
-## [4.0.0-beta.419] - 2025-06-16
+## [unreleased]
+
+### 🚀 Features
+
+- *(scheduling)* Add command to manually run scheduled database backups and tasks with options for chunking, delays, and dry runs
+
+### 🐛 Bug Fixes
+
+- *(versions)* Update coolify version numbers in versions.json and constants.php to 4.0.0-beta.420.5 and 4.0.0-beta.420.6
+- *(database)* Ensure internal port defaults correctly for unsupported database types in StartDatabaseProxy
+
+### 🚜 Refactor
+
+- *(postgresql)* Improve layout and spacing in SSL and Proxy configuration sections for better UI consistency
+
+## [4.0.0-beta.420.4] - 2025-07-08
+
+### 🐛 Bug Fixes
+
+- *(service)* Update Postiz compose configuration for improved server availability
+- *(install.sh)* Use IPV4_PUBLIC_IP variable in output instead of repeated curl
+- *(env)* Generate literal env variables better
+- *(deployment)* Update x-data initialization in deployment view for improved functionality
+- *(deployment)* Enhance COOLIFY_URL and COOLIFY_FQDN variable generation for better compatibility
+- *(deployment)* Improve docker-compose domain handling and environment variable generation
+- *(deployment)* Refactor domain parsing and environment variable generation using Spatie URL library
+- *(deployment)* Update COOLIFY_URL and COOLIFY_FQDN generation to use Spatie URL library for improved accuracy
+- *(scheduling)* Change redis cleanup command frequency from hourly to weekly for better resource management
+
+### 🚜 Refactor
+
+- *(previews)* Streamline preview URL generation by utilizing application method
+- *(application)* Adjust layout and spacing in general application view for improved UI
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.420.3] - 2025-07-03
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.420.2] - 2025-07-03
+
+### 🚀 Features
+
+- *(template)* Added excalidraw (#6095)
+- *(template)* Add excalidraw service configuration with documentation and tags
+
+### 🐛 Bug Fixes
+
+- *(terminal)* Ensure shell execution only uses valid shell if available in terminal command
+- *(ui)* Improve destination selection description for clarity in resource segregation
+- *(jobs)* Update middleware to use expireAfter for WithoutOverlapping in multiple job classes
+- Removing eager loading (#6071)
+- *(template)* Adjust health check interval and retries for excalidraw service
+- *(ui)* Env variable settings wrong order
+- *(service)* Ensure configuration changes are properly tracked and dispatched
+
+### 🚜 Refactor
+
+- *(ui)* Enhance project cloning interface with improved table layout for server and resource selection
+- *(terminal)* Simplify command construction for SSH execution
+- *(settings)* Streamline instance admin checks and initialization of settings in Livewire components
+- *(policy)* Optimize team membership checks in S3StoragePolicy
+- *(popup)* Improve styling and structure of the small popup component
+- *(shared)* Enhance FQDN generation logic for services in newParser function
+- *(redis)* Enhance CleanupRedis command with dry-run option and improved key deletion logic
+- *(init)* Standardize method naming conventions and improve command structure in Init.php
+- *(shared)* Improve error handling in getTopLevelNetworks function to return network name on invalid docker-compose.yml
+- *(database)* Improve error handling for unsupported database types in StartDatabaseProxy
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Bump coolify and nightly versions to 4.0.0-beta.420.3 and 4.0.0-beta.420.4 respectively
+- *(versions)* Update coolify and nightly versions to 4.0.0-beta.420.4 and 4.0.0-beta.420.5 respectively
+
+## [4.0.0-beta.420.1] - 2025-06-26
+
+### 🐛 Bug Fixes
+
+- *(server)* Prepend 'mux_' to UUID in muxFilename method for consistent naming
+- *(ui)* Enhance terminal access messaging to clarify server functionality and terminal status
+- *(database)* Proxy ssl port if ssl is enabled
+
+### 🚜 Refactor
+
+- *(ui)* Separate views for instance settings to separate paths to make it cleaner
+- *(ui)* Remove unnecessary step3ButtonText attributes from modal confirmation components for cleaner code
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update Coolify versions to 4.0.0-beta.420.2 and 4.0.0-beta.420.3 in multiple files
+
+## [4.0.0-beta.420] - 2025-06-26
+
+### 🚀 Features
+
+- *(service)* Add Miniflux service (#5843)
+- *(service)* Add Pingvin Share service (#5969)
+- *(auth)* Add Discord OAuth Provider (#5552)
+- *(auth)* Add Clerk OAuth Provider (#5553)
+- *(auth)* Add Zitadel OAuth Provider (#5490)
+- *(core)* Set custom API rate limit (#5984)
+- *(service)* Enhance service status handling and UI updates
+- *(cleanup)* Add functionality to delete teams with no members or servers in CleanupStuckedResources command
+- *(ui)* Add heart icon and enhance popup messaging for sponsorship support
+- *(settings)* Add sponsorship popup toggle and corresponding database migration
+- *(migrations)* Add optimized indexes to activity_log for improved query performance
+
+### 🐛 Bug Fixes
+
+- *(service)* Audiobookshelf healthcheck command (#5993)
+- *(service)* Downgrade Evolution API phone version (#5977)
+- *(service)* Pingvinshare-with-clamav
+- *(ssh)* Scp requires square brackets for ipv6 (#6001)
+- *(github)* Changing github app breaks the webhook. it does not anymore
+- *(parser)* Improve FQDN generation and update environment variable handling
+- *(ui)* Enhance status refresh buttons with loading indicators
+- *(ui)* Update confirmation button text for stopping database and service
+- *(routes)* Update middleware for deploy route to use 'api.ability:deploy'
+- *(ui)* Refine API token creation form and update helper text for clarity
+- *(ui)* Adjust layout of deployments section for improved alignment
+- *(ui)* Adjust project grid layout and refine server border styling for better visibility
+- *(ui)* Update border styling for consistency across components and enhance loading indicators
+- *(ui)* Add padding to section headers in settings views for improved spacing
+- *(ui)* Reduce gap between input fields in email settings for better alignment
+- *(docker)* Conditionally enable gzip compression in Traefik labels based on configuration
+- *(parser)* Enable gzip compression conditionally for Pocketbase images and streamline service creation logic
+- *(ui)* Update padding for trademarks policy and enhance spacing in advanced settings section
+- *(ui)* Correct closing tag for sponsorship link in layout popups
+- *(ui)* Refine wording in sponsorship donation prompt in layout popups
+- *(ui)* Update navbar icon color and enhance popup layout for sponsorship support
+- *(ui)* Add target="_blank" to sponsorship links in layout popups for improved user experience
+- *(models)* Refine comment wording in User model for clarity on user deletion criteria
+- *(models)* Improve user deletion logic in User model to handle team member roles and prevent deletion if user is alone in root team
+- *(ui)* Update wording in sponsorship prompt for clarity and engagement
+- *(shared)* Refactor gzip handling for Pocketbase in newParser function for improved clarity
+
+### 🚜 Refactor
+
+- *(service)* Update Hoarder to their new name karakeep (#5964)
+- *(service)* Karakeep naming and formatting
+- *(service)* Improve miniflux
+- *(core)* Rename API rate limit ENV
+- *(ui)* Simplify container selection form in execute-container-command view
+- *(email)* Streamline SMTP and resend settings logic for improved clarity
+- *(invitation)* Rename methods for consistency and enhance invitation deletion logic
+- *(user)* Streamline user deletion process and enhance team management logic
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(service)* Update Evolution API image to the official one (#6031)
+- *(versions)* Bump coolify versions to v4.0.0-beta.420 and v4.0.0-beta.421
+- *(dependencies)* Update composer dependencies to latest versions including resend-laravel to ^0.19.0 and aws-sdk-php to 3.347.0
+- *(versions)* Update Coolify version to 4.0.0-beta.420.1 and add new services (karakeep, miniflux, pingvinshare) to service templates
+
+## [4.0.0-beta.419] - 2025-06-17
 
 ### 🚀 Features
 
@@ -50,6 +222,11 @@ All notable changes to this project will be documented in this file.
 - *(proxy-dashboard)* Implement ProxyDashboardCacheService to manage Traefik dashboard cache; clear cache on configuration changes and proxy actions
 - *(terminal-connection)* Enhance terminal connection handling with auto-connect feature and improved status messaging
 - *(terminal)* Implement resize handling with ResizeObserver for improved terminal responsiveness
+- *(migration)* Add is_sentinel_enabled column to server_settings with default true
+- *(seeder)* Dispatch StartProxy action for each server in ProductionSeeder
+- *(seeder)* Add CheckAndStartSentinelJob dispatch for each server in ProductionSeeder
+- *(seeder)* Conditionally dispatch StartProxy action based on proxy check result
+- *(service)* Update Changedetection template (#5937)
 
 ### 🐛 Bug Fixes
 
@@ -121,6 +298,11 @@ All notable changes to this project will be documented in this file.
 - *(terminal)* Now it should work
 - *(degraded-status)* Remove unnecessary whitespace in badge element for cleaner HTML
 - *(routes)* Add name to security route for improved route management
+- *(migration)* Update default value handling for is_sentinel_enabled column in server_settings
+- *(seeder)* Conditionally dispatch CheckAndStartSentinelJob based on server's sentinel status
+- *(service)* Disable healthcheck logging for Gotenberg (#6005)
+- *(service)* Joplin volume name (#5930)
+- *(server)* Update sentinelUpdatedAt assignment to use server's sentinel_updated_at property
 
 ### 💼 Other
 
@@ -198,11 +380,15 @@ All notable changes to this project will be documented in this file.
 - *(navigation)* Remove wire:navigate directive from configuration links for cleaner HTML structure
 - *(proxy)* Update StartProxy calls to use named parameter for async option
 - *(clone-project)* Enhance server retrieval by including destinations and filtering out build servers
+- *(ui)* Terminal
+- *(ui)* Remove terminal header from execute-container-command view
+- *(ui)* Remove unnecessary padding from deployment, backup, and logs sections
 
 ### 📚 Documentation
 
 - Update changelog
 - *(service)* Add new docs link for zipline (#5912)
+- Update changelog
 - Update changelog
 - Update changelog
 
@@ -236,6 +422,9 @@ All notable changes to this project will be documented in this file.
 - *(api)* Update API docs
 - *(dependencies)* Update package versions in composer.json and composer.lock for improved compatibility and performance
 - *(dependencies)* Update package versions in package.json and package-lock.json for improved stability and features
+- *(version)* Update coolify-realtime to version 1.0.9 in docker-compose and versions files
+- *(version)* Update coolify version to 4.0.0-beta.420 and nightly version to 4.0.0-beta.421
+- *(service)* Changedetection remove unused code
 
 ## [4.0.0-beta.417] - 2025-05-07
 

@@ -32,7 +32,7 @@
         Select events for which you would like to receive Slack notifications.
     </p>
     <div class="flex flex-col gap-4 max-w-2xl">
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="deploymentSuccessSlackNotifications"
@@ -44,14 +44,14 @@
                     id="statusChangeSlackNotifications" label="Container Status Changes" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Backups</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="backupSuccessSlackNotifications" label="Backup Success" />
                 <x-forms.checkbox instantSave="saveModel" id="backupFailureSlackNotifications" label="Backup Failure" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Scheduled Tasks</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="scheduledTaskSuccessSlackNotifications"
@@ -60,7 +60,7 @@
                     label="Scheduled Task Failure" />
             </div>
         </div>
-        <div class="border dark:border-coolgray-300 p-4 rounded-lg">
+        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="font-medium mb-3">Server</h3>
             <div class="flex flex-col gap-1.5 pl-1">
                 <x-forms.checkbox instantSave="saveModel" id="dockerCleanupSuccessSlackNotifications"

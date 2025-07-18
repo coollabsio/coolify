@@ -7,7 +7,7 @@
 version: '3.8'
 services:
   api:
-    image: 'atendai/evolution-api:latest' # Change to specific version if needed.
+    image: 'evoapicloud/evolution-api:latest' # Change to specific version if needed.
     restart: always
     depends_on:
       - redis

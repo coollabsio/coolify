@@ -21,7 +21,9 @@ Coolify implements **defense-in-depth security** with multiple layers of protect
 - **Supported Providers**:
   - Google OAuth
   - Microsoft Azure AD
+  - Clerk
   - Authentik
+  - Discord
   - GitHub (via GitHub Apps)
   - GitLab
 

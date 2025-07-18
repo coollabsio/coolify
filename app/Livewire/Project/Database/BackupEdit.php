@@ -73,6 +73,9 @@ class BackupEdit extends Component
     #[Validate(['required', 'boolean'])]
     public bool $dumpAll = false;
 
+    #[Validate(['required', 'int', 'min:1', 'max:36000'])]
+    public int $timeout = 3600;
+
     public function mount()
     {
         try {
@@ -98,6 +101,7 @@ class BackupEdit extends Component
             $this->backup->s3_storage_id = $this->s3StorageId;
             $this->backup->databases_to_backup = $this->databasesToBackup;
             $this->backup->dump_all = $this->dumpAll;
+            $this->backup->timeout = $this->timeout;
             $this->customValidate();
             $this->backup->save();
         } else {
@@ -114,6 +118,7 @@ class BackupEdit extends Component
             $this->s3StorageId = $this->backup->s3_storage_id;
             $this->databasesToBackup = $this->backup->databases_to_backup;
             $this->dumpAll = $this->backup->dump_all;
+            $this->timeout = $this->backup->timeout;
         }
     }
 
