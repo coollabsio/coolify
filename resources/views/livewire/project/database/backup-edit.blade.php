@@ -77,6 +77,7 @@
             <x-forms.input label="Frequency" id="frequency" />
             <x-forms.input label="Timezone" id="timezone" disabled
                 helper="The timezone of the server where the backup is scheduled to run (if not set, the instance timezone will be used)" />
+            <x-forms.input label="Timeout" id="timeout" helper="The timeout of the backup job in seconds."/>
         </div>
 
         <h3 class="mt-6 mb-2 text-lg font-medium">Backup Retention Settings</h3>

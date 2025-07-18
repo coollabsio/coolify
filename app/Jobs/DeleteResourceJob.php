@@ -8,6 +8,7 @@ use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -30,7 +31,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
+        public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
         public bool $deleteConfigurations = true,
         public bool $deleteVolumes = true,
         public bool $dockerCleanup = true,
@@ -42,6 +43,13 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
+            // Handle ApplicationPreview instances separately
+            if ($this->resource instanceof ApplicationPreview) {
+                $this->deleteApplicationPreview();
+
+                return;
+            }
+
             switch ($this->resource->type()) {
                 case 'application':
                     StopApplication::run($this->resource, previewDeployments: true);
@@ -103,5 +111,56 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
             Artisan::queue('cleanup:stucked-resources');
         }
+    }
+
+    private function deleteApplicationPreview()
+    {
+        $application = $this->resource->application;
+        $server = $application->destination->server;
+        $pull_request_id = $this->resource->pull_request_id;
+
+        // Ensure the preview is soft deleted (may already be done in Livewire component)
+        if (! $this->resource->trashed()) {
+            $this->resource->delete();
+        }
+
+        try {
+            if ($server->isSwarm()) {
+                instant_remote_process(["docker stack rm {$application->uuid}-{$pull_request_id}"], $server);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($server, $application->id, $pull_request_id)->toArray();
+                $this->stopPreviewContainers($containers, $server);
+            }
+        } catch (\Throwable $e) {
+            // Log the error but don't fail the job
+            ray('Error stopping preview containers: '.$e->getMessage());
+        }
+
+        // Finally, force delete to trigger resource cleanup
+        $this->resource->forceDelete();
+    }
+
+    private function stopPreviewContainers(array $containers, $server, int $timeout = 30)
+    {
+        if (empty($containers)) {
+            return;
+        }
+
+        $containerNames = [];
+        foreach ($containers as $container) {
+            $containerNames[] = str_replace('/', '', $container['Names']);
+        }
+
+        $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
+        $commands = [
+            "docker stop --time=$timeout $containerList",
+            "docker rm -f $containerList",
+        ];
+
+        instant_remote_process(
+            command: $commands,
+            server: $server,
+            throwError: false
+        );
     }
 }
