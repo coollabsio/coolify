@@ -1260,26 +1260,17 @@ class Service extends BaseModel
 
             return 3;
         });
+        $envs = collect([]);
         foreach ($sorted as $env) {
-            if (version_compare($env->version, '4.0.0-beta.347', '<=')) {
-                $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
-            } else {
-                $real_value = $env->real_value;
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    if ($env->is_literal || $env->is_multiline) {
-                        $real_value = '\''.$real_value.'\'';
-                    } else {
-                        $real_value = escapeEnvVariables($env->real_value);
-                    }
-                }
-                $commands[] = "echo \"{$env->key}={$real_value}\" >> .env";
-            }
+            $envs->push("{$env->key}={$env->real_value}");
         }
-        if ($sorted->count() === 0) {
+        if ($envs->count() === 0) {
             $commands[] = 'touch .env';
+        } else {
+            $envs_base64 = base64_encode($envs->implode("\n"));
+            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
         }
+
         instant_remote_process($commands, $this->server);
     }
 

@@ -599,7 +599,15 @@ function getTopLevelNetworks(Service|Application $resource)
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
             } catch (\Exception $e) {
-                throw new \RuntimeException($e->getMessage());
+                // If the docker-compose.yml file is not valid, we will return the network name as the key
+                $topLevelNetworks = collect([
+                    $resource->uuid => [
+                        'name' => $resource->uuid,
+                        'external' => true,
+                    ],
+                ]);
+
+                return $topLevelNetworks->keys();
             }
             $services = data_get($yaml, 'services');
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
@@ -653,9 +661,16 @@ function getTopLevelNetworks(Service|Application $resource)
         try {
             $yaml = Yaml::parse($resource->docker_compose_raw);
         } catch (\Exception $e) {
-            throw new \RuntimeException($e->getMessage());
+            // If the docker-compose.yml file is not valid, we will return the network name as the key
+            $topLevelNetworks = collect([
+                $resource->uuid => [
+                    'name' => $resource->uuid,
+                    'external' => true,
+                ],
+            ]);
+
+            return $topLevelNetworks->keys();
         }
-        $server = $resource->destination->server;
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $services = data_get($yaml, 'services');
         $definedNetwork = collect([$resource->uuid]);
@@ -2931,7 +2946,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
     } catch (\Exception) {
         return collect([]);
     }
-
     $services = data_get($yaml, 'services', collect([]));
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
@@ -3049,7 +3063,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                 }
             }
-
             // Get magic environments where we need to preset the FQDN
             if ($key->startsWith('SERVICE_FQDN_')) {
                 // SERVICE_FQDN_APP or SERVICE_FQDN_APP_3000
@@ -3134,6 +3147,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     continue;
                 }
                 if ($command->value() === 'FQDN') {
+                    if ($isApplication && $resource->build_pack === 'dockercompose') {
+                        continue;
+                    }
                     $fqdnFor = $key->after('SERVICE_FQDN_')->lower()->value();
                     if (str($fqdnFor)->contains('_')) {
                         $fqdnFor = str($fqdnFor)->before('_');
@@ -3149,6 +3165,9 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 } elseif ($command->value() === 'URL') {
+                    if ($isApplication && $resource->build_pack === 'dockercompose') {
+                        continue;
+                    }
                     $fqdnFor = $key->after('SERVICE_URL_')->lower()->value();
                     if (str($fqdnFor)->contains('_')) {
                         $fqdnFor = str($fqdnFor)->before('_');
@@ -3599,7 +3618,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                             'is_required' => $isRequired,
                         ]);
                         // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where('resourceable_type', get_class($resource))->where('resourceable_id', $resource->id)->first()->value;
+                        // $environment[$parsedKeyValue->value()] = $resource->environment_variables()->where('key', $parsedKeyValue)->where('resourceable_type', get_class($resource))->where('resourceable_id', $resource->id)->first()->real_value;
+                        $environment[$parsedKeyValue->value()] = $value;
 
                         continue;
                     }
@@ -3637,9 +3657,30 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
 
         if ($isApplication) {
-            $domains = collect(json_decode($resource->docker_compose_domains)) ?? collect([]);
+            if ($isPullRequest) {
+                $preview = $resource->previews()->find($preview_id);
+                $domains = collect(json_decode(data_get($preview, 'docker_compose_domains'))) ?? collect([]);
+            } else {
+                $domains = collect(json_decode($resource->docker_compose_domains)) ?? collect([]);
+            }
             $fqdns = data_get($domains, "$serviceName.domain");
-            if ($fqdns) {
+            // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
+            if ($resource->build_pack === 'dockercompose') {
+                foreach ($domains as $forServiceName => $domain) {
+                    $parsedDomain = data_get($domain, 'domain');
+                    if (filled($parsedDomain)) {
+                        $parsedDomain = str($parsedDomain)->explode(',')->first();
+                        $coolifyUrl = Url::fromString($parsedDomain);
+                        $coolifyScheme = $coolifyUrl->getScheme();
+                        $coolifyFqdn = $coolifyUrl->getHost();
+                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
+                        $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper(), $coolifyUrl->__toString());
+                        $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper(), $coolifyFqdn);
+                    }
+                }
+            }
+            // If the domain is set, we need to generate the FQDNs for the preview
+            if (filled($fqdns)) {
                 $fqdns = str($fqdns)->explode(',');
                 if ($isPullRequest) {
                     $preview = $resource->previews()->find($preview_id);
@@ -3671,7 +3712,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     }
                 }
             }
-
             $defaultLabels = defaultLabels(
                 id: $resource->id,
                 name: $containerName,
@@ -3681,6 +3721,7 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                 type: 'application',
                 environment: $resource->environment->name,
             );
+
         } elseif ($isService) {
             if ($savedService->serviceType()) {
                 $fqdns = generateServiceSpecificFqdns($savedService);
@@ -3702,10 +3743,13 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
         }
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
-            $coolifyEnvironments->put('COOLIFY_URL', $fqdns->implode(','));
+            $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
+                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+            });
+            $coolifyEnvironments->put('COOLIFY_URL', $fqdnsWithoutPort->implode(','));
 
             $urls = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '');
+                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
             });
             $coolifyEnvironments->put('COOLIFY_FQDN', $urls->implode(','));
         }
