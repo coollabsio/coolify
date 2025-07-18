@@ -20,3 +20,8 @@ services:
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
       - runner:/tmp/runner
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep '[R]unner' > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
