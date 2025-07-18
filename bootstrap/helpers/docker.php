@@ -359,7 +359,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
-    $labels->push('traefik.http.middlewares.gzip.compress=true');
+    if ($is_gzip_enabled) {
+        $labels->push('traefik.http.middlewares.gzip.compress=true');
+    }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
 
     $is_http_basic_auth_enabled = $is_http_basic_auth_enabled && $http_basic_auth_username !== null && $http_basic_auth_password !== null;

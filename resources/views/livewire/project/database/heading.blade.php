@@ -11,16 +11,16 @@
             class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
             <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.configuration', $parameters) }}">
-                <button>Configuration</button>
+                Configuration
             </a>
 
             <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.logs', $parameters) }}">
-                <button>Logs</button>
+                Logs
             </a>
             <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.command', $parameters) }}">
-                <button>Terminal</button>
+                Terminal
             </a>
             @if (
                 $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
@@ -29,7 +29,7 @@
                     $database->getMorphClass() === 'App\Models\StandaloneMariadb')
                 <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
                     href="{{ route('project.database.backup.index', $parameters) }}">
-                    <button>Backups</button>
+                    Backups
                 </a>
             @endif
         </nav>
@@ -60,7 +60,7 @@
                             'If the database is currently in use data could be lost.',
                             'All non-persistent data of this database (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the database again).',
                         ]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Stop Database">
+                        step1ButtonText="Continue" step2ButtonText="Confirm">
                         <x-slot:button-title>
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"

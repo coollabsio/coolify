@@ -19,6 +19,7 @@ class StartService
             StopService::run(service: $service, dockerCleanup: false);
         }
         $service->saveComposeConfigs();
+        $service->isConfigurationChanged(save: true);
         $commands[] = 'cd '.$service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
         if ($pullLatestImages) {
@@ -41,6 +42,6 @@ class StartService
             }
         }
 
-        return remote_process($commands, $service->server, type_uuid: $service->uuid);
+        return remote_process($commands, $service->server, type_uuid: $service->uuid, callEventOnFinish: 'ServiceStatusChanged');
     }
 }
