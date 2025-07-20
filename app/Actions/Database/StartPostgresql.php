@@ -203,15 +203,13 @@ class StartPostgresql
         }
 
         if ($this->database->enable_ssl) {
-            $docker_compose['services'][$container_name]['command'] = [
-                'postgres',
-                '-c',
-                'ssl=on',
-                '-c',
-                'ssl_cert_file=/var/lib/postgresql/certs/server.crt',
-                '-c',
-                'ssl_key_file=/var/lib/postgresql/certs/server.key',
-            ];
+            $docker_compose['services'][$container_name]['command'] ??= ['postgres'];
+            array_push(
+                $docker_compose['services'][$container_name]['command'],
+                '-c', 'ssl=on',
+                '-c', 'ssl_cert_file=/var/lib/postgresql/certs/server.crt',
+                '-c', 'ssl_key_file=/var/lib/postgresql/certs/server.key'
+            );
         }
 
         // Add custom docker run options
