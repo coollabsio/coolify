@@ -6,7 +6,7 @@
 
 services:
   rybbit_backend:
-    image: ghcr.io/rybbit-io/rybbit-backend:v1.5.0
+    image: ghcr.io/rybbit-io/rybbit-backend:v1.5.1
     environment:
       - NODE_ENV=production
       - CLICKHOUSE_HOST=http://rybbit_clickhouse:8123
@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
 
   rybbit_client:
-    image: ghcr.io/rybbit-io/rybbit-client:v1.5.0
+    image: ghcr.io/rybbit-io/rybbit-client:v1.5.1
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_RYBBIT_80}
