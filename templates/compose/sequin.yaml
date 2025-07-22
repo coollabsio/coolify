@@ -28,6 +28,8 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "http://localhost:7376/health"]
 
   postgres:
     image: 'postgres:16'
