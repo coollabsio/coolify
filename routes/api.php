@@ -48,8 +48,11 @@ Route::group([
     Route::get('/projects/{uuid}/{environment_name_or_uuid}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
 
     Route::post('/projects', [ProjectController::class, 'create_project'])->middleware(['api.ability:read']);
+    Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
     Route::patch('/projects/{uuid}', [ProjectController::class, 'update_project'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/environments/{environment_uuid}', [ProjectController::class, 'update_environment'])->middleware(['api.ability:write']);
     Route::delete('/projects/{uuid}', [ProjectController::class, 'delete_project'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/environments/{environment_uuid}', [ProjectController::class, 'delete_environment'])->middleware(['api.ability:write']);
 
     Route::get('/security/keys', [SecurityController::class, 'keys'])->middleware(['api.ability:read']);
     Route::post('/security/keys', [SecurityController::class, 'create_key'])->middleware(['api.ability:write']);

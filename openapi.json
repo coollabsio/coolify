@@ -5196,6 +5196,258 @@
                 ]
             }
         },
+        "\/projects\/{uuid}\/environments": {
+            "post": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Create Environment",
+                "description": "Create a new environment in a project.",
+                "operationId": "create-environment",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Project UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Environment data.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The name of the environment.",
+                                        "minLength": 3
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "The description of the environment.",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Environment created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string",
+                                            "example": "og888os",
+                                            "description": "The UUID of the environment."
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "example": "staging",
+                                            "description": "The name of the environment."
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "example": "Staging environment",
+                                            "description": "The description of the environment."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "description": "Project not found."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/projects\/{uuid}\/environments\/{environment_uuid}": {
+            "delete": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Delete Environment",
+                "description": "Delete an environment from a project.",
+                "operationId": "delete-environment",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Project UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "path",
+                        "description": "Environment UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Environment deleted.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Environment deleted."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "description": "Project or environment not found."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Update Environment",
+                "description": "Update an environment in a project.",
+                "operationId": "update-environment",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Project UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "path",
+                        "description": "Environment UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Environment data.",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The name of the environment.",
+                                        "minLength": 3
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "The description of the environment.",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Environment updated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string",
+                                            "example": "og888os",
+                                            "description": "The UUID of the environment."
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "example": "staging",
+                                            "description": "The name of the environment."
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "example": "Staging environment",
+                                            "description": "The description of the environment."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "description": "Project or environment not found."
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/resources": {
             "get": {
                 "tags": [
@@ -8024,6 +8276,9 @@
                         "type": "boolean"
                     },
                     "is_swarm_worker": {
+                        "type": "boolean"
+                    },
+                    "is_terminal_enabled": {
                         "type": "boolean"
                     },
                     "is_usable": {
