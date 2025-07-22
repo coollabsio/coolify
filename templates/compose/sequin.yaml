@@ -7,35 +7,34 @@
 services:
   sequin:
     image: sequin/sequin:latest
-    pull_policy: always
     environment:
       - SERVICE_FQDN_SEQUIN_7376
       - SERVER_HOST=${SERVICE_FQDN_SEQUIN}
-      - PG_HOSTNAME=sequin_postgres
-      - PG_DATABASE=sequin
+      - PG_HOSTNAME=postgres
+      - PG_DATABASE=${POSTGRES_DB:-sequin-db}
       - PG_PORT=5432
       - PG_USERNAME=${SERVICE_USER_POSTGRES}
       - PG_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - PG_POOL_SIZE=20
-      - SECRET_KEY_BASE=${SERVICE_REALBASE64_64_SEQUIN}
-      - VAULT_KEY=${SERVICE_REALBASE64_SEQUIN}
-      - REDIS_URL=redis://sequin_redis:6379
+      - SECRET_KEY_BASE=${SERVICE_REALBASE64_64_SECRETKEY}
+      - VAULT_KEY=${SERVICE_REALBASE64_VAULTKEY}
+      - REDIS_URL=redis://redis:6379
       - CONFIG_FILE_PATH=/config/playground.yml
       - FEATURE_ACCOUNT_SELF_SIGNUP=${FEATURE_ACCOUNT_SELF_SIGNUP:-false}
       - SEQUIN_TELEMETRY_DISABLED=${SEQUIN_TELEMETRY_DISABLED:-false}
       - CRASH_REPORTING_DISABLED=${CRASH_REPORTING_DISABLED:-false}
     depends_on:
-      sequin_redis:
+      redis:
         condition: service_started
-      sequin_postgres:
+      postgres:
         condition: service_healthy
 
-  sequin_postgres:
+  postgres:
     image: 'postgres:16'
     environment:
-      - POSTGRES_DB=sequin
-      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
-      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - POSTGRES_DB=${POSTGRES_DB:-sequin-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     command:
       - postgres
       - '-c'
@@ -50,13 +49,18 @@ services:
       start_period: 2s
       start_interval: 1s
     volumes:
-      - 'sequin_postgres_data:/var/lib/postgresql/data'
+      - 'postgres_data:/var/lib/postgresql/data'
 
-  sequin_redis:
+  redis:
     image: 'redis:7'
     command:
       - redis-server
       - '--port'
       - '6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
     volumes:
-      - 'sequin_redis_data:/data'
+      - 'redis_data:/data'
