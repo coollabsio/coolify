@@ -1,0 +1,19 @@
+# documentation: https://docs.fossorial.io/Getting%20Started/overview
+# slogan: Pangolin tunnels your services to the internet so you can access anything from anywhere.
+# tags: wireguard, reverse-proxy, zero-trust-network-access, open source
+# logo: svgs/pangolin-logo.png
+
+services:
+  newt:
+    image: fosrl/newt
+    container_name: newt
+    restart: unless-stopped
+    environment:
+      - 'PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT:-domain.tld}'
+      - 'NEWT_ID=${NEWT_ID}'
+      - 'NEWT_SECRET=${NEWT_SECRET}'
+    healthcheck:
+      test: ["CMD", "newt", "--version"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
