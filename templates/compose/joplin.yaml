@@ -25,6 +25,8 @@ services:
 
   joplin:
     image: 'joplin/server:latest'
+    expose:
+      - "22300"
     platform: 'linux/amd64'
     depends_on:
       postgres:
