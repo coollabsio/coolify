@@ -56,7 +56,7 @@
                                         </option>
                                     @endif -->
                                     <option value="{{ data_get($repo, 'name') }}">
-                                        {{ data_get($repo, 'name') }}
+                                        {{ data_get($repo, 'full_name') }}
                                     </option>
                                 @endforeach
                             </x-forms.datalist>
