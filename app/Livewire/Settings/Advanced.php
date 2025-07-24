@@ -44,18 +44,17 @@ class Advanced extends Component
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
-        } else {
-            $this->server = Server::findOrFail(0);
-            $this->settings = instanceSettings();
-            $this->custom_dns_servers = $this->settings->custom_dns_servers;
-            $this->allowed_ips = $this->settings->allowed_ips;
-            $this->do_not_track = $this->settings->do_not_track;
-            $this->is_registration_enabled = $this->settings->is_registration_enabled;
-            $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
-            $this->is_api_enabled = $this->settings->is_api_enabled;
-            $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
-            $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         }
+        $this->server = Server::findOrFail(0);
+        $this->settings = instanceSettings();
+        $this->custom_dns_servers = $this->settings->custom_dns_servers;
+        $this->allowed_ips = $this->settings->allowed_ips;
+        $this->do_not_track = $this->settings->do_not_track;
+        $this->is_registration_enabled = $this->settings->is_registration_enabled;
+        $this->is_dns_validation_enabled = $this->settings->is_dns_validation_enabled;
+        $this->is_api_enabled = $this->settings->is_api_enabled;
+        $this->disable_two_step_confirmation = $this->settings->disable_two_step_confirmation;
+        $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
     }
 
     public function submit()
