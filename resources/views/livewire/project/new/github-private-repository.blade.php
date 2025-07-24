@@ -45,18 +45,21 @@
                 @if ($repositories->count() > 0)
                     <div class="flex flex-col gap-2 pb-6">
                         <div class="flex gap-2">
-                            <x-forms.select class="w-full" label="Repository" wire:model="selected_repository_id">
+                            <x-forms.datalist class="w-full" label="Repository" wire:model.live="repository_search" id="repository_search" helper="Search by repository name or type to filter repositories">
                                 @foreach ($repositories as $repo)
-                                    @if ($loop->first)
+                                <!-- @if ($loop->first)
                                         <option selected value="{{ data_get($repo, 'id') }}">
                                             {{ data_get($repo, 'name') }}
                                         </option>
                                     @else
                                         <option value="{{ data_get($repo, 'id') }}">{{ data_get($repo, 'name') }}
                                         </option>
-                                    @endif
+                                    @endif -->
+                                    <option value="{{ data_get($repo, 'name') }}">
+                                        {{ data_get($repo, 'name') }}
+                                    </option>
                                 @endforeach
-                            </x-forms.select>
+                            </x-forms.datalist>
                         </div>
                         <x-forms.button wire:click.prevent="loadBranches"> Load Repository </x-forms.button>
                     </div>

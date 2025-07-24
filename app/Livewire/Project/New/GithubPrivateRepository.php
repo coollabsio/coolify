@@ -53,6 +53,9 @@ class GithubPrivateRepository extends Component
 
     public ?string $publish_directory = null;
 
+    // Repository search functionality
+    public string $repository_search = '';
+
     // In case of docker compose
     public ?string $base_directory = null;
 
@@ -120,8 +123,43 @@ class GithubPrivateRepository extends Component
         $this->repositories = $this->repositories->sortBy('name');
         if ($this->repositories->count() > 0) {
             $this->selected_repository_id = data_get($this->repositories->first(), 'id');
+            // Initialize search field with the first repository's name
+            $this->repository_search = data_get($this->repositories->first(), 'name');
         }
         $this->current_step = 'repository';
+    }
+
+    public function updatedRepositorySearch()
+    {
+        // Find repository by name or full_name when user types or selects
+        if (!empty($this->repository_search)) {
+            $repository = $this->repositories->first(function ($repo) {
+                $search = strtolower(trim($this->repository_search));
+                $name = strtolower(data_get($repo, 'name'));
+                $fullName = strtolower(data_get($repo, 'full_name'));
+                
+                return $name === $search || $fullName === $search;
+            });
+            
+            if ($repository) {
+                $this->selected_repository_id = data_get($repository, 'id');
+            } else {
+                // If no exact match found, try partial matching for better UX
+                $repository = $this->repositories->first(function ($repo) {
+                    $search = strtolower(trim($this->repository_search));
+                    $name = strtolower(data_get($repo, 'name'));
+                    $fullName = strtolower(data_get($repo, 'full_name'));
+                    
+                    return str_contains($name, $search) || str_contains($fullName, $search);
+                });
+                
+                if ($repository) {
+                    $this->selected_repository_id = data_get($repository, 'id');
+                    // Update search field to exact repository name for clarity
+                    $this->repository_search = data_get($repository, 'name');
+                }
+            }
+        }
     }
 
     public function loadBranches()
