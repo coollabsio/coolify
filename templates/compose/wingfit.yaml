@@ -1,0 +1,18 @@
+# documentation: https://github.com/itskovacs/wingfit/blob/main/README.md
+# slogan: Wingfit is a minimalist fitness app to plan your workouts, track your personal records and leverage smartwatch data.
+# tags: fitness, workout
+# logo: svgs/wingfit.png
+# port: 8000
+
+services:
+  wingfit:
+    image: 'ghcr.io/itskovacs/wingfit:latest'
+    environment:
+      - SERVICE_FQDN_WINGFIT_8000
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/8000' || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - 'wingfit-data:/app/storage'
