@@ -15,6 +15,10 @@
     @endif
 
     <section>
+        <livewire:system-info-widget />
+    </section>
+
+    <section>
         <h3 class="pb-2">Projects</h3>
         @if ($projects->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
