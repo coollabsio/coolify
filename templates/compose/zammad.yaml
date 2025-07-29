@@ -1,0 +1,247 @@
+# documentation: https://docs.zammad.org/en/latest/
+# slogan: Web-based open-source helpdesk and support ticketing system
+# tags: helpdesk,support,crm,ticketing
+# logo: svgs/zammad.svg
+# port: 8080
+
+version: '3.8'
+
+x-zammad-common-env: &zammad-common-env
+  MEMCACHE_SERVERS: 'zammad-memcached:11211'
+  POSTGRESQL_DB: zammad_production
+  POSTGRESQL_HOST: zammad-postgresql
+  POSTGRESQL_USER: '${SERVICE_USER_POSTGRES}'
+  POSTGRESQL_PASS: '${SERVICE_PASSWORD_POSTGRES}'
+  POSTGRESQL_PORT: '5432'
+  POSTGRESQL_OPTIONS: '?pool=50'
+  REDIS_URL: 'redis://zammad-redis:6379'
+  ELASTICSEARCH_ENABLED: 'true'
+  ELASTICSEARCH_SCHEMA: http
+  ELASTICSEARCH_HOST: zammad-elasticsearch
+  ELASTICSEARCH_PORT: '9200'
+  ELASTICSEARCH_USER: elastic
+  ELASTICSEARCH_PASS: '${SERVICE_PASSWORD_ELASTIC}'
+  TZ: '${TZ:-Europe/Dublin}'
+
+x-zammad-service: &zammad-service
+  image: '${IMAGE_REPO:-ghcr.io/zammad/zammad}:${VERSION:-6.5.0-53}'
+  restart: unless-stopped
+  environment:
+    <<: *zammad-common-env
+  volumes:
+    - 'zammad-storage:/opt/zammad/storage'
+  depends_on:
+    zammad-memcached:
+      condition: service_healthy
+    zammad-postgresql:
+      condition: service_healthy
+    zammad-redis:
+      condition: service_healthy
+    zammad-elasticsearch:
+      condition: service_healthy
+
+services:
+  zammad-railsserver:
+    <<: *zammad-service
+    labels:
+      coolify.service.name: zammad-railsserver
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000 || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    environment:
+      <<: *zammad-common-env
+    command: ['zammad-railsserver']
+
+  zammad-scheduler:
+    <<: *zammad-service
+    labels:
+      coolify.service.name: zammad-scheduler
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD-SHELL', 'test -f /proc/1/status || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: ['zammad-scheduler']
+
+  zammad-websocket:
+    <<: *zammad-service
+    labels:
+      coolify.service.name: zammad-websocket
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD-SHELL', "ss -ltn | grep ':6042' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: ['zammad-websocket']
+
+  zammad-nginx:
+    <<: *zammad-service
+    labels:
+      coolify.service.name: zammad-nginx
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:8080 || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    environment:
+      <<: *zammad-common-env
+      SERVICE_FQDN_ZAMMAD_8080: ${SERVICE_FQDN_ZAMMAD}
+      NGINX_SERVER_SCHEME: https
+      NGINX_PORT: '8080'
+    depends_on:
+      zammad-railsserver:
+        condition: service_healthy
+      zammad-memcached:
+        condition: service_healthy
+      zammad-postgresql:
+        condition: service_healthy
+      zammad-redis:
+        condition: service_healthy
+      zammad-elasticsearch:
+        condition: service_healthy
+    expose:
+      - "8080"
+    command: ['zammad-nginx']
+
+  zammad-backup:
+    <<: *zammad-service
+    labels:
+      coolify.service.name: zammad-backup
+      coolify.project: zammad
+    volumes:
+      - 'zammad-backup:/var/tmp/zammad'
+      - 'zammad-storage:/opt/zammad/storage:ro'
+    user: '0:0'
+    command: ['zammad-backup']
+
+  zammad-init:
+    <<: *zammad-service
+    restart: on-failure
+    exclude_from_hc: true
+    labels:
+      coolify.service.name: zammad-init
+      coolify.project: zammad
+    user: '0:0'
+    command: ['zammad-init']
+
+  zammad-memcached:
+    image: 'memcached:${MEMCACHE_VERSION:-1.6.38-alpine}'
+    restart: unless-stopped
+    labels:
+      coolify.service.name: zammad-memcached
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD-SHELL', 'echo stats | nc localhost 11211 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: 'memcached -m 256M'
+
+  zammad-postgresql:
+    image: 'postgres:${POSTGRES_VERSION:-17.4-alpine}'
+    restart: unless-stopped
+    labels:
+      coolify.service.name: zammad-postgresql
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${SERVICE_USER_POSTGRES}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      POSTGRES_DB: zammad_production
+      POSTGRES_USER: '${SERVICE_USER_POSTGRES}'
+      POSTGRES_PASSWORD: '${SERVICE_PASSWORD_POSTGRES}'
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --locale=C'
+    volumes:
+      - 'postgresql-data:/var/lib/postgresql/data'
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+
+  zammad-redis:
+    image: 'redis:${REDIS_VERSION:-7.4.3-alpine}'
+    restart: unless-stopped
+    labels:
+      coolify.service.name: zammad-redis
+      coolify.project: zammad
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - 'redis-data:/data'
+    command: >
+      redis-server
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+
+  zammad-elasticsearch:
+    image: 'bitnami/elasticsearch:${ELASTICSEARCH_VERSION:-8.18.0}'
+    restart: unless-stopped
+    labels:
+      coolify.service.name: zammad-elasticsearch
+      coolify.project: zammad
+    environment:
+      ELASTICSEARCH_ENABLE_SECURITY: 'true'
+      ELASTICSEARCH_SKIP_TRANSPORT_TLS: 'true'
+      ELASTICSEARCH_ENABLE_REST_TLS: 'false'
+      ELASTICSEARCH_PASSWORD: '${SERVICE_PASSWORD_ELASTIC}'
+      ES_JAVA_OPTS: '-Xms1g -Xmx1g'
+      ELASTICSEARCH_HEAP_SIZE: '1g'
+    volumes:
+      - 'elasticsearch-data:/bitnami/elasticsearch/data'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs -u elastic:${SERVICE_PASSWORD_ELASTIC} http://localhost:9200 || exit 1']
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+volumes:
+  zammad-storage:
+    driver: local
+  zammad-backup:
+    driver: local
+  postgresql-data:
+    driver: local
+  redis-data:
+    driver: local
+  elasticsearch-data:
+    driver: local
