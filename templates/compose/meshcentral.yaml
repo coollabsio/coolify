@@ -8,17 +8,15 @@ services:
   meshcentral:
     image: "typhonragewind/meshcentral:latest"
     environment:
-      - SERVICE_FQDN_MESHCENTRAL_80
       - SERVICE_FQDN_MESHCENTRAL_443
       - HOSTNAME=${SERVICE_FQDN_MESHCENTRAL}
       - REVERSE_PROXY=false
-      - REVERSE_PROXY_TLS_PORT=
       - IFRAME=false
       - ALLOW_NEW_ACCOUNTS=${ALLOW_NEW_ACCOUNTS:-false}
       - WEBRTC=false
       - BACKUPS_PW=${SERVICE_BACKUP_PASSWORD}
-      - BACKUP_INTERVAL=24
-      - BACKUP_KEEP_DAYS=7
+      - BACKUP_INTERVAL=${BACKUP_INTERVAL:-24}
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-7}
     volumes:
       - "./meshcentral/data:/opt/meshcentral/meshcentral-data"
       - "./meshcentral/user_files:/opt/meshcentral/meshcentral-files"
