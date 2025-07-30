@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
+use App\Models\EnvironmentVariable;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -214,25 +215,21 @@ class General extends Component
 
     }
 
-    public function loadComposeFile($isInit = false)
+    public function loadComposeFile($isInit = false, $showToast = true)
     {
         try {
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
 
-            // Must reload the application to get the latest database changes
-            // Why? Not sure, but it works.
-            // $this->application->refresh();
-
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
-                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+                $showToast && $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
                 return;
             }
             $this->application->parse();
-            $this->dispatch('success', 'Docker compose file loaded.');
+            $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
@@ -273,7 +270,8 @@ class General extends Component
         $this->application->save();
         $this->dispatch('success', 'Domain generated.');
         if ($this->application->build_pack === 'dockercompose') {
-            $this->loadComposeFile();
+            $this->updateServiceEnvironmentVariables();
+            $this->loadComposeFile(showToast: false);
         }
 
         return $domain;
@@ -488,6 +486,12 @@ class General extends Component
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
+
+            // Update SERVICE_FQDN_ and SERVICE_URL_ environment variables for Docker Compose applications
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->updateServiceEnvironmentVariables();
+            }
+
             $showToaster && ! $warning && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
@@ -512,5 +516,86 @@ class General extends Component
             'Content-Type' => 'application/json',
             'Content-Disposition' => 'attachment; filename='.$fileName,
         ]);
+    }
+
+    private function updateServiceEnvironmentVariables()
+    {
+        $domains = collect(json_decode($this->application->docker_compose_domains, true)) ?? collect([]);
+
+        foreach ($domains as $serviceName => $service) {
+            $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_');
+            $domain = data_get($service, 'domain');
+
+            if ($domain) {
+                // Create or update SERVICE_FQDN_ and SERVICE_URL_ variables
+                $fqdn = Url::fromString($domain);
+                $port = $fqdn->getPort();
+                $path = $fqdn->getPath();
+                $fqdnValue = $fqdn->getScheme().'://'.$fqdn->getHost();
+                if ($path !== '/') {
+                    $fqdnValue = $fqdnValue.$path;
+                }
+                $urlValue = str($domain)->after('://');
+                if ($path !== '/') {
+                    $urlValue = $urlValue.$path;
+                }
+
+                // Create/update SERVICE_FQDN_
+                EnvironmentVariable::updateOrCreate([
+                    'resourceable_type' => Application::class,
+                    'resourceable_id' => $this->application->id,
+                    'key' => "SERVICE_FQDN_{$serviceNameFormatted}",
+                ], [
+                    'value' => $fqdnValue,
+                    'is_build_time' => false,
+                    'is_preview' => false,
+                ]);
+
+                // Create/update SERVICE_URL_
+                EnvironmentVariable::updateOrCreate([
+                    'resourceable_type' => Application::class,
+                    'resourceable_id' => $this->application->id,
+                    'key' => "SERVICE_URL_{$serviceNameFormatted}",
+                ], [
+                    'value' => $urlValue,
+                    'is_build_time' => false,
+                    'is_preview' => false,
+                ]);
+
+                // Create/update port-specific variables if port exists
+                if ($port) {
+                    EnvironmentVariable::updateOrCreate([
+                        'resourceable_type' => Application::class,
+                        'resourceable_id' => $this->application->id,
+                        'key' => "SERVICE_FQDN_{$serviceNameFormatted}_{$port}",
+                    ], [
+                        'value' => $fqdnValue,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+
+                    EnvironmentVariable::updateOrCreate([
+                        'resourceable_type' => Application::class,
+                        'resourceable_id' => $this->application->id,
+                        'key' => "SERVICE_URL_{$serviceNameFormatted}_{$port}",
+                    ], [
+                        'value' => $urlValue,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+                }
+            } else {
+                // Delete SERVICE_FQDN_ and SERVICE_URL_ variables if domain is removed
+                EnvironmentVariable::where('resourceable_type', Application::class)
+                    ->where('resourceable_id', $this->application->id)
+                    ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
+                    ->delete();
+
+                EnvironmentVariable::where('resourceable_type', Application::class)
+                    ->where('resourceable_id', $this->application->id)
+                    ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
+                    ->delete();
+            }
+        }
     }
 }

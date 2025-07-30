@@ -58,10 +58,6 @@ class ScheduledJobManager implements ShouldQueue
         // Freeze the execution time at the start of the job
         $this->executionTime = Carbon::now();
 
-        Log::channel('scheduled')->info('ScheduledJobManager started', [
-            'execution_time' => $this->executionTime->format('Y-m-d H:i:s T'),
-        ]);
-
         // Process backups - don't let failures stop task processing
         try {
             $this->processScheduledBackups();
@@ -81,8 +77,6 @@ class ScheduledJobManager implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
         }
-
-        Log::channel('scheduled')->info('ScheduledJobManager completed');
     }
 
     private function processScheduledBackups(): void
@@ -111,16 +105,6 @@ class ScheduledJobManager implements ShouldQueue
                 }
 
                 if ($this->shouldRunNow($frequency, $serverTimezone)) {
-                    Log::channel('scheduled')->info('Dispatching backup job', [
-                        'backup_id' => $backup->id,
-                        'backup_name' => $backup->name ?? 'unnamed',
-                        'server_name' => $server->name,
-                        'frequency' => $frequency,
-                        'timezone' => $serverTimezone,
-                        'execution_time' => $this->executionTime?->format('Y-m-d H:i:s T'),
-                        'current_time' => Carbon::now()->format('Y-m-d H:i:s T'),
-                    ]);
-
                     DatabaseBackupJob::dispatch($backup);
                 }
             } catch (\Exception $e) {
@@ -157,16 +141,6 @@ class ScheduledJobManager implements ShouldQueue
                 }
 
                 if ($this->shouldRunNow($frequency, $serverTimezone)) {
-                    Log::channel('scheduled')->info('Dispatching task job', [
-                        'task_id' => $task->id,
-                        'task_name' => $task->name ?? 'unnamed',
-                        'server_name' => $server->name,
-                        'frequency' => $frequency,
-                        'timezone' => $serverTimezone,
-                        'execution_time' => $this->executionTime?->format('Y-m-d H:i:s T'),
-                        'current_time' => Carbon::now()->format('Y-m-d H:i:s T'),
-                    ]);
-
                     ScheduledTaskJob::dispatch($task);
                 }
             } catch (\Exception $e) {

@@ -229,16 +229,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Set preview fqdn
         if ($this->pull_request_id !== 0) {
-            if ($this->application->build_pack === 'dockercompose') {
-                // For Docker Compose apps, use the preview model's compose-specific method
-                $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
-                if ($this->preview) {
+            $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
+            if ($this->preview) {
+                if ($this->application->build_pack === 'dockercompose') {
                     $this->preview->generate_preview_fqdn_compose();
-                }
-            } else {
-                // For non-Docker Compose apps, use the preview model's method
-                $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
-                if ($this->preview) {
+                } else {
                     $this->preview->generate_preview_fqdn();
                 }
             }

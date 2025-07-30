@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(bump)* Update composer deps
+- *(version)* Bump Coolify version to 4.0.0-beta.420.6
+
+## [4.0.0-beta.420.5] - 2025-07-08
+
 ### 🚀 Features
 
 - *(scheduling)* Add command to manually run scheduled database backups and tasks with options for chunking, delays, and dry runs

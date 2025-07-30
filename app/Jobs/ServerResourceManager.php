@@ -59,10 +59,6 @@ class ServerResourceManager implements ShouldQueue
             $this->instanceTimezone = config('app.timezone');
         }
 
-        Log::channel('scheduled')->info('ServerResourceManager started', [
-            'execution_time' => $this->executionTime->format('Y-m-d H:i:s T'),
-        ]);
-
         // Process server checks - don't let failures stop the job
         try {
             $this->processServerChecks();
@@ -72,8 +68,6 @@ class ServerResourceManager implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
         }
-
-        Log::channel('scheduled')->info('ServerResourceManager completed');
     }
 
     private function processServerChecks(): void
