@@ -1,0 +1,57 @@
+# documentation: https://autobase.tech/docs/
+# slogan: Autobase for PostgreSQL® is an open-source alternative to cloud-managed databases (self-hosted DBaaS).
+# tags: database, postgres, automation, self-hosted, dbaas
+# logo: svgs/autobase.svg
+# port: 80
+
+services:
+  autobase-console-db:
+    image: autobase/console_db:2.3.0
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    volumes:
+      - ${COOLIFY_VOLUME_APP}:/var/lib/postgresql
+
+  autobase-console-api:
+    image: autobase/console_api:2.3.0
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      autobase-console-db:
+        condition: service_healthy
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      - SERVICE_FQDN_AUTOBASE_CONSOLE_API_8080
+      - PG_CONSOLE_DB_HOST=autobase-console-db
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/ansible:/tmp/ansible
+
+  autobase-console-ui:
+    image: autobase/console_ui:2.3.0
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - 'http://localhost:80/'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      autobase-console-api:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_AUTOBASE_CONSOLE_UI_80
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
+      - PG_CONSOLE_API_URL=${API_URL:-SERVICE_FQDN_AUTOBASE_CONSOLE_API/api/v1}
