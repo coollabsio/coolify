@@ -14,12 +14,12 @@ services:
       - PDS_DATA_DIRECTORY=/pds
       - PDS_BLOBSTORE_DISK_LOCATION=/pds/blocks
       - PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-52428800}
-      - PDS_DID_PLC_URL=${PDS_DID_PLC_URL}
-      - PDS_BSKY_APP_VIEW_URL=${PDS_BSKY_APP_VIEW_URL}
-      - PDS_BSKY_APP_VIEW_DID=${PDS_BSKY_APP_VIEW_DID}
-      - PDS_REPORT_SERVICE_URL=${PDS_REPORT_SERVICE_URL}
-      - PDS_REPORT_SERVICE_DID=${PDS_REPORT_SERVICE_DID}
-      - PDS_CRAWLERS=${PDS_CRAWLERS}
+      - PDS_DID_PLC_URL=${PDS_DID_PLC_URL:-https://plc.directory}
+      - PDS_BSKY_APP_VIEW_URL=${PDS_BSKY_APP_VIEW_URL:-https://api.bsky.app}
+      - PDS_BSKY_APP_VIEW_DID=${PDS_BSKY_APP_VIEW_DID:-did:web:api.bsky.app}
+      - PDS_REPORT_SERVICE_URL=${PDS_REPORT_SERVICE_URL:-https://mod.bsky.app/xrpc/com.atproto.moderation.createReport}
+      - PDS_REPORT_SERVICE_DID=${PDS_REPORT_SERVICE_DID:-did:plc:ar7c4by46qjdydhdevvrndac}
+      - PDS_CRAWLERS=${PDS_CRAWLERS:-https://bsky.network}
       - LOG_ENABLED=true
     volumes:
       - /root/pds-data:/pds
