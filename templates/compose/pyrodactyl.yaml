@@ -3,6 +3,7 @@
 # tags: game, game server, management, panel, minecraft
 # logo: svgs/pyrodactyl.png
 # port: 8080
+# ignore: true
 
 services:
   pyrodactyl:
