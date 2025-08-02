@@ -1,3 +1,8 @@
+# documentation: https://github.com/bluesky-social/pds
+# slogan: Bluesky PDS (Personal Data Server) container image, compose file, and documentation
+# tags: bluesky, pds, platform
+# logo: svgs/bluesky.svg
+
 services:
   pds:
     image: 'ghcr.io/bluesky-social/pds:0.4.158'
