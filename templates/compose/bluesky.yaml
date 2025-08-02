@@ -2,6 +2,7 @@
 # slogan: Bluesky PDS (Personal Data Server) container image, compose file, and documentation
 # tags: bluesky, pds, platform
 # logo: svgs/bluesky.svg
+# port: 3000
 
 services:
   pds:
@@ -23,3 +24,9 @@ services:
       - LOG_ENABLED=true
     volumes:
       - /root/pds-data:/pds
+    
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://127.0.0.1:3000/xrpc/_health"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
