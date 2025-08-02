@@ -26,6 +26,38 @@ services:
       - PDS_REPORT_SERVICE_DID=${PDS_REPORT_SERVICE_DID:-did:plc:ar7c4by46qjdydhdevvrndac}
       - PDS_CRAWLERS=${PDS_CRAWLERS:-https://bsky.network}
       - LOG_ENABLED=${LOG_ENABLED:-true}
+  
+    command: >
+      sh -c '
+        echo "Installing curl, bash, and pdsadmin..."
+        apk add --no-cache curl bash && \
+        curl -o /usr/local/bin/pdsadmin.sh https://raw.githubusercontent.com/bluesky-social/pds/main/pdsadmin.sh && \
+        chmod +x /usr/local/bin/pdsadmin.sh && \
+        ln -sf /usr/local/bin/pdsadmin.sh /usr/local/bin/pdsadmin
+
+        echo "Generating /pds/pds.env..."
+        printf "%s\n" \
+        "SERVICE_FQDN_PDS_3000=$${SERVICE_FQDN_PDS_3000}" \
+        "PDS_HOSTNAME=$${PDS_HOSTNAME}" \
+        "PDS_JWT_SECRET=$${PDS_JWT_SECRET}" \
+        "PDS_ADMIN_PASSWORD=$${PDS_ADMIN_PASSWORD}" \
+        "PDS_ADMIN_EMAIL=$${PDS_ADMIN_EMAIL}" \
+        "PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=$${PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX}" \
+        "PDS_DATA_DIRECTORY=$${PDS_DATA_DIRECTORY}" \
+        "PDS_BLOBSTORE_DISK_LOCATION=$${PDS_DATA_DIRECTORY}/blocks" \
+        "PDS_BLOB_UPLOAD_LIMIT=$${PDS_BLOB_UPLOAD_LIMIT}" \
+        "PDS_DID_PLC_URL=$${PDS_DID_PLC_URL}" \
+        "PDS_BSKY_APP_VIEW_URL=$${PDS_BSKY_APP_VIEW_URL}" \
+        "PDS_BSKY_APP_VIEW_DID=$${PDS_BSKY_APP_VIEW_DID}" \
+        "PDS_REPORT_SERVICE_URL=$${PDS_REPORT_SERVICE_URL}" \
+        "PDS_REPORT_SERVICE_DID=$${PDS_REPORT_SERVICE_DID}" \
+        "PDS_CRAWLERS=$${PDS_CRAWLERS}" \
+        "LOG_ENABLED=$${LOG_ENABLED}" \
+        > /pds/pds.env
+
+        echo "Launching PDS..."
+        exec node --enable-source-maps index.js
+      '
 
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://127.0.0.1:3000/xrpc/_health"]
