@@ -315,7 +315,7 @@
                     }
                 }
             });"
-            class="fixed block w-full group z-[9999] sm:max-w-xs"
+            class="fixed block w-full group z-9999 sm:max-w-xs"
             :class="{ 'right-0 top-0 sm:mt-6 sm:mr-6': position=='top-right', 'left-0 top-0 sm:mt-6 sm:ml-6': position=='top-left', 'left-1/2 -translate-x-1/2 top-0 sm:mt-6': position=='top-center', 'right-0 bottom-0 sm:mr-6 sm:mb-6': position=='bottom-right', 'left-0 bottom-0 sm:ml-6 sm:mb-6': position=='bottom-left', 'left-1/2 -translate-x-1/2 bottom-0 sm:mb-6': position=='bottom-center' }"
             x-cloak>
 
@@ -390,7 +390,7 @@
                     class="absolute w-full duration-100 ease-out sm:max-w-xs "
                     :class="{ 'toast-no-description': !toast.description }">
                     <span
-                        class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 rounded sm:max-w-xs group"
+                        class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 rounded-sm sm:max-w-xs group"
                         :class="{ 'p-4': !toast.html, 'p-0': toast.html }">
                         <template x-if="!toast.html">
                             <div class="relative w-full">

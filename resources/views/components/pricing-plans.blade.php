@@ -5,15 +5,15 @@
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 bg-white/5">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-sm dark:text-white gap-x-1 bg-white/5">
                 <legend class="sr-only">Payment frequency</legend>
-                <label class="cursor-pointer rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded-sm px-2.5 py-1"
                     :class="selected === 'monthly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
                     <span>Monthly</span>
                 </label>
-                <label class="cursor-pointer rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded-sm px-2.5 py-1"
                     :class="selected === 'yearly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
@@ -34,7 +34,7 @@
             <div>
             </div>
         </div>
-        <div class="p-4 rounded bg-coolgray-400">
+        <div class="p-4 rounded-sm bg-coolgray-400">
             <h2 id="tier-hobby" class="flex items-start gap-4 text-4xl font-bold tracking-tight">Unlimited Trial
                 <x-forms.button><a class="font-bold dark:text-white hover:no-underline"
                         href="https://github.com/coollabsio/coolify">Get Started</a></x-forms.button>
@@ -257,7 +257,7 @@
                     </ul>
                 </div>
             </div>
-            {{-- <div class="p-4 mt-10 rounded">
+            {{-- <div class="p-4 mt-10 rounded-sm">
                 <div class="flex items-start gap-4 text-xl tracking-tight">Need official support for
                     your self-hosted instance?
                     <x-forms.button>

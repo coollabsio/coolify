@@ -5,7 +5,7 @@
     <h1 class="py-0">Deployment</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div class="pt-4" x-data="{
+    <div x-data="{
         fullscreen: false,
         alwaysScroll: false,
         intervalId: null,
@@ -57,9 +57,9 @@
         <div id="screen" :class="fullscreen ? 'fullscreen' : 'relative'">
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                 class="flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
-                :class="fullscreen ? '' : 'min-h-14 max-h-[40rem] border border-dotted rounded'">
+                :class="fullscreen ? '' : 'min-h-14 max-h-[40rem] border border-dotted rounded-sm'">
                 <div :class="fullscreen ? 'fixed' : 'absolute'" class="top-2 right-5">
-                    <div class="flex justify-end gap-4 fixed -translate-x-full">
+                    <div class="flex justify-end gap-4">
                         <button title="Toggle timestamps" x-on:click="showTimestamps = !showTimestamps">
                             <svg class="w-5 h-5 opacity-30 hover:opacity-100" viewBox="0 0 24 24"
                                 xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"

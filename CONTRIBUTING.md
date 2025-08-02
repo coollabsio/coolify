@@ -238,9 +238,9 @@ After completing these steps, you'll have a fresh development setup.
 ### Contributing a New Service
 
 To add a new service to Coolify, please refer to our documentation:
-[Adding a New Service](https://coolify.io/docs/knowledge-base/contribute/service)
+[Adding a New Service](https://coolify.io/docs/get-started/contribute/service)
 
 ### Contributing to Documentation
 
 To contribute to the Coolify documentation, please refer to this guide:
-[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/CONTRIBUTING.md)
+[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/readme.md)

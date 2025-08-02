@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Models\InstanceSettings;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -23,7 +24,7 @@ class ServiceApplicationView extends Component
         'application.human_name' => 'nullable',
         'application.description' => 'nullable',
         'application.fqdn' => 'nullable',
-        'application.image' => 'required',
+        'application.image' => 'string|nullable',
         'application.exclude_from_status' => 'required|boolean',
         'application.required_fqdn' => 'required|boolean',
         'application.is_log_drain_enabled' => 'nullable|boolean',
@@ -71,6 +72,40 @@ class ServiceApplicationView extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+    }
+
+    public function convertToDatabase()
+    {
+        try {
+            $service = $this->application->service;
+            $serviceApplication = $this->application;
+
+            // Check if database with same name already exists
+            if ($service->databases()->where('name', $serviceApplication->name)->exists()) {
+                throw new \Exception('A database with this name already exists.');
+            }
+
+            $redirectParams = collect($this->parameters)
+                ->except('database_uuid')
+                ->all();
+            DB::transaction(function () use ($service, $serviceApplication) {
+                $service->databases()->create([
+                    'name' => $serviceApplication->name,
+                    'human_name' => $serviceApplication->human_name,
+                    'description' => $serviceApplication->description,
+                    'exclude_from_status' => $serviceApplication->exclude_from_status,
+                    'is_log_drain_enabled' => $serviceApplication->is_log_drain_enabled,
+                    'image' => $serviceApplication->image,
+                    'service_id' => $service->id,
+                    'is_migrated' => true,
+                ]);
+                $serviceApplication->delete();
+            });
+
+            return redirect()->route('project.service.configuration', $redirectParams);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()

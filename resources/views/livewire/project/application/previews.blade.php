@@ -130,6 +130,22 @@
                             </a>
                         @endif
                         <div class="flex-1"></div>
+                        <x-forms.button
+                            wire:click="force_deploy_without_cache({{ data_get($preview, 'pull_request_id') }})">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path
+                                    d="M12.983 8.978c3.955 -.182 7.017 -1.446 7.017 -2.978c0 -1.657 -3.582 -3 -8 -3c-1.661 0 -3.204 .19 -4.483 .515m-2.783 1.228c-.471 .382 -.734 .808 -.734 1.257c0 1.22 1.944 2.271 4.734 2.74" />
+                                <path
+                                    d="M4 6v6c0 1.657 3.582 3 8 3c.986 0 1.93 -.067 2.802 -.19m3.187 -.82c1.251 -.53 2.011 -1.228 2.011 -1.99v-6" />
+                                <path d="M4 12v6c0 1.657 3.582 3 8 3c3.217 0 5.991 -.712 7.261 -1.74m.739 -3.26v-4" />
+                                <path d="M3 3l18 18" />
+                            </svg>
+                            Force deploy (without
+                            cache)
+                        </x-forms.button>
                         <x-forms.button wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
                             @if (data_get($preview, 'status') === 'exited')
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
@@ -152,15 +168,13 @@
                             @endif
                         </x-forms.button>
                         @if (data_get($preview, 'status') !== 'exited')
-                            <x-modal-confirmation 
-                            title="Confirm Preview Deployment Stopping?"
-                            buttonTitle="Stop"
-                            submitAction="stop({{ data_get($preview, 'pull_request_id') }})"
-                            :actions="['This preview deployment will be stopped.', 'If the preview deployment is currently in use data could be lost.', 'All non-persistent data of this preview deployment (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the preview deployment again).']"
-                            :confirmWithText="false"
-                            :confirmWithPassword="false"
-                            step2ButtonText="Stop Preview Deployment"
-                            >
+                            <x-modal-confirmation title="Confirm Preview Deployment Stopping?" buttonTitle="Stop"
+                                submitAction="stop({{ data_get($preview, 'pull_request_id') }})" :actions="[
+                                    'This preview deployment will be stopped.',
+                                    'If the preview deployment is currently in use data could be lost.',
+                                    'All non-persistent data of this preview deployment (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the preview deployment again).',
+                                ]"
+                                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Stop Preview Deployment">
                                 <x-slot:customButton>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error"
                                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -177,17 +191,13 @@
                                 </x-slot:customButton>
                             </x-modal-confirmation>
                         @endif
-                        <x-modal-confirmation 
-                        title="Confirm Preview Deployment Deletion?"
-                        buttonTitle="Delete"
-                        isErrorButton
-                        submitAction="delete({{ data_get($preview, 'pull_request_id') }})"
-                        :actions="['All containers of this preview deployment will be stopped and permanently deleted.']"
-                        confirmationText="{{ data_get($preview, 'fqdn'). '/' }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the Preview Deployment name below"
-                        shortConfirmationLabel="Preview Deployment Name"
-                        :confirmWithPassword="false"
-                        />
+                        <x-modal-confirmation title="Confirm Preview Deployment Deletion?" buttonTitle="Delete"
+                            isErrorButton submitAction="delete({{ data_get($preview, 'pull_request_id') }})"
+                            :actions="[
+                                'All containers of this preview deployment will be stopped and permanently deleted.',
+                            ]" confirmationText="{{ data_get($preview, 'fqdn') . '/' }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Preview Deployment name below"
+                            shortConfirmationLabel="Preview Deployment Name" :confirmWithPassword="false" />
                     </div>
                 </div>
             @endforeach

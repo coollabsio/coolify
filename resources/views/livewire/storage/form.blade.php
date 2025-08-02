@@ -1,21 +1,28 @@
 <div>
     <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
         <div class="flex items-start gap-2">
-            <div class="pb-4">
+            <div class="">
                 <h1>Storage Details</h1>
                 <div class="subtitle">{{ $storage->name }}</div>
-                @if ($storage->is_usable)
-                    <div>Usable</div>
-                @else
-                    <div class="text-red-500">Not Usable</div>
-                @endif
+                <div class="flex items-center gap-2 pb-4">
+                    <div>Current Status:</div>
+                    @if ($storage->is_usable)
+                        <span
+                            class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded dark:text-green-100 dark:bg-green-800">
+                            Usable
+                        </span>
+                    @else
+                        <span
+                            class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded dark:text-red-100 dark:bg-red-800">
+                            Not Usable
+                        </span>
+                    @endif
+                </div>
             </div>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            <x-forms.button wire:click="test_s3_connection">
-                Validate Connection
-            </x-forms.button>
+
             <x-modal-confirmation title="Confirm Storage Deletion?" isErrorButton buttonTitle="Delete"
                 submitAction="delete({{ $storage->id }})" :actions="[
                     'The selected storage location will be permanently deleted from Coolify.',
@@ -37,5 +44,8 @@
             <x-forms.input required type="password" label="Access Key" id="storage.key" />
             <x-forms.input required type="password" label="Secret Key" id="storage.secret" />
         </div>
+        <x-forms.button class="mt-4" isHighlighted wire:click="testConnection">
+            Validate Connection
+        </x-forms.button>
     </form>
 </div>

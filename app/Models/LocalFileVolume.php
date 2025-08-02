@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class LocalFileVolume extends BaseModel
 {
     protected $casts = [
-        'fs_path' => 'encrypted',
-        'mount_path' => 'encrypted',
+        // 'fs_path' => 'encrypted',
+        // 'mount_path' => 'encrypted',
         'content' => 'encrypted',
         'is_directory' => 'boolean',
     ];

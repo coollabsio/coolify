@@ -35,6 +35,6 @@ class Index extends Component
     {
         $project = collect($this->projects)->firstWhere('uuid', $projectUuid);
 
-        return $this->redirect($project->navigateTo(), true);
+        return $this->redirect($project->navigateTo(), navigate: false);
     }
 }

@@ -51,7 +51,7 @@ class Dashboard extends Component
 
     public function navigateToProject($projectUuid)
     {
-        return $this->redirect(collect($this->projects)->firstWhere('uuid', $projectUuid)->navigateTo(), true);
+        return $this->redirect(collect($this->projects)->firstWhere('uuid', $projectUuid)->navigateTo(), navigate: false);
     }
 
     public function render()

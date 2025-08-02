@@ -1,6 +1,6 @@
 <div>
     <dialog id="newInitScript" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='save_new_init_script'>
+        <form method="dialog" class="flex flex-col gap-2 rounded-sm modal-box" wire:submit='save_new_init_script'>
             <h3 class="text-lg font-bold">Add Init Script</h3>
             <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
             <x-forms.textarea placeholder="CREATE DATABASE test;" id="new_content" label="Content" required />
@@ -74,18 +74,15 @@
             @endif
         </div>
         <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between py-2">
-                <div class="flex items-center justify-between w-full">
-                    <h3>SSL Configuration</h3>
-                    @if ($database->enable_ssl && $certificateValidUntil)
-                        <x-modal-confirmation title="Regenerate SSL Certificates"
-                            buttonTitle="Regenerate SSL Certificates" :actions="[
-                                'The SSL certificate of this database will be regenerated.',
-                                'You must restart the database after regenerating the certificate to start using the new certificate.',
-                            ]"
-                            submitAction="regenerateSslCertificate" :confirmWithText="false" :confirmWithPassword="false" />
-                    @endif
-                </div>
+            <div class="flex items-center gap-2 py-2">
+                <h3>SSL Configuration</h3>
+                @if ($database->enable_ssl && $certificateValidUntil)
+                    <x-modal-confirmation title="Regenerate SSL Certificates" buttonTitle="Regenerate SSL Certificates"
+                        :actions="[
+                            'The SSL certificate of this database will be regenerated.',
+                            'You must restart the database after regenerating the certificate to start using the new certificate.',
+                        ]" submitAction="regenerateSslCertificate" :confirmWithText="false" :confirmWithPassword="false" />
+                @endif
             </div>
             @if ($database->enable_ssl && $certificateValidUntil)
                 <span class="text-sm">Valid until:
@@ -140,11 +137,9 @@
                 @endif
 
                 <div class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between py-2">
-                        <div class="flex items-center gap-2">
-                            <h3>Proxy</h3>
-                            <x-loading wire:loading wire:target="instantSave" />
-                        </div>
+                    <div class="flex items-center gap-2 py-2">
+                        <h3>Proxy</h3>
+                        <x-loading wire:loading wire:target="instantSave" />
                         @if (data_get($database, 'is_public'))
                             <x-slide-over fullScreen>
                                 <x-slot:title>Proxy Logs</x-slot:title>
@@ -157,11 +152,11 @@
                             </x-slide-over>
                         @endif
                     </div>
-                    <div class="flex flex-col gap-2">
+                    <div class="flex flex-col gap-2 w-64">
                         <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
-                        <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                            id="database.public_port" label="Public Port" />
                     </div>
+                    <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
+                        id="database.public_port" label="Public Port" />
                 </div>
 
                 <div class="flex flex-col gap-2">
@@ -181,7 +176,7 @@
             <div class="flex items-center gap-2 pb-2">
                 <h3>Initialization scripts</h3>
                 <x-modal-input buttonTitle="+ Add" title="New Init Script">
-                    <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
+                    <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='save_new_init_script'>
                         <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename"
                             required />
                         <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
