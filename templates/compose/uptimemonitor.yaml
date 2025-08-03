@@ -1,0 +1,15 @@
+# documentation: https://github.com/airlabspl/uptimemonitor/blob/master/README.md
+# slogan: A self-hosted, simple web uptime monitor
+# tags: uptime,downtime,monitor,self-hosted
+# logo: svgs/uptime-monitor-dev.svg
+# port: 3000
+services:
+  app:
+    image: airlabs/uptimemonitor:latest
+    environment:
+      - SECURE=${SECURE:-true}
+    ports:
+      - "3000:3000"
+    restart: always
+    volumes:
+      - ${COOLIFY_VOLUME_APP}:/app/data
