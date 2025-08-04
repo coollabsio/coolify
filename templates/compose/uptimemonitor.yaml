@@ -1,7 +1,7 @@
 # documentation: https://github.com/airlabspl/uptimemonitor/blob/master/README.md
 # slogan: A self-hosted, simple web uptime monitor
 # tags: uptime,downtime,monitor,self-hosted
-# logo: svgs/uptime-monitor-dev.svg
+# logo: svgs/uptimemonitor.svg
 # port: 3000
 services:
   app:
