@@ -29,7 +29,7 @@ class StopDatabase
             $this->stopContainer($database, $database->uuid, 30);
 
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, true);
+                CleanupDocker::dispatch($server, false, false);
             }
 
             if ($database->is_public) {
