@@ -89,14 +89,14 @@ services:
         #                      #
         ########################
 
-        test -n "${ENABLE_REGISTRATION}" && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
+        [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
         && echo >> /data/homeserver.yaml \
         && cat <<EOF >> /data/homeserver.yaml
         #registration
         enable_registration: true  # Allows users to register on your server.
         EOF
 
-        ! grep ${RECAPTCHA_PUBLIC_KEY} /data/homeserver.yaml &>/dev/null \
+        [ -n "${RECAPTCHA_PUBLIC_KEY}" ] && ! grep "${RECAPTCHA_PUBLIC_KEY}" /data/homeserver.yaml &>/dev/null \
         && echo >> /data/homeserver.yaml \
         && cat <<EOF >> /data/homeserver.yaml
         # reCAPTCHA settings
