@@ -5,7 +5,6 @@
 # port: 8080
 
 version: "3.8"
-# Infra for Hatchet: https://docs.hatchet.run/self-hosting/docker-compose
 services:
   postgres:
     image: postgres:15.6
