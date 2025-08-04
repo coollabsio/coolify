@@ -27,6 +27,8 @@ class StartDatabaseProxy
         $server = data_get($database, 'destination.server');
         $containerName = data_get($database, 'uuid');
         $proxyContainerName = "{$database->uuid}-proxy";
+        $isSSLEnabled = $database->enable_ssl ?? false;
+
         if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
             $databaseType = $database->databaseType();
             $network = $database->service->uuid;
@@ -42,6 +44,12 @@ class StartDatabaseProxy
             'standalone-mongodb' => 27017,
             default => throw new \Exception("Unsupported database type: $databaseType"),
         };
+        if ($isSSLEnabled) {
+            $internalPort = match ($databaseType) {
+                'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6380,
+                default => $internalPort,
+            };
+        }
 
         $configuration_dir = database_proxy_dir($database->uuid);
         if (isDev()) {

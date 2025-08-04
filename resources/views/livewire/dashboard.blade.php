@@ -63,12 +63,13 @@
     <section>
         <h3 class="pb-2">Servers</h3>
         @if ($servers->count() > 0)
-            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($servers as $server)
                     <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                         @class([
                             'gap-2 border cursor-pointer box group',
-                            'border-red-500' => !$server->settings->is_reachable,
+                            'border-red-500' =>
+                                !$server->settings->is_reachable || $server->settings->force_disabled,
                         ])>
                         <div class="flex flex-col justify-center mx-6">
                             <div class="box-title">

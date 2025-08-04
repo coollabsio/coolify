@@ -4,16 +4,18 @@
     </x-slot>
     <x-team.navbar />
 
-    <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
-        <div class="flex items-end gap-2">
-            <h2>General</h2>
+    <form class="flex flex-col" wire:submit='submit'>
+        <h2>General</h2>
+        <div class="subtitle">
+            Manage the general settings of this team.
+        </div>
+
+        <div class="flex items-end gap-2 pb-6">
+            <x-forms.input id="team.name" label="Name" required />
+            <x-forms.input id="team.description" label="Description" />
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-        </div>
-        <div class="flex gap-2">
-            <x-forms.input id="team.name" label="Name" required />
-            <x-forms.input id="team.description" label="Description" />
         </div>
     </form>
 

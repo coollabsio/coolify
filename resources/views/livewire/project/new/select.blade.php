@@ -12,7 +12,7 @@
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
     <div x-data="searchResources()">
         @if ($current_step === 'type')
-            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky top-0 z-50 py-2">
+            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky z-10 top-10 py-2">
                 <input autocomplete="off" x-ref="searchInput" class="input-sticky"
                     :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
                     @keydown.window.slash.prevent="$refs.searchInput.focus()">
@@ -253,7 +253,8 @@
     @endif
     @if ($current_step === 'destinations')
         <h2>Select a destination</h2>
-        <div>Destinations are used to segregate resources by network. If you are unsure, select the default
+        <div class="pb-4">Destinations are used to segregate resources by network. If you are unsure, select the
+            default
             Standalone Docker (coolify).</div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($server->isSwarm())

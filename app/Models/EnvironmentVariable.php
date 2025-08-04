@@ -118,7 +118,14 @@ class EnvironmentVariable extends BaseModel
                     return null;
                 }
 
-                return $this->get_real_environment_variables($this->value, $resource);
+                $real_value = $this->get_real_environment_variables($this->value, $resource);
+                if ($this->is_literal || $this->is_multiline) {
+                    $real_value = '\''.$real_value.'\'';
+                } else {
+                    $real_value = escapeEnvVariables($real_value);
+                }
+
+                return $real_value;
             }
         );
     }
