@@ -32,10 +32,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
-        public bool $deleteConfigurations = true,
         public bool $deleteVolumes = true,
-        public bool $dockerCleanup = true,
-        public bool $deleteConnectedNetworks = true
+        public bool $deleteConnectedNetworks = true,
+        public bool $deleteConfigurations = true,
+        public bool $dockerCleanup = true
     ) {
         $this->onQueue('high');
     }
@@ -66,7 +66,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                     break;
                 case 'service':
                     StopService::run($this->resource, true);
-                    DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->dockerCleanup, $this->deleteConnectedNetworks);
+                    DeleteService::run($this->resource, $this->deleteVolumes, $this->deleteConnectedNetworks, $this->deleteConfigurations, $this->dockerCleanup);
 
                     return;
             }
@@ -106,7 +106,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->dockerCleanup) {
                 $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
                 if ($server) {
-                    CleanupDocker::dispatch($server, true);
+                    CleanupDocker::dispatch($server, false, false);
                 }
             }
             Artisan::queue('cleanup:stucked-resources');
