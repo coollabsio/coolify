@@ -1,0 +1,68 @@
+# documentation: https://ce.judge0.com/
+# slogan: Judge0, where code happens.
+# tags: code,run,compute
+# logo: svgs/judge0.png
+# port: 80
+
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "100M"
+
+services:
+  server:
+    image: judge0/judge0:1.13.1
+    ports:
+      - "2358:2358"
+    privileged: true
+    restart: always
+    environment:
+      - REDIS_HOST
+      - REDIS_PASSWORD
+      - POSTGRES_HOST
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - AUTHZ_TOKEN
+    <<: *default-logging
+
+  workers:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    privileged: true
+    restart: always
+    environment:
+      - REDIS_HOST
+      - REDIS_PASSWORD
+      - POSTGRES_HOST
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - AUTHZ_TOKEN
+    <<: *default-logging
+
+  db:
+    image: postgres:16.2
+    restart: always
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+    volumes:
+      - data:/var/lib/postgresql/data/
+    <<: *default-logging
+
+  redis:
+    image: redis:7.2.4
+    command:
+      - bash
+      - -c
+      - docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"
+    restart: always
+    environment:
+      - REDIS_PASSWORD
+    <<: *default-logging
+
+volumes:
+  data:
