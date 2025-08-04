@@ -133,7 +133,7 @@ class ServerResourceManager implements ShouldQueue
             $dockerCleanupFrequency = VALID_CRON_STRINGS[$dockerCleanupFrequency];
         }
         if ($this->shouldRunNow($dockerCleanupFrequency, $serverTimezone)) {
-            DockerCleanupJob::dispatch($server);
+            DockerCleanupJob::dispatch($server, false, $server->settings->delete_unused_volumes, $server->settings->delete_unused_networks);
         }
 
         // Dispatch ServerPatchCheckJob if due (weekly)
