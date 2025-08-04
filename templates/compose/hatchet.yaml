@@ -1,0 +1,120 @@
+# documentation: https://docs.hatchet.run/self-hosting/docker-compose
+# slogan: Hatchet is a high-throughput, low-latency computing service. It's built on an open-source, fault-tolerant queue, allowing work to be delivered as fast as your system can handle
+# tags: ai-agents,background-tasks,data-pipelines,scheduling
+# logo: svgs/hatchet.svg
+# port: 8080
+
+version: "3.8"
+# Infra for Hatchet: https://docs.hatchet.run/self-hosting/docker-compose
+services:
+  postgres:
+    image: postgres:15.6
+    command: postgres -c 'max_connections=1000'
+    restart: always
+    hostname: "postgres"
+    environment:
+      - POSTGRES_USER=hatchet
+      - POSTGRES_PASSWORD=hatchet
+      - POSTGRES_DB=hatchet
+    ports:
+      - "5435:5432"
+    volumes:
+      - hatchet_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d hatchet -U hatchet"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    hostname: "rabbitmq"
+    ports:
+      - "5673:5672" # RabbitMQ
+      - "15673:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: "user"
+      RABBITMQ_DEFAULT_PASS: "password"
+    volumes:
+      - "hatchet_rabbitmq_data:/var/lib/rabbitmq"
+      - "hatchet_rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf" # Configuration file mount
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+  migration:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:latest
+    command: /hatchet/hatchet-migrate
+    restart: no
+    environment:
+      DATABASE_URL: "postgres://hatchet:hatchet@postgres:5432/hatchet"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  setup-config:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-admin:latest
+    command: /hatchet/hatchet-admin quickstart --skip certs --generated-config-dir /hatchet/config --overwrite=false
+    restart: no
+    environment:
+      DATABASE_URL: "postgres://hatchet:hatchet@postgres:5432/hatchet"
+      SERVER_TASKQUEUE_RABBITMQ_URL: amqp://user:password@rabbitmq:5672/
+      SERVER_AUTH_COOKIE_DOMAIN: localhost:8080
+      SERVER_AUTH_COOKIE_INSECURE: "t"
+      SERVER_GRPC_BIND_ADDRESS: "0.0.0.0"
+      SERVER_GRPC_INSECURE: "t"
+      SERVER_GRPC_BROADCAST_ADDRESS: localhost:7077
+      SERVER_DEFAULT_ENGINE_VERSION: "V1"
+      SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS: hatchet-engine:7077
+    volumes:
+      - hatchet_certs:/hatchet/certs
+      - hatchet_config:/hatchet/config
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+  hatchet-engine:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-engine:latest
+    command: /hatchet/hatchet-engine --config /hatchet/config
+    restart: on-failure
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+      migration:
+        condition: service_completed_successfully
+    ports:
+      - "7077:7070"
+    environment:
+      DATABASE_URL: "postgres://hatchet:hatchet@postgres:5432/hatchet"
+      SERVER_GRPC_BIND_ADDRESS: "0.0.0.0"
+      SERVER_GRPC_INSECURE: "t"
+    volumes:
+      - hatchet_certs:/hatchet/certs
+      - hatchet_config:/hatchet/config
+  hatchet-dashboard:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-dashboard:latest
+    command: sh ./entrypoint.sh --config /hatchet/config
+    ports:
+      - 8080:80
+    restart: on-failure
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+      migration:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: "postgres://hatchet:hatchet@postgres:5432/hatchet"
+      # Default credentials are "admin@example.com" and "Admin123!!"
+    volumes:
+      - hatchet_certs:/hatchet/certs
+      - hatchet_config:/hatchet/config
+
+volumes:
+  hatchet_postgres_data:
+  hatchet_rabbitmq_data:
+  hatchet_rabbitmq.conf:
+  hatchet_config:
+  hatchet_certs:
