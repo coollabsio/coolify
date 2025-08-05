@@ -99,10 +99,10 @@ class Danger extends Component
             $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
-                $this->delete_configurations,
                 $this->delete_volumes,
-                $this->docker_cleanup,
-                $this->delete_connected_networks
+                $this->delete_connected_networks,
+                $this->delete_configurations,
+                $this->docker_cleanup
             );
 
             return redirect()->route('project.resource.index', [

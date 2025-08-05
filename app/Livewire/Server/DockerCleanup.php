@@ -71,7 +71,7 @@ class DockerCleanup extends Component
     public function manualCleanup()
     {
         try {
-            DockerCleanupJob::dispatch($this->server, true);
+            DockerCleanupJob::dispatch($this->server, true, $this->deleteUnusedVolumes, $this->deleteUnusedNetworks);
             $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
