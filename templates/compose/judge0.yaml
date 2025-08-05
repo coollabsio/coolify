@@ -2,8 +2,7 @@
 # slogan: Judge0, where code happens.
 # tags: code,run,compute
 # logo: svgs/judge0.png
-# port: 80
-
+# port: 2358
 x-logging: &default-logging
   logging:
     driver: json-file
@@ -13,36 +12,38 @@ x-logging: &default-logging
 services:
   server:
     image: judge0/judge0:1.13.1
+    privileged: true
     environment:
-      REDIS_HOST: ${SERVICE_REDIS_HOST:-redis}
-      REDIS_PASSWORD: ${SERVICE_REDIS_PASSWORD:-changeme}
-      POSTGRES_HOST: ${SERVICE_DB_HOST:-db}
-      POSTGRES_DB: ${SERVICE_DB_NAME:-judge0}
-      POSTGRES_USER: ${SERVICE_DB_USER:-judge0}
-      POSTGRES_PASSWORD: ${SERVICE_DB_PASSWORD:-changeme}
-      AUTHZ_TOKEN: ${AUTHZ_TOKEN:-changeme}
-      PORT: ${PORT:-2358} # Coolify will inject PORT
+      - SERVICE_FQDN_SERVER_2358
+      - REDIS_HOST=${COOLIFY_REDIS_HOST:-redis}
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - POSTGRES_HOST=${COOLIFY_POSTGRES_HOST:-db}
+      - POSTGRES_DB=${COOLIFY_POSTGRES_DB:-judge0}
+      - POSTGRES_USER=${COOLIFY_POSTGRES_USER:-judge0}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - AUTHZ_TOKEN=${SERVICE_PASSWORD_AUTHZ}
     <<: *default-logging
 
   workers:
     image: judge0/judge0:1.13.1
     command: ["./scripts/workers"]
+    privileged: true
     environment:
-      REDIS_HOST: ${SERVICE_REDIS_HOST:-redis}
-      REDIS_PASSWORD: ${SERVICE_REDIS_PASSWORD:-changeme}
-      POSTGRES_HOST: ${SERVICE_DB_HOST:-db}
-      POSTGRES_DB: ${SERVICE_DB_NAME:-judge0}
-      POSTGRES_USER: ${SERVICE_DB_USER:-judge0}
-      POSTGRES_PASSWORD: ${SERVICE_DB_PASSWORD:-changeme}
-      AUTHZ_TOKEN: ${AUTHZ_TOKEN:-changeme}
+      - REDIS_HOST=${COOLIFY_REDIS_HOST:-redis}
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - POSTGRES_HOST=${COOLIFY_POSTGRES_HOST:-db}
+      - POSTGRES_DB=${COOLIFY_POSTGRES_DB:-judge0}
+      - POSTGRES_USER=${COOLIFY_POSTGRES_USER:-judge0}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - AUTHZ_TOKEN=${SERVICE_PASSWORD_AUTHZ}
     <<: *default-logging
 
   db:
     image: postgres:16.2
     environment:
-      POSTGRES_DB: ${SERVICE_DB_NAME:-judge0}
-      POSTGRES_USER: ${SERVICE_DB_USER:-judge0}
-      POSTGRES_PASSWORD: ${SERVICE_DB_PASSWORD:-changeme}
+      - POSTGRES_DB=${COOLIFY_POSTGRES_DB:-judge0}
+      - POSTGRES_USER=${COOLIFY_POSTGRES_USER:-judge0}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
     volumes:
       - data:/var/lib/postgresql/data/
     <<: *default-logging
@@ -53,8 +54,9 @@ services:
       - bash
       - -c
       - docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"
+    restart: always
     environment:
-      REDIS_PASSWORD: ${SERVICE_REDIS_PASSWORD:-changeme}
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
     <<: *default-logging
 
 volumes:
