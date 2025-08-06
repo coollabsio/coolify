@@ -32,10 +32,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource,
-        public bool $deleteConfigurations = true,
         public bool $deleteVolumes = true,
-        public bool $dockerCleanup = true,
-        public bool $deleteConnectedNetworks = true
+        public bool $deleteConnectedNetworks = true,
+        public bool $deleteConfigurations = true,
+        public bool $dockerCleanup = true
     ) {
         $this->onQueue('high');
     }
@@ -52,7 +52,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
             switch ($this->resource->type()) {
                 case 'application':
-                    StopApplication::run($this->resource, previewDeployments: true);
+                    StopApplication::run($this->resource, previewDeployments: true, dockerCleanup: $this->dockerCleanup);
                     break;
                 case 'standalone-postgresql':
                 case 'standalone-redis':
@@ -62,11 +62,11 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-keydb':
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
-                    StopDatabase::run($this->resource, true);
+                    StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup);
                     break;
                 case 'service':
-                    StopService::run($this->resource, true);
-                    DeleteService::run($this->resource, $this->deleteConfigurations, $this->deleteVolumes, $this->dockerCleanup, $this->deleteConnectedNetworks);
+                    StopService::run($this->resource, $this->deleteConnectedNetworks, $this->dockerCleanup);
+                    DeleteService::run($this->resource, $this->deleteVolumes, $this->deleteConnectedNetworks, $this->deleteConfigurations, $this->dockerCleanup);
 
                     return;
             }
@@ -78,7 +78,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 $this->resource->deleteVolumes();
                 $this->resource->persistentStorages()->delete();
             }
-            $this->resource->fileStorages()->delete();
+            $this->resource->fileStorages()->delete(); // these are file mounts which should probably have their own flag
 
             $isDatabase = $this->resource instanceof StandalonePostgresql
             || $this->resource instanceof StandaloneRedis
@@ -106,7 +106,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->dockerCleanup) {
                 $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
                 if ($server) {
-                    CleanupDocker::dispatch($server, true);
+                    CleanupDocker::dispatch($server, false, false);
                 }
             }
             Artisan::queue('cleanup:stucked-resources');
