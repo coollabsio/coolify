@@ -9,10 +9,10 @@ services:
     image: 'public.ecr.aws/zinclabs/openobserve:v0.15.0-rc4-debug'
     container_name: openobserve
     environment:
-      - ZO_DATA_DIR: /data
-      - ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL:-root@example.com}
-      - ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD:-Complexpass#123}
-      - SERVICE_FQDN_UPTIMEKUMA_5080
+      - ZO_DATA_DIR=/data
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-root@example.com}
+      - ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD:-Complexpass#123}
+      - SERVICE_FQDN_OPENOBSERVE_5080
     volumes:
       - './data:/data'
     restart: unless-stopped
