@@ -1,0 +1,42 @@
+# documentation: https://www.pgbouncer.org/config.html
+# slogan: A connection pool for postgress with postgress setup
+# tags: database
+# logo: svgs/pgbouncer.svg
+# port: 5433
+
+
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-changeme}
+      - SERVICE_FQDN_POSTGRESS_5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: always
+    environment:
+      - DB_HOST=${DB_CONNECT:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=$DB_USER
+      - DB_PASSWORD=$DB_PASSWORD
+      - AUTH_TYPE=scram-sha-256
+      - MAX_CLIENT_CONN=${MAX_CONNECTIONS:-100}
+      - POOL_MODE=${POOL_MODE:-transaction}
+      - ADMIN_USERS=${DB_ADMIN_USER:-$DB_USER}
+      - DEFAULT_POOL_SIZE=${DEFAILT_POOL_SIZE:-15}
+      - MIN_POOL_SIZE=${MIN_POOL_SIZE:-15}
+      - SERVICE_FQDN_PGBOUNCER_5433
+    ports:
+      - "5433:5432"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
