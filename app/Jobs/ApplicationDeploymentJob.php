@@ -1502,9 +1502,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function cleanup_git()
     {
-        $this->execute_remote_command(
-            [executeInDocker($this->deployment_uuid, "rm -fr {$this->basedir}/.git")],
-        );
+        // Only remove .git if enabled (default: true for backward compatibility)
+        if ($this->application->settings->is_git_cleanup_enabled ?? true) {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "rm -fr {$this->basedir}/.git")],
+            );
+        }
     }
 
     private function generate_nixpacks_confs()
