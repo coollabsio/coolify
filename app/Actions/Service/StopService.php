@@ -14,7 +14,7 @@ class StopService
 
     public string $jobQueue = 'high';
 
-    public function handle(Service $service, bool $isDeleteOperation = false, bool $dockerCleanup = true)
+    public function handle(Service $service, bool $deleteConnectedNetworks = false, bool $dockerCleanup = true)
     {
         try {
             $server = $service->destination->server;
@@ -36,11 +36,11 @@ class StopService
                 $this->stopContainersInParallel($containersToStop, $server);
             }
 
-            if ($isDeleteOperation) {
+            if ($deleteConnectedNetworks) {
                 $service->deleteConnectedNetworks();
             }
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, true);
+                CleanupDocker::dispatch($server, false, false);
             }
         } catch (\Exception $e) {
             return $e->getMessage();
