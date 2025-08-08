@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('application_settings', function (Blueprint $table) {
-            $table->boolean('is_git_cleanup_enabled')->default(true);
+            //
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('application_settings', function (Blueprint $table) {
-            $table->dropColumn('is_git_cleanup_enabled');
+            //
         });
     }
 };

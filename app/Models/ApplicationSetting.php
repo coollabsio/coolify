@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ApplicationSetting extends Model
 {
-    protected $cast = [
+    protected $casts = [
         'is_static' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
@@ -15,6 +15,7 @@ class ApplicationSetting extends Model
         'is_preview_deployments_enabled' => 'boolean',
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
+        'is_git_cleanup_enabled' => 'boolean',
     ];
 
     protected $guarded = [];

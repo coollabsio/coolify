@@ -67,6 +67,9 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isConnectToDockerNetworkEnabled = false;
 
+    #[Validate(['boolean'])]
+    public bool $isGitCleanupEnabled = true;
+
     public function mount()
     {
         try {
@@ -99,6 +102,7 @@ class Advanced extends Component
             $this->application->settings->is_raw_compose_deployment_enabled = $this->isRawComposeDeploymentEnabled;
             $this->application->settings->connect_to_docker_network = $this->isConnectToDockerNetworkEnabled;
             $this->application->settings->disable_build_cache = $this->disableBuildCache;
+            $this->application->settings->is_git_cleanup_enabled = $this->isGitCleanupEnabled;
             $this->application->settings->save();
         } else {
             $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
@@ -121,6 +125,7 @@ class Advanced extends Component
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
+            $this->isGitCleanupEnabled = $this->application->settings->is_git_cleanup_enabled ?? true;
         }
     }
 
