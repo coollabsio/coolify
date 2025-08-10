@@ -1,0 +1,278 @@
+<?php
+
+# phpmig.php
+
+use Phpmig\Adapter;
+use Pimple\Container;
+
+$container = new Container();
+
+$container['db'] = function () {
+    $dbh = new PDO('mysql:dbname=testdb;host=127.0.0.1','username','passwd');
+    $dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    return $dbh;
+};
+
+$container['phpmig.adapter'] = function ($c) {
+    return new Adapter\PDO\Sql($c['db'], 'migrations');
+};
+
+$container['phpmig.migrations_path'] = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
+
+return $container;
+
+<?php
+
+# phpmig
+
+use Phpmig\Adapter;
+use Pimple\Container;
+
+$container = new Container();
+
+$container['db'] = function () {
+    $dbh = new PDO(sprintf('pgsql:dbname=%s;host=%s;password=%s', 'dbname', 'localhost', 'password'), 'dbuser', '');
+    $dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    return $dbh;
+};
+
+$container['phpmig.adapter'] = function ($c) {
+    return new Adapter\PDO\SqlPgsql($c['db'], 'migrations', 'migrationschema');
+};
+
+return $container;
+
+<?php
+
+# phpmig.php
+
+// do some autoloading of Doctrine here
+
+use Phpmig\Adapter;
+use Pimple\Container;
+use Doctrine\DBAL\DriverManager;
+
+$container = new Container();
+
+$container['db'] = function () {
+    return DriverManager::getConnection(array(
+        'driver' => 'pdo_sqlite',
+        'path'   => __DIR__ . DIRECTORY_SEPARATOR . 'db.sqlite',
+    ));
+};
+
+$container['phpmig.adapter'] = function ($c) {
+    return new Adapter\Doctrine\DBAL($c['db'], 'migrations');
+};
+
+$container['phpmig.migrations_path'] = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
+
+return $container;
+
+phpmig:
+  tableName: migrations
+  createStatement: CREATE TABLE migrations ( version VARCHAR(255) NOT NULL );
+  
+  # phpmig.php
+
+// Set some constants
+define('PHPMIG_PATH', realpath(dirname(__FILE__)));
+define('VENDOR_PATH', PHPMIG_PATH . '/vendor');
+set_include_path(get_include_path() . PATH_SEPARATOR . VENDOR_PATH);
+
+// Register autoloading
+require_once 'Zend/Loader/Autoloader.php';
+$autoloader = Zend_Loader_Autoloader::getInstance();
+$autoloader->registerNamespace('Zend_');
+
+use Phpmig\Adapter\Zend\Db;
+use Pimple\Container;
+
+$container = new Container();
+
+$container['db'] = function () {
+    return Zend_Db::factory('pdo_mysql', array(
+        'dbname' => 'DBNAME',
+        'username' => 'USERNAME',
+        'password' => 'PASSWORD',
+        'host' => 'localhost'
+    ));
+};
+
+$container['phpmig.adapter'] = function($c) {
+    $configuration = null;
+    $configurationFile = PHPMIG_PATH . '/config/mysql.yaml';
+
+    if (file_exists($configurationFile)) {
+        $configuration = new Zend_Config_Yaml($configurationFile, null, array('ignore_constants' => true));
+    }
+
+    return new Db($c['db'], $configuration);
+};
+
+$container['phpmig.migrations_path'] = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
+
+return $container;
+
+<?php
+
+use Phpmig\Adapter;
+use Pimple\Container;
+use Illuminate\Database\Capsule\Manager as Capsule;
+
+$container = new Container();
+
+$container['config'] = [
+    'driver'    => 'xxx',
+    'host'      => 'xxx',
+    'database'  => 'xxx',
+    'username'  => 'xxx',
+    'password'  => 'x',
+    'charset'   => 'xxx',
+    'collation' => 'xxx',
+    'prefix'    => '',
+];
+
+$container['db'] = function ($c) {
+    $capsule = new Capsule();
+    $capsule->addConnection($c['config']);
+    $capsule->setAsGlobal();
+    $capsule->bootEloquent();
+
+   return $capsule;
+};
+
+$container['phpmig.adapter'] = function($c) {
+    return new Adapter\Illuminate\Database($c['db'], 'migrations');
+};
+$container['phpmig.migrations_path'] = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
+
+return $container;
+
+<?php
+
+use Phpmig\Migration\Migration;
+
+class AddRatingToLolCats extends Migration
+{
+    /**
+     * Do the migration
+     */
+    public function up()
+    {
+        $sql = "ALTER TABLE `lol_cats` ADD COLUMN `rating` INT(10) UNSIGNED NULL";
+        $container = $this->getContainer(); 
+        $container['db']->query($sql);
+    }
+
+    /**
+     * Undo the migration
+     */
+    public function down()
+    {
+        $sql = "ALTER TABLE `lol_cats` DROP COLUMN `rating`";
+        $container = $this->getContainer(); 
+        $container['db']->query($sql);
+    }
+}
+
+<?= "<?php ";?>
+
+use Phpmig\Migration\Migration;
+
+class <?= $className ?> extends Migration
+{
+    $someValue = <?= $this->container['value'] ?>; 
+
+    /**
+     * Do the migration
+     */
+    public function up()
+    {
+        $container = $this->getContainer();
+    }
+
+    /**
+     * Undo the migration
+     */
+    public function down()
+    {
+        $container = $this->getContainer();
+    }
+}
+
+<?php
+
+use Phpmig\Migration\Migration;
+
+class %s extends Migration
+{
+    /**
+     * Do the migration
+     */
+    public function up()
+    {
+        $container = $this->getContainer(); 
+    }
+
+    /**
+     * Undo the migration
+     */
+    public function down()
+    {
+        $container = $this->getContainer(); 
+    }
+}
+
+<?php
+
+/** @var Pimple\Container $container */
+$container['phpmig.sets'] = function ($container) {
+    return array(
+        'cms' => array(
+            'adapter' => new Adapter\File\Flat('modules/migrationLogs/cms_migrations.log'),
+            'migrations_path' => 'migrations/cms',
+            'migrations_template_path' => 'PhpmigCmsTemplate.php'
+        ),
+        'blog' => array(
+            'adapter' => new Adapter\File\Flat('modules/migrationLogs/blog_migrations.log'),
+            'migrations_path' => 'migrations/blog',
+            'migrations_template_path' => 'PhpmigBlogTemplate.php',
+        )
+    );
+};
+
+<?php
+
+/** @var Pimple\Container $container */
+$container['phpmig.migrations'] = function () {
+    return array_merge(
+        glob('migrations_1/*.php'),
+        glob('migrations_2/*.php')
+    );
+};
+
+
+$msg = 'This is a super secret message!';
+
+// Generating an encryption key and a nonce
+$key   = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES); // 256 bit
+$nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES); // 24 bytes
+
+// Encrypt
+$ciphertext = sodium_crypto_secretbox($msg, $nonce, $key);
+// Decrypt
+$plaintext = sodium_crypto_secretbox_open($ciphertext, $nonce, $key);
+
+echo $plaintext === $msg ? 'Success' : 'Error';
+
+msg = 'This is the message to authenticate!';
+$key = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES); // 256 bit
+
+// Generate the Message Authentication Code
+$mac = sodium_crypto_auth($msg, $key);
+
+// Altering $mac or $msg, verification will fail
+echo sodium_crypto_auth_verify($mac, $msg, $key) ? 'Success' : 'Error';
+
+ 
