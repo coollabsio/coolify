@@ -1,0 +1,81 @@
+# documentation: https://www.home-assistant.io/installation/linux
+# slogan: Open source home automation that puts local control and privacy first.
+# tags: opensource, smarthome, micro, controller, homeassistant
+# logo: svgs/homeassistant.svg
+# port: 8123
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - homeassistant-config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    privileged: true
+    network_mode: host
+    # INFO: this is how you map a device
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - SERVICE_FQDN_HOMEASSISTANT_8123
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        echo "coolify-proxy" > /tmp/target
+        echo "coolify" > /tmp/network
+
+        curl --silent --unix-socket /var/run/docker.sock \
+          "http://localhost/containers/$(cat /tmp/target)/json" \
+          | grep -o "\"$(cat /tmp/network)\"[^{]*{[^}]*\"IPAddress\":\"[0-9.]*\"" \
+          | grep -o '"IPAddress":"[0-9.]*"' \
+          | cut -d':' -f2 \
+          | tr -d '"' > /tmp/proxy_ip
+
+        [ ! -f /config/automations.yaml ] && cat <<EOF > /config/automations.yaml
+        []
+        EOF
+
+        [ ! -f /config/scripts.yaml ] && cat <<EOF > /config/scripts.yaml
+        EOF
+
+        [ ! -f /config/scenes.yaml ] && cat <<EOF > /config/scenes.yaml
+        EOF
+
+        [ ! -f /config/secrets.yaml ] && cat <<EOF > /config/secrets.yaml
+        # Use this file to store secrets like usernames and passwords.
+        # Learn more at https://www.home-assistant.io/docs/configuration/secrets/
+        EOF
+
+        [ ! -f /config/configuration.yaml ] && cat <<EOF > /config/configuration.yaml
+        # Loads default set of integrations. Do not remove.
+        default_config:
+
+        # Load frontend themes from the themes folder
+        frontend:
+          themes: !include_dir_merge_named themes
+
+        automation: !include automations.yaml
+        script: !include scripts.yaml
+        scene: !include scenes.yaml
+
+        # Configure reverse proxy
+        http:
+          use_x_forwarded_for: true
+          trusted_proxies:
+            - $(cat /tmp/proxy_ip)
+          ip_ban_enabled: true
+          login_attempts_threshold: 5
+        EOF
+
+        /init
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -I
+        - localhost:8123
+      interval: 5s
+      timeout: 3s
+      retries: 5
