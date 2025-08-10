@@ -3049,7 +3049,6 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
             // Get all SERVICE_ variables from keys and values
             $key = str($key);
             $value = str($value);
-
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
             if (count($valueMatches[1]) > 0) {
@@ -3166,6 +3165,10 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                     ]);
                 } elseif ($command->value() === 'URL') {
                     if ($isApplication && $resource->build_pack === 'dockercompose') {
+                        continue;
+                    }
+                    // For services, only generate URL if explicit FQDN is set
+                    if ($isService && blank($savedService->fqdn)) {
                         continue;
                     }
                     $fqdnFor = $key->after('SERVICE_URL_')->lower()->value();
@@ -3674,8 +3677,8 @@ function newParser(Application|Service $resource, int $pull_request_id = 0, ?int
                         $coolifyScheme = $coolifyUrl->getScheme();
                         $coolifyFqdn = $coolifyUrl->getHost();
                         $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                        $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper(), $coolifyUrl->__toString());
-                        $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper(), $coolifyFqdn);
+                        $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_'), $coolifyUrl->__toString());
+                        $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_'), $coolifyFqdn);
                     }
                 }
             }
