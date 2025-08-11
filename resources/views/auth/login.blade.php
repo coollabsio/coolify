@@ -23,7 +23,7 @@
                             required label="{{ __('input.password') }}" />
 
                         <a href="/forgot-password" class="text-xs">
-                            {{ __('auth.forgot_password') }}?
+                            {{ __('auth.forgot_password_link') }}
                         </a>
                     @else
                         <x-forms.input type="email" name="email" autocomplete="email" required
@@ -31,7 +31,7 @@
                         <x-forms.input type="password" name="password" autocomplete="current-password" required
                             label="{{ __('input.password') }}" />
                         <a href="/forgot-password" class="text-xs">
-                            {{ __('auth.forgot_password') }}?
+                            {{ __('auth.forgot_password_link') }}
                         </a>
                         @endenv
 

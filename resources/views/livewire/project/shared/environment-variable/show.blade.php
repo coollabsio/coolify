@@ -21,7 +21,7 @@
             </div>
         @else
             @if ($isDisabled)
-                <div class="flex flex-col w-full gap-2 lg:flex-row">
+                <div class="flex flex-col w-full gap-2 flex-wrap lg:flex-row">
                     <x-forms.input disabled id="key" />
                     <x-forms.input disabled type="password" id="value" />
                     @if ($is_shared)
@@ -29,7 +29,7 @@
                     @endif
                 </div>
             @else
-                <div class="flex flex-col w-full gap-2 lg:flex-row">
+                <div class="flex flex-col w-full gap-2 flex-wrap lg:flex-row">
                     @if ($is_multiline)
                         <x-forms.input :required="$is_redis_credential" isMultiline="{{ $is_multiline }}" id="key" />
                         <x-forms.textarea :required="$is_redis_credential" type="password" id="value" />
@@ -42,7 +42,7 @@
                     @endif
                 </div>
             @endif
-            <div class="flex flex-col w-full gap-2 lg:flex-row">
+            <div class="flex flex-col w-full gap-2 flex-wrap lg:flex-row">
                 @if (!$is_redis_credential)
                     @if ($type === 'service')
                         <x-forms.checkbox instantSave id="is_build_time"
@@ -88,6 +88,7 @@
                     <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
                         buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
                         confirmationText="{{ $key }}"
+                        buttonFullWidth="true"
                         confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
                         shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
                         step2ButtonText="Permanently Delete" />
@@ -101,6 +102,7 @@
                     <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
                         buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
                         confirmationText="{{ $key }}"
+                        buttonFullWidth="true"
                         confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
                         shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
                         step2ButtonText="Permanently Delete" />

@@ -182,14 +182,15 @@ return [
     'defaults' => [
         's6' => [
             'connection' => 'redis',
-            'queue' => ['high', 'default'],
-            'balance' => env('HORIZON_BALANCE', 'auto'),
-            'maxTime' => 0,
-            'maxJobs' => 0,
+            'balance' => env('HORIZON_BALANCE', 'false'),
+            'queue' => env('HORIZON_QUEUES', 'high,default'),
+            'maxTime' => 3600,
+            'maxJobs' => 400,
             'memory' => 128,
             'tries' => 1,
-            'timeout' => 3560,
             'nice' => 0,
+            'sleep' => 3,
+            'timeout' => 3600,
         ],
     ],
 
@@ -198,7 +199,7 @@ return [
             's6' => [
                 'autoScalingStrategy' => 'size',
                 'minProcesses' => env('HORIZON_MIN_PROCESSES', 1),
-                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 6),
+                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 4),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
@@ -208,7 +209,7 @@ return [
             's6' => [
                 'autoScalingStrategy' => 'size',
                 'minProcesses' => env('HORIZON_MIN_PROCESSES', 1),
-                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 6),
+                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 4),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
