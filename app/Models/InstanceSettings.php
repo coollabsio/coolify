@@ -25,6 +25,9 @@ class InstanceSettings extends Model
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
 
+        'lettermint_enabled' => 'boolean',
+        'lettermint_api_key' => 'encrypted',
+
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',

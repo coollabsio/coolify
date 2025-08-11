@@ -10,7 +10,7 @@ function is_transactional_emails_enabled(): bool
 {
     $settings = instanceSettings();
 
-    return $settings->smtp_enabled || $settings->resend_enabled;
+    return $settings->smtp_enabled || $settings->resend_enabled || data_get($settings, 'lettermint_enabled', false);
 }
 
 function send_internal_notification(string $message): void
@@ -58,7 +58,7 @@ function set_transanctional_email_settings($settings = null)
     if (! $settings) {
         $settings = instanceSettings();
     }
-    if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
+    if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled') && ! data_get($settings, 'lettermint_enabled')) {
         return null;
     }
 
@@ -71,6 +71,10 @@ function set_transanctional_email_settings($settings = null)
 
     if (data_get($settings, 'smtp_enabled')) {
         return 'smtp';
+    }
+
+    if (data_get($settings, 'lettermint_enabled')) {
+        return 'lettermint';
     }
 
     return null;

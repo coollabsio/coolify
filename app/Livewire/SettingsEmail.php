@@ -53,6 +53,12 @@ class SettingsEmail extends Component
     #[Validate(['nullable', 'string'])]
     public ?string $resendApiKey = null;
 
+    #[Validate(['boolean'])]
+    public bool $lettermintEnabled = false;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $lettermintApiKey = null;
+
     #[Validate(['nullable', 'email'])]
     public ?string $testEmailAddress = null;
 
@@ -83,6 +89,8 @@ class SettingsEmail extends Component
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
+            $this->settings->lettermint_enabled = $this->lettermintEnabled;
+            $this->settings->lettermint_api_key = $this->lettermintApiKey;
             $this->settings->save();
         } else {
             $this->smtpEnabled = $this->settings->smtp_enabled;
@@ -97,6 +105,8 @@ class SettingsEmail extends Component
 
             $this->resendEnabled = $this->settings->resend_enabled;
             $this->resendApiKey = $this->settings->resend_api_key;
+            $this->lettermintEnabled = data_get($this->settings, 'lettermint_enabled', false);
+            $this->lettermintApiKey = data_get($this->settings, 'lettermint_api_key');
         }
     }
 
@@ -116,14 +126,21 @@ class SettingsEmail extends Component
         try {
             $currentSmtpEnabled = $this->settings->smtp_enabled;
             $currentResendEnabled = $this->settings->resend_enabled;
+            $currentLettermintEnabled = data_get($this->settings, 'lettermint_enabled', false);
             $this->resetErrorBag();
 
             if ($type === 'SMTP') {
                 $this->submitSmtp();
                 $this->resendEnabled = $this->settings->resend_enabled = false;
+                $this->lettermintEnabled = $this->settings->lettermint_enabled = false;
             } elseif ($type === 'Resend') {
                 $this->submitResend();
                 $this->smtpEnabled = $this->settings->smtp_enabled = false;
+                $this->lettermintEnabled = $this->settings->lettermint_enabled = false;
+            } elseif ($type === 'Lettermint') {
+                $this->submitLettermint();
+                $this->smtpEnabled = $this->settings->smtp_enabled = false;
+                $this->resendEnabled = $this->settings->resend_enabled = false;
             }
             $this->settings->save();
 
@@ -132,6 +149,8 @@ class SettingsEmail extends Component
                 $this->smtpEnabled = $currentSmtpEnabled;
             } elseif ($type === 'Resend') {
                 $this->resendEnabled = $currentResendEnabled;
+            } elseif ($type === 'Lettermint') {
+                $this->lettermintEnabled = $currentLettermintEnabled;
             }
 
             return handleError($e, $this);
@@ -206,6 +225,36 @@ class SettingsEmail extends Component
             $this->dispatch('success', 'Resend settings updated.');
         } catch (\Throwable $e) {
             $this->resendEnabled = false;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function submitLettermint()
+    {
+        try {
+            $this->validate([
+                'lettermintEnabled' => 'boolean',
+                'lettermintApiKey' => 'required|string',
+                'smtpFromAddress' => 'required|email',
+                'smtpFromName' => 'required|string',
+            ], [
+                'lettermintApiKey.required' => 'Lettermint API Key is required.',
+                'smtpFromAddress.required' => 'From Address is required.',
+                'smtpFromAddress.email' => 'Please enter a valid email address.',
+                'smtpFromName.required' => 'From Name is required.',
+            ]);
+
+            $this->settings->lettermint_enabled = $this->lettermintEnabled;
+            $this->settings->lettermint_api_key = $this->lettermintApiKey;
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
+
+            $this->settings->save();
+
+            $this->dispatch('success', 'Lettermint settings updated.');
+        } catch (\Throwable $e) {
+            $this->lettermintEnabled = false;
 
             return handleError($e, $this);
         }

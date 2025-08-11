@@ -15,6 +15,14 @@ class ConfigurationRepository
 
     public function updateMailConfig($settings): void
     {
+        if (data_get($settings, 'lettermint_enabled')) {
+            $this->config->set('mail.default', 'array');
+            $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');
+            $this->config->set('mail.from.name', $settings->smtp_from_name ?? 'Test');
+
+            return;
+        }
+
         if ($settings->resend_enabled) {
             $this->config->set('mail.default', 'resend');
             $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');

@@ -77,5 +77,24 @@
                 </div>
             </form>
         </div>
+        <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
+            <form wire:submit.prevent="submitLettermint" class="flex flex-col">
+                <div class="flex gap-2">
+                    <h3>Lettermint</h3>
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </div>
+                <div class="w-32">
+                    <x-forms.checkbox instantSave='instantSave("Lettermint")' id="lettermintEnabled" label="Enabled" />
+                </div>
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col w-full gap-2 xl:flex-row">
+                        <x-forms.input type="password" id="lettermintApiKey" placeholder="API key" required label="API Key"
+                            autocomplete="new-password" />
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 </div>

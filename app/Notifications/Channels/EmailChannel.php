@@ -4,6 +4,7 @@ namespace App\Notifications\Channels;
 
 use Illuminate\Notifications\Notification;
 use Resend;
+use Lettermint\Lettermint as LettermintClient;
 
 class EmailChannel
 {
@@ -20,6 +21,7 @@ class EmailChannel
             $settings = $notifiable->emailNotificationSettings;
         }
         $isResendEnabled = $settings->resend_enabled;
+        $isLettermintEnabled = data_get($settings, 'lettermint_enabled', false);
         $isSmtpEnabled = $settings->smtp_enabled;
         if ($customEmails) {
             $recipients = [$customEmails];
@@ -28,7 +30,16 @@ class EmailChannel
         }
         $mailMessage = $notification->toMail($notifiable);
 
-        if ($isResendEnabled) {
+        if ($isLettermintEnabled) {
+            $from = "{$settings->smtp_from_name} <{$settings->smtp_from_address}>";
+            $client = new LettermintClient($settings->lettermint_api_key);
+            $client->email
+                ->from($from)
+                ->to(...$recipients)
+                ->subject($mailMessage->subject)
+                ->html((string) $mailMessage->render())
+                ->send();
+        } elseif ($isResendEnabled) {
             $resend = Resend::client($settings->resend_api_key);
             $from = "{$settings->smtp_from_name} <{$settings->smtp_from_address}>";
             $resend->emails->send([

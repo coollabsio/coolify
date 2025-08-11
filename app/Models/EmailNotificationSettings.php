@@ -25,6 +25,9 @@ class EmailNotificationSettings extends Model
         'resend_enabled',
         'resend_api_key',
 
+        'lettermint_enabled',
+        'lettermint_api_key',
+
         'use_instance_email_settings',
 
         'deployment_success_email_notifications',
@@ -52,6 +55,9 @@ class EmailNotificationSettings extends Model
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
 
+        'lettermint_enabled' => 'boolean',
+        'lettermint_api_key' => 'encrypted',
+
         'use_instance_email_settings' => 'boolean',
 
         'deployment_success_email_notifications' => 'boolean',
@@ -72,6 +78,6 @@ class EmailNotificationSettings extends Model
 
     public function isEnabled()
     {
-        return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
+        return $this->smtp_enabled || $this->resend_enabled || $this->lettermint_enabled || $this->use_instance_email_settings;
     }
 }

@@ -107,6 +107,27 @@
                     </div>
                 </div>
             </form>
+            <form wire:submit='submitLettermint'
+                class="p-4 border dark:border-coolgray-300 border-neutral-200 flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <h3>Lettermint</h3>
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </div>
+                <div class="w-32">
+                    <x-forms.checkbox wire:model="lettermintEnabled" instantSave="instantSave('Lettermint')" id="lettermintEnabled"
+                        label="Enabled" />
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-col w-full gap-2 xl:flex-row">
+                            <x-forms.input required type="password" id="lettermintApiKey" placeholder="API key"
+                                label="API Key" />
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
     @endif
     <h2 class="mt-4">Notification Settings</h2>
