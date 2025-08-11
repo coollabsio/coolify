@@ -7,7 +7,6 @@
 services:
   init-clickhouse:
     image: clickhouse/clickhouse-server:24.1.2-alpine
-    container_name: signoz-init-clickhouse
     command:
       - bash
       - -c
@@ -29,7 +28,6 @@ services:
 
   zookeeper:
     image: bitnami/zookeeper:3.7.1
-    container_name: signoz-zookeeper
     user: root
     healthcheck:
       test:
@@ -54,7 +52,6 @@ services:
   clickhouse:
     # addding non LTS version due to this fix https://github.com/ClickHouse/ClickHouse/commit/32caf8716352f45c1b617274c7508c86b7d1afab
     image: clickhouse/clickhouse-server:24.1.2-alpine
-    container_name: signoz-clickhouse
     tty: true
     depends_on:
       init-clickhouse:
@@ -388,7 +385,6 @@ services:
 
   signoz:
     image: signoz/signoz:latest
-    container_name: signoz
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -469,7 +465,6 @@ services:
 
   otel-collector:
     image: signoz/signoz-otel-collector:latest
-    container_name: signoz-otel-collector
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -602,7 +597,6 @@ services:
 
   schema-migrator-sync:
     image: signoz/signoz-schema-migrator:latest
-    container_name: schema-migrator-sync
     command:
       - sync
       - --dsn=tcp://clickhouse:9000
@@ -618,7 +612,6 @@ services:
 
   schema-migrator-async:
     image: signoz/signoz-schema-migrator:latest
-    container_name: schema-migrator-async
     depends_on:
       clickhouse:
         condition: service_healthy
