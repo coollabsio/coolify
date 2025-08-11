@@ -77,6 +77,7 @@ services:
       - NEXT_PUBLIC_POLOTNO=${NEXT_PUBLIC_POLOTNO}
       - IS_GENERAL=true
       - NX_ADD_PLUGINS=${NX_ADD_PLUGINS:-false}
+      - NOT_SECURED=${NOT_SECURED:-false}
       
       # Payment Settings
       - FEE_AMOUNT=${FEE_AMOUNT:-0.05}

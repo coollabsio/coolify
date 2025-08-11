@@ -1101,7 +1101,7 @@ function getContainerLogs(Server $server, string $container_id, int $lines = 100
         ], $server);
     }
 
-    $output .= removeAnsiColors($output);
+    $output = removeAnsiColors($output);
 
     return $output;
 }

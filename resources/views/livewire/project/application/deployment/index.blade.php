@@ -3,31 +3,36 @@
     <h1>Deployments</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div class="flex flex-col gap-2 pb-10"
-        @if (!$skip) wire:poll.5000ms='reload_deployments' @endif>
+    <div class="flex flex-col gap-2 pb-10" @if (!$skip) wire:poll.5000ms='reloadDeployments' @endif>
         <div class="flex items-end gap-2">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
             @if ($deployments_count > 0)
-                <x-forms.button disabled="{{ !$show_prev }}" wire:click="previous_page('{{ $default_take }}')">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="m14 6l-6 6l6 6z" />
-                    </svg>
-                </x-forms.button>
-                <x-forms.button disabled="{{ !$show_next }}" wire:click="next_page('{{ $default_take }}')">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="m10 18l6-6l-6-6z" />
-                    </svg>
-                </x-forms.button>
+                <div class="flex items-center gap-2">
+                    <x-forms.button disabled="{{ !$showPrev }}" wire:click="previousPage('{{ $defaultTake }}')">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="m14 6l-6 6l6 6z" />
+                        </svg>
+                    </x-forms.button>
+                    <span class="text-sm text-gray-600 dark:text-gray-400 px-2">
+                        Page {{ $currentPage }} of {{ ceil($deployments_count / $defaultTake) }}
+                    </span>
+                    <x-forms.button disabled="{{ !$showNext }}" wire:click="nextPage('{{ $defaultTake }}')">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="m10 18l6-6l-6-6z" />
+                        </svg>
+                    </x-forms.button>
+                </div>
             @endif
         </div>
-        @if ($deployments_count > 0)
-            <form class="flex items-end gap-2">
-                <x-forms.input id="pull_request_id" label="Pull Request"></x-forms.input>
-                <x-forms.button type="submit">Filter</x-forms.button>
-            </form>
-        @endif
+        <form class="flex items-end gap-2">
+            <x-forms.input id="pull_request_id" type="number" min="1" label="Pull Request Id"></x-forms.input>
+            <x-forms.button type="submit">Filter</x-forms.button>
+            @if ($pull_request_id)
+                <x-forms.button type="button" wire:click="clearFilter">Clear</x-forms.button>
+            @endif
+        </form>
         @forelse ($deployments as $deployment)
             <div @class([
                 'p-2 border-l-2 bg-white dark:bg-coolgray-100',
