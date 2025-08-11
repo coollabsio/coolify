@@ -49,7 +49,7 @@ class StopApplication
                 }
 
                 if ($dockerCleanup) {
-                    CleanupDocker::dispatch($server, true);
+                    CleanupDocker::dispatch($server, false, false);
                 }
             } catch (\Exception $e) {
                 return $e->getMessage();
