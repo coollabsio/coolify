@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - ${COOLIFY_VOLUME_APP}:/var/lib/postgresql
+      - console_postgres:/var/lib/postgresql
 
   autobase-console-api:
     image: autobase/console_api:2.3.0
