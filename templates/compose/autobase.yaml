@@ -12,7 +12,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
     volumes:
       - ${COOLIFY_VOLUME_APP}:/var/lib/postgresql
 
@@ -26,7 +25,6 @@ services:
     depends_on:
       autobase-console-db:
         condition: service_healthy
-    restart: unless-stopped
     expose:
       - "8080"
     environment:
@@ -50,7 +48,6 @@ services:
     depends_on:
       autobase-console-api:
         condition: service_healthy
-    restart: unless-stopped
     environment:
       - SERVICE_FQDN_AUTOBASE_CONSOLE_UI_80
       - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
