@@ -13,7 +13,7 @@
             </div>
         @endif
         @isset($rate_limit_remaining)
-            <div class="pt-1 ">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
+            <div class="pt-1 pb-4">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset
         <div wire:loading.remove wire:target='load_prs'>
             @if ($pull_requests->count() > 0)
@@ -66,7 +66,7 @@
         <h3 class="py-4">Deployments</h3>
         <div class="flex flex-wrap w-full gap-4">
             @foreach (data_get($application, 'previews') as $previewName => $preview)
-                <div class="flex flex-col w-full p-4 border dark:border-coolgray-200">
+                <div class="flex flex-col w-full p-4 border dark:border-coolgray-200" wire:key="preview-container-{{ $preview->pull_request_id }}">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
                         @if (str(data_get($preview, 'status'))->startsWith('running'))
                             <x-status.running :status="data_get($preview, 'status')" />
@@ -100,7 +100,7 @@
                                 </form>
                             @else
                                 @foreach (collect(json_decode($preview->docker_compose_domains)) as $serviceName => $service)
-                                    <livewire:project.application.previews-compose wire:key="{{ $preview->id }}"
+                                    <livewire:project.application.previews-compose wire:key="preview-{{ $preview->pull_request_id }}-{{ $serviceName }}"
                                         :service="$service" :serviceName="$serviceName" :preview="$preview" />
                                 @endforeach
                             @endif

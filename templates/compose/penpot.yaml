@@ -55,7 +55,7 @@ services:
       - PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS:-false}
       - PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL:-false}
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:6060/readyz']
+      test: ['CMD', 'node', '-e', "require('http').get({host:'127.0.0.1', port:6060, path:'/readyz'}, res => process.exit(res.statusCode===200 ? 0 : 1)).on('error', () => process.exit(1));"]
       interval: 10s
       timeout: 30s
       retries: 15

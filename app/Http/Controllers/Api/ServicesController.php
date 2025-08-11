@@ -510,10 +510,10 @@ class ServicesController extends Controller
 
         DeleteResourceJob::dispatch(
             resource: $service,
-            deleteConfigurations: $request->query->get('delete_configurations', true),
             deleteVolumes: $request->query->get('delete_volumes', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true)
         );
 
         return response()->json([
