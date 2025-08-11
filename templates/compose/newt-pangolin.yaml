@@ -5,11 +5,9 @@
 
 services:
   newt:
-    image: fosrl/newt
-    container_name: newt
-    restart: unless-stopped
+    image: fosrl/newt:latest
     environment:
-      - 'PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT:-domain.tld}'
+      - 'PANGOLIN_ENDPOINT=$SERVICE_FQDN_PANGOLIN'
       - 'NEWT_ID=${NEWT_ID}'
       - 'NEWT_SECRET=${NEWT_SECRET}'
     healthcheck:
