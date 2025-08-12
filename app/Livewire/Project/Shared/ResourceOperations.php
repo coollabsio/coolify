@@ -412,7 +412,7 @@ class ResourceOperations extends Component
 
                     if ($this->cloneVolumeData) {
                         try {
-                            StopService::dispatch($application, false, false);
+                            StopService::dispatch($application);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
                             $sourceServer = $application->service->destination->server;
@@ -454,7 +454,7 @@ class ResourceOperations extends Component
 
                     if ($this->cloneVolumeData) {
                         try {
-                            StopService::dispatch($database->service, false, false);
+                            StopService::dispatch($database->service);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
                             $sourceServer = $database->service->destination->server;

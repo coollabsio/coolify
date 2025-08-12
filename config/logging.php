@@ -118,6 +118,20 @@ return [
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
+
+        'scheduled' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/scheduled.log'),
+            'level' => 'debug',
+            'days' => 1,
+        ],
+
+        'scheduled-errors' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/scheduled-errors.log'),
+            'level' => 'debug',
+            'days' => 7,
+        ],
     ],
 
 ];
