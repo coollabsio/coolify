@@ -70,7 +70,7 @@ class Advanced extends Component
     #[Validate(['boolean'])]
     public bool $isGitCleanupEnabled = true;
 
-    public $showGitRemovalWarningModal = false;
+    public bool $showGitRemovalWarningModal = false;
 
     public function mount()
     {
@@ -127,8 +127,41 @@ class Advanced extends Component
             $this->isRawComposeDeploymentEnabled = $this->application->settings->is_raw_compose_deployment_enabled;
             $this->isConnectToDockerNetworkEnabled = $this->application->settings->connect_to_docker_network;
             $this->disableBuildCache = $this->application->settings->disable_build_cache;
-            $this->isGitCleanupEnabled = $this->application->settings->is_git_cleanup_enabled ?? true;
+            $this->isGitCleanupEnabled = $this->application->settings->is_git_cleanup_enabled ?? false;
         }
+    }
+
+    public function handleGitCleanupToggle()
+    {
+        if ($this->isGitCleanupEnabled) {
+            $this->showGitRemovalWarningModal = true;
+
+        } else {
+            $this->updateGitCleanupSetting(true);
+        }
+    }
+
+    public function confirmGitRemoval()
+    {
+
+        $this->updateGitCleanupSetting(false);
+        $this->showGitRemovalWarningModal = false;
+        $this->dispatch('success', '.git removal disabled.');
+    }
+
+    public function cancelGitRemoval()
+    {
+        // User canceled unchecking, keep checkbox checked
+        $this->isGitCleanupEnabled = true;
+        $this->showGitRemovalWarningModal = false;
+    }
+
+    protected function updateGitCleanupSetting($value)
+    {
+        $this->application->settings->is_git_cleanup_enabled = $value;
+        $this->application->settings->save();
+        $this->isGitCleanupEnabled = $value;
+        $this->dispatch('saved');
     }
 
     private function resetDefaultLabels()
@@ -177,39 +210,6 @@ class Advanced extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-    // Add these properties
-
-    // Add these methods
-    public function showGitRemovalWarning()
-    {
-        if (! $this->isGitCleanupEnabled) {
-            $this->showGitRemovalWarningModal = true;
-
-            return;
-        }
-
-        $this->updateGitCleanupSetting(false);
-    }
-
-    public function confirmGitRemoval()
-    {
-        $this->updateGitCleanupSetting(true);
-        $this->showGitRemovalWarningModal = false;
-    }
-
-    public function cancelGitRemoval()
-    {
-        $this->isGitCleanupEnabled = false;
-        $this->showGitRemovalWarningModal = false;
-    }
-
-    protected function updateGitCleanupSetting($value)
-    {
-        $this->application->settings->is_git_cleanup_enabled = $value;
-        $this->application->settings->save();
-        $this->isGitCleanupEnabled = $value;
-        $this->dispatch('saved');
     }
 
     public function submit()
