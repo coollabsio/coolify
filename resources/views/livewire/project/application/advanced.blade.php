@@ -67,6 +67,8 @@
                     helper="Allow Git Submodules during build process." />
                 <x-forms.checkbox instantSave id="isGitLfsEnabled" label="LFS"
                     helper="Allow Git LFS during build process." />
+                <x-forms.checkbox instantSave id="isGitCleanupEnabled" label="Remove .git after import"
+                    helper="If enabled, the .git directory will be removed from the deployment folder after importing the repository. Disable to preserve Git metadata (e.g., for runtime version reads)." />
             @endif
         </div>
 

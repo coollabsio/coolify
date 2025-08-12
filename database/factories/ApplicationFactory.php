@@ -17,6 +17,7 @@ class ApplicationFactory extends Factory
             'ports_exposes' => '3000',
             'environment_id' => 1,
             'destination_id' => 1,
+            'is_git_cleanup_enabled' => fake()->boolean(),
         ];
     }
 }
