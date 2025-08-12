@@ -22,7 +22,10 @@ services:
       - 'CAP_AWS_BUCKET=${CAP_AWS_BUCKET:-capso}'
       - 'CAP_AWS_REGION=${CAP_AWS_REGION:-us-east-1}'
       - 'S3_PUBLIC_ENDPOINT=${SERVICE_FQDN_CAPS3_3902}'
-      - 'S3_INTERNAL_ENDPOINT=${S3_INTERNAL_ENDPOINT:-http://minio:3902}'
+      - 'S3_INTERNAL_ENDPOINT=${SERVICE_FQDN_CAPS3_3902}'
+      - 'NEXT_RUNTIME=nodejs'
+      - 'S3_PATH_STYLE=true'
+      - 'CAP_AWS_ENDPOINT=${SERVICE_FQDN_CAPS3_3902}'
     depends_on:
       cap-db:
         condition: service_healthy
