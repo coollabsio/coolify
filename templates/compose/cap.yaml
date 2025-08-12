@@ -13,15 +13,16 @@ services:
     environment:
       - SERVICE_FQDN_CAP_3000
       - 'DATABASE_URL=mysql://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@cap-db:3306/${MYSQL_DATABASE:-planetscale}'
-      - 'WEB_URL=${WEB_URL:-http://localhost:3000}'
-      - 'NEXTAUTH_URL=${WEB_URL:-http://localhost:3000}'
+      - 'WEB_URL=${SERVICE_FQDN_CAP_3000}'
+      - 'NEXTAUTH_URL=${SERVICE_FQDN_CAP_3000}'
       - 'DATABASE_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_DATABASEENCRYPTIONKEY}'
       - 'NEXTAUTH_SECRET=${SERVICE_PASSWORD_64_NEXTAUTHSECRET}'
       - 'CAP_AWS_ACCESS_KEY=${SERVICE_USER_MINIO}'
       - 'CAP_AWS_SECRET_KEY=${SERVICE_PASSWORD_MINIO}'
       - 'CAP_AWS_BUCKET=${CAP_AWS_BUCKET:-capso}'
       - 'CAP_AWS_REGION=${CAP_AWS_REGION:-us-east-1}'
-      - 'CAP_AWS_ENDPOINT=${CAP_AWS_ENDPOINT:-http://minio:3902}'
+      - 'S3_PUBLIC_ENDPOINT=${SERVICE_FQDN_CAPS3_3902}'
+      - 'S3_INTERNAL_ENDPOINT=${S3_INTERNAL_ENDPOINT:-http://minio:3902}'
     depends_on:
       cap-db:
         condition: service_healthy
@@ -58,6 +59,7 @@ services:
     image: 'bitnami/minio:latest'
     restart: unless-stopped
     environment:
+      - SERVICE_FQDN_CAPS3_3902
       - MINIO_API_PORT_NUMBER=3902
       - MINIO_CONSOLE_PORT_NUMBER=3903
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
