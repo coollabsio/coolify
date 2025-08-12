@@ -67,9 +67,43 @@
                     helper="Allow Git Submodules during build process." />
                 <x-forms.checkbox instantSave id="isGitLfsEnabled" label="LFS"
                     helper="Allow Git LFS during build process." />
+                    
+                <!-- .git Removal Checkbox with Warning Modal -->
+                <x-forms.checkbox 
+                    id="isGitCleanupEnabled" 
+                    label="Remove .git after import"
+                    helper="If enabled, the .git directory will be removed from the deployment folder after importing the repository."
+                    wire:model="isGitCleanupEnabled"
+                    wire:click.prevent="showGitRemovalWarning"
+                />
+
+                <!-- Warning Modal -->
+                <x-modal wire:model="showGitRemovalWarningModal">
+                    <x-modal.header>
+                        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Security Warning: Remove .git Folder?</h2>
+                    </x-modal.header>
+                    <x-modal.content>
+                        <div class="space-y-4">
+                            <p class="text-red-500 dark:text-red-400 font-semibold">This action has significant security implications!</p>
+                            <ul class="list-disc pl-5 space-y-2">
+                                <li>Exposes your full source code, commit history, and even deleted files to the public</li>
+                                <li>Often .git contains secrets or SSH keys from git or other services</li>
+                                <li>This action cannot be undone once performed</li>
+                                <li>Proceed only if you understand the risks</li>
+                            </ul>
+                        </div>
+                    </x-modal.content>
+                    <x-modal.footer>
+                        <x-button type="button" color="red" wire:click="confirmGitRemoval">
+                            I Understand - Remove .git
+                        </x-button>
+                        <x-button type="button" color="gray" wire:click="cancelGitRemoval">
+                            Cancel
+                        </x-button>
+                    </x-modal.footer>
+                </x-modal>
             @endif
         </div>
-
     </div>
     <form wire:submit="submit" class="flex flex-col gap-2">
         @if ($application->build_pack !== 'dockercompose')
