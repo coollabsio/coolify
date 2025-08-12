@@ -6,7 +6,7 @@
 
 services:
   affine:
-    image: ghcr.io/toeverything/affine-graphql:stable
+    image: ghcr.io/toeverything/affine:stable
     depends_on:
       redis:
         condition: service_healthy  
@@ -43,7 +43,7 @@ services:
 
   affine_migration:
     exclude_from_hc: true
-    image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
     restart: on-failure
     volumes:
       - affine-storage:/root/.affine/storage
@@ -74,7 +74,7 @@ services:
       timeout: 5s
       retries: 5
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     volumes:
       - affine-postgres-data:/var/lib/postgresql/data
     healthcheck:
