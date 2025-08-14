@@ -10,7 +10,7 @@ services:
     volumes:
       - app_storage:/rails/storage
     environment:
-      - SERVICE_FQDN_MAYBE
+      - SERVICE_URL_MAYBE
       - SELF_HOSTED=true
       - RAILS_FORCE_SSL=${RAILS_FORCE_SSL:-false}
       - RAILS_ASSUME_SSL=${RAILS_ASSUME_SSL:-false}

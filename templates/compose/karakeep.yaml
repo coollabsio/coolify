@@ -10,8 +10,8 @@ services:
     volumes:
       - karakeep-data:/data
     environment:
-      - SERVICE_FQDN_KARAKEEP
-      - NEXTAUTH_URL=${SERVICE_FQDN_KARAKEEP}
+      - SERVICE_URL_KARAKEEP
+      - NEXTAUTH_URL=${SERVICE_URL_KARAKEEP}
       - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
       - MEILI_ADDR=http://meilisearch:7700
@@ -36,7 +36,7 @@ services:
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
       - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
-      - NEXTAUTH_URL=${SERVICE_FQDN_KARAKEEP}
+      - NEXTAUTH_URL=${SERVICE_URL_KARAKEEP}
     volumes:
       - karakeep-meilisearch:/meili_data
     healthcheck:

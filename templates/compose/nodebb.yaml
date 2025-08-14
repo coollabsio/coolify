@@ -8,7 +8,7 @@ services:
   nodebb:
     image: ghcr.io/nodebb/nodebb:latest
     environment:
-      - SERVICE_FQDN_NODEBB_4567
+      - SERVICE_URL_NODEBB_4567
     volumes:
       - nodebb_build:/usr/src/app/build
       - nodebb_uploads:/usr/src/app/public/uploads

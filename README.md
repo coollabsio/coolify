@@ -53,6 +53,7 @@ Thank you so much!
 
 ## Big Sponsors
 
+* [CubePath](https://cubepath.com/?ref=coolify.io) - Dedicated Servers & Instant Deploy
 * [GlueOps](https://www.glueops.dev?ref=coolify.io) - DevOps automation and infrastructure management
 * [Algora](https://algora.io?ref=coolify.io) - Open source contribution platform
 * [Ubicloud](https://www.ubicloud.com?ref=coolify.io) - Open source cloud infrastructure platform
@@ -87,8 +88,11 @@ Thank you so much!
 * [Gozunga](https://gozunga.com?ref=coolify.io) - Seriously Simple Cloud Infrastructure
 * [Macarne](https://macarne.com?ref=coolify.io) - Best IP Transit & Carrier Ethernet Solutions for Simplified Network Connectivity
 
+
 ## Small Sponsors
 
+<a href="https://open-elements.com/?utm_source=coolify.io"><img width="60px" alt="OpenElements" src="https://github.com/OpenElements.png"/></a>
+<a href="https://xaman.app/?utm_source=coolify.io"><img width="60px" alt="XamanApp" src="https://github.com/XamanApp.png"/></a>
 <a href="https://www.uxwizz.com/?utm_source=coolify.io"><img width="60px" alt="UXWizz" src="https://github.com/UXWizz.png"/></a>
 <a href="https://evercam.io/?utm_source=coolify.io"><img width="60px" alt="Evercam" src="https://github.com/evercam.png"/></a>
 <a href="https://github.com/iujlaki"><img width="60px" alt="Imre Ujlaki" src="https://github.com/iujlaki.png"/></a>

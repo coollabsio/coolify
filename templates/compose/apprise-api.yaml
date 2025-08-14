@@ -8,7 +8,7 @@ services:
   apprise-api:
     image: linuxserver/apprise-api:latest
     environment:
-      - SERVICE_FQDN_APPRISE_8000
+      - SERVICE_URL_APPRISE_8000
       - PUID=1000
       - PGID=1000
       - TZ=UTC

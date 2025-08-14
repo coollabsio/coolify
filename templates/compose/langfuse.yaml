@@ -5,7 +5,7 @@
 # port: 3000
 
 x-app-env: &app-env
-  - NEXTAUTH_URL=${SERVICE_FQDN_LANGFUSE}
+  - NEXTAUTH_URL=${SERVICE_URL_LANGFUSE}
   - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse-db}
   - SALT=${SERVICE_PASSWORD_SALT}
   - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_LANGFUSE}
@@ -70,7 +70,7 @@ services:
         condition: service_healthy
     environment:
       <<: *app-env
-      SERVICE_FQDN_LANGFUSE_3000: ${SERVICE_FQDN_LANGFUSE_3000}
+      SERVICE_URL_LANGFUSE_3000: ${SERVICE_URL_LANGFUSE_3000}
     healthcheck:
       test:
         - CMD

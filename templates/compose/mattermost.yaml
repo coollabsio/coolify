@@ -16,8 +16,8 @@ services:
       - 'mattermost-data-client-plugins:/mattermost/client/plugins:rw'
       - 'mattermost-data-bleve-indexes:/mattermost/bleve-indexes:rw'
     environment:
-      - SERVICE_FQDN_MATTERMOST_8065
-      - MM_SERVICESETTINGS_SITEURL=${SERVICE_FQDN_MATTERMOST}
+      - SERVICE_URL_MATTERMOST_8065
+      - MM_SERVICESETTINGS_SITEURL=${SERVICE_URL_MATTERMOST}
       - TZ=${TZ:-UTC}
       - MM_SQLSETTINGS_DRIVERNAME=postgres
       - MM_SQLSETTINGS_DATASOURCE=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB?sslmode=disable&connect_timeout=10

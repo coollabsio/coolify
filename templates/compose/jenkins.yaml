@@ -8,7 +8,7 @@ services:
   jenkins:
     image: jenkins/jenkins:latest
     environment:
-      - SERVICE_FQDN_JENKINS_8080
+      - SERVICE_URL_JENKINS_8080
     volumes:
       - jenkins-home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock

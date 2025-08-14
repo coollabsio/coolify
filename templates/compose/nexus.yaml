@@ -9,7 +9,7 @@ services:
     image: sonatype/nexus3
     platform: linux/amd64
     environment:
-      - SERVICE_FQDN_NEXUS_8081
+      - SERVICE_URL_NEXUS_8081
       - NEXUS_SECURITY_RANDOMPASSWORD=${NEXUS_SECURITY_RANDOMPASSWORD:-false}
       - INSTALL4J_ADD_VM_PARAMS=-Xms2703m -Xmx2703m -XX:MaxDirectMemorySize=2703m -Djava.util.prefs.userRoot=/nexus-data/javaprefs
     volumes:

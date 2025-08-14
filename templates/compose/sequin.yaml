@@ -8,7 +8,7 @@ services:
   sequin:
     image: sequin/sequin:latest
     environment:
-      - SERVICE_FQDN_SEQUIN_7376
+      - SERVICE_URL_SEQUIN_7376
       - SERVER_HOST=${SERVICE_URL_SEQUIN}
       - PG_HOSTNAME=postgres
       - PG_DATABASE=${POSTGRES_DB:-sequin-db}

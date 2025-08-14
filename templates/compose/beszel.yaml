@@ -10,7 +10,7 @@ services:
   beszel:
     image: henrygd/beszel:latest
     environment:
-      - SERVICE_FQDN_BESZEL_8090
+      - SERVICE_URL_BESZEL_8090
     volumes:
       - beszel_data:/beszel_data
 

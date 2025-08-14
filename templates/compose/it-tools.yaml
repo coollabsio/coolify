@@ -8,7 +8,7 @@ services:
   it-tools:
     image: corentinth/it-tools:latest
     environment:
-      - SERVICE_FQDN_ITTOOLS_80
+      - SERVICE_URL_ITTOOLS_80
     volumes:
       - it-tools-data:/app/data
     healthcheck:

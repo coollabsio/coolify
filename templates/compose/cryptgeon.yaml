@@ -8,7 +8,7 @@ services:
   app:
     image: cupcakearmy/cryptgeon:latest
     environment:
-      - SERVICE_FQDN_CRYPTGEON_8000
+      - SERVICE_URL_CRYPTGEON_8000
       - SIZE_LIMIT=${SIZE_LIMIT:-4 MiB}
       - MAX_VIEWS=${MAX_VIEWS:-100}
       - MAX_EXPIRATION=${MAX_EXPIRATION:-360}

@@ -48,7 +48,7 @@ class PreviewsCompose extends Component
             $random = new Cuid2;
 
             // Generate a unique domain like main app services do
-            $generated_fqdn = generateFqdn($server, $random);
+            $generated_fqdn = generateFqdn(server: $server, random: $random, parserVersion: $this->preview->application->compose_parsing_version);
 
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', str($generated_fqdn)->after('://'), $preview_fqdn);

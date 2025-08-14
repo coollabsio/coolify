@@ -8,7 +8,7 @@ services:
   litequeen:
     image: kivsegrob/lite-queen:latest
     environment:
-      - SERVICE_FQDN_LITEQUEEN_8000
+      - SERVICE_URL_LITEQUEEN_8000
     volumes:
       - litequeen-data:/home/litequeen/data
       - type: bind

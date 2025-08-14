@@ -7,7 +7,7 @@
 services:
   statusnook:
     environment:
-      - SERVICE_FQDN_STATUSNOOK_8000
+      - SERVICE_URL_STATUSNOOK_8000
     volumes:
       - "statusnook-data:/app/statusnook-data"
     image: goksan/statusnook

@@ -132,8 +132,16 @@
                 id="database.public_port" label="Public Port" />
         </div>
         <x-forms.textarea
-            helper="<a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/redis/redis/7.2/redis.conf'>Redis Default Configuration</a>"
-            label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
+    placeholder="# maxmemory 256mb
+# maxmemory-policy allkeys-lru
+# timeout 300"
+    helper="You only need to provide the Redis directives you want to override — Redis will use default values for everything else. <br/><br/>
+⚠️ <strong>Important:</strong> Coolify automatically applies the requirepass directive using the password shown in the Password field above. If you override requirepass in your custom configuration, make sure it matches the password field to avoid authentication issues. <br/><br/>
+🔗 <strong>Tip:</strong> <a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/redis/redis/7.2/redis.conf'>View the full Redis default configuration</a> to see what options are available."
+    label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
+
+
+
         <h3 class="pt-4">Advanced</h3>
         <div class="flex flex-col">
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."

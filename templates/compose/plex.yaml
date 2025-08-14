@@ -8,8 +8,8 @@ services:
   plex:
     image: lscr.io/linuxserver/plex:latest
     environment:
-      - SERVICE_FQDN_PLEX_32400
-      - _APP_URL=$SERVICE_FQDN_PLEX
+      - SERVICE_URL_PLEX_32400
+      - _APP_URL=$SERVICE_URL_PLEX
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/Toronto}

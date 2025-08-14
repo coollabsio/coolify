@@ -1,0 +1,17 @@
+{
+    "entries": [
+        {
+            "tag_name": "v4.0.0-beta.418",
+            "title": "v4.0.0-beta.418",
+            "content": "- fix(core): Clean up Horizon Redis data every hour.\r\n- fix(ui): Infinite loop on requesting a png file on new resource page.\r\n\r\n## What's Changed\r\n* v4.0.0-beta.418 by @andrasbacsai in https://github.com/coollabsio/coolify/pull/5793\r\n\r\n\r\n**Full Changelog**: https://github.com/coollabsio/coolify/compare/v4.0.0-beta.417...v4.0.0-beta.418",
+            "published_at": "2025-05-09T06:30:49.000000Z"
+        },
+        {
+            "tag_name": "v4.0.0-beta.417",
+            "title": "v4.0.0-beta.417",
+            "content": "- fix(core): Cleanup redis data every 10 minutes.\r\n- fix(core): Revert jobs to be `dontRelease` as they were before the redis/job problems started.\r\n\r\n## What's Changed\r\n* v4.0.0-beta.417 by @andrasbacsai in https://github.com/coollabsio/coolify/pull/5784\r\n\r\n\r\n**Full Changelog**: https://github.com/coollabsio/coolify/compare/v4.0.0-beta.416...v4.0.0-beta.417",
+            "published_at": "2025-05-07T21:14:23.000000Z"
+        }
+    ],
+    "last_updated": "2025-08-10T10:20:51.376736Z"
+}

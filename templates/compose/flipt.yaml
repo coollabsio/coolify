@@ -10,7 +10,7 @@ services:
     volumes:
       - 'flipt-data:/var/opt/flipt'
     environment:
-      - SERVICE_FQDN_FLIPT_8080
+      - SERVICE_URL_FLIPT_8080
     healthcheck:
       test:
         - CMD

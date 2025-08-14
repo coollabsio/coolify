@@ -24,7 +24,7 @@ services:
   nlp:
     image: ghcr.io/getzep/zep-nlp-server:0.4
     environment:
-      - SERVICE_FQDN_NLP_5557
+      - SERVICE_URL_NLP_5557
       - ZEP_OPENAI_API_KEY=${OPENAI_API_KEY}
       - ZEP_AUTH_SECRET=${SERVICE_PASSWORD_AUTHSECRET}
       - ZEP_SERVER_WEB_ENABLED=${ZEP_SERVER_WEB_ENABLED:-false}
@@ -42,7 +42,7 @@ services:
       nlp:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_ZEP_8000
+      - SERVICE_URL_ZEP_8000
       - ZEP_STORE_POSTGRES_DSN=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/postgres?sslmode=disable
       - ZEP_NLP_SERVER_URL=http://nlp:5557
       - ZEP_EXTRACTORS_DOCUMENTS_EMBEDDINGS_SERVICE=${EXTRACTORS_DOCUMENTS_EMBEDDINGS_SERVICE:-openai}

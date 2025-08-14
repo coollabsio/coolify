@@ -13,8 +13,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_OWNCLOUD_8080
-      - OWNCLOUD_DOMAIN=${SERVICE_FQDN_OWNCLOUD}
+      - SERVICE_URL_OWNCLOUD_8080
+      - OWNCLOUD_DOMAIN=${SERVICE_URL_OWNCLOUD}
       - OWNCLOUD_TRUSTED_DOMAINS=${SERVICE_URL_OWNCLOUD}
       - OWNCLOUD_DB_TYPE=mysql
       - OWNCLOUD_DB_HOST=mariadb

@@ -13,7 +13,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_LITELLM_4000
+      - SERVICE_URL_LITELLM_4000
       - LITELLM_LOG=${LITELLM_LOG:-ERROR}
       - LITELLM_MODE=${LITELLM_MODE:-PRODUCTION}
       - LITELLM_MASTER_KEY=${SERVICE_PASSWORD_MASTERKEY}

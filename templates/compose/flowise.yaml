@@ -8,7 +8,7 @@ services:
   flowise:
     image: flowiseai/flowise:latest
     environment:
-      - SERVICE_FQDN_FLOWISE_3001
+      - SERVICE_URL_FLOWISE_3001
       - DEBUG=${DEBUG:-false}
       - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}
       - PORT=${PORT:-3001}

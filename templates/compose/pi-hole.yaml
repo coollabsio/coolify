@@ -16,7 +16,7 @@ services:
       # Uncomment the line below if you are using Pi-hole as your NTP server
       - "123:123/udp"
     environment:
-      - SERVICE_FQDN_PIHOLE_80
+      - SERVICE_URL_PIHOLE_80
       - TZ=${TZ:-Europe/London}
       - FTLCONF_webserver_api_password=${SERVICE_PASSWORD_PIHOLE}
       - FTLCONF_dns_listeningMode=${FTLCONF_dns_listeningMode:-all}

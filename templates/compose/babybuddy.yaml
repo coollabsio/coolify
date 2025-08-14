@@ -7,11 +7,11 @@ services:
   babybuddy:
     image: lscr.io/linuxserver/babybuddy:latest
     environment:
-      - SERVICE_FQDN_BABYBUDDY
+      - SERVICE_URL_BABYBUDDY
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
-      - CSRF_TRUSTED_ORIGINS=$SERVICE_FQDN_BABYBUDDY
+      - CSRF_TRUSTED_ORIGINS=$SERVICE_URL_BABYBUDDY
     volumes:
       - babybuddy-config:/config
     healthcheck:

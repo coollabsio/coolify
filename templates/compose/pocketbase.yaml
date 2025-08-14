@@ -8,7 +8,7 @@ services:
   pocketbase:
     image: ghcr.io/coollabsio/pocketbase:latest
     environment:
-      - SERVICE_FQDN_POCKETBASE_8080
+      - SERVICE_URL_POCKETBASE_8080
     volumes:
       - pocketbase-data:/app/pb_data
       - pocketbase-hooks:/app/pb_hooks

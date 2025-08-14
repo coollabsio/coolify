@@ -8,8 +8,8 @@ services:
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     environment:
-      - SERVICE_FQDN_SONARR_8989
-      - _APP_URL=$SERVICE_FQDN_SONARR
+      - SERVICE_URL_SONARR_8989
+      - _APP_URL=$SERVICE_URL_SONARR
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/Toronto}

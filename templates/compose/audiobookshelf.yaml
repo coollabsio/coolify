@@ -8,7 +8,7 @@ services:
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:latest
     environment:
-      - SERVICE_FQDN_AUDIOBOOKSHELF_80
+      - SERVICE_URL_AUDIOBOOKSHELF_80
       - TZ=${TIMEZONE:-America/Toronto}
     volumes:
       - audiobookshelf-audiobooks:/audiobooks

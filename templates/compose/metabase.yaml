@@ -10,7 +10,7 @@ services:
     volumes:
       - /dev/urandom:/dev/random:ro
     environment:
-      - SERVICE_FQDN_METABASE_3000
+      - SERVICE_URL_METABASE_3000
       - MB_DB_TYPE=postgres
       - MB_DB_HOST=postgresql
       - MB_DB_PORT=5432

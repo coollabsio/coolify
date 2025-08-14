@@ -203,6 +203,16 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
+    public function changelogReads()
+    {
+        return $this->hasMany(UserChangelogRead::class);
+    }
+
+    public function getUnreadChangelogCount(): int
+    {
+        return app(\App\Services\ChangelogService::class)->getUnreadCountForUser($this);
+    }
+
     public function getRecipients(): array
     {
         return [$this->email];

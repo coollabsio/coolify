@@ -8,7 +8,7 @@ services:
   freshrss:
     image: freshrss/freshrss:latest
     environment:
-      - SERVICE_FQDN_FRESHRSS_80
+      - SERVICE_URL_FRESHRSS_80
       - CRON_MIN=${CRON_MIN:-1,31}
       - POSTGRES_DB=${POSTGRESQL_DATABASE:-freshrss}
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}

@@ -8,7 +8,7 @@ services:
   firefox:
     image: jlesage/firefox
     environment:
-      - SERVICE_FQDN_FIREFOX_5800
+      - SERVICE_URL_FIREFOX_5800
     volumes:
       - firefox_config:/config
     healthcheck:

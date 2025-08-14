@@ -8,10 +8,10 @@ services:
   postiz:
     image: ghcr.io/gitroomhq/postiz-app:v1.60.1
     environment:
-      - SERVICE_FQDN_POSTIZ_5000
-      - MAIN_URL=${SERVICE_FQDN_POSTIZ}
-      - FRONTEND_URL=${SERVICE_FQDN_POSTIZ}
-      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_FQDN_POSTIZ}/api
+      - SERVICE_URL_POSTIZ_5000
+      - MAIN_URL=${SERVICE_URL_POSTIZ}
+      - FRONTEND_URL=${SERVICE_URL_POSTIZ}
+      - NEXT_PUBLIC_BACKEND_URL=${SERVICE_URL_POSTIZ}/api
       - JWT_SECRET=${SERVICE_PASSWORD_JWTSECRET}
       - DATABASE_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRESQL}@postgres:5432/${POSTGRESQL_DATABASE:-postiz-db}
       - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379

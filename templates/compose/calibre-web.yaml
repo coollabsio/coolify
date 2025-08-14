@@ -8,7 +8,7 @@ services:
   calibre-web:
     image: lscr.io/linuxserver/calibre-web:latest
     environment:
-      - SERVICE_FQDN_CALIBRE_8083
+      - SERVICE_URL_CALIBRE_8083
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Etc/UTC}

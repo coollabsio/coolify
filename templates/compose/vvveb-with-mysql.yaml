@@ -10,7 +10,7 @@ services:
     volumes:
       - vvveb-data:/var/www/html
     environment:
-      - SERVICE_FQDN_VVVEB_80
+      - SERVICE_URL_VVVEB_80
       - DB_ENGINE=mysqli
       - DB_HOST=mysql
       - DB_USER=${SERVICE_USER_VVVEB}

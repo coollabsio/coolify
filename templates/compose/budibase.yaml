@@ -82,7 +82,7 @@ services:
   proxy-service:
     image: budibase/proxy
     environment:
-      - SERVICE_FQDN_BUDIBASE_10000
+      - SERVICE_URL_BUDIBASE_10000
       - PROXY_RATE_LIMIT_WEBHOOKS_PER_SECOND=10
       - PROXY_RATE_LIMIT_API_PER_SECOND=20
       - APPS_UPSTREAM_URL=http://app-service:4002

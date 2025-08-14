@@ -25,6 +25,7 @@ class Input extends Component
         public string $autocomplete = 'off',
         public ?int $minlength = null,
         public ?int $maxlength = null,
+        public bool $autofocus = false,
     ) {}
 
     public function render(): View|Closure|string

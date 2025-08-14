@@ -7,12 +7,12 @@ services:
   phpmyadmin:
     image: lscr.io/linuxserver/phpmyadmin:latest
     environment:
-      - SERVICE_FQDN_PHPMYADMIN
+      - SERVICE_URL_PHPMYADMIN
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
       - PMA_ARBITRARY=1
-      - PMA_ABSOLUTE_URI=$SERVICE_FQDN_PHPMYADMIN
+      - PMA_ABSOLUTE_URI=$SERVICE_URL_PHPMYADMIN
     volumes:
       - phpmyadmin-config:/config
     healthcheck:

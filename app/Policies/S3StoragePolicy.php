@@ -21,7 +21,7 @@ class S3StoragePolicy
      */
     public function view(User $user, S3Storage $storage): bool
     {
-        return $user->teams()->where('id', $storage->team_id)->exists();
+        return $user->teams()->get()->firstWhere('id', $storage->team_id)->exists();
     }
 
     /**
@@ -37,7 +37,7 @@ class S3StoragePolicy
      */
     public function update(User $user, Server $server): bool
     {
-        return $user->teams()->get()->firstWhere('id', $server->team_id) !== null;
+        return $user->teams()->get()->firstWhere('id', $server->team_id)->exists() && $user->isAdmin();
     }
 
     /**
@@ -45,7 +45,7 @@ class S3StoragePolicy
      */
     public function delete(User $user, S3Storage $storage): bool
     {
-        return $user->teams()->where('id', $storage->team_id)->exists();
+        return $user->teams()->get()->firstWhere('id', $storage->team_id)->exists() && $user->isAdmin();
     }
 
     /**

@@ -29,7 +29,7 @@ services:
     volumes:
       - kimai-data:/opt/kimai/var/data
     environment:
-      - SERVICE_FQDN_KIMAI_8001
+      - SERVICE_URL_KIMAI_8001
       - APP_SECRET=${SERVICE_PASSWORD_APPSECRET}
       - MAILER_FROM=${MAILER_FROM:-kimai@example.com}
       - MAILER_URL=${MAILER_URL:-null://null}

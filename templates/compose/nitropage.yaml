@@ -8,7 +8,7 @@ services:
   nitropage:
     image: nitropage/nitropage:sqlite
     environment:
-      - SERVICE_FQDN_NITROPAGE_3000
+      - SERVICE_URL_NITROPAGE_3000
       - NP_AUTH_SALT=${SERVICE_BASE64_SALT}
       - NP_AUTH_PASSWORD=${SERVICE_PASSWORD_64_SESSION}
       - DATABASE_URL=file:../.data/dev.db

@@ -9,7 +9,8 @@
                     </svg>
                     <div class="text-center">
                         <h3 class="text-lg font-medium">Terminal Not Available</h3>
-                        <p class="mt-2 text-sm text-gray-500">No shell (bash/sh) is available in this container. Please
+                        <p class="mt-2 text-sm text-neutral-300">No shell (bash/sh) is available in this container.
+                            Please
                             ensure either bash or sh is installed to use the terminal.</p>
                     </div>
                 </div>

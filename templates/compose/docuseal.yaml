@@ -8,8 +8,8 @@ services:
   docuseal:
     image: docuseal/docuseal:latest
     environment:
-      - SERVICE_FQDN_DOCUSEAL_3000
-      - HOST=${SERVICE_FQDN_DOCUSEAL}
+      - SERVICE_URL_DOCUSEAL_3000
+      - HOST=${SERVICE_URL_DOCUSEAL}
     volumes:
       - docuseal-data:/data
     healthcheck:

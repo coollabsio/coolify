@@ -8,7 +8,7 @@ services:
   jupyter-notebook-python:
     image: quay.io/jupyter/base-notebook:latest
     environment:
-      - SERVICE_FQDN_JUPYTER_8888
+      - SERVICE_URL_JUPYTER_8888
     volumes:
       - '/jupyter:/home/jovyan/work'
     command: start-notebook.sh

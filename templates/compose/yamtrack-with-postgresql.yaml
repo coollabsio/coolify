@@ -8,8 +8,8 @@ services:
   yamtrack:
     image: ghcr.io/fuzzygrim/yamtrack
     environment:
-      - SERVICE_FQDN_YAMTRACK_8000
-      - URLS=${SERVICE_FQDN_YAMTRACK}
+      - SERVICE_URL_YAMTRACK_8000
+      - URLS=${SERVICE_URL_YAMTRACK}
       - TZ=${TZ:-Europe/Berlin}
       - SECRET=${SERVICE_PASSWORD_SECRET}
       - REGISTRATION=${REGISTRATION_ENABLED:-true}

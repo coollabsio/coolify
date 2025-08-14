@@ -132,6 +132,12 @@ class ExecuteContainerCommand extends Component
                 });
             }
         }
+
+        // Sort containers alphabetically by name
+        $this->containers = $this->containers->sortBy(function ($container) {
+            return data_get($container, 'container.Names');
+        });
+
         if ($this->containers->count() === 1) {
             $this->selected_container = data_get($this->containers->first(), 'container.Names');
         }

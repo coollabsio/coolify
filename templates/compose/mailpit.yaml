@@ -17,7 +17,7 @@ services:
         isDirectory: false
         content: ""
     environment:
-      - SERVICE_FQDN_MAILPIT_8025
+      - SERVICE_URL_MAILPIT_8025
       - MP_MAX_MESSAGES=5000
       - MP_DATABASE=/data/mailpit.db
       - MP_SMTP_AUTH_ACCEPT_ANY=1

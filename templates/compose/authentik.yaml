@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     command: server
     environment:
-      - SERVICE_FQDN_AUTHENTIKSERVER_9000
+      - SERVICE_URL_AUTHENTIKSERVER_9000
       - AUTHENTIK_REDIS__HOST=${REDIS_HOST:-redis}
       - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}

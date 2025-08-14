@@ -9,9 +9,9 @@ services:
   twenty:
     image: 'twentycrm/twenty:latest'
     environment:
-      - SERVICE_FQDN_TWENTY_3000
-      - SERVER_URL=$SERVICE_FQDN_TWENTY
-      - FRONT_BASE_URL=$SERVICE_FQDN_TWENTY
+      - SERVICE_URL_TWENTY_3000
+      - SERVER_URL=$SERVICE_URL_TWENTY
+      - FRONT_BASE_URL=$SERVICE_URL_TWENTY
       - ENABLE_DB_MIGRATIONS=true
       - CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}
       - REDIS_URL=redis://redis:6379

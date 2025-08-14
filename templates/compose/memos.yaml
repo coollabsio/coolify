@@ -10,4 +10,4 @@ services:
     volumes:
       - memos/:/var/opt/memos
     environment:
-      - SERVICE_FQDN_MEMOS_5230
+      - SERVICE_URL_MEMOS_5230

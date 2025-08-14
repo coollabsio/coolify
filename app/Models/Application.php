@@ -111,7 +111,7 @@ class Application extends BaseModel
 {
     use HasConfiguration, HasFactory, SoftDeletes;
 
-    private static $parserVersion = '4';
+    private static $parserVersion = '5';
 
     protected $guarded = [];
 
@@ -1353,7 +1353,7 @@ class Application extends BaseModel
     public function parse(int $pull_request_id = 0, ?int $preview_id = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
-            return newParser($this, $pull_request_id, $preview_id);
+            return applicationParser($this, $pull_request_id, $preview_id);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
@@ -1442,7 +1442,21 @@ class Application extends BaseModel
             $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
                 $json = collect(json_decode($this->docker_compose_domains));
-                $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
+                foreach ($json as $key => $value) {
+                    if (str($key)->contains('-')) {
+                        $key = str($key)->replace('-', '_');
+                    }
+                    $json->put((string) $key, $value);
+                }
+                $services = collect(data_get($parsedServices, 'services', []));
+                foreach ($services as $name => $service) {
+                    if (str($name)->contains('-')) {
+                        $replacedName = str($name)->replace('-', '_');
+                        $services->put((string) $replacedName, $service);
+                        $services->forget((string) $name);
+                    }
+                }
+                $names = collect($services)->keys()->toArray();
                 $jsonNames = $json->keys()->toArray();
                 $diff = array_diff($jsonNames, $names);
                 $json = $json->filter(function ($value, $key) use ($diff) {

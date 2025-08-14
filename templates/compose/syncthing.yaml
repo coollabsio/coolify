@@ -8,7 +8,7 @@ services:
   syncthing:
     image: lscr.io/linuxserver/syncthing:latest
     environment:
-      - SERVICE_FQDN_SYNCTHING_8384
+      - SERVICE_URL_SYNCTHING_8384
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Etc/UTC}

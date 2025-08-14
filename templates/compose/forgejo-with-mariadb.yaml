@@ -8,8 +8,8 @@ services:
   forgejo:
     image: codeberg.org/forgejo/forgejo:8
     environment:
-      - SERVICE_FQDN_FORGEJO_3000
-      - FORGEJO__server__ROOT_URL=${SERVICE_FQDN_FORGEJO_3000}
+      - SERVICE_URL_FORGEJO_3000
+      - FORGEJO__server__ROOT_URL=${SERVICE_URL_FORGEJO_3000}
       - FORGEJO__migrations__ALLOWED_DOMAINS=${FORGEJO__migrations__ALLOWED_DOMAINS}
       - FORGEJO__migrations__ALLOW_LOCALNETWORKS=${FORGEJO__migrations__ALLOW_LOCALNETWORKS-false}
       - USER_UID=1000

@@ -61,7 +61,7 @@ class ResourceOperations extends Component
             $url = $this->resource->fqdn;
 
             if ($server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                $url = generateFqdn($server, $uuid);
+                $url = generateFqdn(server: $server, random: $uuid, parserVersion: $this->resource->compose_parsing_version);
             }
 
             $new_resource = $this->resource->replicate([

@@ -8,8 +8,8 @@ services:
   leantime:
     image: leantime/leantime:latest
     environment:
-      - SERVICE_FQDN_LEANTIME_8080
-      - LEAN_APP_URL=${SERVICE_FQDN_LEANTIME}
+      - SERVICE_URL_LEANTIME_8080
+      - LEAN_APP_URL=${SERVICE_URL_LEANTIME}
       - LEAN_DB_HOST=mysql
       - LEAN_DB_USER=${SERVICE_USER_MYSQLDB}
       - LEAN_DB_PASSWORD=${SERVICE_PASSWORD_MYSQLDB}

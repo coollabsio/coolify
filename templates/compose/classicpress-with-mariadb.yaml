@@ -9,7 +9,7 @@ services:
     volumes:
       - classicpress-files:/var/www/html
     environment:
-      - SERVICE_FQDN_CLASSICPRESS
+      - SERVICE_URL_CLASSICPRESS
       - CLASSICPRESS_DB_HOST=mariadb
       - CLASSICPRESS_DB_USER=$SERVICE_USER_CLASSICPRESS
       - CLASSICPRESS_DB_PASSWORD=$SERVICE_PASSWORD_CLASSICPRESS

@@ -11,7 +11,7 @@ services:
     volumes:
       - windows-storage:/storage
     environment:
-      - SERVICE_FQDN_WINDOWS_8006
+      - SERVICE_URL_WINDOWS_8006
       - VERSION=11
     devices:
       - /dev/kvm:/dev/kvm

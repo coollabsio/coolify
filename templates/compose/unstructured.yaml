@@ -8,7 +8,7 @@ services:
   unstructured:
     image: "downloads.unstructured.io/unstructured-io/unstructured-api:latest"
     environment:
-      - SERVICE_FQDN_UNSTRUCTURED_8000
+      - SERVICE_URL_UNSTRUCTURED_8000
       - "UNSTRUCTURED_API_KEY=${SERVICE_PASSWORD_APIKEY}"
     healthcheck:
       test:

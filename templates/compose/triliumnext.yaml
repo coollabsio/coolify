@@ -9,7 +9,7 @@ services:
     image: ghcr.io/triliumnext/trilium:stable
     platform: linux/amd64 # https://github.com/TriliumNext/Trilium/issues/6390
     environment:
-      - SERVICE_FQDN_TRILIUMNEXT_8080
+      - SERVICE_URL_TRILIUMNEXT_8080
       - TZ=${TZ:-Europe/Berlin}
     volumes:
       - triliumnext_data:/home/node/trilium-data
