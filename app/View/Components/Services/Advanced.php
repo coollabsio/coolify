@@ -1,13 +1,13 @@
 <?php
 
-namespace App\View\Components\services;
+namespace App\View\Components\Services;
 
 use App\Models\Service;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\View\Component;
 
-class advanced extends Component
+class Advanced extends Component
 {
     /**
      * Create a new component instance.
