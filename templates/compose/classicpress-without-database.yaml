@@ -9,7 +9,7 @@ services:
     volumes:
        - classicpress-files:/var/www/html
     environment:
-       - SERVICE_FQDN_CLASSICPRESS
+       - SERVICE_URL_CLASSICPRESS
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1"]
       interval: 2s

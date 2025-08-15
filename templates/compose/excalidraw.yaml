@@ -8,7 +8,7 @@ services:
   excalidraw:
     image: excalidraw/excalidraw:latest
     environment:
-      - SERVICE_FQDN_EXCALIDRAW_80
+      - SERVICE_URL_EXCALIDRAW_80
     healthcheck:
       test:
         - CMD

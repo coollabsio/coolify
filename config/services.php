@@ -65,6 +65,6 @@ return [
         'client_secret' => env('ZITADEL_CLIENT_SECRET'),
         'redirect' => env('ZITADEL_REDIRECT_URI'),
         'base_url' => env('ZITADEL_BASE_URL'),
-    ]
+    ],
 
 ];

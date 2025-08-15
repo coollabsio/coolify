@@ -10,8 +10,8 @@ services:
     command:
       - serve
     environment:
-      - SERVICE_FQDN_NTFY_80
-      - NTFY_BASE_URL=${SERVICE_FQDN_NTFY}
+      - SERVICE_URL_NTFY_80
+      - NTFY_BASE_URL=${SERVICE_URL_NTFY}
       - TZ=${TZ:-UTC}
       - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db

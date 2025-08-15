@@ -8,7 +8,7 @@ services:
   limesurvey:
     image: adamzammit/limesurvey:latest
     environment:
-      - SERVICE_FQDN_LIMESURVEY_80
+      - SERVICE_URL_LIMESURVEY_80
       - LIMESURVEY_DB_HOST=mariadb
       - LIMESURVEY_DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - LIMESURVEY_DB_USER=${SERVICE_USER_MYSQL}

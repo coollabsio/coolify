@@ -8,8 +8,8 @@ services:
   neon-proxy:
     image: 'ghcr.io/neondatabase/wsproxy:latest'
     environment:
-      - SERVICE_FQDN_NEONPROXY
-      - SERVICE_FQDN_NEONPROMETHEUS_2112
+      - SERVICE_URL_NEONPROXY
+      - SERVICE_URL_NEONPROMETHEUS_2112
       - 'APPEND_PORT=postgres:5432'
       - 'ALLOW_ADDR_REGEX=.*'
       - LOG_TRAFFIC=false

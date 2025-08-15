@@ -9,7 +9,7 @@ services:
     image: ghcr.io/gchq/cyberchef:latest
     platform: linux/amd64
     environment:
-      - SERVICE_FQDN_CYBERCHEF_80
+      - SERVICE_URL_CYBERCHEF_80
     volumes:
       - cyberchef-data:/app/data
     healthcheck:

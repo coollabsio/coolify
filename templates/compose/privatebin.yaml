@@ -8,7 +8,7 @@ services:
   privatebin:
     image: privatebin/nginx-fpm-alpine
     environment:
-      - SERVICE_FQDN_PRIVATEBIN_8080
+      - SERVICE_URL_PRIVATEBIN_8080
     volumes:
       - privatebin_data:/srv/data
     healthcheck:

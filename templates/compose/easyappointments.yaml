@@ -8,8 +8,8 @@ services:
   easyappointments:
     image: alextselegidis/easyappointments:latest
     environment:
-      - SERVICE_FQDN_EASYAPPOINTMENTS_80
-      - BASE_URL=${SERVICE_FQDN_EASYAPPOINTMENTS}
+      - SERVICE_URL_EASYAPPOINTMENTS_80
+      - BASE_URL=${SERVICE_URL_EASYAPPOINTMENTS}
       - DB_HOST=mysql
       - DB_NAME=easyappointments
       - DB_USERNAME=root

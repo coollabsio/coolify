@@ -10,8 +10,8 @@ services:
     volumes:
       - teable_data:/app/.assets:rw
     environment:
-      - SERVICE_FQDN_TEABLE_3000
-      - PUBLIC_ORIGIN=${SERVICE_FQDN_TEABLE}
+      - SERVICE_URL_TEABLE_3000
+      - PUBLIC_ORIGIN=${SERVICE_URL_TEABLE}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - SECRET_KEY=${SERVICE_PASSWORD_64_SECRET}
       - TZ=${TIMEZONE}

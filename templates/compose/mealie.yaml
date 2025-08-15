@@ -8,7 +8,7 @@ services:
   mealie:
     image: 'ghcr.io/mealie-recipes/mealie:latest'
     environment:
-      - SERVICE_FQDN_MEALIE_9000
+      - SERVICE_URL_MEALIE_9000
       - ALLOW_SIGNUP=${ALLOW_SIGNUP:-true}
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}

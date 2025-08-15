@@ -447,4 +447,74 @@ class ProjectController extends Controller
 
         return response()->json(['message' => 'Project deleted.']);
     }
+
+    #[OA\Post(
+        summary: 'Create Environment',
+        description: 'Create environment in project.',
+        path: '/projects/{uuid}/{environment_name}',
+        operationId: 'create-environment',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_name', in: 'path', required: true, description: 'Environment name', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Environment created.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'uuid' => ['type' => 'string', 'example' => 'env123', 'description' => 'The UUID of the environment.'],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Project not found.',
+            ),
+        ]
+    )]
+    public function create_environment(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        if (! $request->uuid) {
+            return response()->json(['message' => 'Project UUID is required.'], 422);
+        }
+        if (! $request->environment_name) {
+            return response()->json(['message' => 'Environment name is required.'], 422);
+        }
+
+        $project = Project::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $project) {
+            return response()->json(['message' => 'Project not found.'], 404);
+        }
+
+        $environment = $project->environments()->create([
+            'name' => $request->environment_name,
+        ]);
+
+        return response()->json([
+            'uuid' => $environment->uuid,
+        ])->setStatusCode(201);
+    }
 }

@@ -8,7 +8,7 @@ services:
   wakapi:
     image: ghcr.io/muety/wakapi:latest
     environment:
-      - SERVICE_FQDN_WAKAPI_3000
+      - SERVICE_URL_WAKAPI_3000
       - TZ=${TIMEZONE:-Europe/Berlin}
 
       - WAKAPI_SERVER_LISTEN_IPV6="-"

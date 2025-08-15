@@ -8,7 +8,7 @@ services:
   marimo:
     image: ghcr.io/marimo-team/marimo:latest-sql
     environment:
-      - SERVICE_FQDN_MARIMO_8080
+      - SERVICE_URL_MARIMO_8080
       - TOKEN_PASSWORD=$SERVICE_PASSWORD_MARIMO
     volumes:
       - "marimo:/app"

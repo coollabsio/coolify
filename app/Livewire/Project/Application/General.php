@@ -156,6 +156,14 @@ class General extends Component
             $this->application->settings->save();
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
+        // Convert service names with dots to use underscores for HTML form binding
+        $sanitizedDomains = [];
+        foreach ($this->parsedServiceDomains as $serviceName => $domain) {
+            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $sanitizedDomains[$sanitizedKey] = $domain;
+        }
+        $this->parsedServiceDomains = $sanitizedDomains;
+
         $this->ports_exposes = $this->application->ports_exposes;
         $this->is_preserve_repository_enabled = $this->application->settings->is_preserve_repository_enabled;
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
@@ -206,25 +214,32 @@ class General extends Component
 
     }
 
-    public function loadComposeFile($isInit = false)
+    public function loadComposeFile($isInit = false, $showToast = true)
     {
         try {
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
 
-            // Must reload the application to get the latest database changes
-            // Why? Not sure, but it works.
-            // $this->application->refresh();
-
             ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
             if (is_null($this->parsedServices)) {
-                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+                $showToast && $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
                 return;
             }
-            $this->application->parse();
-            $this->dispatch('success', 'Docker compose file loaded.');
+
+            // Refresh parsedServiceDomains to reflect any changes in docker_compose_domains
+            $this->application->refresh();
+            $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
+            // Convert service names with dots to use underscores for HTML form binding
+            $sanitizedDomains = [];
+            foreach ($this->parsedServiceDomains as $serviceName => $domain) {
+                $sanitizedKey = str($serviceName)->slug('_')->toString();
+                $sanitizedDomains[$sanitizedKey] = $domain;
+            }
+            $this->parsedServiceDomains = $sanitizedDomains;
+
+            $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
@@ -241,13 +256,31 @@ class General extends Component
     public function generateDomain(string $serviceName)
     {
         $uuid = new Cuid2;
-        $domain = generateFqdn($this->application->destination->server, $uuid);
-        $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
-        $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+        $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
+        $sanitizedKey = str($serviceName)->slug('_')->toString();
+        $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
+
+        // Convert back to original service names for storage
+        $originalDomains = [];
+        foreach ($this->parsedServiceDomains as $key => $value) {
+            // Find the original service name by checking parsed services
+            $originalServiceName = $key;
+            if (isset($this->parsedServices['services'])) {
+                foreach ($this->parsedServices['services'] as $originalName => $service) {
+                    if (str($originalName)->slug('_')->toString() === $key) {
+                        $originalServiceName = $originalName;
+                        break;
+                    }
+                }
+            }
+            $originalDomains[$originalServiceName] = $value;
+        }
+
+        $this->application->docker_compose_domains = json_encode($originalDomains);
         $this->application->save();
         $this->dispatch('success', 'Domain generated.');
         if ($this->application->build_pack === 'dockercompose') {
-            $this->loadComposeFile();
+            $this->loadComposeFile(showToast: false);
         }
 
         return $domain;
@@ -293,7 +326,7 @@ class General extends Component
     {
         $server = data_get($this->application, 'destination.server');
         if ($server) {
-            $fqdn = generateFqdn($server, $this->application->uuid);
+            $fqdn = generateFqdn(server: $server, random: $this->application->uuid, parserVersion: $this->application->compose_parsing_version);
             $this->application->fqdn = $fqdn;
             $this->application->save();
             $this->resetDefaultLabels();
@@ -320,7 +353,7 @@ class General extends Component
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             if ($this->application->build_pack === 'dockercompose') {
-                $this->loadComposeFile();
+                $this->loadComposeFile(showToast: false);
             }
             $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
@@ -397,7 +430,7 @@ class General extends Component
             }
 
             if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
-                $compose_return = $this->loadComposeFile();
+                $compose_return = $this->loadComposeFile(showToast: false);
                 if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
                     return;
                 }
@@ -430,17 +463,17 @@ class General extends Component
             }
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
-
-                foreach ($this->parsedServiceDomains as $serviceName => $service) {
-                    $domain = data_get($service, 'domain');
-                    if ($domain) {
-                        if (! validate_dns_entry($domain, $this->application->destination->server)) {
-                            $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
-                        }
-                        check_domain_usage(resource: $this->application);
-                    }
-                }
                 if ($this->application->isDirty('docker_compose_domains')) {
+                    foreach ($this->parsedServiceDomains as $service) {
+                        $domain = data_get($service, 'domain');
+                        if ($domain) {
+                            if (! validate_dns_entry($domain, $this->application->destination->server)) {
+                                $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                            }
+                        }
+                    }
+                    check_domain_usage(resource: $this->application);
+                    $this->application->save();
                     $this->resetDefaultLabels();
                 }
             }
@@ -470,5 +503,76 @@ class General extends Component
             'Content-Type' => 'application/json',
             'Content-Disposition' => 'attachment; filename='.$fileName,
         ]);
+    }
+
+    private function updateServiceEnvironmentVariables()
+    {
+        $domains = collect(json_decode($this->application->docker_compose_domains, true)) ?? collect([]);
+
+        foreach ($domains as $serviceName => $service) {
+            $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_');
+            $domain = data_get($service, 'domain');
+            // Delete SERVICE_FQDN_ and SERVICE_URL_ variables if domain is removed
+            $this->application->environment_variables()->where('resourceable_type', Application::class)
+                ->where('resourceable_id', $this->application->id)
+                ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
+                ->delete();
+
+            $this->application->environment_variables()->where('resourceable_type', Application::class)
+                ->where('resourceable_id', $this->application->id)
+                ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
+                ->delete();
+
+            if ($domain) {
+                // Create or update SERVICE_FQDN_ and SERVICE_URL_ variables
+                $fqdn = Url::fromString($domain);
+                $port = $fqdn->getPort();
+                $path = $fqdn->getPath();
+                $urlValue = $fqdn->getScheme().'://'.$fqdn->getHost();
+                if ($path !== '/') {
+                    $urlValue = $urlValue.$path;
+                }
+                $fqdnValue = str($domain)->after('://');
+                if ($path !== '/') {
+                    $fqdnValue = $fqdnValue.$path;
+                }
+
+                // Create/update SERVICE_FQDN_
+                $this->application->environment_variables()->updateOrCreate([
+                    'key' => "SERVICE_FQDN_{$serviceNameFormatted}",
+                ], [
+                    'value' => $fqdnValue,
+                    'is_build_time' => false,
+                    'is_preview' => false,
+                ]);
+
+                // Create/update SERVICE_URL_
+                $this->application->environment_variables()->updateOrCreate([
+                    'key' => "SERVICE_URL_{$serviceNameFormatted}",
+                ], [
+                    'value' => $urlValue,
+                    'is_build_time' => false,
+                    'is_preview' => false,
+                ]);
+                // Create/update port-specific variables if port exists
+                if (filled($port)) {
+                    $this->application->environment_variables()->updateOrCreate([
+                        'key' => "SERVICE_FQDN_{$serviceNameFormatted}_{$port}",
+                    ], [
+                        'value' => $fqdnValue,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+
+                    $this->application->environment_variables()->updateOrCreate([
+                        'key' => "SERVICE_URL_{$serviceNameFormatted}_{$port}",
+                    ], [
+                        'value' => $urlValue,
+                        'is_build_time' => false,
+                        'is_preview' => false,
+                    ]);
+                }
+            }
+        }
     }
 }

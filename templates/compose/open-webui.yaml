@@ -10,7 +10,7 @@ services:
     volumes:
       - "open-webui:/app/backend/data"
     environment:
-      - SERVICE_FQDN_OPENWEBUI_8080
+      - SERVICE_URL_OPENWEBUI_8080
     healthcheck:
       test:
         - CMD

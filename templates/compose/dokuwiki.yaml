@@ -7,7 +7,7 @@ services:
   dokuwiki:
     image: lscr.io/linuxserver/dokuwiki:latest
     environment:
-      - SERVICE_FQDN_DOKUWIKI
+      - SERVICE_URL_DOKUWIKI
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

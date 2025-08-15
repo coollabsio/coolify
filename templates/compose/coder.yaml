@@ -9,10 +9,10 @@ services:
   coder:
     image: ghcr.io/coder/coder:latest
     environment:
-      - SERVICE_FQDN_CODER_7080
+      - SERVICE_URL_CODER_7080
       - CODER_PG_CONNECTION_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@coder-database/${POSTGRES_DB:-coder-db}?sslmode=disable
       - CODER_HTTP_ADDRESS=0.0.0.0:7080
-      - CODER_ACCESS_URL=${SERVICE_FQDN_CODER}
+      - CODER_ACCESS_URL=${SERVICE_URL_CODER}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:

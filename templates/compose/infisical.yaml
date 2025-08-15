@@ -9,8 +9,8 @@ services:
   backend:
     image: "infisical/infisical:latest-postgres"
     environment:
-      - SERVICE_FQDN_BACKEND_8080
-      - SITE_URL=${SERVICE_FQDN_BACKEND_8080}
+      - SERVICE_URL_BACKEND_8080
+      - SITE_URL=${SERVICE_URL_BACKEND_8080}
       - NODE_ENV=${NODE_ENV:-production}
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
       - AUTH_SECRET=${SERVICE_REALBASE64_64_AUTHSECRET}

@@ -9,7 +9,7 @@ services:
     image: ghcr.io/denoland/denokv:latest
     environment:
       - 'ACCESS_TOKEN=${SERVICE_PASSWORD_DENOKV}'
-      - SERVICE_FQDN_DENOKV_4512
+      - SERVICE_URL_DENOKV_4512
     volumes:
       - '${COOLIFY_VOLUME_APP}:/data'
     command: '--sqlite-path /data/denokv.sqlite serve --access-token ${SERVICE_PASSWORD_DENOKV}'

@@ -7,7 +7,7 @@ services:
   grocy:
     image: lscr.io/linuxserver/grocy:latest
     environment:
-      - SERVICE_FQDN_GROCY
+      - SERVICE_URL_GROCY
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

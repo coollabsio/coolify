@@ -8,7 +8,7 @@ services:
   dashy:
     image: lissy93/dashy
     environment:
-      - SERVICE_FQDN_DASHY_8080
+      - SERVICE_URL_DASHY_8080
       - PUID=1000
       - PGID=1000
       - TZ=${TIMEZONE:-UTC}

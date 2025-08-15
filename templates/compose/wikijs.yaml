@@ -10,7 +10,7 @@ services:
     depends_on:
       - postgres
     environment:
-      - SERVICE_FQDN_WIKIJS_3000
+      - SERVICE_URL_WIKIJS_3000
       - DB_TYPE=postgres
       - DB_HOST=postgres
       - DB_PORT=5432

@@ -10,7 +10,7 @@ services:
     volumes:
       - seafile-data:/shared
     environment:
-      - SERVICE_FQDN_SEAFILE_80
+      - SERVICE_URL_SEAFILE_80
       - SEAFILE_SERVER_HOSTNAME=${SERVICE_URL_SEAFILE_80}
       - DB_HOST=mariadb
       - DB_PORT=3306

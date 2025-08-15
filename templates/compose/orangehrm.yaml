@@ -9,7 +9,7 @@ services:
     image: orangehrm/orangehrm:latest
     platform: linux/amd64
     environment:
-      - SERVICE_FQDN_ORANGEHRM_80
+      - SERVICE_URL_ORANGEHRM_80
       - ORANGEHRM_DATABASE_HOST=mariadb
       - ORANGEHRM_DATABASE_USER=${SERVICE_USER_MYSQL}
       - ORANGEHRM_DATABASE_PASSWORD=${SERVICE_PASSWORD_MYSQL}

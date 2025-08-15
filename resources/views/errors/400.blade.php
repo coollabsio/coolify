@@ -6,7 +6,8 @@
         @if ($exception->getMessage())
             <p class="text-base leading-7 text-red-500">{{ $exception->getMessage() }}</p>
         @else
-            <p class="text-base leading-7 text-neutral-300">The request could not be understood by the server due to
+            <p class="text-base leading-7 dark:text-neutral-400 text-black">The request could not be understood by the
+                server due to
                 malformed syntax.
             </p>
         @endif

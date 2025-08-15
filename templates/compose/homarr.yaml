@@ -8,7 +8,7 @@ services:
   homarr:
     image: ghcr.io/ajnart/homarr:latest
     environment:
-      - SERVICE_FQDN_HOMARR_7575
+      - SERVICE_URL_HOMARR_7575
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./homarr/configs:/app/data/configs

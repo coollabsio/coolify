@@ -11,7 +11,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPERTOKENS_3567
+      - SERVICE_URL_SUPERTOKENS_3567
       - API_KEYS=${API_KEYS:-}
       - MYSQL_CONNECTION_URI=mysql://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@mysql:3306/${MYSQL_DATABASE:-supertokens}
     healthcheck:

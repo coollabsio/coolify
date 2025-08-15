@@ -10,7 +10,7 @@ services:
     volumes:
       - pgbackweb_backups:/backups
     environment:
-      - SERVICE_FQDN_PGBACKWEB_8085
+      - SERVICE_URL_PGBACKWEB_8085
       - PBW_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_PGBACKWEB}
       - PBW_POSTGRES_CONN_STRING=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-pgbackweb-db}?sslmode=disable
       - TZ=${TIME_ZONE:-UTC}

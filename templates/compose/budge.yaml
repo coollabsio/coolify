@@ -7,7 +7,7 @@ services:
   budge:
     image: lscr.io/linuxserver/budge:latest
     environment:
-      - SERVICE_FQDN_BUDGE
+      - SERVICE_URL_BUDGE
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

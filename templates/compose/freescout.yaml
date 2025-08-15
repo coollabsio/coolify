@@ -14,12 +14,12 @@ services:
       mariadb:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_FREESCOUT_80
+      - SERVICE_URL_FREESCOUT_80
       - DB_HOST=mariadb
       - DB_NAME=${MARIADB_DATABASE:-freescout}
       - DB_USER=${SERVICE_USER_MARIADB:-freescout}
       - DB_PASS=${SERVICE_PASSWORD_MARIADB}
-      - SITE_URL=${SERVICE_FQDN_FREESCOUT}
+      - SITE_URL=${SERVICE_URL_FREESCOUT}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASS=${SERVICE_PASSWORD_ADMIN}
       - DISPLAY_ERRORS=${DISPLAY_ERRORS:-FALSE}

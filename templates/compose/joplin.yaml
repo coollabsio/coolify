@@ -30,8 +30,8 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_JOPLIN_22300
-      - APP_BASE_URL=${SERVICE_FQDN_JOPLIN}
+      - SERVICE_URL_JOPLIN_22300
+      - APP_BASE_URL=${SERVICE_URL_JOPLIN}
       - DB_CLIENT=pg
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
       - POSTGRES_DATABASE=joplin

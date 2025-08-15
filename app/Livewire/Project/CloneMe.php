@@ -129,7 +129,7 @@ class CloneMe extends Component
                 $uuid = (string) new Cuid2;
                 $url = $application->fqdn;
                 if ($this->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                    $url = generateFqdn($this->server, $uuid);
+                    $url = generateFqdn(server: $this->server, random: $uuid, parserVersion: $application->compose_parsing_version);
                 }
 
                 $newApplication = $application->replicate([
@@ -454,7 +454,7 @@ class CloneMe extends Component
 
                         if ($this->cloneVolumeData) {
                             try {
-                                StopService::dispatch($application, false, false);
+                                StopService::dispatch($application);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
                                 $sourceServer = $application->service->destination->server;
@@ -508,7 +508,7 @@ class CloneMe extends Component
 
                         if ($this->cloneVolumeData) {
                             try {
-                                StopService::dispatch($database->service, false, false);
+                                StopService::dispatch($database->service);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
                                 $sourceServer = $database->service->destination->server;

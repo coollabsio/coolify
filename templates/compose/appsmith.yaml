@@ -7,7 +7,7 @@ services:
   appsmith:
     image: index.docker.io/appsmith/appsmith-ce:latest
     environment:
-      - SERVICE_FQDN_APPSMITH
+      - SERVICE_URL_APPSMITH
       - APPSMITH_MAIL_ENABLED=${APPSMITH_MAIL_ENABLED:-false}
       - APPSMITH_DISABLE_TELEMETRY=${APPSMITH_DISABLE_TELEMETRY:-false}
       - APPSMITH_DISABLE_INTERCOM=${APPSMITH_DISABLE_INTERCOM:-true}

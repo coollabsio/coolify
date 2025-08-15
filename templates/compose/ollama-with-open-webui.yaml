@@ -21,7 +21,7 @@ services:
     depends_on:
       - ollama-api
     environment:
-      - SERVICE_FQDN_OLLAMA_8080
+      - SERVICE_URL_OLLAMA_8080
       - OLLAMA_BASE_URL=http://ollama-api:11434
     healthcheck:
       test:

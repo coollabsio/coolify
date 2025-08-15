@@ -8,8 +8,8 @@ services:
   martin:
     image: ghcr.io/maplibre/martin:v0.13.0
     environment:
-      - SERVICE_FQDN_MARTIN_3000
-      - HOST=${SERVICE_FQDN_MARTIN}
+      - SERVICE_URL_MARTIN_3000
+      - HOST=${SERVICE_URL_MARTIN}
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-martin-db}
     depends_on:
       postgresql:

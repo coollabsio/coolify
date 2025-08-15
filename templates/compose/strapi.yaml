@@ -8,7 +8,7 @@ services:
   strapi:
     image: "elestio/strapi-development:latest"
     environment:
-      - SERVICE_FQDN_STRAPI_1337
+      - SERVICE_URL_STRAPI_1337
       - DATABASE_CLIENT=postgres
       - DATABASE_HOST=postgresql
       - DATABASE_PORT=5432

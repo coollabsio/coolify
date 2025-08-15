@@ -8,7 +8,7 @@ services:
   dozzle:
     image: amir20/dozzle:latest
     environment:
-      - SERVICE_FQDN_DOZZLE_8080
+      - SERVICE_URL_DOZZLE_8080
       - DOZZLE_AUTH_PROVIDER=simple
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

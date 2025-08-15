@@ -7,7 +7,7 @@ services:
   drupal:
     image: "drupal:10-apache"
     environment:
-      - SERVICE_FQDN_DRUPAL
+      - SERVICE_URL_DRUPAL
       - DB_HOST=postgres
       - DB_NAME=postgres
       - DB_USER=postgres

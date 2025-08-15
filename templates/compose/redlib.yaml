@@ -8,7 +8,7 @@ services:
   redlib:
     image: quay.io/redlib/redlib:latest
     environment:
-      - SERVICE_FQDN_REDLIB_8080
+      - SERVICE_URL_REDLIB_8080
       - REDLIB_SFW_ONLY=${REDLIB_SFW_ONLY:-off}
       - REDLIB_BANNER=${REDLIB_BANNER:-""}
       - REDLIB_ROBOTS_DISABLE_INDEXING=${REDLIB_ROBOTS_DISABLE_INDEXING:-off}

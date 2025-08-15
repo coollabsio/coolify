@@ -8,7 +8,7 @@ services:
   libreoffice:
     image: lscr.io/linuxserver/libreoffice:latest
     environment:
-      - SERVICE_FQDN_LIBREOFFICE_3000
+      - SERVICE_URL_LIBREOFFICE_3000
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Etc/UTC}

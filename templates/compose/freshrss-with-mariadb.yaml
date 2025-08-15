@@ -8,7 +8,7 @@ services:
   freshrss:
     image: freshrss/freshrss:latest
     environment:
-      - SERVICE_FQDN_FRESHRSS_80
+      - SERVICE_URL_FRESHRSS_80
       - CRON_MIN=${CRON_MIN:-1,31}
       - MARIADB_DB=${MARIADB_DATABASE:-freshrss}
       - MARIADB_USER=${SERVICE_USER_MARIADB}

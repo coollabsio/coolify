@@ -21,7 +21,7 @@ services:
   moodle:
     image: docker.io/bitnami/moodle:4.3
     environment:
-      - SERVICE_FQDN_MOODLE_8080
+      - SERVICE_URL_MOODLE_8080
       - MOODLE_DATABASE_HOST=mariadb
       - MOODLE_DATABASE_PORT_NUMBER=3306
       - MOODLE_DATABASE_USER=$SERVICE_USER_MARIADB

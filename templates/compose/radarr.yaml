@@ -8,8 +8,8 @@ services:
   radarr:
     image: lscr.io/linuxserver/radarr:latest
     environment:
-      - SERVICE_FQDN_RADARR_7878
-      - _APP_URL=$SERVICE_FQDN_RADARR
+      - SERVICE_URL_RADARR_7878
+      - _APP_URL=$SERVICE_URL_RADARR
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-America/Toronto}

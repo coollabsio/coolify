@@ -39,7 +39,7 @@ services:
   account:
     image: hardcoreeng/account:v0.6.246
     environment:
-      - SERVICE_FQDN_HULY_3000
+      - SERVICE_URL_HULY_3000
       - SERVER_PORT=3000
       - SERVER_SECRET=$SERVICE_PASSWORD_SECRET
       - MONGO_URL=mongodb://mongodb:27017
@@ -55,7 +55,7 @@ services:
   front:
     image: hardcoreeng/front:v0.6.246
     environment:
-      - SERVICE_FQDN_HULY_8080
+      - SERVICE_URL_HULY_8080
       - MONGO_URL=mongodb://mongodb:27017
       - SERVER_PORT=8080
       - SERVER_SECRET=$SERVICE_PASSWORD_SECRET

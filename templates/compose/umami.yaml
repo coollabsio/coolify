@@ -8,7 +8,7 @@ services:
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
     environment:
-      - SERVICE_FQDN_UMAMI_3000
+      - SERVICE_URL_UMAMI_3000
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
       - DATABASE_TYPE=postgres
       - APP_SECRET=$SERVICE_PASSWORD_64_UMAMI

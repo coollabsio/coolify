@@ -8,7 +8,7 @@ services:
   web-check:
     image: lissy93/web-check
     environment:
-      - SERVICE_FQDN_WEBCHECK_3000
+      - SERVICE_URL_WEBCHECK_3000
     healthcheck:
       test:
         - CMD-SHELL

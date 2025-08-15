@@ -10,7 +10,7 @@ services:
     volumes:
       - joomla_data:/var/www/html
     environment:
-      - SERVICE_FQDN_JOOMLA
+      - SERVICE_URL_JOOMLA
       - JOOMLA_DB_HOST=mariadb
       - JOOMLA_DB_USER=${SERVICE_USER_JOOMLA}
       - JOOMLA_DB_PASSWORD=${SERVICE_PASSWORD_JOOMLA}

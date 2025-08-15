@@ -111,7 +111,7 @@ class Application extends BaseModel
 {
     use HasConfiguration, HasFactory, SoftDeletes;
 
-    private static $parserVersion = '4';
+    private static $parserVersion = '5';
 
     protected $guarded = [];
 
@@ -798,7 +798,7 @@ class Application extends BaseModel
 
     public function previews()
     {
-        return $this->hasMany(ApplicationPreview::class);
+        return $this->hasMany(ApplicationPreview::class)->orderBy('pull_request_id', 'desc');
     }
 
     public function deployment_queue()
@@ -836,9 +836,14 @@ class Application extends BaseModel
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
     }
 
-    public function deployments(int $skip = 0, int $take = 10)
+    public function deployments(int $skip = 0, int $take = 10, ?string $pullRequestId = null)
     {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
+
+        if ($pullRequestId) {
+            $deployments = $deployments->where('pull_request_id', $pullRequestId);
+        }
+
         $count = $deployments->count();
         $deployments = $deployments->skip($skip)->take($take)->get();
 
@@ -1348,7 +1353,7 @@ class Application extends BaseModel
     public function parse(int $pull_request_id = 0, ?int $preview_id = null)
     {
         if ((int) $this->compose_parsing_version >= 3) {
-            return newParser($this, $pull_request_id, $preview_id);
+            return applicationParser($this, $pull_request_id, $preview_id);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, preview_id: $preview_id);
         } else {
@@ -1437,7 +1442,21 @@ class Application extends BaseModel
             $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
                 $json = collect(json_decode($this->docker_compose_domains));
-                $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
+                foreach ($json as $key => $value) {
+                    if (str($key)->contains('-')) {
+                        $key = str($key)->replace('-', '_');
+                    }
+                    $json->put((string) $key, $value);
+                }
+                $services = collect(data_get($parsedServices, 'services', []));
+                foreach ($services as $name => $service) {
+                    if (str($name)->contains('-')) {
+                        $replacedName = str($name)->replace('-', '_');
+                        $services->put((string) $replacedName, $service);
+                        $services->forget((string) $name);
+                    }
+                }
+                $names = collect($services)->keys()->toArray();
                 $jsonNames = $json->keys()->toArray();
                 $diff = array_diff($jsonNames, $names);
                 $json = $json->filter(function ($value, $key) use ($diff) {
@@ -1576,34 +1595,6 @@ class Application extends BaseModel
                 }
             }
         }
-    }
-
-    public function generate_preview_fqdn(int $pull_request_id)
-    {
-        $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->id, $pull_request_id);
-        if (is_null(data_get($preview, 'fqdn')) && $this->fqdn) {
-            if (str($this->fqdn)->contains(',')) {
-                $url = Url::fromString(str($this->fqdn)->explode(',')[0]);
-                $preview_fqdn = getFqdnWithoutPort(str($this->fqdn)->explode(',')[0]);
-            } else {
-                $url = Url::fromString($this->fqdn);
-                if (data_get($preview, 'fqdn')) {
-                    $preview_fqdn = getFqdnWithoutPort(data_get($preview, 'fqdn'));
-                }
-            }
-            $template = $this->preview_url_template;
-            $host = $url->getHost();
-            $schema = $url->getScheme();
-            $random = new Cuid2;
-            $preview_fqdn = str_replace('{{random}}', $random, $template);
-            $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-            $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-            $preview_fqdn = "$schema://$preview_fqdn";
-            $preview->fqdn = $preview_fqdn;
-            $preview->save();
-        }
-
-        return $preview;
     }
 
     public static function getDomainsByUuid(string $uuid): array

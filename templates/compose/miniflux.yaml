@@ -8,8 +8,8 @@ services:
   miniflux:
     image: ghcr.io/miniflux/miniflux:latest
     environment:
-      - SERVICE_FQDN_MINIFLUX
-      - BASE_URL=${SERVICE_FQDN_MINIFLUX}
+      - SERVICE_URL_MINIFLUX
+      - BASE_URL=${SERVICE_URL_MINIFLUX}
       - PORT=${PORT:-8080}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-1}
       - CREATE_ADMIN=${CREATE_ADMIN:-1}

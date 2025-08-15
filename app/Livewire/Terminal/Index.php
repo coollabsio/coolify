@@ -59,7 +59,7 @@ class Index extends Component
 
                 return null;
             })->filter();
-        });
+        })->sortBy('name');
     }
 
     public function updatedSelectedUuid()

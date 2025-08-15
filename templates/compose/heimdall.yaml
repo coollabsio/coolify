@@ -7,7 +7,7 @@ services:
   heimdall:
     image: lscr.io/linuxserver/heimdall:latest
     environment:
-      - SERVICE_FQDN_HEIMDALL
+      - SERVICE_URL_HEIMDALL
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
