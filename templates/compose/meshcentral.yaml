@@ -22,7 +22,7 @@ services:
       - "./meshcentral/user_files:/opt/meshcentral/meshcentral-files"
       - "./meshcentral/backups:/opt/meshcentral/meshcentral-backups"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health.ashx"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health.ashx').then((r) => {if (r.status !== 200) throw new Error(r.status)})"]
       interval: 30s
       timeout: 10s
       retries: 3
