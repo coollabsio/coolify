@@ -11,17 +11,13 @@ services:
     command: postgres -c 'max_connections=1000'
     hostname: "postgres"
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-hatchet}
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_DB=${POSTGRES_DB:-hatchet}
+      - POSTGRES_USER=hatchet
+      - POSTGRES_PASSWORD=hatchet
+      - POSTGRES_DB=hatchet
     volumes:
       - hatchet_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -d ${POSTGRES_DB:-hatchet} -U ${POSTGRES_USER:-hatchet}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -d hatchet -U hatchet"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -47,7 +43,7 @@ services:
     command: /hatchet/hatchet-migrate
     restart: no
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-hatchet}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-hatchet}
+      - DATABASE_URL=postgres://hatchet:hatchet@postgres:5432/hatchet
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,13 +52,13 @@ services:
     command: /hatchet/hatchet-admin quickstart --skip certs --generated-config-dir /hatchet/config --overwrite=false
     restart: no
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-hatchet}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-hatchet}
+      - DATABASE_URL=postgres://hatchet:hatchet@postgres:5432/hatchet
       - SERVER_TASKQUEUE_RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER:-user}:${SERVICE_PASSWORD_RABBITMQ}@rabbitmq:5672/
-      - SERVER_AUTH_COOKIE_DOMAIN=${SERVICE_FQDN_HATCHETDASHBOARD_80}
+      - SERVER_AUTH_COOKIE_DOMAIN=${SERVER_AUTH_COOKIE_DOMAIN:-localhost:8080}
       - SERVER_AUTH_COOKIE_INSECURE=${SERVER_AUTH_COOKIE_INSECURE:-t}
-      - SERVER_GRPC_BIND_ADDRESS=${SERVER_GRPC_BIND_ADDRESS:-0.0.0.0}
+      - SERVER_GRPC_BIND_ADDRESS=${SERVER_GRPC_BIND_ADDRESS:-0.0.0.0:7070}
       - SERVER_GRPC_INSECURE=${SERVER_GRPC_INSECURE:-t}
-      - SERVER_GRPC_BROADCAST_ADDRESS=${SERVICE_FQDN_HATCHETENGINE_7070}
+      - SERVER_GRPC_BROADCAST_ADDRESS=${SERVER_GRPC_BROADCAST_ADDRESS:-localhost:7070}
       - SERVER_DEFAULT_ENGINE_VERSION=${SERVER_DEFAULT_ENGINE_VERSION:-V1}
       - SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS=hatchet-engine:7070
     volumes:
@@ -84,8 +80,8 @@ services:
       migration:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-hatchet}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-hatchet}
-      - SERVER_GRPC_BIND_ADDRESS=${SERVER_GRPC_BIND_ADDRESS:-0.0.0.0}
+      - DATABASE_URL=postgres://hatchet:hatchet@postgres:5432/hatchet
+      - SERVER_GRPC_BIND_ADDRESS=${SERVER_GRPC_BIND_ADDRESS:-0.0.0.0:7070}
       - SERVER_GRPC_INSECURE=${SERVER_GRPC_INSECURE:-t}
       - SERVICE_FQDN_HATCHETENGINE_7070
     volumes:
@@ -100,7 +96,10 @@ services:
       migration:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-hatchet}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-hatchet}
+      - DATABASE_URL=postgres://hatchet:hatchet@postgres:5432/hatchet
+      - SERVER_URL=${SERVER_URL:-http://localhost:8080}
+      - SERVER_GRPC_BIND_ADDRESS=${SERVER_GRPC_BIND_ADDRESS:-0.0.0.0:7070}
+      - SERVER_GRPC_BROADCAST_ADDRESS=hatchet-engine:7070
       - SERVICE_FQDN_HATCHETDASHBOARD_80
       # Default credentials are "admin@example.com" and "Admin123!!"
     volumes:
