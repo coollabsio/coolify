@@ -228,6 +228,7 @@ class Application extends BaseModel
         static::created(function ($application) {
             ApplicationSetting::create([
                 'application_id' => $application->id,
+                'is_env_sorting_enabled' => false,
             ]);
             $application->compose_parsing_version = self::$parserVersion;
             $application->save();

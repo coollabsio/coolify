@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('application_settings', function (Blueprint $table) {
-            $table->boolean('is_env_sorting_enabled')->default(true);
+            $table->boolean('is_env_sorting_enabled')->default(false);
         });
     }
 
