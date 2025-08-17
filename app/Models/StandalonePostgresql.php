@@ -320,7 +320,10 @@ class StandalonePostgresql extends BaseModel
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['percent']];
+            return [
+                (int) $metric['time'],
+                (float) ($metric['percent'] ?? 0.0)
+            ];
         });
 
         return $parsedCollection->toArray();
