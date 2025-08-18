@@ -65,6 +65,8 @@ class Services extends Command
         $json = Yaml::parse($content);
         $compose = base64_encode(Yaml::dump($json, 10, 2));
 
+        $category = trim((string) str($data->get('category'))->lower()) ?: 'other';
+
         $tags = str($data->get('tags'))->lower()->explode(',')->map(fn ($tag) => trim($tag))->filter();
         $tags = $tags->isEmpty() ? null : $tags->all();
 
@@ -73,6 +75,7 @@ class Services extends Command
             'documentation' => $documentation,
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
+            'category' => $category,
             'tags' => $tags,
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
@@ -134,6 +137,8 @@ class Services extends Command
         $json = Yaml::parse($modifiedContent);
         $compose = base64_encode(Yaml::dump($json, 10, 2));
 
+        $category = trim((string) str($data->get('category'))->lower()) ?: 'other';
+
         $tags = str($data->get('tags'))->lower()->explode(',')->map(fn ($tag) => trim($tag))->filter();
         $tags = $tags->isEmpty() ? null : $tags->all();
 
@@ -142,6 +147,7 @@ class Services extends Command
             'documentation' => $documentation,
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
+            'category' => $category,
             'tags' => $tags,
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
@@ -202,6 +208,8 @@ class Services extends Command
         $json = Yaml::parse($modifiedContent);
         $compose = Yaml::dump($json, 10, 2); // Not base64 encoded
 
+        $category = trim((string) str($data->get('category'))->lower()) ?: 'other';
+
         $tags = str($data->get('tags'))->lower()->explode(',')->map(fn ($tag) => trim($tag))->filter();
         $tags = $tags->isEmpty() ? null : $tags->all();
 
@@ -210,6 +218,7 @@ class Services extends Command
             'documentation' => $documentation,
             'slogan' => $data->get('slogan', str($file)->headline()),
             'compose' => $compose,
+            'category' => $category,
             'tags' => $tags,
             'logo' => $data->get('logo', 'svgs/default.webp'),
             'minversion' => $data->get('minversion', '0.0.0'),
