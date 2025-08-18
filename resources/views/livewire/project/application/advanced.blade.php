@@ -77,54 +77,25 @@
         wire:click.prevent="handleGitCleanupToggle"
     />
 
-    <!-- Warning Modal -->
-    <div x-data="{ showModal: @entangle('showGitRemovalWarningModal') }" x-cloak>
-        <!-- Modal Backdrop -->
-        <div x-show="showModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 transition-opacity"></div>
-
-        <!-- Modal -->
-        <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4"
-            x-transition:enter="ease-out duration-300"
-            x-transition:enter-start="opacity-0 scale-95"
-            x-transition:enter-end="opacity-100 scale-100"
-            x-transition:leave="ease-in duration-200"
-            x-transition:leave-start="opacity-100 scale-100"
-            x-transition:leave-end="opacity-0 scale-95">
-            <div class="w-full max-w-md bg-white dark:bg-coolgray-100 rounded-lg shadow-xl overflow-hidden">
-                <!-- Modal Header -->
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-coolgray-200">
-                    <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Security Warning: Remove .git Folder?</h2>
-                </div>
-
-                <!-- Modal Content -->
-                <div class="p-6">
-                    <div class="space-y-4">
-                        <p class="text-red-500 dark:text-red-400 font-semibold">This action has significant security implications!</p>
-                        <ul class="list-disc pl-5 space-y-2">
-                            <li>Exposes your full source code, commit history, and even deleted files to the public</li>
-                            <li>Often .git contains secrets or SSH keys from git or other services</li>
-                            <li>This action cannot be undone once performed</li>
-                            <li>Proceed only if you understand the risks</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Modal Footer -->
-                <div class="px-6 py-4 bg-gray-50 dark:bg-coolgray-200 text-right space-x-3">
-                    <button type="button" 
-                        class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none"
-                        wire:click="confirmGitRemoval">
-                        I Understand - Remove .git
-                    </button>
-                    <button type="button" 
-                        class="px-4 py-2 bg-gray-300 dark:bg-coolgray-300 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-400 focus:outline-none"
-                        wire:click="cancelGitRemoval">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Warning Modal using same component as dashboard -->
+    <x-modal-confirmation 
+        title="Security Warning: Remove .git Folder?" 
+        buttonTitle="I Understand - Do not Remove .git" 
+        isErrorButton
+        submitAction="confirmGitRemoval" 
+        :actions="[
+            'Exposes your full source code, commit history, and even deleted files to the public',
+            'Often .git contains secrets or SSH keys from git or other services', 
+            'This action cannot be undone once performed',
+            'Proceed only if you understand the risks'
+        ]" 
+        :confirmWithText="false" 
+        :confirmWithPassword="false"
+        step2ButtonText="Permanently Remove .git Folder" 
+        :dispatchEvent="true"
+        dispatchEventType="success" 
+        dispatchEventMessage="Git cleanup enabled successfully." 
+    />
 @endif
         </div>
     </div>
