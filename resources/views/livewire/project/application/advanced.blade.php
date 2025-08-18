@@ -91,7 +91,7 @@
         ]" 
         :confirmWithText="false" 
         :confirmWithPassword="false"
-        step2ButtonText="Permanently Remove .git Folder" 
+        step2ButtonText="Do not Remove .git Folder" 
         :dispatchEvent="true"
         dispatchEventType="success" 
         dispatchEventMessage="Git cleanup enabled successfully." 
