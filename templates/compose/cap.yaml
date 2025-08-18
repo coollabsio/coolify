@@ -4,15 +4,28 @@
 # logo: svgs/cap.svg
 # port: 5679
 
-
-# Storage options:
-# - Default: local MinIO (`cap-s3`) with endpoints injected by Coolify.
-# - Remote S3-compatible (AWS S3, Cloudflare R2, etc.): override the below via env vars:
-#   - CAP_AWS_ACCESS_KEY, CAP_AWS_SECRET_KEY, CAP_AWS_BUCKET, CAP_AWS_REGION
-#   - CAP_AWS_ENDPOINT, S3_PUBLIC_ENDPOINT, S3_INTERNAL_ENDPOINT
-#   - S3_PATH_STYLE=true (R2/most S3-compatible) or false (AWS S3 virtual-hosted style)
-# If using a remote bucket exclusively, you can remove/disable the `cap-s3` service and its dependency.
-
+# Storage Configuration:
+# Option 1: Remote S3-compatible storage (AWS S3, Cloudflare R2, etc.)
+# Set these environment variables:
+# - CAP_AWS_ACCESS_KEY: Your S3/R2 access key
+# - CAP_AWS_SECRET_KEY: Your S3/R2 secret key  
+# - CAP_AWS_BUCKET: Your S3/R2 bucket name
+# - CAP_AWS_REGION: Your S3/R2 region (e.g., us-east-1, auto for R2)
+# - CAP_AWS_ENDPOINT: Your S3/R2 endpoint URL
+# - S3_PUBLIC_ENDPOINT: Public endpoint for your bucket (same as CAP_AWS_ENDPOINT for most cases)
+# - S3_INTERNAL_ENDPOINT: Internal endpoint (same as CAP_AWS_ENDPOINT for most cases)
+# - S3_PATH_STYLE: true for R2/most S3-compatible, false for AWS S3 virtual-hosted style
+#
+# Option 2: Local MinIO storage
+# Deploy MinIO as a separate service in the same network and set:
+# - CAP_AWS_ACCESS_KEY: MinIO root user
+# - CAP_AWS_SECRET_KEY: MinIO root password
+# - CAP_AWS_BUCKET: Your bucket name (e.g., capso)
+# - CAP_AWS_REGION: us-east-1 (or any region)
+# - CAP_AWS_ENDPOINT: http://minio:9000 (internal MinIO endpoint)
+# - S3_PUBLIC_ENDPOINT: http://your-minio-domain:9000 (public MinIO endpoint)
+# - S3_INTERNAL_ENDPOINT: http://minio:9000 (internal MinIO endpoint)
+# - S3_PATH_STYLE: true
 
 services:
   cap-web:
@@ -26,19 +39,17 @@ services:
       - 'NEXTAUTH_URL=${SERVICE_FQDN_CAP_3000}'
       - 'DATABASE_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_DATABASEENCRYPTIONKEY}'
       - 'NEXTAUTH_SECRET=${SERVICE_PASSWORD_64_NEXTAUTHSECRET}'
-      - 'CAP_AWS_ACCESS_KEY=${CAP_AWS_ACCESS_KEY:-$SERVICE_USER_MINIO}'
-      - 'CAP_AWS_SECRET_KEY=${CAP_AWS_SECRET_KEY:-$SERVICE_PASSWORD_MINIO}'
-      - 'CAP_AWS_BUCKET=${CAP_AWS_BUCKET:-capso}'
-      - 'CAP_AWS_REGION=${CAP_AWS_REGION:-us-east-1}'
-      - 'S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:-$SERVICE_FQDN_CAPS3_3902}'
-      - 'S3_INTERNAL_ENDPOINT=${S3_INTERNAL_ENDPOINT:-$SERVICE_FQDN_CAPS3_3902}'
+      - 'CAP_AWS_ACCESS_KEY=${CAP_AWS_ACCESS_KEY}'
+      - 'CAP_AWS_SECRET_KEY=${CAP_AWS_SECRET_KEY}'
+      - 'CAP_AWS_BUCKET=${CAP_AWS_BUCKET}'
+      - 'CAP_AWS_REGION=${CAP_AWS_REGION}'
+      - 'S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT}'
+      - 'S3_INTERNAL_ENDPOINT=${S3_INTERNAL_ENDPOINT}'
       - 'NEXT_RUNTIME=nodejs'
       - 'S3_PATH_STYLE=${S3_PATH_STYLE:-true}'
-      - 'CAP_AWS_ENDPOINT=${CAP_AWS_ENDPOINT:-$SERVICE_FQDN_CAPS3_3902}'
+      - 'CAP_AWS_ENDPOINT=${CAP_AWS_ENDPOINT}'
     depends_on:
       cap-db:
-        condition: service_healthy
-      cap-s3:
         condition: service_healthy
         
   cap-db:
@@ -66,24 +77,3 @@ services:
       retries: 5
     volumes:
       - 'cap_db:/var/lib/mysql'
-  cap-s3:
-    container_name: cap-s3
-    image: 'bitnami/minio:latest'
-    restart: unless-stopped
-    environment:
-      - SERVICE_FQDN_CAPS3_3902
-      - MINIO_API_PORT_NUMBER=3902
-      - MINIO_CONSOLE_PORT_NUMBER=3903
-      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
-      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - '-f'
-        - 'http://localhost:3902/minio/health/live'
-      interval: 10s
-      timeout: 10s
-      retries: 5
-    volumes:
-      - 'cap_s3:/bitnami/minio/data'
