@@ -27,7 +27,7 @@ services:
         max-file: "3"
 
   zookeeper:
-    image: bitnami/zookeeper:3.7.1
+    image: signoz/zookeeper:3.7.1
     user: root
     healthcheck:
       test:
