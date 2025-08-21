@@ -32,7 +32,12 @@ services:
         condition: service_healthy
     environment:
       - PG_CONSOLE_DB_HOST=autobase-console-db
+      - PG_CONSOLE_DB_PASSWORD=${PG_CONSOLE_DB_PASSWORD:-postgres-pass}
       - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
+      - PG_CONSOLE_ENCRYPTIONKEY=${PG_CONSOLE_ENCRYPTIONKEY:-secret_key}
+      - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
+      # More available environment variables:
+      # https://github.com/vitabaks/autobase/blob/2.3.2/console/service/README.md#configuration
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/ansible:/tmp/ansible
