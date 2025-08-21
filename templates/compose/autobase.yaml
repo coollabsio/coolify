@@ -24,7 +24,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-fsS",
             "-H", "accept: application/json",
-            "-H", "Authorization: Bearer ${AUTH_TOKEN}",
+            "-H", "Authorization: Bearer ${SERVICE_PASSWORD_UI}",
             "http://localhost:8080/api/v1/version"]
       interval: 10s
       timeout: 5s
@@ -35,7 +35,7 @@ services:
     environment:
       - PG_CONSOLE_DB_HOST=autobase-console-db
       - PG_CONSOLE_DB_PASSWORD=${SERVICE_PASSWORD_DB}
-      - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
       - PG_CONSOLE_ENCRYPTIONKEY=${SERVICE_BASE64_API}
       - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
     volumes:
@@ -55,5 +55,5 @@ services:
         condition: service_healthy
     environment:
       - SERVICE_FQDN_AUTOBASE_CONSOLE_UI_80
-      - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${SERVICE_PASSWORD_UI}
       - PG_CONSOLE_API_HOST=autobase-console-api
