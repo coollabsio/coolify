@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 10
     environment:
-      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_AUTOBASE_CONSOLE_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
     volumes:
       - console_postgres:/var/lib/postgresql
 
@@ -34,9 +34,9 @@ services:
         condition: service_healthy
     environment:
       - PG_CONSOLE_DB_HOST=autobase-console-db
-      - PG_CONSOLE_DB_PASSWORD=${SERVICE_PASSWORD_AUTOBASE_CONSOLE_DB}
+      - PG_CONSOLE_DB_PASSWORD=${SERVICE_PASSWORD_DB}
       - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
-      - PG_CONSOLE_ENCRYPTIONKEY=${SERVICE_BASE64_AUTOBASE_CONSOLE_API}
+      - PG_CONSOLE_ENCRYPTIONKEY=${SERVICE_BASE64_API}
       - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
