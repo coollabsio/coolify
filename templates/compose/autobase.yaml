@@ -6,7 +6,7 @@
 
 services:
   autobase-console-db:
-    image: autobase/console_db:2.3.0
+    image: autobase/console_db:2.3.2
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -16,19 +16,19 @@ services:
       - console_postgres:/var/lib/postgresql
 
   autobase-console-api:
-    image: autobase/console_api:2.3.0
+    image: autobase/console_api:2.3.2
     healthcheck:
-      test: ["CMD", "true"]
+      test: ["CMD", "curl", "-fsS",
+            "-H", "accept: application/json",
+            "-H", "Authorization: Bearer ${AUTH_TOKEN}",
+            "http://localhost:8080/api/v1/version"]
       interval: 10s
       timeout: 5s
       retries: 5
     depends_on:
       autobase-console-db:
         condition: service_healthy
-    expose:
-      - "8080"
     environment:
-      - SERVICE_FQDN_AUTOBASE_CONSOLE_API_8080
       - PG_CONSOLE_DB_HOST=autobase-console-db
       - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
     volumes:
@@ -36,12 +36,9 @@ services:
       - /tmp/ansible:/tmp/ansible
 
   autobase-console-ui:
-    image: autobase/console_ui:2.3.0
+    image: autobase/console_ui:2.3.2
     healthcheck:
-      test:
-        - CMD
-        - curl
-        - 'http://localhost:80/'
+      test: [ "CMD", "curl", "http://localhost:80/" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,4 +48,4 @@ services:
     environment:
       - SERVICE_FQDN_AUTOBASE_CONSOLE_UI_80
       - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
-      - PG_CONSOLE_API_URL=${API_URL:-SERVICE_FQDN_AUTOBASE_CONSOLE_API/api/v1}
+      - PG_CONSOLE_API_HOST=autobase-console-api
