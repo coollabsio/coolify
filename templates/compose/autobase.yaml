@@ -5,6 +5,7 @@
 # port: 80
 
 services:
+  # https://github.com/vitabaks/autobase/blob/2.3.2/console/db/README.md
   autobase-console-db:
     image: autobase/console_db:2.3.2
     healthcheck:
@@ -18,6 +19,7 @@ services:
       - console_postgres:/var/lib/postgresql
 
   autobase-console-api:
+    # https://github.com/vitabaks/autobase/blob/2.3.2/console/service/README.md
     image: autobase/console_api:2.3.2
     healthcheck:
       test: ["CMD", "curl", "-fsS",
@@ -36,13 +38,12 @@ services:
       - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN:-secret_token}
       - PG_CONSOLE_ENCRYPTIONKEY=${PG_CONSOLE_ENCRYPTIONKEY:-secret_key}
       - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-info}
-      # More available environment variables:
-      # https://github.com/vitabaks/autobase/blob/2.3.2/console/service/README.md#configuration
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/ansible:/tmp/ansible
 
   autobase-console-ui:
+    # https://github.com/vitabaks/autobase/blob/2.3.2/console/ui/README.md
     image: autobase/console_ui:2.3.2
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:80/" ]
