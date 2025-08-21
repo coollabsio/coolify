@@ -18,8 +18,8 @@ services:
     volumes:
       - console_postgres:/var/lib/postgresql
 
+  # https://github.com/vitabaks/autobase/blob/2.3.2/console/service/README.md
   autobase-console-api:
-    # https://github.com/vitabaks/autobase/blob/2.3.2/console/service/README.md
     image: autobase/console_api:2.3.2
     healthcheck:
       test: ["CMD", "curl", "-fsS",
@@ -42,8 +42,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/ansible:/tmp/ansible
 
+  # https://github.com/vitabaks/autobase/blob/2.3.2/console/ui/README.md
   autobase-console-ui:
-    # https://github.com/vitabaks/autobase/blob/2.3.2/console/ui/README.md
     image: autobase/console_ui:2.3.2
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:80/" ]
