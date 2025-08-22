@@ -15,8 +15,13 @@ services:
       - VIKUNJA_DATABASE_PATH=/db/vikunja.db
       - VIKUNJA_DATABASE_TYPE=sqlite
     volumes:
-      - vikunja-data:/app/vikunja/
+      - vikunja-files:/app/vikunja/files
       - vikunja-sqlite-data:/db
+      # - type: bind
+      #   source: ./config.yml
+      #   target: /app/vikunja/config.yml
+      #   content: |
+      #     ... your vikunja config.yml
     depends_on:
       - init
   init:
@@ -24,4 +29,5 @@ services:
     restart: no
     volumes:
       - vikunja-sqlite-data:/db
-    command: ["sh", "-c", "touch /db/vikunja.db && chown -R 1000 /db"]
+      - vikunja-files:/app/vikunja/files
+    command: ["sh", "-c", "touch /db/vikunja.db && chown -R 1000 /db && chown 1000 /app/vikunja/files"]
