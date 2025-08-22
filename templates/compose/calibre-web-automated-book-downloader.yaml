@@ -1,0 +1,23 @@
+# documentation: https://github.com/calibrain/calibre-web-automated-book-downloader
+# slogan: An intuitive web interface for searching and requesting book downloads, designed to work seamlessly with Calibre-Web-Automated.
+# tags: calibre,calibre-web,ebook,library,epub,ereader,kindle,book,reader,download,downloader
+# logo: svgs/calibre-web-automated-book-downloader.png
+# port: 8084
+services:
+  calibre-web-automated-book-downloader:
+    image: 'ghcr.io/calibrain/calibre-web-automated-book-downloader:latest'
+    environment:
+      - SERVICE_FQDN_CWABD_8084
+      - FLASK_PORT=${FLASK_PORT:-8084}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - BOOK_LANGUAGE=${BOOK_LANGUAGE:-en}
+      - USE_BOOK_TITLE=${USE_BOOK_TITLE:-true}
+      - TZ=${TZ:-America/New_York}
+      - APP_ENV=${APP_ENV:-prod}
+      - UID=${UID:-1000}
+      - GID=${GID:-100}
+      - CWA_DB_PATH=${CWA_DB_PATH:-/cwa-config/app.db} # This is using the volume where the  CWA's app.db is located
+    restart: unless-stopped
+    volumes:
+      - /path/to/cwa/books-ingest:/cwa-book-ingest  # This is where the books will be downloaded to, usually it would be the same as whatever you gave in "calibre-web-automated"
+      - /path/to/cwa/configuration:/cwa-config # This is the location of CWA's app.db, which contains authentication details. Use a volume mount.
