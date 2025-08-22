@@ -1,0 +1,21 @@
+# documentation: https://github.com/crocodilestick/Calibre-Web-Automated
+# slogan: Calibre-Web but automated and with Calibre features! Fully automate and simplify your eBook set up!
+# tags: calibre,calibre-web,ebook,library,epub,ereader,kindle,book,reader
+# logo: svgs/calibre-web-automated.svg
+# port: 8083
+services:
+  calibre-web-automated:
+    image: 'crocodilestick/calibre-web-automated:latest'
+    environment:
+      - SERVICE_FQDN_CWA_8083
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-UTC}
+      - HARDCOVER_TOKEN=${HARDCOVER_TOKEN:-your_hardcover_api_key_here}
+      - NETWORK_SHARE_MODE=${NETWORK_SHARE_MODE:-false}
+    volumes:
+      - 'cwa-config:/config'
+      - 'cwa-book-ingest:/cwa-book-ingest'
+      - 'calibre-library:/calibre-library'
+      - 'calibre-plugins:/config/.config/calibre/plugins'
+    restart: unless-stopped
