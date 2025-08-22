@@ -975,6 +975,11 @@ class Application extends BaseModel
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
 
+        if ($this->git_commit_sha === 'HEAD') {
+            $git_clone_command = str_replace('git clone', 'git clone --depth=1', $git_clone_command);
+        }
+
+        // unfortunately we can't do a shallow clone if we need a specific commit :/
         if ($this->git_commit_sha !== 'HEAD') {
             $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git -c advice.detachedHead=false checkout {$this->git_commit_sha} >/dev/null 2>&1";
         }
@@ -982,7 +987,8 @@ class Application extends BaseModel
             if ($public) {
                 $git_clone_command = "{$git_clone_command} && cd {$baseDir} && sed -i \"s#git@\(.*\):#https://\\1/#g\" {$baseDir}/.gitmodules || true";
             }
-            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive";
+            $submoduleDepth = ($this->git_commit_sha === 'HEAD') ? ' --depth=1' : '';
+            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive{$submoduleDepth}";
         }
         if ($this->settings->is_git_lfs_enabled) {
             $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git lfs pull";
