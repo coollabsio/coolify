@@ -27,6 +27,7 @@ services:
       retries: 10
     volumes:
      - sftpgo-data:/srv/sftpgo/data
+     - sftpgo-keys:/var/lib/sftpgo
 
   postgresql:
     image: "postgres:17-alpine"
