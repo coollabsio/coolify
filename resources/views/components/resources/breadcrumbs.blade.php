@@ -13,7 +13,7 @@
                     {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}
                 </a>
                 <button @mouseenter="projectOpen = true" @mouseleave="projectOpen = false"
-                    class="ml-1 text-warning hover:text-warning-600 focus:outline-none">
+                    class="px-1 text-warning hover:text-warning-600 focus:outline-none">
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-down': projectOpen }" fill="none"
                         stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -28,7 +28,7 @@
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="absolute z-20 mt-40 w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-coolgray-200">
+                    class="absolute z-20 mt-34 w-48 -ml-5 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-coolgray-200">
                     <a href="{{ route('project.show', ['project_uuid' => data_get($resource, 'environment.project.uuid')]) }}" 
                         class="block px-4 py-2 text-sm hover:bg-coolgray-200 dark:hover:bg-coolgray-200">
                         Overview
@@ -59,7 +59,7 @@
                     {{ data_get($resource, 'environment.name') }}
                 </a>
                 <button @mouseenter="envOpen = true" @mouseleave="envOpen = false"
-                    class="ml-1 text-warning hover:text-warning-600 focus:outline-none">
+                    class="px-1 text-warning hover:text-warning-600 focus:outline-none">
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-down': envOpen }" fill="none" 
                         stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -74,7 +74,7 @@
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="absolute z-20 mt-40 w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-coolgray-200">
+                    class="absolute z-20 mt-34 w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-coolgray-200">
                     <a href="{{ route('project.resource.index', [
                             'environment_uuid' => data_get($resource, 'environment.uuid'),
                             'project_uuid' => data_get($resource, 'environment.project.uuid'),
@@ -125,7 +125,7 @@
                     {{ data_get($resource, 'name') }}
                 </a>
                 <button @mouseenter="resourceOpen = true" @mouseleave="resourceOpen = false"
-                    class="ml-1 text-warning hover:text-warning-600 focus:outline-none">
+                    class="px-1 text-warning hover:text-warning-600 focus:outline-none">
                     <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-down': resourceOpen }" fill="none" 
                         stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
@@ -140,7 +140,7 @@
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
-                    class="absolute z-20 mt-50 w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-coolgray-200">
+                    class="absolute z-20 mt-44 w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-coolgray-200">
                     @if($resource->getMorphClass() === 'App\Models\Application')
                         <!-- Application Sections -->
                         <a href="{{ route('project.application.configuration', [
