@@ -932,6 +932,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--shm-size' => 'shm_size',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
+        '--network' => 'network_mode', // ✅ add network mapping
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -943,7 +944,6 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $options[$option] = array_unique($options[$option]);
         }
         if ($option === '--hostname') {
-            // Match --hostname=value or --hostname value
             $regexForParsingHostname = '/--hostname(?:=|\s+)([^\s]+)/';
             preg_match($regexForParsingHostname, $custom_docker_run_options, $hostname_matches);
             $value = $hostname_matches[1] ?? null;
@@ -962,7 +962,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         }
     }
     $options = collect($options);
-    // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
+
     foreach ($options as $option => $value) {
         if (! data_get($mapping, $option)) {
             continue;
@@ -1013,6 +1013,13 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                     ],
                 ],
             ]);
+        } elseif ($option === '--network') {
+            // ✅ Explicit handling for host networking
+            if (is_array($value) && in_array('host', $value)) {
+                $compose_options->put('network_mode', 'host');
+            } else {
+                $compose_options->put('network_mode', $value[0] ?? 'default');
+            }
         } else {
             if ($list_options->contains($option)) {
                 if ($compose_options->has($mapping[$option])) {
@@ -1020,11 +1027,9 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 } else {
                     $compose_options->put($mapping[$option], $value);
                 }
-
                 continue;
             } else {
                 $compose_options->put($mapping[$option], $value);
-
                 continue;
             }
         }
