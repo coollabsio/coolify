@@ -1,10 +1,9 @@
 # documentation: https://docs.sftpgo.com/2.6/
 # slogan: SFTPGo is an event-driven SFTP, FTP/S, HTTP/S and WebDAV server.
 # tags: sftpgo,sftp,ftp,file,webdav
-# logo: svgs/sftpgo.svg
+# logo: svgs/sftpgo.png
 # port: 8080
 
-version: 3.8
 services:
   sftpgo:
     image: "ghcr.io/drakkan/sftpgo:v2.6-alpine"
@@ -12,11 +11,13 @@ services:
       postgresql:
         condition: service_healthy
     ports:
-      - 2022:2022
+      - ${SFTP_0_PORT}:${SFTP_0_PORT}
     environment:
       - SERVICE_FQDN_SFTPGO_8080
       - SFTPGO_DATA_PROVIDER__DRIVER=postgresql
       - SFTPGO_DATA_PROVIDER__CONNECTION_STRING=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgresql:5432/${POSTGRES_DATABASE:-sftpgo}
+      - SFTPGO_SFTPD__BINDINGS__0__PORT=${SFTP_0_PORT?Port is required for the first SFTP binding}
+      - SFTPGO_LOG_LEVEL=${LOG_LEVEL:-info}
     healthcheck:
       test:
        - "CMD-SHELL"
