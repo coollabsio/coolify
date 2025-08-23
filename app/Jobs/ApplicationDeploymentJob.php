@@ -1759,242 +1759,241 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     private function generate_compose_file()
-    {
-        $this->create_workdir();
-        $ports = $this->application->main_port();
-        $persistent_storages = $this->generate_local_persistent_volumes();
-        $persistent_file_volumes = $this->application->fileStorages()->get();
-        $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-        // $environment_variables = $this->generate_environment_variables($ports);
-        $this->save_environment_variables();
-        if (data_get($this->application, 'custom_labels')) {
-            $this->application->parseContainerLabels();
-            $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
-            $labels = $labels->filter(function ($value, $key) {
-                return ! Str::startsWith($value, 'coolify.');
-            });
-            $this->application->custom_labels = base64_encode($labels->implode("\n"));
-            $this->application->save();
-        } else {
-            if ($this->application->settings->is_container_label_readonly_enabled) {
-                $labels = collect(generateLabelsApplication($this->application, $this->preview));
-            }
+{
+    $this->create_workdir();
+    $ports = $this->application->main_port();
+    $persistent_storages = $this->generate_local_persistent_volumes();
+    $persistent_file_volumes = $this->application->fileStorages()->get();
+    $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
+    $this->save_environment_variables();
+
+    // Handle custom labels
+    if (data_get($this->application, 'custom_labels')) {
+        $this->application->parseContainerLabels();
+        $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)))
+            ->filter(fn($value) => ! Str::startsWith($value, 'coolify.'));
+        $this->application->custom_labels = base64_encode($labels->implode("\n"));
+        $this->application->save();
+    } elseif ($this->application->settings->is_container_label_readonly_enabled || $this->pull_request_id !== 0) {
+        $labels = collect(generateLabelsApplication($this->application, $this->preview));
+    }
+
+    if ($this->application->settings->is_container_label_escape_enabled) {
+        $labels = $labels->map(fn($value) => escapeDollarSign($value));
+    }
+
+    $labels = $labels->merge(defaultLabels(
+        $this->application->id,
+        $this->application->uuid,
+        $this->application->project()->name,
+        $this->application->name,
+        $this->application->environment->name,
+        $this->pull_request_id
+    ))->toArray();
+
+    // Check for custom HEALTHCHECK
+    if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
+            'hidden' => true,
+            'save' => 'dockerfile_from_repo',
+            'ignore_errors' => true,
+        ]);
+        $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
+    }
+
+    $custom_network_aliases = is_array($this->application->custom_network_aliases) ? $this->application->custom_network_aliases : [];
+
+    // Base Docker Compose structure
+    $docker_compose = [
+        'services' => [
+            $this->container_name => [
+                'image' => $this->production_image_name,
+                'container_name' => $this->container_name,
+                'restart' => RESTART_MODE,
+                'expose' => $ports,
+                'networks' => [
+                    $this->destination->network => [
+                        'aliases' => array_merge([$this->container_name], $custom_network_aliases),
+                    ],
+                ],
+                'mem_limit' => $this->application->limits_memory,
+                'memswap_limit' => $this->application->limits_memory_swap,
+                'mem_swappiness' => $this->application->limits_memory_swappiness,
+                'mem_reservation' => $this->application->limits_memory_reservation,
+                'cpus' => (float) $this->application->limits_cpus,
+                'cpu_shares' => $this->application->limits_cpu_shares,
+            ],
+        ],
+        'networks' => [
+            $this->destination->network => [
+                'external' => true,
+                'name' => $this->destination->network,
+                'attachable' => true,
+            ],
+        ],
+    ];
+
+    if (! is_null($this->env_filename)) {
+        $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
+    }
+
+    $docker_compose['services'][$this->container_name]['healthcheck'] = [
+        'test' => ['CMD-SHELL', $this->generate_healthcheck_commands()],
+        'interval' => $this->application->health_check_interval.'s',
+        'timeout' => $this->application->health_check_timeout.'s',
+        'retries' => $this->application->health_check_retries,
+        'start_period' => $this->application->health_check_start_period.'s',
+    ];
+
+    if (! is_null($this->application->limits_cpuset)) {
+        data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
+    }
+
+    // Swarm adjustments
+    if ($this->server->isSwarm()) {
+        $swarm_forget_keys = [
+            'container_name', 'expose', 'restart',
+            'mem_limit', 'memswap_limit', 'mem_swappiness', 'mem_reservation',
+            'cpus', 'cpuset', 'cpu_shares'
+        ];
+        foreach ($swarm_forget_keys as $key) {
+            data_forget($docker_compose['services'][$this->container_name], $key);
         }
+
+        $docker_compose['services'][$this->container_name]['deploy'] = [
+            'mode' => 'replicated',
+            'replicas' => data_get($this->application, 'swarm_replicas', 1),
+            'update_config' => ['order' => 'start-first'],
+            'rollback_config' => ['order' => 'start-first'],
+            'labels' => $labels,
+            'resources' => [
+                'limits' => [
+                    'cpus' => $this->application->limits_cpus,
+                    'memory' => $this->application->limits_memory,
+                ],
+                'reservations' => [
+                    'cpus' => $this->application->limits_cpus,
+                    'memory' => $this->application->limits_memory,
+                ],
+            ],
+        ];
+
+        if (data_get($this->application, 'swarm_placement_constraints')) {
+            $swarm_placement_constraints = Yaml::parse(base64_decode(data_get($this->application, 'swarm_placement_constraints')));
+            $docker_compose['services'][$this->container_name]['deploy'] = array_merge(
+                $docker_compose['services'][$this->container_name]['deploy'],
+                $swarm_placement_constraints
+            );
+        }
+
+        if (data_get($this->application, 'settings.is_swarm_only_worker_nodes')) {
+            $docker_compose['services'][$this->container_name]['deploy']['placement']['constraints'][] = 'node.role == worker';
+        }
+
         if ($this->pull_request_id !== 0) {
-            $labels = collect(generateLabelsApplication($this->application, $this->preview));
+            $docker_compose['services'][$this->container_name]['deploy']['replicas'] = 1;
         }
-        if ($this->application->settings->is_container_label_escape_enabled) {
-            $labels = $labels->map(function ($value, $key) {
-                return escapeDollarSign($value);
-            });
-        }
-        $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->application->project()->name, $this->application->name, $this->application->environment->name, $this->pull_request_id))->toArray();
+    } else {
+        $docker_compose['services'][$this->container_name]['labels'] = $labels;
+    }
 
-        // Check for custom HEALTHCHECK
-        if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
-            $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
-                'hidden' => true,
-                'save' => 'dockerfile_from_repo',
-                'ignore_errors' => true,
-            ]);
-            $this->application->parseHealthcheckFromDockerfile($this->saved_outputs->get('dockerfile_from_repo'));
-        }
-        $custom_network_aliases = [];
-        if (is_array($this->application->custom_network_aliases) && count($this->application->custom_network_aliases) > 0) {
-            $custom_network_aliases = $this->application->custom_network_aliases;
-        }
-        $docker_compose = [
-            'services' => [
-                $this->container_name => [
-                    'image' => $this->production_image_name,
-                    'container_name' => $this->container_name,
-                    'restart' => RESTART_MODE,
-                    'expose' => $ports,
-                    'networks' => [
-                        $this->destination->network => [
-                            'aliases' => array_merge(
-                                [$this->container_name],
-                                $custom_network_aliases
-                            ),
-                        ],
-                    ],
-                    'mem_limit' => $this->application->limits_memory,
-                    'memswap_limit' => $this->application->limits_memory_swap,
-                    'mem_swappiness' => $this->application->limits_memory_swappiness,
-                    'mem_reservation' => $this->application->limits_memory_reservation,
-                    'cpus' => (float) $this->application->limits_cpus,
-                    'cpu_shares' => $this->application->limits_cpu_shares,
-                ],
-            ],
-            'networks' => [
-                $this->destination->network => [
-                    'external' => true,
-                    'name' => $this->destination->network,
-                    'attachable' => true,
-                ],
-            ],
+    if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
+        $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
+    }
+
+    if ($this->application->settings->is_gpu_enabled) {
+        $gpu = [
+            'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
+            'capabilities' => ['gpu'],
+            'options' => data_get($this->application, 'settings.gpu_options', []),
         ];
-        if (! is_null($this->env_filename)) {
-            $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
+        if (data_get($this->application, 'settings.gpu_count')) {
+            $gpu['count'] = data_get($this->application, 'settings.gpu_count') === 'all'
+                ? 'all'
+                : (int) data_get($this->application, 'settings.gpu_count');
+        } elseif (data_get($this->application, 'settings.gpu_device_ids')) {
+            $gpu['ids'] = data_get($this->application, 'settings.gpu_device_ids');
         }
-        $docker_compose['services'][$this->container_name]['healthcheck'] = [
-            'test' => [
-                'CMD-SHELL',
-                $this->generate_healthcheck_commands(),
-            ],
-            'interval' => $this->application->health_check_interval.'s',
-            'timeout' => $this->application->health_check_timeout.'s',
-            'retries' => $this->application->health_check_retries,
-            'start_period' => $this->application->health_check_start_period.'s',
-        ];
+        data_set($docker_compose, "services.{$this->container_name}.deploy.resources.reservations.devices", [$gpu]);
+    }
 
-        if (! is_null($this->application->limits_cpuset)) {
-            data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
-        }
-        if ($this->server->isSwarm()) {
-            data_forget($docker_compose, 'services.'.$this->container_name.'.container_name');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.expose');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.restart');
+    if ($this->application->isHealthcheckDisabled()) {
+        data_forget($docker_compose['services'][$this->container_name], 'healthcheck');
+    }
 
-            data_forget($docker_compose, 'services.'.$this->container_name.'.mem_limit');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.memswap_limit');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.mem_swappiness');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.mem_reservation');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.cpus');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.cpuset');
-            data_forget($docker_compose, 'services.'.$this->container_name.'.cpu_shares');
+    if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
+        $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
+    }
 
-            $docker_compose['services'][$this->container_name]['deploy'] = [
-                'mode' => 'replicated',
-                'replicas' => data_get($this->application, 'swarm_replicas', 1),
-                'update_config' => [
-                    'order' => 'start-first',
-                ],
-                'rollback_config' => [
-                    'order' => 'start-first',
-                ],
-                'labels' => $labels,
-                'resources' => [
-                    'limits' => [
-                        'cpus' => $this->application->limits_cpus,
-                        'memory' => $this->application->limits_memory,
-                    ],
-                    'reservations' => [
-                        'cpus' => $this->application->limits_cpus,
-                        'memory' => $this->application->limits_memory,
-                    ],
-                ],
-            ];
-            if (data_get($this->application, 'swarm_placement_constraints')) {
-                $swarm_placement_constraints = Yaml::parse(base64_decode(data_get($this->application, 'swarm_placement_constraints')));
-                $docker_compose['services'][$this->container_name]['deploy'] = array_merge(
-                    $docker_compose['services'][$this->container_name]['deploy'],
-                    $swarm_placement_constraints
-                );
-            }
-            if (data_get($this->application, 'settings.is_swarm_only_worker_nodes')) {
-                $docker_compose['services'][$this->container_name]['deploy']['placement']['constraints'][] = 'node.role == worker';
-            }
-            if ($this->pull_request_id !== 0) {
-                $docker_compose['services'][$this->container_name]['deploy']['replicas'] = 1;
-            }
+    // Persistent volumes
+    if (count($persistent_storages) > 0) {
+        $docker_compose['services'][$this->container_name]['volumes'] = array_merge(
+            $docker_compose['services'][$this->container_name]['volumes'] ?? [],
+            $persistent_storages
+        );
+    }
+
+    if (count($persistent_file_volumes) > 0) {
+        $docker_compose['services'][$this->container_name]['volumes'] = array_merge(
+            $docker_compose['services'][$this->container_name]['volumes'] ?? [],
+            $persistent_file_volumes->map(fn($item) => "$item->fs_path:$item->mount_path")->toArray()
+        );
+    }
+
+    if (count($volume_names) > 0) {
+        $docker_compose['volumes'] = $volume_names;
+    }
+
+    // ✅ Merge custom docker run options and handle network_mode host
+    if ($this->pull_request_id === 0) {
+        $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
+
+        $target_services = [];
+
+        if ((bool) $this->application->settings->is_consistent_container_name_enabled && ! $this->application->settings->custom_internal_name) {
+            $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+            $target_services[] = $this->application->uuid;
         } else {
-            $docker_compose['services'][$this->container_name]['labels'] = $labels;
-        }
-        if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
-            $docker_compose['services'][$this->container_name]['logging'] = generate_fluentd_configuration();
-        }
-        if ($this->application->settings->is_gpu_enabled) {
-            $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
-                [
-                    'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
-                    'capabilities' => ['gpu'],
-                    'options' => data_get($this->application, 'settings.gpu_options', []),
-                ],
-            ];
-            if (data_get($this->application, 'settings.gpu_count')) {
-                $count = data_get($this->application, 'settings.gpu_count');
-                if ($count === 'all') {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = $count;
-                } else {
-                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = (int) $count;
-                }
-            } elseif (data_get($this->application, 'settings.gpu_device_ids')) {
-                $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['ids'] = data_get($this->application, 'settings.gpu_device_ids');
-            }
-        }
-        if ($this->application->isHealthcheckDisabled()) {
-            data_forget($docker_compose, 'services.'.$this->container_name.'.healthcheck');
-        }
-        if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
-            $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
+            $target_services[] = $this->container_name;
         }
 
-        if (count($persistent_storages) > 0) {
-            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
-                $docker_compose['services'][$this->container_name]['volumes'] = [];
-            }
-            $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_storages);
-        }
-        if (count($persistent_file_volumes) > 0) {
-            if (! data_get($docker_compose, 'services.'.$this->container_name.'.volumes')) {
-                $docker_compose['services'][$this->container_name]['volumes'] = [];
-            }
-            $docker_compose['services'][$this->container_name]['volumes'] = array_merge($docker_compose['services'][$this->container_name]['volumes'], $persistent_file_volumes->map(function ($item) {
-                return "$item->fs_path:$item->mount_path";
-            })->toArray());
-        }
-        if (count($volume_names) > 0) {
-            $docker_compose['volumes'] = $volume_names;
-        }
+        foreach ($target_services as $service_name) {
+            if (count($custom_compose) > 0) {
+                $ipv4 = data_get($custom_compose, 'ip.0');
+                $ipv6 = data_get($custom_compose, 'ip6.0');
+                data_forget($custom_compose, 'ip');
+                data_forget($custom_compose, 'ip6');
 
-        if ($this->pull_request_id === 0) {
-            $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
-            if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
-                if (! $this->application->settings->custom_internal_name) {
-                    $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                    if (count($custom_compose) > 0) {
-                        $ipv4 = data_get($custom_compose, 'ip.0');
-                        $ipv6 = data_get($custom_compose, 'ip6.0');
-                        data_forget($custom_compose, 'ip');
-                        data_forget($custom_compose, 'ip6');
-                        if ($ipv4 || $ipv6) {
-                            data_forget($docker_compose['services'][$this->application->uuid], 'networks');
-                        }
-                        if ($ipv4) {
-                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
-                        }
-                        if ($ipv6) {
-                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                        }
-                        $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
-                    }
-                }
-            } else {
-                if (count($custom_compose) > 0) {
-                    $ipv4 = data_get($custom_compose, 'ip.0');
-                    $ipv6 = data_get($custom_compose, 'ip6.0');
-                    data_forget($custom_compose, 'ip');
-                    data_forget($custom_compose, 'ip6');
-                    if ($ipv4 || $ipv6) {
-                        data_forget($docker_compose['services'][$this->container_name], 'networks');
-                    }
+                if (data_get($custom_compose, 'network_mode') === 'host') {
+                    // ✅ Remove networks if network_mode host
+                    data_forget($docker_compose['services'][$service_name], 'networks');
+                } elseif ($ipv4 || $ipv6) {
+                    data_forget($docker_compose['services'][$service_name], 'networks');
                     if ($ipv4) {
-                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                        $docker_compose['services'][$service_name]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
                     }
                     if ($ipv6) {
-                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                        $docker_compose['services'][$service_name]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
                     }
-                    $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
                 }
+
+                $docker_compose['services'][$service_name] = array_merge_recursive(
+                    $docker_compose['services'][$service_name],
+                    $custom_compose
+                );
             }
         }
-
-        $this->docker_compose = Yaml::dump($docker_compose, 10);
-        $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"), 'hidden' => true]);
     }
+
+    $this->docker_compose = Yaml::dump($docker_compose, 10);
+    $this->docker_compose_base64 = base64_encode($this->docker_compose);
+    $this->execute_remote_command([
+        executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}/docker-compose.yaml > /dev/null"),
+        'hidden' => true
+    ]);
+}
+
 
     private function generate_local_persistent_volumes()
     {
