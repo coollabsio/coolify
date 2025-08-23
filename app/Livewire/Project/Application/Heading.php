@@ -5,11 +5,14 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Models\Application;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class Heading extends Component
 {
+    use AuthorizesRequests;
+
     public Application $application;
 
     public ?string $lastDeploymentInfo = null;
@@ -57,11 +60,15 @@ class Heading extends Component
 
     public function force_deploy_without_cache()
     {
+        $this->authorize('deploy', $this->application);
+
         $this->deploy(force_rebuild: true);
     }
 
     public function deploy(bool $force_rebuild = false)
     {
+        $this->authorize('deploy', $this->application);
+
         if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
             $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
 
@@ -110,12 +117,16 @@ class Heading extends Component
 
     public function stop()
     {
+        $this->authorize('deploy', $this->application);
+
         $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
         StopApplication::dispatch($this->application, false, $this->docker_cleanup);
     }
 
     public function restart()
     {
+        $this->authorize('deploy', $this->application);
+
         if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
             $this->dispatch('error', 'Failed to deploy', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 

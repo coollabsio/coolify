@@ -7,6 +7,7 @@ use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -14,6 +15,8 @@ use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $resourceName;
@@ -96,6 +99,7 @@ class Danger extends Component
         }
 
         try {
+            $this->authorize('delete', $this->resource);
             $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,

@@ -11,11 +11,14 @@ use App\Models\StandaloneMysql;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
+    use AuthorizesRequests;
+
     protected $listeners = ['refresh'];
 
     public StandaloneMysql $database;
@@ -111,6 +114,8 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
@@ -128,6 +133,8 @@ class General extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (str($this->database->public_port)->isEmpty()) {
                 $this->database->public_port = null;
             }
@@ -148,6 +155,8 @@ class General extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if ($this->database->is_public && ! $this->database->public_port) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
@@ -184,6 +193,8 @@ class General extends Component
     public function instantSaveSSL()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {
@@ -194,6 +205,8 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $existingCert = $this->database->sslCertificates()->first();
 
             if (! $existingCert) {

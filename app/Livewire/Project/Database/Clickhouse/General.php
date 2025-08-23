@@ -8,11 +8,14 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Support\ValidationPatterns;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public StandaloneClickhouse $database;
@@ -131,6 +134,8 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
                 $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
@@ -149,6 +154,8 @@ class General extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->isPublic = false;
@@ -186,6 +193,8 @@ class General extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }

@@ -17,6 +17,18 @@ class AuthServiceProvider extends ServiceProvider
         \App\Models\PrivateKey::class => \App\Policies\PrivateKeyPolicy::class,
         \App\Models\StandaloneDocker::class => \App\Policies\StandaloneDockerPolicy::class,
         \App\Models\SwarmDocker::class => \App\Policies\SwarmDockerPolicy::class,
+        \App\Models\Application::class => \App\Policies\ApplicationPolicy::class,
+        \App\Models\ApplicationPreview::class => \App\Policies\ApplicationPreviewPolicy::class,
+        \App\Models\ApplicationSetting::class => \App\Policies\ApplicationSettingPolicy::class,
+        // Database policies - all use the shared DatabasePolicy
+        \App\Models\StandalonePostgresql::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneMysql::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneMariadb::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneMongodb::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneRedis::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneKeydb::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneDragonfly::class => \App\Policies\DatabasePolicy::class,
+        \App\Models\StandaloneClickhouse::class => \App\Policies\DatabasePolicy::class,
     ];
 
     /**

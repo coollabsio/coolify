@@ -3,12 +3,15 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 class Import extends Component
 {
+    use AuthorizesRequests;
+
     public bool $unsupported = false;
 
     public $resource;
@@ -165,6 +168,8 @@ EOD;
 
     public function runImport()
     {
+        $this->authorize('update', $this->resource);
+
         if ($this->filename === '') {
             $this->dispatch('error', 'Please select a file to import.');
 

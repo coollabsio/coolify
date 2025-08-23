@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -12,6 +13,8 @@ use Visus\Cuid2\Cuid2;
 
 class General extends Component
 {
+    use AuthorizesRequests;
+
     public string $applicationId;
 
     public Application $application;
@@ -190,8 +193,14 @@ class General extends Component
             $this->dispatch('error', $e->getMessage());
         }
         if ($this->application->build_pack === 'dockercompose') {
-            $this->application->fqdn = null;
-            $this->application->settings->save();
+            // Only update if user has permission
+            try {
+                $this->authorize('update', $this->application);
+                $this->application->fqdn = null;
+                $this->application->settings->save();
+            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                // User doesn't have update permission, just continue without saving
+            }
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         // Convert service names with dots to use underscores for HTML form binding
@@ -207,14 +216,27 @@ class General extends Component
         $this->is_container_label_escape_enabled = $this->application->settings->is_container_label_escape_enabled;
         $this->customLabels = $this->application->parseContainerLabels();
         if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && $this->application->settings->is_container_label_readonly_enabled === true) {
-            $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
-            $this->application->custom_labels = base64_encode($this->customLabels);
-            $this->application->save();
+            // Only update custom labels if user has permission
+            try {
+                $this->authorize('update', $this->application);
+                $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
+                $this->application->custom_labels = base64_encode($this->customLabels);
+                $this->application->save();
+            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                // User doesn't have update permission, just use existing labels
+                // $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
+            }
         }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         if ($this->application->build_pack === 'dockercompose' && ! $this->application->docker_compose_raw) {
-            $this->initLoadingCompose = true;
-            $this->dispatch('info', 'Loading docker compose file.');
+            // Only load compose file if user has update permission
+            try {
+                $this->authorize('update', $this->application);
+                $this->initLoadingCompose = true;
+                $this->dispatch('info', 'Loading docker compose file.');
+            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                // User doesn't have update permission, skip loading compose file
+            }
         }
 
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
@@ -224,37 +246,44 @@ class General extends Component
 
     public function instantSave()
     {
-        if ($this->application->settings->isDirty('is_spa')) {
-            $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
-        }
-        if ($this->application->isDirty('is_http_basic_auth_enabled')) {
-            $this->application->save();
-        }
-        $this->application->settings->save();
-        $this->dispatch('success', 'Settings saved.');
-        $this->application->refresh();
+        try {
+            $this->authorize('update', $this->application);
 
-        // If port_exposes changed, reset default labels
-        if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
-            $this->resetDefaultLabels(false);
-        }
-        if ($this->is_preserve_repository_enabled !== $this->application->settings->is_preserve_repository_enabled) {
-            if ($this->application->settings->is_preserve_repository_enabled === false) {
-                $this->application->fileStorages->each(function ($storage) {
-                    $storage->is_based_on_git = $this->application->settings->is_preserve_repository_enabled;
-                    $storage->save();
-                });
+            if ($this->application->settings->isDirty('is_spa')) {
+                $this->generateNginxConfiguration($this->application->settings->is_spa ? 'spa' : 'static');
             }
-        }
-        if ($this->application->settings->is_container_label_readonly_enabled) {
-            $this->resetDefaultLabels(false);
-        }
+            if ($this->application->isDirty('is_http_basic_auth_enabled')) {
+                $this->application->save();
+            }
+            $this->application->settings->save();
+            $this->dispatch('success', 'Settings saved.');
+            $this->application->refresh();
 
+            // If port_exposes changed, reset default labels
+            if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
+                $this->resetDefaultLabels(false);
+            }
+            if ($this->is_preserve_repository_enabled !== $this->application->settings->is_preserve_repository_enabled) {
+                if ($this->application->settings->is_preserve_repository_enabled === false) {
+                    $this->application->fileStorages->each(function ($storage) {
+                        $storage->is_based_on_git = $this->application->settings->is_preserve_repository_enabled;
+                        $storage->save();
+                    });
+                }
+            }
+            if ($this->application->settings->is_container_label_readonly_enabled) {
+                $this->resetDefaultLabels(false);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function loadComposeFile($isInit = false, $showToast = true)
     {
         try {
+            $this->authorize('update', $this->application);
+
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
@@ -293,35 +322,41 @@ class General extends Component
 
     public function generateDomain(string $serviceName)
     {
-        $uuid = new Cuid2;
-        $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
-        $sanitizedKey = str($serviceName)->slug('_')->toString();
-        $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
+        try {
+            $this->authorize('update', $this->application);
 
-        // Convert back to original service names for storage
-        $originalDomains = [];
-        foreach ($this->parsedServiceDomains as $key => $value) {
-            // Find the original service name by checking parsed services
-            $originalServiceName = $key;
-            if (isset($this->parsedServices['services'])) {
-                foreach ($this->parsedServices['services'] as $originalName => $service) {
-                    if (str($originalName)->slug('_')->toString() === $key) {
-                        $originalServiceName = $originalName;
-                        break;
+            $uuid = new Cuid2;
+            $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
+            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
+
+            // Convert back to original service names for storage
+            $originalDomains = [];
+            foreach ($this->parsedServiceDomains as $key => $value) {
+                // Find the original service name by checking parsed services
+                $originalServiceName = $key;
+                if (isset($this->parsedServices['services'])) {
+                    foreach ($this->parsedServices['services'] as $originalName => $service) {
+                        if (str($originalName)->slug('_')->toString() === $key) {
+                            $originalServiceName = $originalName;
+                            break;
+                        }
                     }
                 }
+                $originalDomains[$originalServiceName] = $value;
             }
-            $originalDomains[$originalServiceName] = $value;
-        }
 
-        $this->application->docker_compose_domains = json_encode($originalDomains);
-        $this->application->save();
-        $this->dispatch('success', 'Domain generated.');
-        if ($this->application->build_pack === 'dockercompose') {
-            $this->loadComposeFile(showToast: false);
-        }
+            $this->application->docker_compose_domains = json_encode($originalDomains);
+            $this->application->save();
+            $this->dispatch('success', 'Domain generated.');
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->loadComposeFile(showToast: false);
+            }
 
-        return $domain;
+            return $domain;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function updatedApplicationBaseDirectory()
@@ -340,6 +375,16 @@ class General extends Component
 
     public function updatedApplicationBuildPack()
     {
+        // Check if user has permission to update
+        try {
+            $this->authorize('update', $this->application);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            // User doesn't have permission, revert the change and return
+            $this->application->refresh();
+
+            return;
+        }
+
         if ($this->application->build_pack !== 'nixpacks') {
             $this->application->settings->is_static = false;
             $this->application->settings->save();
@@ -348,8 +393,14 @@ class General extends Component
             $this->resetDefaultLabels(false);
         }
         if ($this->application->build_pack === 'dockercompose') {
-            $this->application->fqdn = null;
-            $this->application->settings->save();
+            // Only update if user has permission
+            try {
+                $this->authorize('update', $this->application);
+                $this->application->fqdn = null;
+                $this->application->settings->save();
+            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                // User doesn't have update permission, just continue without saving
+            }
         } else {
             // Clear Docker Compose specific data when switching away from dockercompose
             if ($this->application->getOriginal('build_pack') === 'dockercompose') {
@@ -374,21 +425,33 @@ class General extends Component
 
     public function getWildcardDomain()
     {
-        $server = data_get($this->application, 'destination.server');
-        if ($server) {
-            $fqdn = generateFqdn(server: $server, random: $this->application->uuid, parserVersion: $this->application->compose_parsing_version);
-            $this->application->fqdn = $fqdn;
-            $this->application->save();
-            $this->resetDefaultLabels();
-            $this->dispatch('success', 'Wildcard domain generated.');
+        try {
+            $this->authorize('update', $this->application);
+
+            $server = data_get($this->application, 'destination.server');
+            if ($server) {
+                $fqdn = generateFqdn(server: $server, random: $this->application->uuid, parserVersion: $this->application->compose_parsing_version);
+                $this->application->fqdn = $fqdn;
+                $this->application->save();
+                $this->resetDefaultLabels();
+                $this->dispatch('success', 'Wildcard domain generated.');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
     public function generateNginxConfiguration($type = 'static')
     {
-        $this->application->custom_nginx_configuration = defaultNginxConfiguration($type);
-        $this->application->save();
-        $this->dispatch('success', 'Nginx configuration generated.');
+        try {
+            $this->authorize('update', $this->application);
+
+            $this->application->custom_nginx_configuration = defaultNginxConfiguration($type);
+            $this->application->save();
+            $this->dispatch('success', 'Nginx configuration generated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function resetDefaultLabels($manualReset = false)
@@ -430,6 +493,8 @@ class General extends Component
 
     public function setRedirect()
     {
+        $this->authorize('update', $this->application);
+
         try {
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
@@ -448,6 +513,7 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
+            $this->authorize('update', $this->application);
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {

@@ -246,6 +246,8 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
+        $this->authorize('create', Service::class);
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
@@ -547,6 +549,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('view', $service);
+
         $service = $service->load(['applications', 'databases']);
 
         return response()->json($this->removeSensitiveData($service));
@@ -611,6 +615,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('delete', $service);
 
         DeleteResourceJob::dispatch(
             resource: $service,
@@ -717,6 +723,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('update', $service);
 
         $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
 
@@ -856,6 +864,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $envs = $service->environment_variables->map(function ($env) {
             $env->makeHidden([
                 'application_id',
@@ -959,6 +969,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('manageEnvironment', $service);
 
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
@@ -1081,6 +1093,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json(['message' => 'Bulk data is required.'], 400);
@@ -1197,6 +1211,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
@@ -1299,6 +1315,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Service::class)
             ->where('resourceable_id', $service->id)
@@ -1378,6 +1396,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('deploy', $service);
+
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
@@ -1456,6 +1477,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('stop', $service);
+
         if (str($service->status)->contains('stopped') || str($service->status)->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
@@ -1543,6 +1567,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('deploy', $service);
+
         $pullLatest = $request->boolean('latest');
         RestartService::dispatch($service, $pullLatest);
 

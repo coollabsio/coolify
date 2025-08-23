@@ -3,11 +3,14 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Advanced extends Component
 {
+    use AuthorizesRequests;
+
     public Application $application;
 
     #[Validate(['boolean'])]
@@ -142,6 +145,7 @@ class Advanced extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->application);
             $reset = false;
             if ($this->isLogDrainEnabled) {
                 if (! $this->application->destination->server->isLogDrainEnabled()) {
@@ -180,6 +184,7 @@ class Advanced extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->application);
             if ($this->gpuCount && $this->gpuDeviceIds) {
                 $this->dispatch('error', 'You cannot set both GPU count and GPU device IDs.');
                 $this->gpuCount = null;
@@ -197,33 +202,39 @@ class Advanced extends Component
 
     public function saveCustomName()
     {
-        if (str($this->customInternalName)->isNotEmpty()) {
-            $this->customInternalName = str($this->customInternalName)->slug()->value();
-        } else {
-            $this->customInternalName = null;
-        }
-        if (is_null($this->customInternalName)) {
+        try {
+            $this->authorize('update', $this->application);
+
+            if (str($this->customInternalName)->isNotEmpty()) {
+                $this->customInternalName = str($this->customInternalName)->slug()->value();
+            } else {
+                $this->customInternalName = null;
+            }
+            if (is_null($this->customInternalName)) {
+                $this->syncData(true);
+                $this->dispatch('success', 'Custom name saved.');
+
+                return;
+            }
+            $customInternalName = $this->customInternalName;
+            $server = $this->application->destination->server;
+            $allApplications = $server->applications();
+
+            $foundSameInternalName = $allApplications->filter(function ($application) {
+                return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->customInternalName;
+            });
+            if ($foundSameInternalName->isNotEmpty()) {
+                $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
+                $this->customInternalName = $customInternalName;
+                $this->syncData(true);
+
+                return;
+            }
             $this->syncData(true);
             $this->dispatch('success', 'Custom name saved.');
-
-            return;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $customInternalName = $this->customInternalName;
-        $server = $this->application->destination->server;
-        $allApplications = $server->applications();
-
-        $foundSameInternalName = $allApplications->filter(function ($application) {
-            return $application->id !== $this->application->id && $application->settings->custom_internal_name === $this->customInternalName;
-        });
-        if ($foundSameInternalName->isNotEmpty()) {
-            $this->dispatch('error', 'This custom container name is already in use by another application on this server.');
-            $this->customInternalName = $customInternalName;
-            $this->syncData(true);
-
-            return;
-        }
-        $this->syncData(true);
-        $this->dispatch('success', 'Custom name saved.');
     }
 
     public function render()

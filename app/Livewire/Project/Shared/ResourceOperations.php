@@ -12,11 +12,14 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class ResourceOperations extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $projectUuid;
@@ -45,6 +48,8 @@ class ResourceOperations extends Component
 
     public function cloneTo($destination_id)
     {
+        $this->authorize('update', $this->resource);
+
         $new_destination = StandaloneDocker::find($destination_id);
         if (! $new_destination) {
             $new_destination = SwarmDocker::find($destination_id);
@@ -485,6 +490,7 @@ class ResourceOperations extends Component
     public function moveTo($environment_id)
     {
         try {
+            $this->authorize('update', $this->resource);
             $new_environment = Environment::findOrFail($environment_id);
             $this->resource->update([
                 'environment_id' => $environment_id,

@@ -54,6 +54,35 @@ class Handler extends ExceptionHandler
     }
 
     /**
+     * Render an exception into an HTTP response.
+     */
+    public function render($request, Throwable $e)
+    {
+        // Handle authorization exceptions for API routes
+        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                // Get the custom message from the policy if available
+                $message = $e->getMessage();
+
+                // Clean up the message for API responses (remove HTML tags if present)
+                $message = strip_tags(str_replace('<br/>', ' ', $message));
+
+                // If no custom message, use a default one
+                if (empty($message) || $message === 'This action is unauthorized.') {
+                    $message = 'You are not authorized to perform this action.';
+                }
+
+                return response()->json([
+                    'message' => $message,
+                    'error' => 'Unauthorized',
+                ], 403);
+            }
+        }
+
+        return parent::render($request, $e);
+    }
+
+    /**
      * Register the exception handling callbacks for the application.
      */
     public function register(): void

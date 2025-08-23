@@ -11,11 +11,14 @@ use App\Models\StandaloneKeydb;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public StandaloneKeydb $database;
@@ -150,6 +153,8 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
                 $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
@@ -168,6 +173,8 @@ class General extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->isPublic = false;
@@ -205,6 +212,8 @@ class General extends Component
     public function submit()
     {
         try {
+            $this->authorize('manageEnvironment', $this->database);
+
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }
@@ -224,6 +233,8 @@ class General extends Component
     public function instantSaveSSL()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $this->syncData(true);
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {
@@ -234,6 +245,8 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $existingCert = $this->database->sslCertificates()->first();
 
             if (! $existingCert) {

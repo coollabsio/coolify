@@ -28,7 +28,7 @@ class ServicePolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->isAdmin() && $user->teams()->get()->firstWhere('id', $service->team()->first()->id) !== null;
     }
 
     /**
@@ -36,7 +36,7 @@ class ServicePolicy
      */
     public function update(User $user, Service $service): bool
     {
-        return true;
+        return $user->isAdmin() && $user->teams()->get()->firstWhere('id', $service->team()->first()->id) !== null;
     }
 
     /**
@@ -73,10 +73,22 @@ class ServicePolicy
 
     public function stop(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
+        return $user->teams()->get()->firstWhere('id', $service->team()->first()->id) !== null;
+    }
 
-        return false;
+    /**
+     * Determine whether the user can manage environment variables.
+     */
+    public function manageEnvironment(User $user, Service $service): bool
+    {
+        return $user->isAdmin() && $user->teams()->get()->firstWhere('id', $service->team()->first()->id) !== null;
+    }
+
+    /**
+     * Determine whether the user can deploy the service.
+     */
+    public function deploy(User $user, Service $service): bool
+    {
+        return $user->teams()->get()->firstWhere('id', $service->team()->first()->id) !== null;
     }
 }

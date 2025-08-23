@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Database;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Locked;
@@ -14,6 +15,8 @@ use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
+    use AuthorizesRequests;
+
     public ScheduledDatabaseBackup $backup;
 
     #[Locked]
@@ -129,6 +132,8 @@ class BackupEdit extends Component
 
     public function delete($password)
     {
+        $this->authorize('manageBackups', $this->backup->database);
+
         if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
             if (! Hash::check($password, Auth::user()->password)) {
                 $this->addError('password', 'The provided password is incorrect.');
@@ -186,6 +191,8 @@ class BackupEdit extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('manageBackups', $this->backup->database);
+
             $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {
@@ -214,6 +221,8 @@ class BackupEdit extends Component
     public function submit()
     {
         try {
+            $this->authorize('manageBackups', $this->backup->database);
+
             $this->syncData(true);
             $this->dispatch('success', 'Backup updated successfully.');
         } catch (\Throwable $e) {

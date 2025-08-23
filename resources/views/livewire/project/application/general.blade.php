@@ -2,9 +2,11 @@
     <form wire:submit='submit' class="flex flex-col pb-32">
         <div class="flex items-center gap-2">
             <h2>General</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
+            @can('update', $application)
+                <x-forms.button type="submit">
+                    Save
+                </x-forms.button>
+            @endcan
 
             {{-- <x-forms.button wire:click="downloadConfig">
                 Download Config
@@ -24,13 +26,24 @@
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
-                        <x-forms.select x-bind:disabled="initLoadingCompose" wire:model.live="application.build_pack"
-                            label="Build Pack" required>
-                            <option value="nixpacks">Nixpacks</option>
-                            <option value="static">Static</option>
-                            <option value="dockerfile">Dockerfile</option>
-                            <option value="dockercompose">Docker Compose</option>
-                        </x-forms.select>
+                        @can('update', $application)
+                            <x-forms.select x-bind:disabled="initLoadingCompose" wire:model.live="application.build_pack"
+                                label="Build Pack" required>
+                                <option value="nixpacks">Nixpacks</option>
+                                <option value="static">Static</option>
+                                <option value="dockerfile">Dockerfile</option>
+                                <option value="dockercompose">Docker Compose</option>
+                            </x-forms.select>
+                        @else
+                            <x-forms.select disabled label="Build Pack" required>
+                                <option value="nixpacks" @if ($application->build_pack === 'nixpacks') selected @endif>Nixpacks</option>
+                                <option value="static" @if ($application->build_pack === 'static') selected @endif>Static</option>
+                                <option value="dockerfile" @if ($application->build_pack === 'dockerfile') selected @endif>Dockerfile
+                                </option>
+                                <option value="dockercompose" @if ($application->build_pack === 'dockercompose') selected @endif>Docker
+                                    Compose</option>
+                            </x-forms.select>
+                        @endcan
                         @if ($application->settings->is_static || $application->build_pack === 'static')
                             <x-forms.select id="application.static_image" label="Static Image" required>
                                 <option value="nginx:alpine">nginx:alpine</option>
@@ -52,8 +65,10 @@
                                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
                                             label="Domains for {{ str($serviceName)->headline() }}"
                                             id="parsedServiceDomains.{{ str($serviceName)->slug('_') }}.domain"></x-forms.input>
-                                        <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
-                                            Domain</x-forms.button>
+                                        @can('update', $application)
+                                            <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
+                                                Domain</x-forms.button>
+                                        @endcan
                                     </div>
                                 @endif
                             @endforeach
@@ -66,8 +81,10 @@
                 <x-forms.textarea id="application.custom_nginx_configuration"
                     placeholder="Empty means default configuration will be used." label="Custom Nginx Configuration"
                     helper="You can add custom Nginx configuration here." />
-                <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
-                    Configuration</x-forms.button>
+                @can('update', $application)
+                    <x-forms.button wire:click="generateNginxConfiguration">Generate Default Nginx
+                        Configuration</x-forms.button>
+                @endcan
             @endif
             <div class="w-96 pb-6">
                 @if ($application->could_set_build_commands())
@@ -90,8 +107,10 @@
                         <x-forms.input placeholder="https://coolify.io" wire:model.blur-sm="application.fqdn"
                             label="Domains"
                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
-                        <x-forms.button wire:click="getWildcardDomain">Generate Domain
-                        </x-forms.button>
+                        @can('update', $application)
+                            <x-forms.button wire:click="getWildcardDomain">Generate Domain
+                            </x-forms.button>
+                        @endcan
                     @endif
                 </div>
                 <div class="flex items-end gap-2">
@@ -204,87 +223,92 @@
                     @endif
                     <div class="flex flex-col gap-2 pt-6 pb-10">
                         @if ($application->build_pack === 'dockercompose')
-                            <div class="flex flex-col gap-2" x-init="$wire.dispatch('loadCompose', true)">
-                                <div class="flex gap-2">
-                                    <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="/"
-                                        id="application.base_directory" label="Base Directory"
+                            @can('update', $application)
+                                <div class="flex flex-col gap-2" x-init="$wire.dispatch('loadCompose', true)">
+                                @else
+                                    <div class="flex flex-col gap-2">
+                                    @endcan
+                                    <div class="flex gap-2">
+                                        <x-forms.input x-bind:disabled="initLoadingCompose" placeholder="/"
+                                            id="application.base_directory" label="Base Directory"
+                                            helper="Directory to use as root. Useful for monorepos." />
+                                        <x-forms.input x-bind:disabled="initLoadingCompose"
+                                            placeholder="/docker-compose.yaml"
+                                            id="application.docker_compose_location" label="Docker Compose Location"
+                                            helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
+                                    </div>
+                                    <div class="w-96">
+                                        <x-forms.checkbox instantSave
+                                            id="application.settings.is_preserve_repository_enabled"
+                                            label="Preserve Repository During Deployment"
+                                            helper="Git repository (based on the base directory settings) will be copied to the deployment directory." />
+                                    </div>
+                                    <div class="pt-4">The following commands are for advanced use cases.
+                                        Only
+                                        modify them if you
+                                        know what are
+                                        you doing.</div>
+                                    <div class="flex gap-2">
+                                        <x-forms.input placeholder="docker compose build"
+                                            x-bind:disabled="initLoadingCompose"
+                                            id="application.docker_compose_custom_build_command"
+                                            helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
+                                            label="Custom Build Command" />
+                                        <x-forms.input placeholder="docker compose up -d"
+                                            x-bind:disabled="initLoadingCompose"
+                                            id="application.docker_compose_custom_start_command"
+                                            helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
+                                            label="Custom Start Command" />
+                                    </div>
+                                </div>
+                            @else
+                                <div class="flex flex-col gap-2 xl:flex-row">
+                                    <x-forms.input placeholder="/" id="application.base_directory"
+                                        label="Base Directory"
                                         helper="Directory to use as root. Useful for monorepos." />
-                                    <x-forms.input x-bind:disabled="initLoadingCompose"
-                                        placeholder="/docker-compose.yaml" id="application.docker_compose_location"
-                                        label="Docker Compose Location"
-                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
-                                </div>
-                                <div class="w-96">
-                                    <x-forms.checkbox instantSave
-                                        id="application.settings.is_preserve_repository_enabled"
-                                        label="Preserve Repository During Deployment"
-                                        helper="Git repository (based on the base directory settings) will be copied to the deployment directory." />
-                                </div>
-                                <div class="pt-4">The following commands are for advanced use cases.
-                                    Only
-                                    modify them if you
-                                    know what are
-                                    you doing.</div>
-                                <div class="flex gap-2">
-                                    <x-forms.input placeholder="docker compose build"
-                                        x-bind:disabled="initLoadingCompose"
-                                        id="application.docker_compose_custom_build_command"
-                                        helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
-                                        label="Custom Build Command" />
-                                    <x-forms.input placeholder="docker compose up -d"
-                                        x-bind:disabled="initLoadingCompose"
-                                        id="application.docker_compose_custom_start_command"
-                                        helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
-                                        label="Custom Start Command" />
-                                </div>
-                            </div>
-                        @else
-                            <div class="flex flex-col gap-2 xl:flex-row">
-                                <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
-                                    helper="Directory to use as root. Useful for monorepos." />
-                                @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
-                                    <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
-                                        label="Dockerfile Location"
-                                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>" />
-                                @endif
-
-                                @if ($application->build_pack === 'dockerfile')
-                                    <x-forms.input id="application.dockerfile_target_build"
-                                        label="Docker Build Stage Target"
-                                        helper="Useful if you have multi-staged dockerfile." />
-                                @endif
-                                @if ($application->could_set_build_commands())
-                                    @if ($application->settings->is_static)
-                                        <x-forms.input placeholder="/dist" id="application.publish_directory"
-                                            label="Publish Directory" required />
-                                    @else
-                                        <x-forms.input placeholder="/" id="application.publish_directory"
-                                            label="Publish Directory" />
+                                    @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
+                                        <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
+                                            label="Dockerfile Location"
+                                            helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>" />
                                     @endif
+
+                                    @if ($application->build_pack === 'dockerfile')
+                                        <x-forms.input id="application.dockerfile_target_build"
+                                            label="Docker Build Stage Target"
+                                            helper="Useful if you have multi-staged dockerfile." />
+                                    @endif
+                                    @if ($application->could_set_build_commands())
+                                        @if ($application->settings->is_static)
+                                            <x-forms.input placeholder="/dist" id="application.publish_directory"
+                                                label="Publish Directory" required />
+                                        @else
+                                            <x-forms.input placeholder="/" id="application.publish_directory"
+                                                label="Publish Directory" />
+                                        @endif
+                                    @endif
+
+                                </div>
+                                @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                                    <div class="pb-4">
+                                        <x-forms.textarea
+                                            helper="Gitignore-style rules to filter Git based webhook deployments."
+                                            placeholder="src/pages/**" id="application.watch_paths"
+                                            label="Watch Paths" />
+                                    </div>
                                 @endif
+                                <x-forms.input
+                                    helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
+                                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
+                                    id="application.custom_docker_run_options" label="Custom Docker Options" />
 
-                            </div>
-                            @if ($this->application->is_github_based() && !$this->application->is_public_repository())
-                                <div class="pb-4">
-                                    <x-forms.textarea
-                                        helper="Gitignore-style rules to filter Git based webhook deployments."
-                                        placeholder="src/pages/**" id="application.watch_paths"
-                                        label="Watch Paths" />
-                                </div>
-                            @endif
-                            <x-forms.input
-                                helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
-                                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
-                                id="application.custom_docker_run_options" label="Custom Docker Options" />
-
-                            @if ($application->build_pack !== 'dockercompose')
-                                <div class="pt-2 w-96">
-                                    <x-forms.checkbox
-                                        helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
-                                        instantSave id="application.settings.is_build_server_enabled"
-                                        label="Use a Build Server?" />
-                                </div>
-                            @endif
+                                @if ($application->build_pack !== 'dockercompose')
+                                    <div class="pt-2 w-96">
+                                        <x-forms.checkbox
+                                            helper="Use a build server to build your application. You can configure your build server in the Server settings. For more info, check the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                            instantSave id="application.settings.is_build_server_enabled"
+                                            label="Use a Build Server?" />
+                                    </div>
+                                @endif
                         @endif
                     </div>
                 @endif
@@ -419,6 +443,7 @@
     @script
         <script>
             $wire.$on('loadCompose', (isInit = true) => {
+                // Only load compose file if user has permission (this event should only be dispatched when authorized)
                 $wire.initLoadingCompose = true;
                 $wire.loadComposeFile(isInit);
             });
