@@ -43,4 +43,14 @@ services:
     volumes:
       - mongodb:/data/db
     command: ["mongod", "--quiet"]
-
+  capture:
+    image: ghcr.io/bluewave-labs/capture:latest
+    container_name: capture
+    restart: unless-stopped
+    ports:
+      - "59232:59232"
+    environment:
+      - API_SECRET=${CAPTURE_SECRET}
+      - GIN_MODE=release
+    volumes:
+      - /etc/os-release:/etc/os-release:ro
