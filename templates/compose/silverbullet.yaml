@@ -7,7 +7,6 @@
 services:
   silverbullet:
     image: ghcr.io/silverbulletmd/silverbullet:v2
-    restart: unless-stopped
     environment:
     - SERVICE_FQDN_SILVERBULLET_3000
     - SB_USER=${SERVICE_USER_SILVERBULLET}:${SERVICE_PASSWORD_SILVERBULLET}
