@@ -1,0 +1,116 @@
+<meta charset="utf-8">
+       <title>Packers and Movers in Hyderabad Skywing Cargo</title>
+       <link rel="amphtml" href="https://www.skywingcargopackers.in/skywing_amp/packer-movers-hyderabad.amp.html">
+
+    <link rel="apple-touch-icon" sizes="120x120" href="icon/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icon/favicon-16x16.png">
+<link rel="manifest" href="icon/site.webmanifest">
+<link rel="mask-icon" href="icon/safari-pinned-tab.svg" color="#5bbad5">
+<meta name="msapplication-TileColor" content="#da532c">
+<meta name="theme-color" content="#ffffff">
+     
+    <script  type="text/javascript" src="jquery.js">
+    </script>
+    <script  type="text/javascript" src="jquery-ui.min.js">
+    </script>
+    <script  type="text/javascript" src="tt_slideshow.js">
+    </script>
+    <script  type="text/javascript" src="bootstrap.min.js">
+    </script>
+    <script  type="text/javascript" src="customjs.js">
+    </script>
+    <script  type="text/javascript" src="tt_animation.js">
+    </script>
+    <script  type="text/javascript" src="contactform.js">
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--<meta name="description" content="Meta Description" />-->
+    <link rel="stylesheet" href="bootstrap.css" type="text/css" media="screen" />
+    <link rel="stylesheet" href="style.css" type="text/css" media="screen" />
+    <script  type="text/javascript" src="totop.js">
+    </script>
+    <script  type="text/javascript" src="tt_animation.js">
+    </script>
+<script  src="https://use.fontawesome.com/6b7db0b580.js"></script>
+<style >
+    @media (max-width:776px){
+        .hidden-xs{display:none};
+        #ttr_header_inner{
+        height:100px !important;
+    }
+    .book_now{
+        height: 130px !important;
+    }
+    .phone{
+        font-size: 15px;
+    }
+    .fa{
+        color:#fff;
+    }
+    .fa-whatsapp{
+        color:#50c514;
+    }
+    .header-right-content{
+        list-style:none;
+        text-align:center;
+        padding-left:0px !important;
+    }
+    .header-right-content .col-6{
+        color: White;
+        text-align:center;
+    }
+    .ttr_headershape01{
+        left:0px !important;
+    }
+    .ttr_menu_main_logo{
+        display:show;
+    }
+    }
+     @media (min-width:777px){
+         .ttr_menu_main_logo{
+        display:none;
+    }
+     }
+   .mobview {
+    display: none;
+}
+   .topherder {
+    display: none;
+    background: rgba(26,75,89,1);
+    padding: 10px 0;
+}
+   @media (max-width: 580px) {
+    .mobview {
+        display: block;
+    }
+        .topherder {
+        display: block;
+        text-align: center;
+    }
+    .topherder ul {
+    margin-left: 0;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+.topherder ul .mobi {
+    font-weight: 600;
+    color: #d6030b;
+    /*border-radius: 5px;*/
+    /*padding: 5px 10px;*/
+    background: #feed00;width: 100%;
+}
+    .topherder ul .mobi {
+        margin-right: 0;
+        font-size: 18px;
+        padding: 5px 10px !important;
+        margin-bottom: 10px;
+        text-align: center;
+        border-radius: 5px;
+    }
+    .topherder ul li {
+    display: inline-block;
+    /*color: #fff;*/
+    list-style: none;
+}
+}
