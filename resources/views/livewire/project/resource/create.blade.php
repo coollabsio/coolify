@@ -8,6 +8,8 @@
         <livewire:project.new.github-private-repository :type="$type" />
     @elseif ($type === 'private-deploy-key')
         <livewire:project.new.github-private-repository-deploy-key :type="$type" />
+    @elseif ($type === 'private-https-auth')
+        <livewire:project.new.github-private-repository-https-auth :type="$type" />
     @elseif ($type === 'dockerfile')
         <livewire:project.new.simple-dockerfile :type="$type" />
     @elseif ($type === 'docker-compose-empty')

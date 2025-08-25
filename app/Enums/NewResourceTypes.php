@@ -7,6 +7,7 @@ enum NewResourceTypes: string
     case PUBLIC = 'public';
     case PRIVATE_GH_APP = 'private-gh-app';
     case PRIVATE_DEPLOY_KEY = 'private-deploy-key';
+    case PRIVATE_HTTPS_AUTH = 'private-https-auth';
     case DOCKERFILE = 'dockerfile';
     case DOCKERCOMPOSE = 'dockercompose';
     case DOCKER_IMAGE = 'docker-image';
