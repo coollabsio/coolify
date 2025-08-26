@@ -1,5 +1,6 @@
 # documentation: https://docs.strapi.io/
 # slogan: Open-source headless CMS to build powerful APIs with built-in content management.
+# category: backend
 # tags: cms, headless, mysql, api
 # logo: svgs/strapi.svg
 # port: 1337
@@ -8,7 +9,7 @@ services:
   strapi:
     image: "elestio/strapi-development:latest"
     environment:
-      - SERVICE_FQDN_STRAPI_1337
+      - SERVICE_URL_STRAPI_1337
       - DATABASE_CLIENT=postgres
       - DATABASE_HOST=postgresql
       - DATABASE_PORT=5432

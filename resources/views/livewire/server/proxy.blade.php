@@ -7,12 +7,11 @@
                     <div class="flex items-center gap-2">
                         <h2>Configuration</h2>
                         @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
-                            <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                            <x-forms.button canGate="update" :canResource="$server" wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                         @else
-                            <x-forms.button disabled wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                            <x-forms.button canGate="update" :canResource="$server" disabled wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                         @endif
-                        <x-forms.button type="submit">Save</x-forms.button>
-
+                        <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
                     </div>
                     <div class="pb-4 "> <svg class="inline-flex w-6 h-6 mr-2 dark:text-warning" viewBox="0 0 256 256"
                             xmlns="http://www.w3.org/2000/svg">
@@ -23,16 +22,16 @@
                     </div>
                     <h3>Advanced</h3>
                     <div class="pb-4 w-96">
-                        <x-forms.checkbox
+                        <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
                             id="server.settings.generate_exact_labels"
                             label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
-                        <x-forms.checkbox instantSave="instantSaveRedirect" id="redirect_enabled"
-                            label="Override default request handler"
-                            helper="Requests to unknown hosts or stopped services will recieve a 503 response or be redirected to the URL you set below (need to enable this first)." />
+                        <x-forms.checkbox canGate="update" :canResource="$server" instantSave="instantSaveRedirect"
+                            id="redirect_enabled" label="Override default request handler"
+                            helper="Requests to unknown hosts or stopped services will receive a 503 response or be redirected to the URL you set below (need to enable this first)." />
                         @if ($redirect_enabled)
-                            <x-forms.input placeholder="https://app.coolify.io" id="redirect_url"
-                                label="Redirect to (optional)" />
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="https://app.coolify.io"
+                                id="redirect_url" label="Redirect to (optional)" />
                         @endif
                     </div>
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
@@ -53,9 +52,11 @@
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
                         @if ($proxy_settings)
                             <div class="flex flex-col gap-2 pt-4">
-                                <x-forms.textarea useMonacoEditor monacoEditorLanguage="yaml" label="Configuration file"
-                                    name="proxy_settings" id="proxy_settings" rows="30" />
-                                <x-forms.button wire:click.prevent="reset_proxy_configuration">
+                                <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
+                                    monacoEditorLanguage="yaml" label="Configuration file" name="proxy_settings"
+                                    id="proxy_settings" rows="30" />
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    wire:click.prevent="reset_proxy_configuration">
                                     Reset configuration to default
                                 </x-forms.button>
                             </div>
@@ -65,33 +66,44 @@
             @elseif($selectedProxy === 'NONE')
                 <div class="flex items-center gap-2">
                     <h2>Configuration</h2>
-                    <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                    @can('update', $server)
+                        <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                    @endcan
                 </div>
                 <div class="pt-2 pb-4">Custom (None) Proxy Selected</div>
             @else
                 <div class="flex items-center gap-2">
                     <h2>Configuration</h2>
-                    <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                    @can('update', $server)
+                        <x-forms.button wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                    @endcan
                 </div>
             @endif
         @else
             <div>
                 <h2>Configuration</h2>
                 <div class="subtitle">Select a proxy you would like to use on this server.</div>
-                <div class="grid gap-4">
-                    <x-forms.button class="box" wire:click="selectProxy('NONE')">
-                        Custom (None)
-                    </x-forms.button>
-                    <x-forms.button class="box" wire:click="selectProxy('TRAEFIK')">
-                        Traefik
-                    </x-forms.button>
-                    <x-forms.button class="box" wire:click="selectProxy('CADDY')">
-                        Caddy
-                    </x-forms.button>
-                    {{-- <x-forms.button disabled class="box">
-                        Nginx
-                    </x-forms.button> --}}
-                </div>
+                @can('update', $server)
+                    <div class="grid gap-4">
+                        <x-forms.button class="box" wire:click="selectProxy('NONE')">
+                            Custom (None)
+                        </x-forms.button>
+                        <x-forms.button class="box" wire:click="selectProxy('TRAEFIK')">
+                            Traefik
+                        </x-forms.button>
+                        <x-forms.button class="box" wire:click="selectProxy('CADDY')">
+                            Caddy
+                        </x-forms.button>
+                        {{-- <x-forms.button disabled class="box">
+                            Nginx
+                        </x-forms.button> --}}
+                    </div>
+                @else
+                    <div
+                        class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
+                        You don't have permission to configure proxy settings for this server.
+                    </div>
+                @endcan
             </div>
     @endif
 </div>

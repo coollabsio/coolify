@@ -1,5 +1,6 @@
 # documentation: https://github.com/dani-garcia/vaultwarden
 # slogan: Vaultwarden is a password manager that allows you to securely store and manage your passwords.
+# category: auth
 # tags: password manager, security
 # logo: svgs/bitwarden.svg
 # port: 80
@@ -8,8 +9,8 @@ services:
   vaultwarden:
     image: vaultwarden/server:latest
     environment:
-      - SERVICE_FQDN_VAULTWARDEN
-      - DOMAIN=${SERVICE_FQDN_VAULTWARDEN}
+      - SERVICE_URL_VAULTWARDEN
+      - DOMAIN=${SERVICE_URL_VAULTWARDEN}
       - DATABASE_URL=${VAULTWARDEN_DB_URL:-data/db.sqlite3}
       - SIGNUPS_ALLOWED=${SIGNUP_ALLOWED:-true}
       - ADMIN_TOKEN=${SERVICE_PASSWORD_64_ADMIN}

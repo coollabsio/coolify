@@ -1,5 +1,6 @@
 # documentation: https://glitchtip.com
 # slogan: GlitchTip is a self-hosted, open-source error tracking system.
+# category: monitoring
 # tags: error, tracking, open-source, self-hosted, sentry
 # logo: svgs/glitchtip.png
 # port: 8080
@@ -35,11 +36,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_GLITCHTIP_8080
+      - SERVICE_URL_GLITCHTIP_8080
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
       - SECRET_KEY=$SERVICE_BASE64_64_ENCRYPTION
       - EMAIL_URL=${EMAIL_URL:-consolemail://}
-      - GLITCHTIP_DOMAIN=${SERVICE_FQDN_GLITCHTIP}
+      - GLITCHTIP_DOMAIN=${SERVICE_URL_GLITCHTIP}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-test@example.com}
       - CELERY_WORKER_AUTOSCALE=${CELERY_WORKER_AUTOSCALE:-1,3}
       - CELERY_WORKER_MAX_TASKS_PER_CHILD=${CELERY_WORKER_MAX_TASKS_PER_CHILD:-10000}
@@ -50,7 +51,7 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-  
+
   worker:
     image: glitchtip/glitchtip
     command: ./bin/run-celery-with-beat.sh
@@ -63,7 +64,7 @@ services:
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
       - SECRET_KEY=$SERVICE_BASE64_64_ENCRYPTION
       - EMAIL_URL=${EMAIL_URL:-consolemail://}
-      - GLITCHTIP_DOMAIN=${SERVICE_FQDN_GLITCHTIP}
+      - GLITCHTIP_DOMAIN=${SERVICE_URL_GLITCHTIP}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-test@example.com}
       - CELERY_WORKER_AUTOSCALE=${CELERY_WORKER_AUTOSCALE:-1,3}
       - CELERY_WORKER_MAX_TASKS_PER_CHILD=${CELERY_WORKER_MAX_TASKS_PER_CHILD:-10000}

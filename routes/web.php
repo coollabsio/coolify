@@ -74,10 +74,8 @@ use App\Livewire\Team\AdminView as TeamAdminView;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
-use App\Models\GitlabApp;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Providers\RouteServiceProvider;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -147,7 +145,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
     });
 
-    Route::get('/terminal', TerminalIndex::class)->name('terminal');
+    Route::get('/terminal', TerminalIndex::class)->name('terminal')->middleware('can.access.terminal');
     Route::post('/terminal/auth', function () {
         if (auth()->check()) {
             return response()->json(['authenticated' => true], 200);
@@ -175,13 +173,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects', ProjectIndex::class)->name('project.index');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
-        Route::get('/edit', ProjectEdit::class)->name('project.edit');
+        Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
-        Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me');
-        Route::get('/new', ResourceCreate::class)->name('project.resource.create');
-        Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit');
+        Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
+        Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
+        Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
@@ -205,14 +203,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment', DeploymentIndex::class)->name('project.application.deployment.index');
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.application.command')->middleware('can.access.terminal');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
         Route::get('/environment-variables', DatabaseConfiguration::class)->name('project.database.environment-variables');
         Route::get('/servers', DatabaseConfiguration::class)->name('project.database.servers');
-        Route::get('/import-backups', DatabaseConfiguration::class)->name('project.database.import-backups');
+        Route::get('/import-backups', DatabaseConfiguration::class)->name('project.database.import-backups')->middleware('can.update.resource');
         Route::get('/persistent-storage', DatabaseConfiguration::class)->name('project.database.persistent-storage');
         Route::get('/webhooks', DatabaseConfiguration::class)->name('project.database.webhooks');
         Route::get('/resource-limits', DatabaseConfiguration::class)->name('project.database.resource-limits');
@@ -222,7 +220,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', DatabaseConfiguration::class)->name('project.database.danger');
 
         Route::get('/logs', Logs::class)->name('project.database.logs');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
     });
@@ -236,7 +234,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
@@ -258,10 +256,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
-        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command');
+        Route::get('/terminal', ExecuteContainerCommand::class)->name('server.command')->middleware('can.access.terminal');
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
-        Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security');
-        Route::get('/security/patches', Patches::class)->name('server.security.patches');
+        Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
+        Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
@@ -283,13 +281,6 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
-    Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
-        $gitlab_app = GitlabApp::ownedByCurrentTeam()->where('uuid', request()->gitlab_app_uuid)->firstOrFail();
-
-        return view('source.gitlab.show', [
-            'gitlab_app' => $gitlab_app,
-        ]);
-    })->name('source.gitlab.show');
 });
 
 Route::middleware(['auth'])->group(function () {

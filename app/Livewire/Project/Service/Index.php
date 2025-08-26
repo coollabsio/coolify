@@ -5,11 +5,14 @@ namespace App\Livewire\Project\Service;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     public ?Service $service = null;
 
     public ?ServiceApplication $serviceApplication = null;
@@ -36,6 +39,7 @@ class Index extends Component
             if (! $this->service) {
                 return redirect()->route('dashboard');
             }
+            $this->authorize('view', $this->service);
             $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
             if ($service) {
                 $this->serviceApplication = $service;
@@ -52,7 +56,12 @@ class Index extends Component
 
     public function generateDockerCompose()
     {
-        $this->service->parse();
+        try {
+            $this->authorize('update', $this->service);
+            $this->service->parse();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function render()

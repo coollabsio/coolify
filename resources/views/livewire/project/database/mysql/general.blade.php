@@ -7,10 +7,10 @@
             </x-forms.button>
         </div>
         <div class="flex gap-2">
-            <x-forms.input label="Name" id="database.name" />
-            <x-forms.input label="Description" id="database.description" />
+            <x-forms.input label="Name" id="database.name" canGate="update" :canResource="$database" />
+            <x-forms.input label="Description" id="database.description" canGate="update" :canResource="$database" />
             <x-forms.input label="Image" id="database.image" required
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/mysql'>https://hub.docker.com/_/mysql</a>" />
+                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/mysql'>https://hub.docker.com/_/mysql</a>" canGate="update" :canResource="$database" />
         </div>
         <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
             automations (like backups) won't work.
@@ -18,43 +18,43 @@
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
                 <x-forms.input label="Root Password" id="database.mysql_root_password" type="password" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
                 <x-forms.input label="Normal User" id="database.mysql_user" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
                 <x-forms.input label="Normal User Password" id="database.mysql_password" type="password" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
+                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." canGate="update" :canResource="$database" />
             </div>
             <div class="flex flex-col gap-2">
                 <x-forms.input label="Initial Database" id="database.mysql_database"
                     placeholder="If empty, it will be the same as Username." readonly
-                    helper="You can only change this in the database." />
+                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @else
             <div class="flex xl:flex-row flex-col gap-4 pb-2">
                 <x-forms.input label="Root Password" id="database.mysql_root_password" type="password"
-                    helper="You can only change this in the database." />
+                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
                 <x-forms.input label="Normal User" id="database.mysql_user" required
-                    helper="You can only change this in the database." />
+                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
                 <x-forms.input label="Normal User Password" id="database.mysql_password" type="password" required
-                    helper="You can only change this in the database." />
+                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
             <div class="flex flex-col gap-2">
                 <x-forms.input label="Initial Database" id="database.mysql_database"
                     placeholder="If empty, it will be the same as Username."
-                    helper="You can only change this in the database." />
+                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
             </div>
         @endif
         <div class="pt-2">
             <x-forms.input
                 helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                 placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-                id="database.custom_docker_run_options" label="Custom Docker Options" />
+                id="database.custom_docker_run_options" label="Custom Docker Options" canGate="update" :canResource="$database" />
         </div>
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
+                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" canGate="update" :canResource="$database" />
             </div>
             <x-forms.input label="MySQL URL (internal)"
                 helper="If you change the user/password/port, this could be different. This is with the default values."
@@ -98,7 +98,7 @@
                 <div class="w-64">
                     @if (str($database->status)->contains('exited'))
                         <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
-                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" canGate="update" :canResource="$database" />
                     @else
                         <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
                             wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" disabled
@@ -110,7 +110,7 @@
                         @if (str($database->status)->contains('exited'))
                             <x-forms.select id="database.ssl_mode" label="SSL Mode" wire:model.live="database.ssl_mode"
                                 instantSave="instantSaveSSL"
-                                helper="Choose the SSL verification mode for MySQL connections">
+                                helper="Choose the SSL verification mode for MySQL connections" canGate="update" :canResource="$database">
                                 <option value="PREFERRED" title="Prefer secure connections">Prefer (secure)</option>
                                 <option value="REQUIRED" title="Require secure connections">Require (secure)</option>
                                 <option value="VERIFY_CA" title="Verify CA certificate">Verify CA (secure)</option>
@@ -151,16 +151,16 @@
                         </x-slide-over>
                     @endif
                 </div>
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" canGate="update" :canResource="$database" />
             </div>
             <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                id="database.public_port" label="Public Port" />
+                id="database.public_port" label="Public Port" canGate="update" :canResource="$database" />
         </div>
-        <x-forms.textarea label="Custom Mysql Configuration" rows="10" id="database.mysql_conf" />
+        <x-forms.textarea label="Custom Mysql Configuration" rows="10" id="database.mysql_conf" canGate="update" :canResource="$database" />
         <h3 class="pt-4">Advanced</h3>
         <div class="flex flex-col">
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" canGate="update" :canResource="$database" />
         </div>
     </form>
 </div>

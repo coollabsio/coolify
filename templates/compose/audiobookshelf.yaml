@@ -1,5 +1,6 @@
 # documentation: https://www.audiobookshelf.org/
 # slogan: Self-hosted audiobook, ebook, and podcast server
+# category: media
 # tags: audiobooks, ebooks, podcasts, server, self-hosted
 # logo: svgs/audiobookshelf.svg
 # port: 80
@@ -8,7 +9,7 @@ services:
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:latest
     environment:
-      - SERVICE_FQDN_AUDIOBOOKSHELF_80
+      - SERVICE_URL_AUDIOBOOKSHELF_80
       - TZ=${TIMEZONE:-America/Toronto}
     volumes:
       - audiobookshelf-audiobooks:/audiobooks

@@ -3,12 +3,15 @@
 namespace App\Livewire\Project\Application\Preview;
 
 use App\Models\Application;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class Form extends Component
 {
+    use AuthorizesRequests;
+
     public Application $application;
 
     #[Validate('required')]
@@ -27,6 +30,7 @@ class Form extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->application);
             $this->resetErrorBag();
             $this->validate();
             $this->application->preview_url_template = str_replace(' ', '', $this->previewUrlTemplate);
@@ -41,6 +45,7 @@ class Form extends Component
     public function resetToDefault()
     {
         try {
+            $this->authorize('update', $this->application);
             $this->application->preview_url_template = '{{pr_id}}.{{domain}}';
             $this->previewUrlTemplate = $this->application->preview_url_template;
             $this->application->save();

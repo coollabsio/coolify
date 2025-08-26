@@ -1,5 +1,6 @@
 # documentation: https://actualbudget.org/docs/install/docker
 # slogan: A local-first personal finance app.
+# category: productivity
 # tags: budgeting,actual,finance,budget,money,expenses,income
 # logo: svgs/actualbudget.png
 # port: 5006
@@ -8,7 +9,7 @@ services:
   actual_server:
     image: actualbudget/actual-server:latest
     environment:
-      - SERVICE_FQDN_ACTUAL_5006
+      - SERVICE_URL_ACTUAL_5006
       - ACTUAL_LOGIN_METHOD=password
     volumes:
       - actual_data:/data

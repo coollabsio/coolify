@@ -237,11 +237,18 @@ function removeOldBackups($backup): void
 {
     try {
         if ($backup->executions) {
-            $localBackupsToDelete = deleteOldBackupsLocally($backup);
-            if ($localBackupsToDelete->isNotEmpty()) {
+            // If local backup is disabled, mark all executions as having local storage deleted
+            if ($backup->disable_local_backup && $backup->save_s3) {
                 $backup->executions()
-                    ->whereIn('id', $localBackupsToDelete->pluck('id'))
+                    ->where('local_storage_deleted', false)
                     ->update(['local_storage_deleted' => true]);
+            } else {
+                $localBackupsToDelete = deleteOldBackupsLocally($backup);
+                if ($localBackupsToDelete->isNotEmpty()) {
+                    $backup->executions()
+                        ->whereIn('id', $localBackupsToDelete->pluck('id'))
+                        ->update(['local_storage_deleted' => true]);
+                }
             }
         }
 
@@ -254,10 +261,18 @@ function removeOldBackups($backup): void
             }
         }
 
-        $backup->executions()
-            ->where('local_storage_deleted', true)
-            ->where('s3_storage_deleted', true)
-            ->delete();
+        // Delete executions where both local and S3 storage are marked as deleted
+        // or where only S3 is enabled and S3 storage is deleted
+        if ($backup->disable_local_backup && $backup->save_s3) {
+            $backup->executions()
+                ->where('s3_storage_deleted', true)
+                ->delete();
+        } else {
+            $backup->executions()
+                ->where('local_storage_deleted', true)
+                ->where('s3_storage_deleted', true)
+                ->delete();
+        }
 
     } catch (\Exception $e) {
         throw $e;

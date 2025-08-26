@@ -1,30 +1,77 @@
 # documentation: https://langfuse.com/docs
 # slogan: Langfuse is an open-source LLM engineering platform that helps teams collaboratively debug, analyze, and iterate on their LLM applications.
+# category: ai
 # tags: ai, qdrant, weaviate, langchain, openai, gpt, llm, lmops, langfuse, llmops, tracing, observation, metrics
-# logo: svgs/langfuse.png
+# logo: svgs/langfuse.svg
 # port: 3000
+
+x-app-env: &app-env
+  - NEXTAUTH_URL=${SERVICE_URL_LANGFUSE}
+  - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse-db}
+  - SALT=${SERVICE_PASSWORD_SALT}
+  - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_LANGFUSE}
+  - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
+  - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
+  - CLICKHOUSE_MIGRATION_URL=clickhouse://clickhouse:9000
+  - CLICKHOUSE_URL=http://clickhouse:8123
+  - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
+  - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+  - CLICKHOUSE_CLUSTER_ENABLED=false
+  - LANGFUSE_USE_AZURE_BLOB=${LANGFUSE_USE_AZURE_BLOB:-false}
+  - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=${LANGFUSE_S3_EVENT_UPLOAD_BUCKET:-langfuse}
+  - LANGFUSE_S3_EVENT_UPLOAD_REGION=${LANGFUSE_S3_EVENT_UPLOAD_REGION:-auto}
+  - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID}
+  - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY}
+  - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=${LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT}
+  - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=${LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE:-true}
+  - LANGFUSE_S3_EVENT_UPLOAD_PREFIX=${LANGFUSE_S3_EVENT_UPLOAD_PREFIX:-events/}
+  - LANGFUSE_S3_MEDIA_UPLOAD_BUCKET=${LANGFUSE_S3_MEDIA_UPLOAD_BUCKET:-langfuse}
+  - LANGFUSE_S3_MEDIA_UPLOAD_REGION=${LANGFUSE_S3_MEDIA_UPLOAD_REGION:-auto}
+  - LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID=${LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID}
+  - LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=${LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY}
+  - LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT}
+  - LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE=${LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE:-true}
+  - LANGFUSE_S3_MEDIA_UPLOAD_PREFIX=${LANGFUSE_S3_MEDIA_UPLOAD_PREFIX:-media/}
+  - LANGFUSE_S3_BATCH_EXPORT_ENABLED=${LANGFUSE_S3_BATCH_EXPORT_ENABLED:-false}
+  - LANGFUSE_S3_BATCH_EXPORT_BUCKET=${LANGFUSE_S3_BATCH_EXPORT_BUCKET:-langfuse}
+  - LANGFUSE_S3_BATCH_EXPORT_PREFIX=${LANGFUSE_S3_BATCH_EXPORT_PREFIX:-exports/}
+  - LANGFUSE_S3_BATCH_EXPORT_REGION=${LANGFUSE_S3_BATCH_EXPORT_REGION:-auto}
+  - LANGFUSE_S3_BATCH_EXPORT_ENDPOINT=${LANGFUSE_S3_BATCH_EXPORT_ENDPOINT}
+  - LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT=${LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT}
+  - LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID=${LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID}
+  - LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY=${LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY}
+  - LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE=${LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE:-true}
+  - LANGFUSE_INGESTION_QUEUE_DELAY_MS=${LANGFUSE_INGESTION_QUEUE_DELAY_MS:-1}
+  - LANGFUSE_INGESTION_CLICKHOUSE_WRITE_INTERVAL_MS=${LANGFUSE_INGESTION_CLICKHOUSE_WRITE_INTERVAL_MS:-1000}
+  - REDIS_HOST=redis
+  - REDIS_PORT=6379
+  - REDIS_AUTH=${SERVICE_PASSWORD_REDIS}
+  - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-admin@example.com}
+  - SMTP_CONNECTION_URL=${SMTP_CONNECTION_URL:-}
+  - NEXTAUTH_SECRET=${SERVICE_BASE64_NEXTAUTHSECRET}
+  - AUTH_DISABLE_SIGNUP=${AUTH_DISABLE_SIGNUP:-true}
+  - HOSTNAME=${HOSTNAME:-0.0.0.0}
+  - LANGFUSE_INIT_ORG_ID=${LANGFUSE_INIT_ORG_ID:-my-org}
+  - LANGFUSE_INIT_ORG_NAME=${LANGFUSE_INIT_ORG_NAME:-My Org}
+  - LANGFUSE_INIT_PROJECT_ID=${LANGFUSE_INIT_PROJECT_ID:-my-project}
+  - LANGFUSE_INIT_PROJECT_NAME=${LANGFUSE_INIT_PROJECT_NAME:-My Project}
+  - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-admin@example.com}
+  - LANGFUSE_INIT_USER_NAME=${SERVICE_USER_LANGFUSE}
+  - LANGFUSE_INIT_USER_PASSWORD=${SERVICE_PASSWORD_LANGFUSE}
 
 services:
   langfuse:
-    image: langfuse/langfuse:2
+    image: langfuse/langfuse:3
+    depends_on: &langfuse-depends-on
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
     environment:
-      - SERVICE_FQDN_LANGFUSE_3000
-      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse}
-      - DIRECT_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-langfuse}
-      - SALT=$SERVICE_PASSWORD_SALT
-      - AUTH_DISABLE_SIGNUP=${AUTH_DISABLE_SIGNUP:-false}
-      - NEXTAUTH_URL=$SERVICE_FQDN_LANGFUSE_3000
-      - NEXTAUTH_SECRET=${SERVICE_BASE64_64_NEXTAUTHSECRET}
-      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
-      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
-      - HOSTNAME=${HOSTNAME:-0.0.0.0}
-      - LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME:-Admin}
-      - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL:-admin@example.com}
-      - LANGFUSE_INIT_USER_PASSWORD=${SERVICE_PASSWORD_LANGFUSE}
-      - LANGFUSE_INIT_ORG_ID=${LANGFUSE_INIT_ORG_ID:-my-org}
-      - LANGFUSE_INIT_ORG_NAME=${LANGFUSE_INIT_ORG_NAME:-My Org}
-      - LANGFUSE_INIT_PROJECT_ID=${LANGFUSE_INIT_PROJECT_ID:-my-project}
-      - LANGFUSE_INIT_PROJECT_NAME=${LANGFUSE_INIT_PROJECT_NAME:-My Project}
+      <<: *app-env
+      SERVICE_URL_LANGFUSE_3000: ${SERVICE_URL_LANGFUSE_3000}
     healthcheck:
       test:
         - CMD
@@ -35,21 +82,54 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
-    depends_on:
-      postgres:
-        condition: service_healthy
-  postgres:
-    image: "postgres:16-alpine"
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-langfuse}
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      <<: *app-env
+    depends_on: *langfuse-depends-on
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-langfuse-db}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
     volumes:
-      - "pg-data:/var/lib/postgresql/data"
+      - langfuse_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test:
         - CMD-SHELL
         - "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8
+    command: ["sh", "-c", "redis-server --requirepass \"$SERVICE_PASSWORD_REDIS\""]
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$SERVICE_PASSWORD_REDIS", "PING"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    user: "101:101"
+    environment:
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-default}
+      - CLICKHOUSE_USER=${SERVICE_USER_CLICKHOUSE}
+      - CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
       interval: 5s
       timeout: 5s
       retries: 10

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -40,9 +41,9 @@ use Visus\Cuid2\Cuid2;
 )]
 class Service extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasSafeStringAttribute, SoftDeletes;
 
-    private static $parserVersion = '4';
+    private static $parserVersion = '5';
 
     protected $guarded = [];
 
@@ -255,6 +256,19 @@ class Service extends BaseModel
                 continue;
             }
             switch ($image) {
+                case $image->contains('drizzle-team/gateway'):
+                    $data = collect([]);
+                    $masterpass = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_DRIZZLE')->first();
+                    $data = $data->merge([
+                        'Master Password' => [
+                            'key' => data_get($masterpass, 'key'),
+                            'value' => data_get($masterpass, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Drizzle', $data->toArray());
+                    break;
                 case $image->contains('castopod'):
                     $data = collect([]);
                     $disable_https = $this->environment_variables()->where('key', 'CP_DISABLE_HTTPS')->first();
@@ -1277,7 +1291,7 @@ class Service extends BaseModel
     public function parse(bool $isNew = false): Collection
     {
         if ((int) $this->compose_parsing_version >= 3) {
-            return newParser($this);
+            return serviceParser($this);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile($this, $isNew);
         } else {

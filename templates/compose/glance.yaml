@@ -1,5 +1,6 @@
 # documentation: https://github.com/glanceapp/glance
 # slogan: A self-hosted dashboard that puts all your feeds in one place.
+# category: monitoring
 # tags: dashboard, server, applications, interface, rrss
 # logo: svgs/glance.png
 # port: 8080
@@ -8,7 +9,7 @@ services:
   glance:
     image: glanceapp/glance:latest
     environment:
-      - SERVICE_FQDN_GLANCE_8080
+      - SERVICE_URL_GLANCE_8080
     volumes:
       - ./config:/app/config
       - type: bind

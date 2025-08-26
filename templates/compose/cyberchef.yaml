@@ -1,5 +1,6 @@
 # documentation: https://github.com/gchq/CyberChef
 # slogan: The Cyber Swiss Army Knife - a web app for encryption, encoding, compression and data analysis
+# category: security
 # tags: encryption, encoding, compression, data analysis, tools, development
 # logo: svgs/cyberchef.jpeg
 # port: 80
@@ -9,7 +10,7 @@ services:
     image: ghcr.io/gchq/cyberchef:latest
     platform: linux/amd64
     environment:
-      - SERVICE_FQDN_CYBERCHEF_80
+      - SERVICE_URL_CYBERCHEF_80
     volumes:
       - cyberchef-data:/app/data
     healthcheck:

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Events\SentinelRestarted;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -61,5 +62,8 @@ class StartSentinel
         $server->settings->is_sentinel_enabled = true;
         $server->settings->save();
         $server->sentinelHeartbeat();
+
+        // Dispatch event to notify UI components
+        SentinelRestarted::dispatch($server, $version);
     }
 }

@@ -31,7 +31,7 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
             if ($response->successful()) {
                 $services = $response->json();
-                File::put(base_path('templates/service-templates.json'), json_encode($services));
+                File::put(base_path('templates/'.config('constants.services.file_name')), json_encode($services));
             } else {
                 send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
             }

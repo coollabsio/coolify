@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasSafeStringAttribute, SoftDeletes;
 
     protected $guarded = [];
 
@@ -320,7 +321,10 @@ class StandalonePostgresql extends BaseModel
         }
         $metrics = json_decode($metrics, true);
         $parsedCollection = collect($metrics)->map(function ($metric) {
-            return [(int) $metric['time'], (float) $metric['percent']];
+            return [
+                (int) $metric['time'],
+                (float) ($metric['percent'] ?? 0.0),
+            ];
         });
 
         return $parsedCollection->toArray();

@@ -18,7 +18,7 @@
                 shortConfirmationLabel="Database Name" />
         @endif
     </div>
-    <div class="w-48 pb-2">
+    <div class="w-64 pb-2">
         <x-forms.checkbox instantSave label="Backup Enabled" id="backupEnabled" />
         @if ($s3s->count() > 0)
             <x-forms.checkbox instantSave label="S3 Enabled" id="saveS3" />
@@ -26,11 +26,18 @@
             <x-forms.checkbox instantSave helper="No validated S3 storage available." label="S3 Enabled" id="saveS3"
                 disabled />
         @endif
+        @if ($backup->save_s3)
+            <x-forms.checkbox instantSave label="Disable Local Backup" id="disableLocalBackup"
+                helper="When enabled, backup files will be deleted from local storage immediately after uploading to S3. This requires S3 backup to be enabled." />
+        @else
+            <x-forms.checkbox disabled label="Disable Local Backup" id="disableLocalBackup"
+                helper="When enabled, backup files will be deleted from local storage immediately after uploading to S3. This requires S3 backup to be enabled." />
+        @endif
     </div>
     @if ($backup->save_s3)
         <div class="pb-6">
             <x-forms.select id="s3StorageId" label="S3 Storage" required>
-                <option value="default">Select a S3 storage</option>
+                <option value="default" disabled>Select a S3 storage</option>
                 @foreach ($s3s as $s3)
                     <option value="{{ $s3->id }}">{{ $s3->name }}</option>
                 @endforeach
@@ -77,6 +84,7 @@
             <x-forms.input label="Frequency" id="frequency" />
             <x-forms.input label="Timezone" id="timezone" disabled
                 helper="The timezone of the server where the backup is scheduled to run (if not set, the instance timezone will be used)" />
+            <x-forms.input label="Timeout" id="timeout" helper="The timeout of the backup job in seconds." />
         </div>
 
         <h3 class="mt-6 mb-2 text-lg font-medium">Backup Retention Settings</h3>

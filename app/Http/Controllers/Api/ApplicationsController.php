@@ -15,6 +15,8 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
@@ -738,6 +740,8 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
 
+        $this->authorize('create', Application::class);
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
@@ -831,8 +835,8 @@ class ApplicationsController extends Controller
         $destination = $destinations->first();
         if ($type === 'public') {
             $validationRules = [
-                'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'docker_compose_location' => 'string',
@@ -883,7 +887,7 @@ class ApplicationsController extends Controller
                 $application->source_type = GithubApp::class;
                 $application->source_id = GithubApp::find(0)->id;
             }
-            $application->git_repository = $repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2);
+            $application->git_repository = str($repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2))->trim()->toString();
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
@@ -935,7 +939,7 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-gh-app') {
             $validationRules = [
                 'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'github_app_uuid' => 'string|required',
@@ -1043,7 +1047,7 @@ class ApplicationsController extends Controller
                 $application->docker_compose_domains = $dockerComposeDomainsJson;
             }
             $application->fqdn = $fqdn;
-            $application->git_repository = $gitRepository;
+            $application->git_repository = str($gitRepository)->trim()->toString();
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
@@ -1090,8 +1094,8 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-deploy-key') {
 
             $validationRules = [
-                'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'private_key_uuid' => 'string|required',
@@ -1519,6 +1523,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
+        $this->authorize('view', $application);
+
         return response()->json($this->removeSensitiveData($application));
     }
 
@@ -1697,12 +1703,14 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $application);
+
         DeleteResourceJob::dispatch(
             resource: $application,
-            deleteConfigurations: $request->query->get('delete_configurations', true),
             deleteVolumes: $request->query->get('delete_volumes', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true)
         );
 
         return response()->json([
@@ -1854,6 +1862,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('update', $application);
+
         $server = $application->destination->server;
         $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network'];
 
@@ -2138,6 +2149,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('view', $application);
+
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
         $envs = $envs->map(function ($env) {
@@ -2252,6 +2266,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
@@ -2442,6 +2459,8 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        $this->authorize('manageEnvironment', $application);
+
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json([
@@ -2626,6 +2645,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
@@ -2776,6 +2798,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Application::class)
             ->where('resourceable_id', $application->id)
@@ -2879,6 +2904,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
+        $this->authorize('deploy', $application);
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
@@ -2971,6 +2998,9 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $this->authorize('deploy', $application);
+
         StopApplication::dispatch($application);
 
         return response()->json(
@@ -3047,6 +3077,8 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $this->authorize('deploy', $application);
 
         $deployment_uuid = new Cuid2;
 

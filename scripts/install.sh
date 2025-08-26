@@ -849,7 +849,7 @@ IPV6_PUBLIC_IP=$(curl -6s https://ifconfig.io || true)
 
 echo -e "\nYour instance is ready to use!\n"
 if [ -n "$IPV4_PUBLIC_IP" ]; then
-    echo -e "You can access Coolify through your Public IPV4: http://[$IPV4_PUBLIC_IP]:8000"
+    echo -e "You can access Coolify through your Public IPV4: http://$IPV4_PUBLIC_IP:8000"
 fi
 if [ -n "$IPV6_PUBLIC_IP" ]; then
     echo -e "You can access Coolify through your Public IPv6: http://[$IPV6_PUBLIC_IP]:8000"
