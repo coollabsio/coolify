@@ -1,5 +1,6 @@
 # documentation: https://posthog.com
 # slogan: The single platform to analyze, test, observe, and deploy new features
+# category: analytics
 # tags: analytics, product, open-source, self-hosted, ab-testing, event-tracking
 # logo: svgs/posthog.svg
 # minversion: 4.0.0-beta.222
@@ -1922,7 +1923,7 @@ services:
 
           loop()
     environment:
-      - SERVICE_FQDN_WEB_8000
+      - SERVICE_URL_WEB_8000
       - OPT_OUT_CAPTURING=true
       - DISABLE_SECURE_SSL_REDIRECT=true
       - IS_BEHIND_PROXY=true
@@ -1938,7 +1939,7 @@ services:
       - PGUSER=posthog
       - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
       - DEPLOYMENT=hobby
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
       - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
@@ -1966,7 +1967,7 @@ services:
       - PGUSER=posthog
       - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
       - DEPLOYMENT=hobby
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
       - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
@@ -1998,7 +1999,7 @@ services:
       - CLICKHOUSE_DATABASE=posthog
       - CLICKHOUSE_SECURE=false
       - CLICKHOUSE_VERIFY=false
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
       - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
@@ -2027,7 +2028,7 @@ services:
   #     - PGUSER=posthog
   #     - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
   #     - DEPLOYMENT=hobby
-  #     - SITE_URL=$SERVICE_FQDN_WEB
+  #     - SITE_URL=$SERVICE_URL_WEB
   #     - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
   #     - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
   #   depends_on:
@@ -2111,7 +2112,7 @@ services:
       - PGUSER=posthog
       - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
       - DEPLOYMENT=hobby
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
       - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
       - TEMPORAL_HOST=temporal

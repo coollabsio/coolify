@@ -1,5 +1,6 @@
 # documentation: https://marimo.io/
 # slogan: An open-source reactive notebook for Python — reproducible, git-friendly, SQL built-in, executable as a script, and shareable as an app.
+# category: devtools
 # tags: notebook, python, data, analysis
 # logo: svgs/marimo.svg
 # port: 8080
@@ -8,7 +9,7 @@ services:
   marimo:
     image: ghcr.io/marimo-team/marimo:latest-sql
     environment:
-      - SERVICE_FQDN_MARIMO_8080
+      - SERVICE_URL_MARIMO_8080
       - TOKEN_PASSWORD=$SERVICE_PASSWORD_MARIMO
     volumes:
       - "marimo:/app"

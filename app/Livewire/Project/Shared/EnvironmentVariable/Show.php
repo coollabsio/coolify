@@ -5,11 +5,12 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
 use App\Traits\EnvironmentVariableProtection;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Show extends Component
 {
-    use EnvironmentVariableProtection;
+    use AuthorizesRequests, EnvironmentVariableProtection;
 
     public $parameters;
 
@@ -73,6 +74,11 @@ class Show extends Component
         if ($this->type === 'standalone-redis' && ($this->env->key === 'REDIS_PASSWORD' || $this->env->key === 'REDIS_USERNAME')) {
             $this->is_redis_credential = true;
         }
+    }
+
+    public function getResourceProperty()
+    {
+        return $this->env->resourceable ?? $this->env;
     }
 
     public function refresh()
@@ -140,6 +146,8 @@ class Show extends Component
 
     public function lock()
     {
+        $this->authorize('update', $this->env);
+
         $this->env->is_shown_once = true;
         if ($this->isSharedVariable) {
             unset($this->env->is_required);
@@ -158,6 +166,8 @@ class Show extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->env);
+
             if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
                 $this->value = $oldValue;
@@ -179,9 +189,11 @@ class Show extends Component
     public function delete()
     {
         try {
+            $this->authorize('delete', $this->env);
+
             // Check if the variable is used in Docker Compose
-            if ($this->type === 'service' || $this->type === 'application' && $this->env->resource()?->docker_compose) {
-                [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resource()?->docker_compose);
+            if ($this->type === 'service' || $this->type === 'application' && $this->env->resourceable?->docker_compose) {
+                [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resourceable?->docker_compose);
 
                 if ($isUsed) {
                     $this->dispatch('error', "Cannot delete environment variable '{$this->env->key}' <br><br>Please remove it from the Docker Compose file first.");

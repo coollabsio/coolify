@@ -143,12 +143,13 @@ class Bitbucket extends Controller
                                 ]);
                                 $pr_app->generate_preview_fqdn_compose();
                             } else {
-                                ApplicationPreview::create([
+                                $pr_app = ApplicationPreview::create([
                                     'git_type' => 'bitbucket',
                                     'application_id' => $application->id,
                                     'pull_request_id' => $pull_request_id,
                                     'pull_request_html_url' => $pull_request_html_url,
                                 ]);
+                                $pr_app->generate_preview_fqdn();
                             }
                         }
                         $result = queue_application_deployment(

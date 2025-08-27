@@ -13,6 +13,7 @@ on:
       - docker/testing-host/Dockerfile
       - templates/**
       - CHANGELOG.md
+      - backlog/**
 
 env:
   GITHUB_REGISTRY: ghcr.io

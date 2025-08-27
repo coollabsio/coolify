@@ -1,5 +1,6 @@
 # documentation: https://www.traccar.org/documentation/
 # slogan: Traccar is a free and open source modern GPS tracking system.
+# category: monitoring
 # tags: traccar,gps,tracking,open,source
 # logo: svgs/traccar.png
 # port: 8082
@@ -8,8 +9,8 @@ services:
   traccar:
     image: traccar/traccar:latest
     environment:
-      - SERVICE_FQDN_TRACCAR_8082
-      - SERVICE_FQDN_TRACCARAPI_5159
+      - SERVICE_URL_TRACCAR_8082
+      - SERVICE_URL_TRACCARAPI_5159
       - CONFIG_USE_ENVIRONMENT_VARIABLES=${CONFIG_USE_ENVIRONMENT_VARIABLES:-true}
       - DATABASE_USER=${SERVICE_USER_POSTGRES}
       - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}

@@ -1,7 +1,9 @@
 <div x-init="$wire.loadImages">
     <div class="flex items-center gap-2">
         <h2>Rollback</h2>
-        <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
+        @can('view', $application)
+            <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
+        @endcan
     </div>
     <div class="pb-4 ">You can easily rollback to a previously built (local) images
         quickly.</div>
@@ -26,16 +28,18 @@
                             <div class="text-xs">{{ $date }}</div>
                         </div>
                         <div class="flex justify-end p-2">
-                            @if (data_get($image, 'is_current'))
-                                <x-forms.button disabled tooltip="This image is currently running.">
-                                    Rollback
-                                </x-forms.button>
-                            @else
-                                <x-forms.button class="dark:bg-coolgray-100"
-                                    wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
-                                    Rollback
-                                </x-forms.button>
-                            @endif
+                            @can('deploy', $application)
+                                @if (data_get($image, 'is_current'))
+                                    <x-forms.button disabled tooltip="This image is currently running.">
+                                        Rollback
+                                    </x-forms.button>
+                                @else
+                                    <x-forms.button class="dark:bg-coolgray-100"
+                                        wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
+                                        Rollback
+                                    </x-forms.button>
+                                @endif
+                            @endcan
                         </div>
                     </div>
                 </div>

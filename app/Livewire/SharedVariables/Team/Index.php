@@ -3,10 +3,13 @@
 namespace App\Livewire\SharedVariables\Team;
 
 use App\Models\Team;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     public Team $team;
 
     protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey',  'environmentVariableDeleted' => '$refresh'];
@@ -14,6 +17,8 @@ class Index extends Component
     public function saveKey($data)
     {
         try {
+            $this->authorize('update', $this->team);
+
             $found = $this->team->environment_variables()->where('key', $data['key'])->first();
             if ($found) {
                 throw new \Exception('Variable already exists.');

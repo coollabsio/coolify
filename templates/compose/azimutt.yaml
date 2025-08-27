@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://docs.azimutt.app/
 # slogan: Next-Gen ERD: Design, Explore, Document and Analyze your database.
+# category: productivity
 # tags: erd, entity-relationship diagram, database tool, database schema, diagram
 # logo: svgs/azimutt.png
 # port: 4000
@@ -54,8 +55,8 @@ services:
     image: bytemark/smtp:latest
     platform: linux/amd64
     environment:
-      - SERVICE_FQDN_SMTP
-      - RELAY_HOST=$SERVICE_FQDN_SMTP
+      - SERVICE_URL_SMTP
+      - RELAY_HOST=$SERVICE_URL_SMTP
       - RELAY_PORT=${RELAY_PORT:-587}
       - RELAY_USERNAME=$SERVICE_EMAIL_SMTP
       - RELAY_PASSWORD=$SERVICE_PASSWORD_SMTP
@@ -75,7 +76,7 @@ services:
       minio:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_AZIMUTT_4000
+      - SERVICE_URL_AZIMUTT_4000
       - SENTRY=false
       - PHX_SERVER=true
       - PHX_HOST=$SERVICE_URL_AZIMUTT
@@ -92,7 +93,7 @@ services:
       - S3_KEY_ID=${S3_KEY_ID}
       - S3_KEY_SECRET=${S3_KEY_SECRET}
       - EMAIL_ADAPTER=${EMAIL_ADAPTER:-smtp}
-      - SMTP_RELAY=$SERVICE_FQDN_SMTP
+      - SMTP_RELAY=$SERVICE_URL_SMTP
       - SMTP_USERNAME=$SERVICE_EMAIL_SMTP
       - SMTP_PASSWORD=$SERVICE_PASSWORD_SMTP
       - SMTP_PORT=${SMTP_PORT:-587}

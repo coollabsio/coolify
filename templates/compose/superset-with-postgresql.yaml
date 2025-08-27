@@ -1,5 +1,6 @@
 # documentation: https://github.com/amancevice/docker-superset
 # slogan: Modern data exploration and visualization platform (unofficial community docker image)
+# category: analytics
 # tags: analytics,bi,dashboard,database,sql,unofficial
 # logo: svgs/superset.svg
 # port: 8088
@@ -8,7 +9,7 @@ services:
   superset:
     image: amancevice/superset:latest
     environment:
-      - SERVICE_FQDN_SUPERSET_8088
+      - SERVICE_URL_SUPERSET_8088
       - SECRET_KEY=${SERVICE_BASE64_64_SUPERSETSECRETKEY}
       - MAPBOX_API_KEY=${MAPBOX_API_KEY}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}

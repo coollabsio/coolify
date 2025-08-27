@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\InstanceSettings;
 use App\Models\ServiceDatabase;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,8 @@ use Livewire\Component;
 
 class Database extends Component
 {
+    use AuthorizesRequests;
+
     public ServiceDatabase $database;
 
     public ?string $db_url_public = null;
@@ -40,24 +43,31 @@ class Database extends Component
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
-        if ($this->database->is_public) {
-            $this->db_url_public = $this->database->getServiceDatabaseUrl();
+        try {
+            $this->parameters = get_route_parameters();
+            $this->authorize('view', $this->database);
+            if ($this->database->is_public) {
+                $this->db_url_public = $this->database->getServiceDatabaseUrl();
+            }
+            $this->refreshFileStorages();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->refreshFileStorages();
     }
 
     public function delete($password)
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
-        }
-
         try {
+            $this->authorize('delete', $this->database);
+
+            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+                if (! Hash::check($password, Auth::user()->password)) {
+                    $this->addError('password', 'The provided password is incorrect.');
+
+                    return;
+                }
+            }
+
             $this->database->delete();
             $this->dispatch('success', 'Database deleted.');
 
@@ -69,24 +79,35 @@ class Database extends Component
 
     public function instantSaveExclude()
     {
-        $this->submit();
+        try {
+            $this->authorize('update', $this->database);
+            $this->submit();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function instantSaveLogDrain()
     {
-        if (! $this->database->service->destination->server->isLogDrainEnabled()) {
-            $this->database->is_log_drain_enabled = false;
-            $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
+        try {
+            $this->authorize('update', $this->database);
+            if (! $this->database->service->destination->server->isLogDrainEnabled()) {
+                $this->database->is_log_drain_enabled = false;
+                $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
-            return;
+                return;
+            }
+            $this->submit();
+            $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->submit();
-        $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
     }
 
     public function convertToApplication()
     {
         try {
+            $this->authorize('update', $this->database);
             $service = $this->database->service;
             $serviceDatabase = $this->database;
 
@@ -122,28 +143,33 @@ class Database extends Component
 
     public function instantSave()
     {
-        if ($this->database->is_public && ! $this->database->public_port) {
-            $this->dispatch('error', 'Public port is required.');
-            $this->database->is_public = false;
-
-            return;
-        }
-        if ($this->database->is_public) {
-            if (! str($this->database->status)->startsWith('running')) {
-                $this->dispatch('error', 'Database must be started to be publicly accessible.');
+        try {
+            $this->authorize('update', $this->database);
+            if ($this->database->is_public && ! $this->database->public_port) {
+                $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
 
                 return;
             }
-            StartDatabaseProxy::run($this->database);
-            $this->db_url_public = $this->database->getServiceDatabaseUrl();
-            $this->dispatch('success', 'Database is now publicly accessible.');
-        } else {
-            StopDatabaseProxy::run($this->database);
-            $this->db_url_public = null;
-            $this->dispatch('success', 'Database is no longer publicly accessible.');
+            if ($this->database->is_public) {
+                if (! str($this->database->status)->startsWith('running')) {
+                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                    $this->database->is_public = false;
+
+                    return;
+                }
+                StartDatabaseProxy::run($this->database);
+                $this->db_url_public = $this->database->getServiceDatabaseUrl();
+                $this->dispatch('success', 'Database is now publicly accessible.');
+            } else {
+                StopDatabaseProxy::run($this->database);
+                $this->db_url_public = null;
+                $this->dispatch('success', 'Database is no longer publicly accessible.');
+            }
+            $this->submit();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->submit();
     }
 
     public function refreshFileStorages()
@@ -154,11 +180,13 @@ class Database extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->database);
             $this->validate();
             $this->database->save();
             updateCompose($this->database);
             $this->dispatch('success', 'Database saved.');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         } finally {
             $this->dispatch('generateDockerCompose');
         }

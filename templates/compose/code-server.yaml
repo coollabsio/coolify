@@ -1,5 +1,6 @@
 # documentation: https://coder.com/docs/code-server/latest
 # slogan: Code-Server is a web-based code editor that enables remote coding and collaboration from any device, anywhere.
+# category: devtools
 # tags: code, editor, remote, collaboration
 # logo: svgs/code-server.svg
 # port: 8443
@@ -8,7 +9,7 @@ services:
   code-server:
     image: lscr.io/linuxserver/code-server:latest
     environment:
-      - SERVICE_FQDN_CODESERVER_8443
+      - SERVICE_URL_CODESERVER_8443
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

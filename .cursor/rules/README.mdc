@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Complete guide to Coolify Cursor rules and development patterns
+globs: .cursor/rules/*.mdc
 alwaysApply: false
 ---
 # Coolify Cursor Rules - Complete Guide
@@ -18,6 +18,7 @@ This comprehensive set of Cursor Rules provides deep insights into **Coolify**, 
 
 ### 🎨 Frontend Development
 - **[frontend-patterns.mdc](mdc:.cursor/rules/frontend-patterns.mdc)** - Livewire + Alpine.js + Tailwind architecture
+- **[form-components.mdc](mdc:.cursor/rules/form-components.mdc)** - Enhanced form components with built-in authorization
 
 ### 🗄️ Data & Backend
 - **[database-patterns.mdc](mdc:.cursor/rules/database-patterns.mdc)** - Database architecture, models, and data management

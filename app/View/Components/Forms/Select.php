@@ -4,6 +4,7 @@ namespace App\View\Components\Forms;
 
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -19,9 +20,19 @@ class Select extends Component
         public ?string $helper = null,
         public bool $required = false,
         public bool $disabled = false,
-        public string $defaultClass = 'select w-full'
+        public string $defaultClass = 'select w-full',
+        public ?string $canGate = null,
+        public mixed $canResource = null,
+        public bool $autoDisable = true,
     ) {
-        //
+        // Handle authorization-based disabling
+        if ($this->canGate && $this->canResource && $this->autoDisable) {
+            $hasPermission = Gate::allows($this->canGate, $this->canResource);
+
+            if (! $hasPermission) {
+                $this->disabled = true;
+            }
+        }
     }
 
     /**

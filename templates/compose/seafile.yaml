@@ -1,5 +1,6 @@
 # documentation: https://manual.seafile.com
 # slogan: Open source cloud storage system for file sync, share and document collaboration
+# category: storage
 # tags: file-manager,file-sharing,storage
 # logo: svgs/seafile.svg
 # port: 80
@@ -10,7 +11,7 @@ services:
     volumes:
       - seafile-data:/shared
     environment:
-      - SERVICE_FQDN_SEAFILE_80
+      - SERVICE_URL_SEAFILE_80
       - SEAFILE_SERVER_HOSTNAME=${SERVICE_URL_SEAFILE_80}
       - DB_HOST=mariadb
       - DB_PORT=3306
