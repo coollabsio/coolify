@@ -998,7 +998,7 @@ class Application extends BaseModel
                 $git_clone_command = "{$git_clone_command} sed -i \"s#git@\(.*\):#https://\\1/#g\" {$baseDir}/.gitmodules || true &&";
             }
             // Add shallow submodules flag if shallow clone is enabled
-            $submoduleFlags = $isShallowCloneEnabled ? '--shallow-submodules' : '';
+            $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
             $git_clone_command = "{$git_clone_command} GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive {$submoduleFlags}; fi";
         }
         if ($this->settings->is_git_lfs_enabled) {
