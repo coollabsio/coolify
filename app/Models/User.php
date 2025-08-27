@@ -53,6 +53,7 @@ class User extends Authenticatable implements SendsEmail
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
+        'email_change_code_expires_at' => 'datetime',
     ];
 
     protected static function boot()
@@ -203,6 +204,16 @@ class User extends Authenticatable implements SendsEmail
         return $this->belongsToMany(Team::class)->withPivot('role');
     }
 
+    public function changelogReads()
+    {
+        return $this->hasMany(UserChangelogRead::class);
+    }
+
+    public function getUnreadChangelogCount(): int
+    {
+        return app(\App\Services\ChangelogService::class)->getUnreadCountForUser($this);
+    }
+
     public function getRecipients(): array
     {
         return [$this->email];
@@ -309,5 +320,78 @@ class User extends Authenticatable implements SendsEmail
         $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
         return data_get($user, 'pivot.role');
+    }
+
+    public function requestEmailChange(string $newEmail): void
+    {
+        // Generate 6-digit code
+        $code = sprintf('%06d', mt_rand(0, 999999));
+
+        // Set expiration using config value
+        $expiryMinutes = config('constants.email_change.verification_code_expiry_minutes', 10);
+        $expiresAt = Carbon::now()->addMinutes($expiryMinutes);
+
+        $this->update([
+            'pending_email' => $newEmail,
+            'email_change_code' => $code,
+            'email_change_code_expires_at' => $expiresAt,
+        ]);
+
+        // Send verification email to new address
+        $this->notify(new \App\Notifications\TransactionalEmails\EmailChangeVerification($this, $code, $newEmail, $expiresAt));
+    }
+
+    public function isEmailChangeCodeValid(string $code): bool
+    {
+        return $this->email_change_code === $code
+            && $this->email_change_code_expires_at
+            && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    public function confirmEmailChange(string $code): bool
+    {
+        if (! $this->isEmailChangeCodeValid($code)) {
+            return false;
+        }
+
+        $oldEmail = $this->email;
+        $newEmail = $this->pending_email;
+
+        // Update email and clear change request fields
+        $this->update([
+            'email' => $newEmail,
+            'pending_email' => null,
+            'email_change_code' => null,
+            'email_change_code_expires_at' => null,
+        ]);
+
+        // For cloud users, dispatch job to update Stripe customer email asynchronously
+        if (isCloud() && $this->currentTeam()->subscription) {
+            dispatch(new \App\Jobs\UpdateStripeCustomerEmailJob(
+                $this->currentTeam(),
+                $this->id,
+                $newEmail,
+                $oldEmail
+            ));
+        }
+
+        return true;
+    }
+
+    public function clearEmailChangeRequest(): void
+    {
+        $this->update([
+            'pending_email' => null,
+            'email_change_code' => null,
+            'email_change_code_expires_at' => null,
+        ]);
+    }
+
+    public function hasEmailChangeRequest(): bool
+    {
+        return ! is_null($this->pending_email)
+            && ! is_null($this->email_change_code)
+            && $this->email_change_code_expires_at
+            && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
 }

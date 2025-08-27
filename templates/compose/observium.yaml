@@ -1,5 +1,6 @@
 # documentation: https://docs.observium.org/
 # slogan: Observium is a comprehensive network monitoring platform designed to deliver powerful monitoring capabilities, combined with an elegant and intuitive user interface.
+# category: monitoring
 # tags: networking, monitoring
 # logo: svgs/observium.webp
 # port: 80
@@ -12,7 +13,7 @@ services:
       - observium_logs:/opt/observium/logs
       - observium_rrd:/opt/observium/rrd
     environment:
-      - SERVICE_FQDN_OBSERVIUM=${SERVICE_FQDN_OBSERVIUM}
+      - SERVICE_URL_OBSERVIUM=${SERVICE_URL_OBSERVIUM}
       - OBSERVIUM_ADMIN_PASS=${SERVICE_PASSWORD_OBSERVIUMADMIN}
       - OBSERVIUM_ADMIN_USER=${SERVICE_USER_OBSERVIUMADMIN}
       - OBSERVIUM_DB_HOST=mariadb

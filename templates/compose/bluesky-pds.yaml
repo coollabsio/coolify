@@ -1,34 +1,65 @@
-# ignore: true
 # documentation: https://github.com/bluesky-social/pds
-# slogan: A social network for the decentralized web
-# tags: pds, bluesky, social, network, decentralized
-# logo:
+# slogan: Bluesky PDS (Personal Data Server)
+# category: backend
+# tags: bluesky, pds, platform
+# logo: svgs/bluesky.svg
 # port: 3000
 
 services:
   pds:
-    image: ghcr.io/bluesky-social/pds:0.4
+    image: 'ghcr.io/bluesky-social/pds:latest'
     volumes:
-      - pds-data:/pds
+      - ./pds-data:/pds
     environment:
-      - SERVICE_FQDN_PDS_3000
-      - PDS_JWT_SECRET=${SERVICE_BASE64_PDS}
-      - PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_PDS}
-      - PDS_ADMIN_EMAIL=${PDS_ADMIN_EMAIL:-admin@example.com}
-      - PDS_DATADIR=${PDS_DATADIR:-/pds}
-      - PDS_BLOBSTORE_DISK_LOCATION=${PDS_DATADIR:-/pds}/blocks
-      - PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-52428800}
+      - SERVICE_URL_PDS_3000
       - PDS_HOSTNAME=${SERVICE_URL_PDS}
-      - PDS_DID_PLC_URL=https://plc.directory
-      - PDS_BSKY_APP_VIEW_URL=https://api.bsky.app
-      - PDS_BSKY_APP_VIEW_DID=did:web:api.bsky.app
-      - PDS_REPORT_SERVICE_URL=https://mod.bsky.app
-      - PDS_REPORT_SERVICE_DID=did:plc:ar7c4by46qjdydhdevvrndac
-      - PDS_CRAWLERS=https://bsky.network
+      - PDS_JWT_SECRET=${SERVICE_PASSWORD_JWT_SECRET}
+      - PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - PDS_ADMIN_EMAIL=${SERVICE_EMAIL_ADMIN}
+      - PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX}
+      - PDS_DATA_DIRECTORY=${PDS_DATA_DIRECTORY:-/pds}
+      - PDS_BLOBSTORE_DISK_LOCATION=${PDS_DATA_DIRECTORY:-/pds}/blocks
+      - PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-52428800}
+      - PDS_DID_PLC_URL=${PDS_DID_PLC_URL:-https://plc.directory}
+      - PDS_BSKY_APP_VIEW_URL=${PDS_BSKY_APP_VIEW_URL:-https://api.bsky.app}
+      - PDS_BSKY_APP_VIEW_DID=${PDS_BSKY_APP_VIEW_DID:-did:web:api.bsky.app}
+      - PDS_REPORT_SERVICE_URL=${PDS_REPORT_SERVICE_URL:-https://mod.bsky.app/xrpc/com.atproto.moderation.createReport}
+      - PDS_REPORT_SERVICE_DID=${PDS_REPORT_SERVICE_DID:-did:plc:ar7c4by46qjdydhdevvrndac}
+      - PDS_CRAWLERS=${PDS_CRAWLERS:-https://bsky.network}
       - LOG_ENABLED=${LOG_ENABLED:-true}
-      - PDS_EMAIL_SMTP_URL=${PDS_EMAIL_SMTP_URL:-smtp://localhost:8025}
-      - PDS_EMAIL_FROM_ADDRESS=${PDS_EMAIL_FROM_ADDRESS:-admin@example.com}
-      - PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${SERVICE_HEX_32_ROTATIONKEY}
+
+    command: >
+      sh -c '
+        echo "Installing curl, bash, and pdsadmin..."
+        apk add --no-cache curl bash && \
+        curl -o /usr/local/bin/pdsadmin.sh https://raw.githubusercontent.com/bluesky-social/pds/main/pdsadmin.sh && \
+        chmod +x /usr/local/bin/pdsadmin.sh && \
+        ln -sf /usr/local/bin/pdsadmin.sh /usr/local/bin/pdsadmin
+
+        echo "Generating /pds/pds.env..."
+        printf "%s\n" \
+        "SERVICE_FQDN_PDS_3000=$${SERVICE_FQDN_PDS_3000}" \
+        "PDS_HOSTNAME=$${PDS_HOSTNAME}" \
+        "PDS_JWT_SECRET=$${PDS_JWT_SECRET}" \
+        "PDS_ADMIN_PASSWORD=$${PDS_ADMIN_PASSWORD}" \
+        "PDS_ADMIN_EMAIL=$${PDS_ADMIN_EMAIL}" \
+        "PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=$${PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX}" \
+        "PDS_DATA_DIRECTORY=$${PDS_DATA_DIRECTORY}" \
+        "PDS_BLOBSTORE_DISK_LOCATION=$${PDS_DATA_DIRECTORY}/blocks" \
+        "PDS_BLOB_UPLOAD_LIMIT=$${PDS_BLOB_UPLOAD_LIMIT}" \
+        "PDS_DID_PLC_URL=$${PDS_DID_PLC_URL}" \
+        "PDS_BSKY_APP_VIEW_URL=$${PDS_BSKY_APP_VIEW_URL}" \
+        "PDS_BSKY_APP_VIEW_DID=$${PDS_BSKY_APP_VIEW_DID}" \
+        "PDS_REPORT_SERVICE_URL=$${PDS_REPORT_SERVICE_URL}" \
+        "PDS_REPORT_SERVICE_DID=$${PDS_REPORT_SERVICE_DID}" \
+        "PDS_CRAWLERS=$${PDS_CRAWLERS}" \
+        "LOG_ENABLED=$${LOG_ENABLED}" \
+        > /pds/pds.env
+
+        echo "Launching PDS..."
+        exec node --enable-source-maps index.js
+      '
+
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://127.0.0.1:3000/xrpc/_health"]
       interval: 2s

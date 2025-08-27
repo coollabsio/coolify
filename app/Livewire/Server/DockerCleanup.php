@@ -4,11 +4,14 @@ namespace App\Livewire\Server;
 
 use App\Jobs\DockerCleanupJob;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class DockerCleanup extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public array $parameters = [];
@@ -42,6 +45,7 @@ class DockerCleanup extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
+            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->force_docker_cleanup = $this->forceDockerCleanup;
             $this->server->settings->docker_cleanup_frequency = $this->dockerCleanupFrequency;
@@ -71,7 +75,8 @@ class DockerCleanup extends Component
     public function manualCleanup()
     {
         try {
-            DockerCleanupJob::dispatch($this->server, true);
+            $this->authorize('update', $this->server);
+            DockerCleanupJob::dispatch($this->server, true, $this->deleteUnusedVolumes, $this->deleteUnusedNetworks);
             $this->dispatch('success', 'Manual cleanup job started. Depending on the amount of data, this might take a while.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

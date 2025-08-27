@@ -1,5 +1,6 @@
 # documentation: https://directus.io
 # slogan: Directus wraps databases with a dynamic API, and provides an intuitive app for managing its content.
+# category: cms
 # tags: directus, cms, database, sql
 # logo: svgs/directus.svg
 # port: 8055
@@ -13,7 +14,7 @@ services:
       - directus-extensions:/directus/extensions
       - directus-templates:/directus/templates
     environment:
-      - SERVICE_FQDN_DIRECTUS_8055
+      - SERVICE_URL_DIRECTUS_8055
       - KEY=$SERVICE_BASE64_64_KEY
       - SECRET=$SERVICE_BASE64_64_SECRET
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}

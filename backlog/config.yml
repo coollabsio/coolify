@@ -1,0 +1,16 @@
+project_name: "Coolify"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: []
+milestones: []
+date_format: yyyy-mm-dd
+max_column_width: 20
+default_editor: "vim"
+auto_open_browser: true
+default_port: 6420
+remote_operations: true
+auto_commit: false
+zero_padded_ids: 5
+bypass_git_hooks: true
+check_active_branches: true
+active_branch_days: 30

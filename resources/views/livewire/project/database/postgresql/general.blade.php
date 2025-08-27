@@ -16,14 +16,14 @@
     <form wire:submit="submit" class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
             <h2>General</h2>
-            <x-forms.button type="submit">
+            <x-forms.button type="submit" canGate="update" :canResource="$database">
                 Save
             </x-forms.button>
         </div>
         <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-            <x-forms.input label="Name" id="database.name" />
-            <x-forms.input label="Description" id="database.description" />
-            <x-forms.input label="Image" id="database.image" required
+            <x-forms.input label="Name" id="database.name" canGate="update" :canResource="$database" />
+            <x-forms.input label="Description" id="database.description" canGate="update" :canResource="$database" />
+            <x-forms.input label="Image" id="database.image" required canGate="update" :canResource="$database"
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
         </div>
         <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
@@ -32,8 +32,10 @@
         @if ($database->started_at)
             <div class="flex xl:flex-row flex-col gap-2">
                 <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres"
+                    canGate="update" :canResource="$database"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
                 <x-forms.input label="Password" id="database.postgres_password" type="password" required
+                    canGate="update" :canResource="$database"
                     helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
                 <x-forms.input label="Initial Database" id="database.postgres_db"
                     placeholder="If empty, it will be the same as Username." readonly
@@ -41,27 +43,30 @@
             </div>
         @else
             <div class="flex xl:flex-row flex-col gap-2 pb-2">
-                <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres" />
-                <x-forms.input label="Password" id="database.postgres_password" type="password" required />
+                <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres"
+                    canGate="update" :canResource="$database" />
+                <x-forms.input label="Password" id="database.postgres_password" type="password" required
+                    canGate="update" :canResource="$database" />
                 <x-forms.input label="Initial Database" id="database.postgres_db"
-                    placeholder="If empty, it will be the same as Username." />
+                    placeholder="If empty, it will be the same as Username." canGate="update" :canResource="$database" />
             </div>
         @endif
         <div class="flex gap-2">
-            <x-forms.input label="Initial Database Arguments" id="database.postgres_initdb_args"
-                placeholder="If empty, use default. See in docker docs." />
-            <x-forms.input label="Host Auth Method" id="database.postgres_host_auth_method"
-                placeholder="If empty, use default. See in docker docs." />
+            <x-forms.input label="Initial Database Arguments" canGate="update" :canResource="$database"
+                id="database.postgres_initdb_args" placeholder="If empty, use default. See in docker docs." />
+            <x-forms.input label="Host Auth Method" canGate="update" :canResource="$database"
+                id="database.postgres_host_auth_method" placeholder="If empty, use default. See in docker docs." />
         </div>
         <x-forms.input
             helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
             placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-            id="database.custom_docker_run_options" label="Custom Docker Options" />
+            id="database.custom_docker_run_options" label="Custom Docker Options" canGate="update" :canResource="$database" />
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
+                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
+                    canGate="update" :canResource="$database" />
             </div>
 
             <x-forms.input label="Postgres URL (internal)"
@@ -81,7 +86,8 @@
                         :actions="[
                             'The SSL certificate of this database will be regenerated.',
                             'You must restart the database after regenerating the certificate to start using the new certificate.',
-                        ]" submitAction="regenerateSslCertificate" :confirmWithText="false" :confirmWithPassword="false" />
+                        ]" submitAction="regenerateSslCertificate" :confirmWithText="false"
+                        :confirmWithPassword="false" />
                 @endif
             </div>
             @if ($database->enable_ssl && $certificateValidUntil)
@@ -102,7 +108,8 @@
                 <div class="w-64" wire:key='enable_ssl'>
                     @if ($database->isExited())
                         <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
-                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" />
+                            wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" canGate="update"
+                            :canResource="$database" />
                     @else
                         <x-forms.checkbox id="database.enable_ssl" label="Enable SSL"
                             wire:model.live="database.enable_ssl" instantSave="instantSaveSSL" disabled
@@ -114,7 +121,8 @@
                         @if ($database->isExited())
                             <x-forms.select id="database.ssl_mode" label="SSL Mode"
                                 wire:model.live="database.ssl_mode" instantSave="instantSaveSSL"
-                                helper="Choose the SSL verification mode for PostgreSQL connections">
+                                helper="Choose the SSL verification mode for PostgreSQL connections" canGate="update"
+                                :canResource="$database">
                                 <option value="allow" title="Allow insecure connections">allow (insecure)</option>
                                 <option value="prefer" title="Prefer secure connections">prefer (secure)</option>
                                 <option value="require" title="Require secure connections">require (secure)</option>
@@ -153,15 +161,16 @@
                         @endif
                     </div>
                     <div class="flex flex-col gap-2 w-64">
-                        <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
+                        <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available"
+                            canGate="update" :canResource="$database" />
                     </div>
                     <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                        id="database.public_port" label="Public Port" />
+                        id="database.public_port" label="Public Port" canGate="update" :canResource="$database" />
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10"
-                        id="database.postgres_conf" />
+                        id="database.postgres_conf" canGate="update" :canResource="$database" />
                 </div>
     </form>
 
@@ -169,23 +178,27 @@
         <h3>Advanced</h3>
         <div class="flex flex-col">
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs"
+                canGate="update" :canResource="$database" />
         </div>
 
         <div class="pb-16">
             <div class="flex items-center gap-2 pb-2">
+
                 <h3>Initialization scripts</h3>
-                <x-modal-input buttonTitle="+ Add" title="New Init Script">
-                    <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='save_new_init_script'>
-                        <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename"
-                            required />
-                        <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
-                            label="Content" required />
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </form>
-                </x-modal-input>
+                @can('update', $database)
+                    <x-modal-input buttonTitle="+ Add" title="New Init Script">
+                        <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='save_new_init_script'>
+                            <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename"
+                                required />
+                            <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
+                                label="Content" required />
+                            <x-forms.button type="submit">
+                                Save
+                            </x-forms.button>
+                        </form>
+                    </x-modal-input>
+                @endcan
             </div>
             <div class="flex flex-col gap-2">
                 @forelse(data_get($database,'init_scripts', []) as $script)

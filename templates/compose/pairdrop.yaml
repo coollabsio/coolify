@@ -1,5 +1,6 @@
 # documentation: https://pairdrop.net/
 # slogan: Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.
+# category: productivity
 # tags: file, sharing, collaboration, teamwork
 # logo: svgs/pairdrop.png
 # port: 3000
@@ -8,7 +9,7 @@ services:
   pairdrop:
     image: lscr.io/linuxserver/pairdrop:latest
     environment:
-      - SERVICE_FQDN_PAIRDROP_3000
+      - SERVICE_URL_PAIRDROP_3000
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

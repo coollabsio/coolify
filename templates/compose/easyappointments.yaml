@@ -1,5 +1,6 @@
 # documentation: https://easyappointments.org/
 # slogan: Schedule Anything. Let's start with easy! Get the best free online appointment scheduler on your server, today.
+# category: productivity
 # tags: calendar, scheduling, database
 # logo: svgs/easyappointments.png
 # port: 80
@@ -8,8 +9,8 @@ services:
   easyappointments:
     image: alextselegidis/easyappointments:latest
     environment:
-      - SERVICE_FQDN_EASYAPPOINTMENTS_80
-      - BASE_URL=${SERVICE_FQDN_EASYAPPOINTMENTS}
+      - SERVICE_URL_EASYAPPOINTMENTS_80
+      - BASE_URL=${SERVICE_URL_EASYAPPOINTMENTS}
       - DB_HOST=mysql
       - DB_NAME=easyappointments
       - DB_USERNAME=root

@@ -4,6 +4,7 @@ namespace App\Livewire\Team;
 
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,8 @@ use Visus\Cuid2\Cuid2;
 
 class InviteLink extends Component
 {
+    use AuthorizesRequests;
+
     public string $email;
 
     public string $role = 'member';
@@ -40,6 +43,7 @@ class InviteLink extends Component
     private function generateInviteLink(bool $sendEmail = false)
     {
         try {
+            $this->authorize('manageInvitations', currentTeam());
             $this->validate();
             if (auth()->user()->role() === 'admin' && $this->role === 'owner') {
                 throw new \Exception('Admins cannot invite owners.');

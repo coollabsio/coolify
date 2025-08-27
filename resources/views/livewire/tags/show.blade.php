@@ -8,8 +8,8 @@
     <div class="flex flex-wrap gap-2 ">
         @forelse ($tags as $oneTag)
             <a :class="{{ $tag?->id == $oneTag->id }} && 'dark:bg-coollabs'"
-                class="w-32 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold  dark:hover:bg-coollabs-100 flex justify-center items-center"
-                href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
+                class="min-w-32 box-without-bg dark:bg-coolgray-100 dark:text-white font-bold dark:hover:bg-coollabs-100 flex justify-center items-center"
+                href="{{ route('tags.show', ['tagName' => $oneTag->name]) }}">{{ data_get_str($oneTag, 'name')->limit(30) }}</a>
         @empty
             <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
         @endforelse

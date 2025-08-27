@@ -30,18 +30,22 @@
                             </div>
                             <div class="flex items-center justify-center gap-2 text-xs font-bold">
                                 @if ($project->environments->first())
-                                    <a class="hover:underline" wire:click.stop
-                                        href="{{ route('project.resource.create', [
-                                            'project_uuid' => $project->uuid,
-                                            'environment_uuid' => $project->environments->first()->uuid,
-                                        ]) }}">
-                                        <span class="p-2 font-bold">+ Add Resource</span>
-                                    </a>
+                                    @can('createAnyResource')
+                                        <a class="hover:underline" wire:click.stop
+                                            href="{{ route('project.resource.create', [
+                                                'project_uuid' => $project->uuid,
+                                                'environment_uuid' => $project->environments->first()->uuid,
+                                            ]) }}">
+                                            <span class="p-2 font-bold">+ Add Resource</span>
+                                        </a>
+                                    @endcan
                                 @endif
-                                <a class="hover:underline" wire:click.stop
-                                    href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
-                                    Settings
-                                </a>
+                                @can('update', $project)
+                                    <a class="hover:underline" wire:click.stop
+                                        href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
+                                        Settings
+                                    </a>
+                                @endcan
                             </div>
                         </div>
                     </div>
@@ -129,10 +133,12 @@
                 @if (count($deploymentsPerServer) > 0)
                     <x-loading />
                 @endif
-                <x-modal-confirmation title="Confirm Cleanup Queues?" buttonTitle="Cleanup Queues" isErrorButton
-                    submitAction="cleanupQueue" :actions="['All running Deployment Queues will be cleaned up.']" :confirmWithText="false" :confirmWithPassword="false"
-                    step2ButtonText="Permanently Cleanup Deployment Queues" :dispatchEvent="true"
-                    dispatchEventType="success" dispatchEventMessage="Deployment Queues cleanup started." />
+                @can('cleanupDeploymentQueue', Application::class)
+                    <x-modal-confirmation title="Confirm Cleanup Queues?" buttonTitle="Cleanup Queues" isErrorButton
+                        submitAction="cleanupQueue" :actions="['All running Deployment Queues will be cleaned up.']" :confirmWithText="false" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Cleanup Deployment Queues" :dispatchEvent="true"
+                        dispatchEventType="success" dispatchEventMessage="Deployment Queues cleanup started." />
+                @endcan
             </div>
             <div wire:poll.3000ms="loadDeployments" class="grid grid-cols-1">
                 @forelse ($deploymentsPerServer as $serverName => $deployments)

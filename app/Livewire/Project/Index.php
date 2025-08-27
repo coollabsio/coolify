@@ -20,6 +20,7 @@ class Index extends Component
         $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
         $this->projects = Project::ownedByCurrentTeam()->get()->map(function ($project) {
             $project->settingsRoute = route('project.edit', ['project_uuid' => $project->uuid]);
+            $project->canUpdate = auth()->user()->can('update', $project);
 
             return $project;
         });

@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://github.com/dockur/macos
 # slogan: Run macOS in a containerized environment.
+# category: productivity
 # tags: macos, virtualization, container, os
 # logo: svgs/macos.svg
 # port: 8006
@@ -11,7 +12,7 @@ services:
     volumes:
       - macos-storage:/storage
     environment:
-      - SERVICE_FQDN_MACOS_8006
+      - SERVICE_URL_MACOS_8006
       - VERSION=15
     devices:
       - /dev/kvm:/dev/kvm

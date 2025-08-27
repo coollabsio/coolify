@@ -1,5 +1,6 @@
 # documentation: https://doc.evolution-api.com/v1/pt/get-started/introduction
 # slogan: Evolution API Installation with Postgres and Redis
+# category: backend
 # tags: evolution-api,evo-api,evolution,whatsapp,api,postgres,redis
 # logo: svgs/evolution-api.svg
 # port: 8080
@@ -13,8 +14,8 @@ services:
       - redis
       - postgres
     environment:
-      - SERVICE_FQDN_EVO_8080
-      - SERVER_URL=$SERVICE_FQDN_EVO
+      - SERVICE_URL_EVO_8080
+      - SERVER_URL=$SERVICE_URL_EVO
       - DB_TYPE=${DB_TYPE:-postgresdb}
       - 'DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}'
       - DB_POSTGRESDB_HOST=${DB_POSTGRESDB_HOST:-postgres}
@@ -105,10 +106,11 @@ services:
       - WEBHOOK_EVENTS_ERRORS_WEBHOOK=${WEBHOOK_EVENTS_ERRORS_WEBHOOK:-}
       - 'CONFIG_SESSION_PHONE_CLIENT=${CONFIG_SESSION_PHONE_CLIENT:-Evolution API V2}'
       - CONFIG_SESSION_PHONE_NAME=${CONFIG_SESSION_PHONE_NAME:-Chrome}
-      - CONFIG_SESSION_PHONE_VERSION=${CONFIG_SESSION_PHONE_VERSION:-2.3000.1020885143}
       - QRCODE_LIMIT=${QRCODE_LIMIT:-30}
       - OPENAI_ENABLED=${OPENAI_ENABLED:-true}
       - DIFY_ENABLED=${DIFY_ENABLED:-true}
+      - FLOWISE_ENABLED=${FLOWISE_ENABLED:-true}
+      - N8N_ENABLED=${N8N_ENABLED:-true}
       - TYPEBOT_ENABLED=${TYPEBOT_ENABLED:-true}
       - TYPEBOT_API_VERSION=${TYPEBOT_API_VERSION:-latest}
       - CHATWOOT_ENABLED=${CHATWOOT_ENABLED:-true}

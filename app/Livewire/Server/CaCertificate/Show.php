@@ -6,12 +6,15 @@ use App\Helpers\SslHelper;
 use App\Jobs\RegenerateSslCertJob;
 use App\Models\Server;
 use App\Models\SslCertificate;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     #[Locked]
     public Server $server;
 
@@ -52,6 +55,7 @@ class Show extends Component
     public function saveCaCertificate()
     {
         try {
+            $this->authorize('manageCaCertificate', $this->server);
             if (! $this->certificateContent) {
                 throw new \Exception('Certificate content cannot be empty.');
             }
@@ -82,6 +86,7 @@ class Show extends Component
     public function regenerateCaCertificate()
     {
         try {
+            $this->authorize('manageCaCertificate', $this->server);
             SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $this->server->id,

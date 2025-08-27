@@ -1,5 +1,6 @@
 # documentation: https://readeck.org/en/docs/
 # slogan: Simple web application that lets you save the precious readable content of web pages you like and want to keep forever.
+# category: productivity
 # tags: read-it-later,pocket-alternative,omnivore-alternative,instapaper-alternative
 # logo: svgs/readeck.svg
 # port: 8000
@@ -8,7 +9,7 @@ services:
   readeck:
     image: codeberg.org/readeck/readeck:latest
     environment:
-      - SERVICE_FQDN_READECK
+      - SERVICE_URL_READECK
       - READECK_USE_X_FORWARDED=${READECK_USE_X_FORWARDED:-true}
     volumes:
       - readeck_data:/readeck

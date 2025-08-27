@@ -183,12 +183,13 @@ class Github extends Controller
                                     ]);
                                     $pr_app->generate_preview_fqdn_compose();
                                 } else {
-                                    ApplicationPreview::create([
+                                    $pr_app = ApplicationPreview::create([
                                         'git_type' => 'github',
                                         'application_id' => $application->id,
                                         'pull_request_id' => $pull_request_id,
                                         'pull_request_html_url' => $pull_request_html_url,
                                     ]);
+                                    $pr_app->generate_preview_fqdn();
                                 }
                             }
 
