@@ -57,8 +57,6 @@ services:
         condition: service_completed_successfully
     volumes:
       - kibana-data:/usr/share/kibana/data
-    ports:
-      - 5601:5601
     healthcheck:
       test:
         ["CMD-SHELL", "curl --silent --fail http://localhost:5601/api/status"]
