@@ -1,0 +1,95 @@
+# documentation: https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install-kibana-with-docker
+# slogan: Elastic + Kibana is a Free and Open Source Search, Monitoring, and Visualization Stack
+# tags: elastic,kibana,elasticsearch,search,visualization,logging,monitoring,observability,analytics,stack,devops
+# logo: svgs/elasticsearch.svg
+# port: 5601
+
+services:
+  elasticsearch:
+    image: 'elastic/elasticsearch:9.1.2'
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - ELASTIC_USER=elastic # Default built-in superuser (can't be changed); included here to avoid confusion about the username
+      - 'ELASTIC_PASSWORD=${SERVICE_PASSWORD_ELASTICSEARCH}'
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m' # Limit JVM heap size to 512MB to prevent Elasticsearch from consuming all system memory
+      - discovery.type=single-node # Disable clustering; run as a standalone node (sufficient for most local or single-host setups)
+      - bootstrap.memory_lock=true # Prevent memory swapping by locking JVM memory (helps with performance/stability)
+      - xpack.security.http.ssl.enabled=false # SSL is unnecessary for HTTP traffic within the isolated Docker network
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro' # Sync container timezone with host
+      - 'elasticsearch-data:/usr/share/elasticsearch/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl --user elastic:${SERVICE_PASSWORD_ELASTICSEARCH} --silent --fail http://localhost:9200/_cluster/health'
+      interval: 10s
+      timeout: 10s
+      retries: 24
+  kibana:
+    image: 'kibana:9.1.2'
+    container_name: kibana
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_KIBANA_5601
+      - 'KIBANA_PASSWORD=${SERVICE_PASSWORD_KIBANA}'
+      - 'ELASTICSEARCH_SERVICEACCOUNTTOKEN=${ELASTICSEARCH_SERVICEACCOUNTTOKEN}' # Kibana authenticates to Elasticsearch using this service token
+      - 'SERVER_NAME=${SERVICE_FQDN_KIBANA}' # For generating links and setting cookie domains
+      - 'SERVER_PUBLICBASEURL=${SERVICE_URL_KIBANA}' # Public URL used in generated links (reporting, alerting, etc.)
+      - 'ELASTICSEARCH_HOSTS=http://elasticsearch:9200' # Connect Kibana to Elasticsearch Service
+      - XPACK.SECURITY.ENABLED=true # Enable authentication and authorization (required for service tokens, roles, etc.)
+      - 'XPACK_SECURITY_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKSECURITY}' # Required for encrypted session & auth tokens
+      - 'XPACK_REPORTING_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKREPORTING}' # Required for reporting (PDFs, PNGs)
+      - 'XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKENCRYPTEDSAVEDOBJECTS}' # Required for encrypting saved objects like alerts
+      - 'TELEMETRY_OPTIN=${TELEMETRY_OPTIN:-false}' # Disable telemetry by default (opt-in only)
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro' # Sync container timezone with host
+      - 'kibana-data:/usr/share/kibana/data'
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'" # Expect HTTP 302 (redirect) from Kibana login page
+      interval: 10s
+      timeout: 10s
+      retries: 120
+  kibana-token-generator:
+    image: 'alpine:latest'
+    container_name: kibana-token-generator
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    exclude_from_hc: true
+    environment:
+      - 'ELASTIC_PASSWORD=${SERVICE_PASSWORD_ELASTICSEARCH}' # Needed to authenticate the ELASTICSEARCH_SERVICEACCOUNTTOKEN creation request
+    entrypoint:
+      - sh
+      - '-c'
+      - |
+        apk add --no-cache curl jq >/dev/null 2>&1
+        echo "Generating Kibana service token..."
+
+        RESPONSE=$(curl -s -w "\n%{http_code}" -u elastic:"$${ELASTIC_PASSWORD}" -X POST "http://elasticsearch:9200/_security/service/elastic/kibana/credential/token/kibana-service-token")
+        HTTP_CODE=$$(echo "$${RESPONSE}" | tail -n1)
+        BODY=$$(echo "$${RESPONSE}" | head -n -1)
+
+        if [ "$${HTTP_CODE}" = "200" ]; then
+          CREATED=$$(echo "$${BODY}" | jq -r '.created')
+          if [ "$${CREATED}" = "true" ]; then
+            TOKEN_VALUE=$$(echo "$${BODY}" | jq -r '.token.value')
+            echo "Token created successfully:"
+            echo "$${TOKEN_VALUE}"
+          else
+            echo "Unexpected response, token not created:"
+            echo "$${BODY}"
+          fi
+        elif [ "$${HTTP_CODE}" = "409" ]; then
+          echo "Token already exists. Skipping token creation."
+        else
+          echo "Failed to create token. HTTP code: $${HTTP_CODE}"
+          echo "$${BODY}"
+          exit 1
+        fi
+    restart: 'no' # Run once to generate token, then exit
