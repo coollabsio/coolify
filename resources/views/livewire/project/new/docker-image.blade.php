@@ -6,6 +6,13 @@
             <h2>Docker Image</h2>
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
-        <x-forms.input rows="20" id="dockerImage" placeholder="nginx:latest"></x-forms.textarea>
+        <div class="space-y-4">
+            <x-forms.textarea 
+                id="dockerImage" 
+                placeholder="nginx:latest or ghcr.io/benjaminehowe/rail-disruptions:sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0"
+                helper="Enter a Docker image with tag or SHA256 hash. Examples:<br>• nginx:latest<br>• ghcr.io/user/app:v1.2.3<br>• sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0"
+                rows="3"
+            />
+        </div>
     </form>
 </div>

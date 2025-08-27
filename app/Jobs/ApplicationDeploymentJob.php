@@ -407,7 +407,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $this->dockerImageTag = $this->application->docker_registry_image_tag;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
+
+        // Check if this is an image hash deployment
+        $isImageHash = str($this->dockerImageTag)->startsWith('sha256-');
+        $displayName = $isImageHash ? "{$this->dockerImage}@sha256:".str($this->dockerImageTag)->after('sha256-') : "{$this->dockerImage}:{$this->dockerImageTag}";
+
+        $this->application_deployment_queue->addLogEntry("Starting deployment of {$displayName} to {$this->server->name}.");
         $this->generate_image_names();
         $this->prepare_builder_image();
         $this->generate_compose_file();
@@ -794,7 +799,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->production_image_name = "{$this->application->uuid}:latest";
             }
         } elseif ($this->application->build_pack === 'dockerimage') {
-            $this->production_image_name = "{$this->dockerImage}:{$this->dockerImageTag}";
+            // Check if this is an image hash deployment
+            if (str($this->dockerImageTag)->startsWith('sha256-')) {
+                $hash = str($this->dockerImageTag)->after('sha256-');
+                $this->production_image_name = "{$this->dockerImage}@sha256:{$hash}";
+            } else {
+                $this->production_image_name = "{$this->dockerImage}:{$this->dockerImageTag}";
+            }
         } elseif ($this->pull_request_id !== 0) {
             if ($this->application->docker_registry_image_name) {
                 $this->build_image_name = "{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build";

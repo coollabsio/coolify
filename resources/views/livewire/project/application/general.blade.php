@@ -166,12 +166,14 @@
                         @if ($application->destination->server->isSwarm())
                             <x-forms.input required id="application.docker_registry_image_name" label="Docker Image"
                                 x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag"
+                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag or Hash"
+                                helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input id="application.docker_registry_image_name" label="Docker Image"
                                 x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag"
+                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag or Hash"
+                                helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
                                 x-bind:disabled="!canUpdate" />
                         @endif
                     @else

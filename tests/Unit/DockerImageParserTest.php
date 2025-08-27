@@ -3,92 +3,113 @@
 namespace Tests\Unit;
 
 use App\Services\DockerImageParser;
-use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class DockerImageParserTest extends TestCase
 {
-    private DockerImageParser $parser;
-
-    protected function setUp(): void
+    public function test_parses_regular_image_with_tag()
     {
-        parent::setUp();
-        $this->parser = new DockerImageParser;
+        $parser = new DockerImageParser;
+        $parser->parse('nginx:latest');
+
+        $this->assertEquals('nginx', $parser->getImageName());
+        $this->assertEquals('latest', $parser->getTag());
+        $this->assertFalse($parser->isImageHash());
+        $this->assertEquals('nginx:latest', $parser->toString());
     }
 
-    #[Test]
-    public function it_parses_simple_image_name()
+    public function test_parses_image_with_sha256_hash()
     {
-        $this->parser->parse('nginx');
+        $parser = new DockerImageParser;
+        $hash = '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0';
+        $parser->parse("ghcr.io/benjaminehowe/rail-disruptions:{$hash}");
 
-        $this->assertEquals('', $this->parser->getRegistryUrl());
-        $this->assertEquals('nginx', $this->parser->getImageName());
-        $this->assertEquals('latest', $this->parser->getTag());
+        $this->assertEquals('ghcr.io/benjaminehowe/rail-disruptions', $parser->getFullImageNameWithoutTag());
+        $this->assertEquals($hash, $parser->getTag());
+        $this->assertTrue($parser->isImageHash());
+        $this->assertEquals("ghcr.io/benjaminehowe/rail-disruptions@sha256:{$hash}", $parser->toString());
+        $this->assertEquals("ghcr.io/benjaminehowe/rail-disruptions@sha256:{$hash}", $parser->getFullImageNameWithHash());
     }
 
-    #[Test]
-    public function it_parses_image_with_tag()
+    public function test_parses_registry_image_with_hash()
     {
-        $this->parser->parse('nginx:1.19');
+        $parser = new DockerImageParser;
+        $hash = 'abc123def456789abcdef123456789abcdef123456789abcdef123456789abc1';
+        $parser->parse("docker.io/library/nginx:{$hash}");
 
-        $this->assertEquals('', $this->parser->getRegistryUrl());
-        $this->assertEquals('nginx', $this->parser->getImageName());
-        $this->assertEquals('1.19', $this->parser->getTag());
+        $this->assertEquals('docker.io/library/nginx', $parser->getFullImageNameWithoutTag());
+        $this->assertEquals($hash, $parser->getTag());
+        $this->assertTrue($parser->isImageHash());
+        $this->assertEquals("docker.io/library/nginx@sha256:{$hash}", $parser->toString());
     }
 
-    #[Test]
-    public function it_parses_image_with_organization()
+    public function test_parses_image_without_tag_defaults_to_latest()
     {
-        $this->parser->parse('coollabs/coolify:latest');
+        $parser = new DockerImageParser;
+        $parser->parse('nginx');
 
-        $this->assertEquals('', $this->parser->getRegistryUrl());
-        $this->assertEquals('coollabs/coolify', $this->parser->getImageName());
-        $this->assertEquals('latest', $this->parser->getTag());
+        $this->assertEquals('nginx', $parser->getImageName());
+        $this->assertEquals('latest', $parser->getTag());
+        $this->assertFalse($parser->isImageHash());
+        $this->assertEquals('nginx:latest', $parser->toString());
     }
 
-    #[Test]
-    public function it_parses_image_with_registry_url()
+    public function test_parses_registry_with_port()
     {
-        $this->parser->parse('ghcr.io/coollabs/coolify:v4');
+        $parser = new DockerImageParser;
+        $parser->parse('registry.example.com:5000/myapp:latest');
 
-        $this->assertEquals('ghcr.io', $this->parser->getRegistryUrl());
-        $this->assertEquals('coollabs/coolify', $this->parser->getImageName());
-        $this->assertEquals('v4', $this->parser->getTag());
+        $this->assertEquals('registry.example.com:5000/myapp', $parser->getFullImageNameWithoutTag());
+        $this->assertEquals('latest', $parser->getTag());
+        $this->assertFalse($parser->isImageHash());
     }
 
-    #[Test]
-    public function it_parses_image_with_port_in_registry()
+    public function test_parses_registry_with_port_and_hash()
     {
-        $this->parser->parse('localhost:5000/my-app:dev');
+        $parser = new DockerImageParser;
+        $hash = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+        $parser->parse("registry.example.com:5000/myapp:{$hash}");
 
-        $this->assertEquals('localhost:5000', $this->parser->getRegistryUrl());
-        $this->assertEquals('my-app', $this->parser->getImageName());
-        $this->assertEquals('dev', $this->parser->getTag());
+        $this->assertEquals('registry.example.com:5000/myapp', $parser->getFullImageNameWithoutTag());
+        $this->assertEquals($hash, $parser->getTag());
+        $this->assertTrue($parser->isImageHash());
+        $this->assertEquals("registry.example.com:5000/myapp@sha256:{$hash}", $parser->toString());
     }
 
-    #[Test]
-    public function it_parses_image_without_tag()
+    public function test_identifies_valid_sha256_hashes()
     {
-        $this->parser->parse('ghcr.io/coollabs/coolify');
+        $parser = new DockerImageParser;
 
-        $this->assertEquals('ghcr.io', $this->parser->getRegistryUrl());
-        $this->assertEquals('coollabs/coolify', $this->parser->getImageName());
-        $this->assertEquals('latest', $this->parser->getTag());
+        // Valid SHA256 hashes
+        $validHashes = [
+            '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0',
+            '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+            'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        ];
+
+        foreach ($validHashes as $hash) {
+            $parser->parse("image:{$hash}");
+            $this->assertTrue($parser->isImageHash(), "Hash {$hash} should be recognized as valid SHA256");
+        }
     }
 
-    #[Test]
-    public function it_converts_back_to_string()
+    public function test_identifies_invalid_sha256_hashes()
     {
-        $originalString = 'ghcr.io/coollabs/coolify:v4';
-        $this->parser->parse($originalString);
+        $parser = new DockerImageParser;
 
-        $this->assertEquals($originalString, $this->parser->toString());
-    }
+        // Invalid SHA256 hashes
+        $invalidHashes = [
+            'latest',
+            'v1.2.3',
+            'abc123', // too short
+            '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf', // too short
+            '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf00', // too long
+            '59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cfg0', // invalid char
+        ];
 
-    #[Test]
-    public function it_converts_to_string_with_default_tag()
-    {
-        $this->parser->parse('nginx');
-        $this->assertEquals('nginx:latest', $this->parser->toString());
+        foreach ($invalidHashes as $hash) {
+            $parser->parse("image:{$hash}");
+            $this->assertFalse($parser->isImageHash(), "Hash {$hash} should not be recognized as valid SHA256");
+        }
     }
 }

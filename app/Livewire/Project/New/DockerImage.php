@@ -45,6 +45,10 @@ class DockerImage extends Component
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+
+        // Determine the image tag based on whether it's a hash or regular tag
+        $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
+
         $application = Application::create([
             'name' => 'docker-image-'.new Cuid2,
             'repository_project_id' => 0,
