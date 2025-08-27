@@ -16,6 +16,209 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
+function parseDockerVolumeString(string $volumeString): array
+{
+    $volumeString = trim($volumeString);
+    $source = null;
+    $target = null;
+    $mode = null;
+
+    // First, check if the source contains an environment variable with default value
+    // This needs to be done before counting colons because ${VAR:-value} contains a colon
+    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}/';
+    $hasEnvVarWithDefault = false;
+    $envVarEndPos = 0;
+
+    if (preg_match($envVarPattern, $volumeString, $matches)) {
+        $hasEnvVarWithDefault = true;
+        $envVarEndPos = strlen($matches[0]);
+    }
+
+    // Count colons, but exclude those inside environment variables
+    $effectiveVolumeString = $volumeString;
+    if ($hasEnvVarWithDefault) {
+        // Temporarily replace the env var to count colons correctly
+        $effectiveVolumeString = substr($volumeString, $envVarEndPos);
+        $colonCount = substr_count($effectiveVolumeString, ':');
+    } else {
+        $colonCount = substr_count($volumeString, ':');
+    }
+
+    if ($colonCount === 0) {
+        // Named volume without target (unusual but valid)
+        // Example: "myvolume"
+        $source = $volumeString;
+        $target = $volumeString;
+    } elseif ($colonCount === 1) {
+        // Simple volume mapping
+        // Examples: "gitea:/data" or "./data:/app/data" or "${VAR:-default}:/data"
+        if ($hasEnvVarWithDefault) {
+            $source = substr($volumeString, 0, $envVarEndPos);
+            $remaining = substr($volumeString, $envVarEndPos);
+            if (strlen($remaining) > 0 && $remaining[0] === ':') {
+                $target = substr($remaining, 1);
+            } else {
+                $target = $remaining;
+            }
+        } else {
+            $parts = explode(':', $volumeString);
+            $source = $parts[0];
+            $target = $parts[1];
+        }
+    } elseif ($colonCount === 2) {
+        // Volume with mode OR Windows path OR env var with mode
+        // Handle env var with mode first
+        if ($hasEnvVarWithDefault) {
+            // ${VAR:-default}:/path:mode
+            $source = substr($volumeString, 0, $envVarEndPos);
+            $remaining = substr($volumeString, $envVarEndPos);
+
+            if (strlen($remaining) > 0 && $remaining[0] === ':') {
+                $remaining = substr($remaining, 1);
+                $lastColon = strrpos($remaining, ':');
+
+                if ($lastColon !== false) {
+                    $possibleMode = substr($remaining, $lastColon + 1);
+                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+                    if (in_array($possibleMode, $validModes)) {
+                        $mode = $possibleMode;
+                        $target = substr($remaining, 0, $lastColon);
+                    } else {
+                        $target = $remaining;
+                    }
+                } else {
+                    $target = $remaining;
+                }
+            }
+        } elseif (preg_match('/^[A-Za-z]:/', $volumeString)) {
+            // Windows path as source (C:/, D:/, etc.)
+            // Find the second colon which is the real separator
+            $secondColon = strpos($volumeString, ':', 2);
+            if ($secondColon !== false) {
+                $source = substr($volumeString, 0, $secondColon);
+                $target = substr($volumeString, $secondColon + 1);
+            } else {
+                // Malformed, treat as is
+                $source = $volumeString;
+                $target = $volumeString;
+            }
+        } else {
+            // Not a Windows path, check for mode
+            $lastColon = strrpos($volumeString, ':');
+            $possibleMode = substr($volumeString, $lastColon + 1);
+
+            // Check if the last part is a valid Docker volume mode
+            $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+            if (in_array($possibleMode, $validModes)) {
+                // It's a mode
+                // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
+                $mode = $possibleMode;
+                $volumeWithoutMode = substr($volumeString, 0, $lastColon);
+                $colonPos = strpos($volumeWithoutMode, ':');
+
+                if ($colonPos !== false) {
+                    $source = substr($volumeWithoutMode, 0, $colonPos);
+                    $target = substr($volumeWithoutMode, $colonPos + 1);
+                } else {
+                    // Shouldn't happen for valid volume strings
+                    $source = $volumeWithoutMode;
+                    $target = $volumeWithoutMode;
+                }
+            } else {
+                // The last colon is part of the path
+                // For now, treat the first occurrence of : as the separator
+                $firstColon = strpos($volumeString, ':');
+                $source = substr($volumeString, 0, $firstColon);
+                $target = substr($volumeString, $firstColon + 1);
+            }
+        }
+    } else {
+        // More than 2 colons - likely Windows paths or complex cases
+        // Use a heuristic: find the most likely separator colon
+        // Look for patterns like "C:" at the beginning (Windows drive)
+        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
+            // Windows path as source
+            // Find the next colon after the drive letter
+            $secondColon = strpos($volumeString, ':', 2);
+            if ($secondColon !== false) {
+                $source = substr($volumeString, 0, $secondColon);
+                $remaining = substr($volumeString, $secondColon + 1);
+
+                // Check if there's a mode at the end
+                $lastColon = strrpos($remaining, ':');
+                if ($lastColon !== false) {
+                    $possibleMode = substr($remaining, $lastColon + 1);
+                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+                    if (in_array($possibleMode, $validModes)) {
+                        $mode = $possibleMode;
+                        $target = substr($remaining, 0, $lastColon);
+                    } else {
+                        $target = $remaining;
+                    }
+                } else {
+                    $target = $remaining;
+                }
+            } else {
+                // Malformed, treat as is
+                $source = $volumeString;
+                $target = $volumeString;
+            }
+        } else {
+            // Try to parse normally, treating first : as separator
+            $firstColon = strpos($volumeString, ':');
+            $source = substr($volumeString, 0, $firstColon);
+            $remaining = substr($volumeString, $firstColon + 1);
+
+            // Check for mode at the end
+            $lastColon = strrpos($remaining, ':');
+            if ($lastColon !== false) {
+                $possibleMode = substr($remaining, $lastColon + 1);
+                $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
+
+                if (in_array($possibleMode, $validModes)) {
+                    $mode = $possibleMode;
+                    $target = substr($remaining, 0, $lastColon);
+                } else {
+                    $target = $remaining;
+                }
+            } else {
+                $target = $remaining;
+            }
+        }
+    }
+
+    // Handle environment variable expansion in source
+    // Example: ${VOLUME_DB_PATH:-db} should extract default value if present
+    if ($source && preg_match('/^\$\{([^}]+)\}$/', $source, $matches)) {
+        $varContent = $matches[1];
+
+        // Check if there's a default value with :-
+        if (strpos($varContent, ':-') !== false) {
+            $parts = explode(':-', $varContent, 2);
+            $varName = $parts[0];
+            $defaultValue = isset($parts[1]) ? $parts[1] : '';
+
+            // If there's a non-empty default value, use it for source
+            if ($defaultValue !== '') {
+                $source = $defaultValue;
+            } else {
+                // Empty default value, keep the variable reference for env resolution
+                $source = '${'.$varName.'}';
+            }
+        }
+        // Otherwise keep the variable as-is for later expansion (no default value)
+    }
+
+    return [
+        'source' => $source !== null ? str($source) : null,
+        'target' => $target !== null ? str($target) : null,
+        'mode' => $mode !== null ? str($mode) : null,
+    ];
+}
+
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null): Collection
 {
     $uuid = data_get($resource, 'uuid');
@@ -304,8 +507,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $source = str($volume)->beforeLast(':');
-                    $target = str($volume)->afterLast(':');
+                    $parsed = parseDockerVolumeString($volume);
+                    $source = $parsed['source'];
+                    $target = $parsed['target'];
+                    // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
@@ -399,8 +604,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $name = "{$name}-pr-$pullRequestId";
                     }
                     if (is_string($volume)) {
-                        $source = str($volume)->beforeLast(':');
-                        $target = str($volume)->afterLast(':');
+                        $parsed = parseDockerVolumeString($volume);
+                        $source = $parsed['source'];
+                        $target = $parsed['target'];
                         $source = $name;
                         $volume = "$source:$target";
                     } elseif (is_array($volume)) {
@@ -640,6 +846,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($resource->build_pack !== 'dockercompose') {
             $domains = collect([]);
         }
+        $serviceName = str($serviceName)->replace('-', '_')->value();
         $fqdns = data_get($domains, "$serviceName.domain");
         // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
         if ($resource->build_pack === 'dockercompose') {
@@ -1311,8 +1518,10 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $source = str($volume)->beforeLast(':');
-                    $target = str($volume)->afterLast(':');
+                    $parsed = parseDockerVolumeString($volume);
+                    $source = $parsed['source'];
+                    $target = $parsed['target'];
+                    // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $fileStorages->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
@@ -1400,8 +1609,9 @@ function serviceParser(Service $resource): Collection
                     $name = "{$uuid}_{$slugWithoutUuid}";
 
                     if (is_string($volume)) {
-                        $source = str($volume)->beforeLast(':');
-                        $target = str($volume)->afterLast(':');
+                        $parsed = parseDockerVolumeString($volume);
+                        $source = $parsed['source'];
+                        $target = $parsed['target'];
                         $source = $name;
                         $volume = "$source:$target";
                     } elseif (is_array($volume)) {
@@ -1655,6 +1865,7 @@ function serviceParser(Service $resource): Collection
                 });
             }
         }
+        $serviceName = str($serviceName)->replace('-', '_')->value();
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
             $uuid = $resource->uuid;

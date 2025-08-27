@@ -59,7 +59,7 @@ services:
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
   vite:
-    image: node:20-alpine
+    image: node:24-alpine
     pull_policy: always
     working_dir: /var/www/html
     environment:
