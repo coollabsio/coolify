@@ -11,11 +11,9 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-UTC}
-      - HARDCOVER_TOKEN=${HARDCOVER_TOKEN:-your_hardcover_api_key_here}
       - NETWORK_SHARE_MODE=${NETWORK_SHARE_MODE:-false}
     volumes:
       - 'cwa-config:/config'
       - 'cwa-book-ingest:/cwa-book-ingest'
       - 'calibre-library:/calibre-library'
       - 'calibre-plugins:/config/.config/calibre/plugins'
-    restart: unless-stopped
