@@ -1,3 +1,0 @@
-#!/bin/bash
-
-ssh root@10.0.3.4 "cd /data/coolify/source && docker pull docker-registry.platformshape.local/coollabsio/coolify:latest && docker pull docker-registry.platformshape.local/coollabsio/coolify-realtime:latest && docker pull docker-registry.platformshape.local/coollabsio/coolify-helper:latest && export REGISTRY_URL=docker-registry.platformshape.local && echo \$REGISTRY_URL && ./upgrade.sh latest latest \$REGISTRY_URL"
