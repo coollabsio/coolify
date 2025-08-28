@@ -165,6 +165,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private ?string $coolify_variables = null;
 
+    private ?string $interpolated_docker_build_options = null;
+
     private bool $preserveRepository = false;
 
     public function tags()
@@ -1385,6 +1387,28 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function set_interpolated_docker_build_options(): void
+    {
+        if (empty($this->application->custom_docker_build_options)) {
+            $this->interpolated_docker_build_options = '';
+
+            return;
+        }
+
+        // Replace common interpolation placeholders
+        $this->interpolated_docker_build_options = str_replace([
+            '{{git_branch}}',
+            '{{git_commit_sha}}',
+            '{{application_uuid}}',
+            '{{application_name}}',
+        ], [
+            $this->application->git_branch ?? 'main',
+            $this->commit ?? $this->application->git_commit_sha ?? 'latest',
+            $this->application->uuid,
+            $this->application->name,
+        ], $this->application->custom_docker_build_options);
+    }
+
     private function set_coolify_variables()
     {
         $this->coolify_variables = "SOURCE_COMMIT={$this->commit} ";
@@ -1475,6 +1499,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->application_deployment_queue->save();
         }
         $this->set_coolify_variables();
+        $this->set_interpolated_docker_build_options();
     }
 
     private function clone_repository()
@@ -2128,13 +2153,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ]);
-                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                     } else {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->build_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ]);
-                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->build_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                     }
 
                     $base64_build_command = base64_encode($build_command);
@@ -2155,10 +2180,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
                 } else {
                     if ($this->force_rebuild) {
-                        $build_command = "docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $build_command = "docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->interpolated_docker_build_options} {$this->workdir}";
                         $base64_build_command = base64_encode($build_command);
                     } else {
-                        $build_command = "docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $build_command = "docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->interpolated_docker_build_options} {$this->workdir}";
                         $base64_build_command = base64_encode($build_command);
                     }
                     $this->execute_remote_command(
@@ -2191,7 +2216,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                 }
             }
-            $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+            $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
             $base64_build_command = base64_encode($build_command);
             $this->execute_remote_command(
                 [
@@ -2217,9 +2242,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Pure Dockerfile based deployment
             if ($this->application->dockerfile) {
                 if ($this->force_rebuild) {
-                    $build_command = "docker build --no-cache --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                    $build_command = "docker build --no-cache --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                 } else {
-                    $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                    $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                 }
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
@@ -2245,13 +2270,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --no-cache --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ]);
-                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                     } else {
                         $this->execute_remote_command([
                             executeInDocker($this->deployment_uuid, "nixpacks build -c /artifacts/thegameplan.json --cache-key '{$this->application->uuid}' --no-error-without-start -n {$this->production_image_name} {$this->workdir} -o {$this->workdir}"),
                             'hidden' => true,
                         ]);
-                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                     }
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
@@ -2271,10 +2296,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
                 } else {
                     if ($this->force_rebuild) {
-                        $build_command = "docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = "docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                         $base64_build_command = base64_encode($build_command);
                     } else {
-                        $build_command = "docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = "docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->interpolated_docker_build_options} {$this->workdir}";
                         $base64_build_command = base64_encode($build_command);
                     }
                     $this->execute_remote_command(

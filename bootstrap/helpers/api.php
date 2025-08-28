@@ -119,6 +119,7 @@ function sharedDataApplications()
         'limits_cpuset' => 'string|nullable',
         'limits_cpu_shares' => 'numeric',
         'custom_labels' => 'string|nullable',
+        'custom_docker_build_options' => 'string|nullable',
         'custom_docker_run_options' => 'string|nullable',
         'post_deployment_command' => 'string|nullable',
         'post_deployment_command_container' => 'string',

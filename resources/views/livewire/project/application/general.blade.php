@@ -305,9 +305,15 @@
                                     </div>
                                 @endif
                                 <x-forms.input
+                                    helper="You can add custom docker build options that will be used when building your container.<br><br>Supports interpolation with: <span class='text-helper'>&#123;&#123;git_branch&#125;&#125;</span>, <span class='text-helper'>&#123;&#123;git_commit_sha&#125;&#125;</span>, <span class='text-helper'>&#123;&#123;application_uuid&#125;&#125;</span>, <span class='text-helper'>&#123;&#123;application_name&#125;&#125;</span>"
+                                    placeholder="--cache-to=type=registry,dest=&#123;&#123;application_name&#125;&#125;:&#123;&#123;git_branch&#125;&#125;"
+                                    id="application.custom_docker_build_options" label="Custom Docker Build Options"
+                                    x-bind:disabled="!canUpdate" />
+
+                                <x-forms.input
                                     helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                                     placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
-                                    id="application.custom_docker_run_options" label="Custom Docker Options"
+                                    id="application.custom_docker_run_options" label="Custom Docker Run Options"
                                     x-bind:disabled="!canUpdate" />
 
                                 @if ($application->build_pack !== 'dockercompose')

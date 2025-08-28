@@ -188,6 +188,9 @@ paths:
                 custom_labels:
                   type: string
                   description: 'Custom labels.'
+                custom_docker_build_options:
+                  type: string
+                  description: 'Custom docker build options.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -441,6 +444,9 @@ paths:
                 custom_labels:
                   type: string
                   description: 'Custom labels.'
+                custom_docker_build_options:
+                  type: string
+                  description: 'Custom docker build options.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -694,6 +700,9 @@ paths:
                 custom_labels:
                   type: string
                   description: 'Custom labels.'
+                custom_docker_build_options:
+                  type: string
+                  description: 'Custom docker build options.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -915,6 +924,9 @@ paths:
                 custom_labels:
                   type: string
                   description: 'Custom labels.'
+                custom_docker_build_options:
+                  type: string
+                  description: 'Custom docker build options.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -1106,6 +1118,9 @@ paths:
                 custom_labels:
                   type: string
                   description: 'Custom labels.'
+                custom_docker_build_options:
+                  type: string
+                  description: 'Custom docker build options.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -1497,6 +1512,9 @@ paths:
                 custom_labels:
                   type: string
                   description: 'Custom labels.'
+                custom_docker_build_options:
+                  type: string
+                  description: 'Custom docker build options.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -5070,6 +5088,10 @@ components:
           type: string
           nullable: true
           description: 'Swarm placement constraints. Only used for swarm deployments.'
+        custom_docker_build_options:
+          type: string
+          nullable: true
+          description: 'Custom docker build options.'
         custom_docker_run_options:
           type: string
           nullable: true

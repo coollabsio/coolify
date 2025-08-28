@@ -257,6 +257,10 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "custom_docker_build_options": {
+                                        "type": "string",
+                                        "description": "Custom docker build options."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -608,6 +612,10 @@
                                     "custom_labels": {
                                         "type": "string",
                                         "description": "Custom labels."
+                                    },
+                                    "custom_docker_build_options": {
+                                        "type": "string",
+                                        "description": "Custom docker build options."
                                     },
                                     "custom_docker_run_options": {
                                         "type": "string",
@@ -961,6 +969,10 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "custom_docker_build_options": {
+                                        "type": "string",
+                                        "description": "Custom docker build options."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -1270,6 +1282,10 @@
                                         "type": "string",
                                         "description": "Custom labels."
                                     },
+                                    "custom_docker_build_options": {
+                                        "type": "string",
+                                        "description": "Custom docker build options."
+                                    },
                                     "custom_docker_run_options": {
                                         "type": "string",
                                         "description": "Custom docker run options."
@@ -1533,6 +1549,10 @@
                                     "custom_labels": {
                                         "type": "string",
                                         "description": "Custom labels."
+                                    },
+                                    "custom_docker_build_options": {
+                                        "type": "string",
+                                        "description": "Custom docker build options."
                                     },
                                     "custom_docker_run_options": {
                                         "type": "string",
@@ -2088,6 +2108,10 @@
                                     "custom_labels": {
                                         "type": "string",
                                         "description": "Custom labels."
+                                    },
+                                    "custom_docker_build_options": {
+                                        "type": "string",
+                                        "description": "Custom docker build options."
                                     },
                                     "custom_docker_run_options": {
                                         "type": "string",
@@ -7591,6 +7615,11 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Swarm placement constraints. Only used for swarm deployments."
+                    },
+                    "custom_docker_build_options": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Custom docker build options."
                     },
                     "custom_docker_run_options": {
                         "type": "string",

@@ -166,6 +166,7 @@ class ApplicationsController extends Controller
                             'limits_cpuset' => ['type' => 'string', 'nullable' => true, 'description' => 'CPU set.'],
                             'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
                             'custom_labels' => ['type' => 'string', 'description' => 'Custom labels.'],
+                            'custom_docker_build_options' => ['type' => 'string', 'description' => 'Custom docker build options.'],
                             'custom_docker_run_options' => ['type' => 'string', 'description' => 'Custom docker run options.'],
                             'post_deployment_command' => ['type' => 'string', 'description' => 'Post deployment command.'],
                             'post_deployment_command_container' => ['type' => 'string', 'description' => 'Post deployment command container.'],

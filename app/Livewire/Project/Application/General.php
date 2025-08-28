@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Models\Application;
+use App\Rules\ValidDockerBuildOptions;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -86,6 +87,7 @@ class General extends Component
             'application.docker_compose_custom_start_command' => 'nullable',
             'application.docker_compose_custom_build_command' => 'nullable',
             'application.custom_labels' => 'nullable',
+            'application.custom_docker_build_options' => ['nullable', new ValidDockerBuildOptions],
             'application.custom_docker_run_options' => 'nullable',
             'application.pre_deployment_command' => 'nullable',
             'application.pre_deployment_command_container' => 'nullable',
@@ -165,7 +167,8 @@ class General extends Component
         'application.docker_compose_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
-        'application.custom_docker_run_options' => 'Custom docker run commands',
+        'application.custom_docker_build_options' => 'Custom docker build options',
+        'application.custom_docker_run_options' => 'Custom docker run options',
         'application.custom_network_aliases' => 'Custom docker network aliases',
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
@@ -514,6 +517,7 @@ class General extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $this->validate();
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
