@@ -18,9 +18,9 @@ services:
       - BACKUP_INTERVAL=${BACKUP_INTERVAL:-24}
       - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-7}
     volumes:
-      - "./meshcentral/data:/opt/meshcentral/meshcentral-data"
-      - "./meshcentral/user_files:/opt/meshcentral/meshcentral-files"
-      - "./meshcentral/backups:/opt/meshcentral/meshcentral-backups"
+      - meshcentral-data:/opt/meshcentral/meshcentral-data
+      - meshcentral-files:/opt/meshcentral/meshcentral-files
+      - meshcentral-backups:/opt/meshcentral/meshcentral-backups
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health.ashx').then((r) => {if (r.status !== 200) throw new Error(r.status)})"]
       interval: 30s
