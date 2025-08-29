@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: Complete technology stack, dependencies, and infrastructure components
+globs: composer.json, package.json, docker-compose*.yml, config/*.php
 alwaysApply: false
 ---
 # Coolify Technology Stack

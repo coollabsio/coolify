@@ -22,6 +22,10 @@
             soon.<br/>Status notifications sent every week.<br/>You can disable notifications in the <a class='dark:text-white underline' href='{{ route('notifications.email') }}'>notification settings</a>." />
                     <x-forms.button type="button" wire:click="$dispatch('checkForUpdatesDispatch')">
                         Check Now</x-forms.button>
+                    @if (isDev())
+                        <x-forms.button type="button" wire:click="sendTestEmail">
+                            Send Test Email (dev only)</x-forms.button>
+                    @endif
                 </div>
                 <div>Update your servers semi-automatically.</div>
                 <div>

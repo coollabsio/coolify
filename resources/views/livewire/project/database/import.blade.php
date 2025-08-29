@@ -108,8 +108,8 @@
                 <div>Location: <span x-text="filename ?? 'N/A'"></span> <span x-text="filesize">/ </span></div>
                 <x-forms.button class="w-full my-4" wire:click='runImport'>Restore Backup</x-forms.button>
             </div>
-            <div class="container w-full mx-auto">
-                <livewire:activity-monitor header="Database Restore Output" />
+            <div class="container w-full mx-auto" x-show="$wire.importRunning">
+                <livewire:activity-monitor header="Database Restore Output" :showWaiting="false" />
             </div>
         @else
             <div>Database must be running to restore a backup.</div>

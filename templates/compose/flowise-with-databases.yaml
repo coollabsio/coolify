@@ -1,5 +1,6 @@
 # documentation: https://docs.flowiseai.com/
 # slogan: Flowise is an open source low-code tool for developers to build customized LLM orchestration flows & AI agents. Also deploys Redis, Postgres and other services.
+# category: ai
 # tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot, flows
 # logo: svgs/flowise.png
 # port: 3001
@@ -15,7 +16,7 @@ services:
       qdrant:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_FLOWISE_3001
+      - SERVICE_URL_FLOWISE_3001
       - DEBUG=${DEBUG:-false}
       - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}
       - PORT=${PORT:-3001}
@@ -66,7 +67,7 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     environment:
-      - SERVICE_FQDN_QDRANT_6333
+      - SERVICE_URL_QDRANT_6333
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}
     volumes:
       - flowise-qdrant-data:/qdrant/storage

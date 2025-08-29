@@ -33,7 +33,7 @@
             </div>
         </div>
     </div>
-    @if (auth()->user()->isAdminFromSession())
+    @can('manageInvitations', currentTeam())
         <div class="py-4">
             @if (is_transactional_emails_enabled())
                 <h2 class="pb-4">Invite New Member</h2>
@@ -55,5 +55,5 @@
             <livewire:team.invite-link />
         </div>
         <livewire:team.invitations :invitations="$invitations" />
-    @endif
+    @endcan
 </div>

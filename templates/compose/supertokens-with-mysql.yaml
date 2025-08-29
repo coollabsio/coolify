@@ -1,5 +1,6 @@
 # documentation: https://supertokens.com/docs/guides
 # slogan: An open-source authentication solution that simplifies the implementation of secure user authentication and session management for web and mobile applications.
+# category: auth
 # tags: supertokens,login,authentication,authorization,oauth,user-management,session-management,access-control,otp,magic-link,passwordless
 # logo: svgs/supertokens.svg
 # port: 3567
@@ -11,7 +12,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPERTOKENS_3567
+      - SERVICE_URL_SUPERTOKENS_3567
       - API_KEYS=${API_KEYS:-}
       - MYSQL_CONNECTION_URI=mysql://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@mysql:3306/${MYSQL_DATABASE:-supertokens}
     healthcheck:

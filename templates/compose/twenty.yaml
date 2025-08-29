@@ -1,6 +1,7 @@
 # ignore: true
 # documentation: https://docs.twenty.com
 # slogan: Twenty is a CRM designed to fit your unique business needs.
+# category: cms
 # tags: crm, self-hosted, dashboard
 # logo: svgs/twenty.svg
 # port: 3000
@@ -9,13 +10,13 @@ services:
   twenty:
     image: 'twentycrm/twenty:latest'
     environment:
-      - SERVICE_FQDN_TWENTY_3000
-      - SERVER_URL=$SERVICE_FQDN_TWENTY
-      - FRONT_BASE_URL=$SERVICE_FQDN_TWENTY
+      - SERVICE_URL_TWENTY_3000
+      - SERVER_URL=$SERVICE_URL_TWENTY
+      - FRONT_BASE_URL=$SERVICE_URL_TWENTY
       - ENABLE_DB_MIGRATIONS=true
       - CACHE_STORAGE_TYPE=${CACHE_STORAGE_TYPE:-redis}
       - REDIS_URL=redis://redis:6379
-  
+
       # https://twenty.com/developers/section/self-hosting/self-hosting-var#security
       - API_RATE_LIMITING_TTL=${API_RATE_LIMITING_TTL:-100}
       - API_RATE_LIMITING_LIMIT=${API_RATE_LIMITING_LIMIT:-100}

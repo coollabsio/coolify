@@ -1,5 +1,6 @@
 # documentation: https://docs.documenso.com/
 # slogan: Document signing, finally open source
+# category: productivity
 # tags: signing, opensource, document, pdf, e-signature, digital-signature, document-signing, pdf-signing, docusign
 # logo: svgs/documenso.png
 # port: 3000
@@ -11,12 +12,12 @@ services:
       database:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_DOCUMENSO_3000
-      - NEXTAUTH_URL=${SERVICE_FQDN_DOCUMENSO}
+      - SERVICE_URL_DOCUMENSO_3000
+      - NEXTAUTH_URL=${SERVICE_URL_DOCUMENSO}
       - NEXTAUTH_SECRET=${SERVICE_BASE64_AUTHSECRET}
       - NEXT_PRIVATE_ENCRYPTION_KEY=${SERVICE_BASE64_ENCRYPTIONKEY}
       - NEXT_PRIVATE_ENCRYPTION_SECONDARY_KEY=${SERVICE_BASE64_SECONDARYENCRYPTIONKEY}
-      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_FQDN_DOCUMENSO}
+      - NEXT_PUBLIC_WEBAPP_URL=${SERVICE_URL_DOCUMENSO}
       - NEXT_PRIVATE_SMTP_TRANSPORT=${NEXT_PRIVATE_SMTP_TRANSPORT}
       - NEXT_PRIVATE_SMTP_HOST=${NEXT_PRIVATE_SMTP_HOST}
       - NEXT_PRIVATE_SMTP_PORT=${NEXT_PRIVATE_SMTP_PORT}
@@ -26,6 +27,16 @@ services:
       - NEXT_PRIVATE_SMTP_FROM_ADDRESS=${NEXT_PRIVATE_SMTP_FROM_ADDRESS}
       - NEXT_PRIVATE_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
       - NEXT_PRIVATE_DIRECT_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database/${POSTGRES_DB:-documenso-db}?schema=public
+      - NEXT_PRIVATE_SIGNING_LOCAL_FILE_PATH=/app/apps/remix/certs/certificate.p12
+      - NEXT_PRIVATE_SIGNING_PASSPHRASE=${SERVICE_PASSWORD_DOCUMENSO}
+      - CERT_VALID_DAYS=${CERT_VALID_DAYS:-365}
+      - CERT_INFO_COUNTRY_NAME=${CERT_INFO_COUNTRY_NAME:-DO}
+      - CERT_INFO_STATE_OR_PROVIDENCE=${CERT_INFO_STATE_OR_PROVIDENCE:-Santiago}
+      - CERT_INFO_LOCALITY_NAME=${CERT_INFO_LOCALITY_NAME:-Santiago}
+      - CERT_INFO_ORGANIZATION_NAME=${CERT_INFO_ORGANIZATION_NAME:-Example INC}
+      - CERT_INFO_ORGANIZATIONAL_UNIT=${CERT_INFO_ORGANIZATIONAL_UNIT:-IT Department}
+      - CERT_INFO_EMAIL=${CERT_INFO_EMAIL:-example@gmail.com}
+      - NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_LOGIN:-false}
     healthcheck:
       test:
         - CMD-SHELL
@@ -33,6 +44,55 @@ services:
       interval: 2s
       timeout: 10s
       retries: 20
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "./certs" > /tmp/certs_dir_path
+        echo "./make-certs.sh" > /tmp/cert_script_path
+        echo "${SERVICE_PASSWORD_DOCUMENSO}" > /tmp/cert_pass
+
+        touch /tmp/cert_info_path
+        cat <<EOF > /tmp/cert_info_path
+        [ req ]
+        distinguished_name = req_distinguished_name
+        prompt = no
+        [ req_distinguished_name ]
+        C            = ${CERT_INFO_COUNTRY_NAME}
+        ST           = ${CERT_INFO_STATE_OR_PROVIDENCE}
+        L            = ${CERT_INFO_LOCALITY_NAME}
+        O            = ${CERT_INFO_ORGANIZATION_NAME}
+        OU           = ${CERT_INFO_ORGANIZATIONAL_UNIT}
+        CN           = ${SERVICE_URL_DOCUMENSO}
+        emailAddress = ${CERT_INFO_EMAIL}
+        EOF
+
+        cat <<EOF > "$(cat /tmp/cert_script_path)"
+        mkdir -p "$(cat /tmp/certs_dir_path)" && cd "$(cat /tmp/certs_dir_path)"
+
+        openssl genrsa -out private.key 2048
+
+        openssl req \
+          -new \
+          -x509 \
+          -key private.key \
+          -out certificate.crt \
+          -days ${CERT_VALID_DAYS} \
+          -config /tmp/cert_info_path
+
+        openssl pkcs12 \
+          -export \
+          -out certificate.p12 \
+          -inkey private.key \
+          -in certificate.crt \
+          -legacy \
+          -password file:/tmp/cert_pass
+        EOF
+        chmod +x "$(cat /tmp/cert_script_path)"
+
+        sh "$(cat /tmp/cert_script_path)"
+
+        ./start.sh
 
   database:
     image: postgres:17

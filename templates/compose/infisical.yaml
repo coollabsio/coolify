@@ -1,5 +1,6 @@
 # documentation: https://infisical.com/docs/documentation/getting-started/introduction
 # slogan: Infisical is the open source secret management platform that developers use to centralize their application configuration and secrets like API keys and database credentials.
+# category: security
 # tags: security, environment, secrets, infisical, database, configuration, secret, api, keys, auth, encryption
 # logo: svgs/infisical.png
 # port: 8080
@@ -9,8 +10,8 @@ services:
   backend:
     image: "infisical/infisical:latest-postgres"
     environment:
-      - SERVICE_FQDN_BACKEND_8080
-      - SITE_URL=${SERVICE_FQDN_BACKEND_8080}
+      - SERVICE_URL_BACKEND_8080
+      - SITE_URL=${SERVICE_URL_BACKEND_8080}
       - NODE_ENV=${NODE_ENV:-production}
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_ENCRYPTIONKEY}
       - AUTH_SECRET=${SERVICE_REALBASE64_64_AUTHSECRET}

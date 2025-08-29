@@ -1,5 +1,6 @@
 # documentation: https://github.com/redlib-org/redlib
 # slogan: An alternative private front-end to Reddit, with its origins in Libreddit.
+# category: productivity
 # tags: frontend, feed
 # logo: svgs/redlib.svg
 # port: 8080
@@ -8,7 +9,7 @@ services:
   redlib:
     image: quay.io/redlib/redlib:latest
     environment:
-      - SERVICE_FQDN_REDLIB_8080
+      - SERVICE_URL_REDLIB_8080
       - REDLIB_SFW_ONLY=${REDLIB_SFW_ONLY:-off}
       - REDLIB_BANNER=${REDLIB_BANNER:-""}
       - REDLIB_ROBOTS_DISABLE_INDEXING=${REDLIB_ROBOTS_DISABLE_INDEXING:-off}

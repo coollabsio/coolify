@@ -1,5 +1,6 @@
 # documentation: https://nocodb.com/
 # slogan: NocoDB is an open source Airtable alternative. Turns any MySQL, PostgreSQL, SQL Server, SQLite & MariaDB into a smart-spreadsheet.
+# category: automation
 # tags: nocodb,airtable,mysql,postgresql,sqlserver,sqlite,mariadb
 # logo: svgs/nocodb.svg
 # port: 8080
@@ -8,7 +9,7 @@ services:
   nocodb:
     image: nocodb/nocodb
     environment:
-      - SERVICE_FQDN_NOCODB_8080
+      - SERVICE_URL_NOCODB_8080
     volumes:
       - nocodb-data:/usr/app/data/
     healthcheck:

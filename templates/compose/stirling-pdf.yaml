@@ -1,5 +1,6 @@
 # documentation: https://github.com/Stirling-Tools/Stirling-PDF
 # slogan: Stirling is a powerful web based PDF manipulation tool
+# category: productivity
 # tags: pdf, manipulation, web, tool
 # logo: svgs/stirling.png
 # port: 8080
@@ -13,7 +14,7 @@ services:
       - stirling-custom-files:/customFiles/
       - stirling-logs:/logs/
     environment:
-      - SERVICE_FQDN_SPDF_8080
+      - SERVICE_URL_SPDF_8080
       - DOCKER_ENABLE_SECURITY=false
     healthcheck:
       test: 'curl --fail --silent http://127.0.0.1:8080/api/v1/info/status | grep -q "UP" || exit 1'

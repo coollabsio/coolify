@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
+use App\Jobs\PullChangelogFromGitHub;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
@@ -52,6 +53,11 @@ class Init extends Command
 
         $this->call('cleanup:redis');
 
+        try {
+            $this->call('cleanup:names');
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:names command: {$e->getMessage()}\n";
+        }
         $this->call('cleanup:stucked-resources');
 
         try {
@@ -62,10 +68,21 @@ class Init extends Command
 
         if (isCloud()) {
             try {
-                $this->cleanupUnnecessaryDynamicProxyConfiguration();
+                $this->cleanupInProgressApplicationDeployments();
+            } catch (\Throwable $e) {
+                echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+            }
+
+            try {
                 $this->pullTemplatesFromCDN();
             } catch (\Throwable $e) {
                 echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+            }
+
+            try {
+                $this->pullChangelogFromGitHub();
+            } catch (\Throwable $e) {
+                echo "Could not changelogs from github: {$e->getMessage()}\n";
             }
 
             return;
@@ -73,9 +90,20 @@ class Init extends Command
 
         try {
             $this->cleanupInProgressApplicationDeployments();
+        } catch (\Throwable $e) {
+            echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+        }
+
+        try {
             $this->pullTemplatesFromCDN();
         } catch (\Throwable $e) {
             echo "Could not pull templates from CDN: {$e->getMessage()}\n";
+        }
+
+        try {
+            $this->pullChangelogFromGitHub();
+        } catch (\Throwable $e) {
+            echo "Could not changelogs from github: {$e->getMessage()}\n";
         }
         try {
             $localhost = $this->servers->where('id', 0)->first();
@@ -105,7 +133,17 @@ class Init extends Command
         $response = Http::retry(3, 1000)->get(config('constants.services.official'));
         if ($response->successful()) {
             $services = $response->json();
-            File::put(base_path('templates/service-templates.json'), json_encode($services));
+            File::put(base_path('templates/'.config('constants.services.file_name')), json_encode($services));
+        }
+    }
+
+    private function pullChangelogFromGitHub()
+    {
+        try {
+            PullChangelogFromGitHub::dispatch();
+            echo "Changelog fetch initiated\n";
+        } catch (\Throwable $e) {
+            echo "Could not fetch changelog from GitHub: {$e->getMessage()}\n";
         }
     }
 

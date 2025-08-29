@@ -1,5 +1,6 @@
 # documentation: https://jellyfin.org
 # slogan: Jellyfin is a media server for hosting and streaming your media collection.
+# category: media
 # tags: media, server, movies, tv, music
 # logo: svgs/jellyfin.svg
 # port: 8096
@@ -8,11 +9,11 @@ services:
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
     environment:
-      - SERVICE_FQDN_JELLYFIN_8096
+      - SERVICE_URL_JELLYFIN_8096
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
-      - JELLYFIN_PublishedServerUrl=$SERVICE_FQDN_JELLYFIN
+      - JELLYFIN_PublishedServerUrl=$SERVICE_URL_JELLYFIN
     volumes:
       - jellyfin-config:/config
       - jellyfin-tvshows:/data/tvshows

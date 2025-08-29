@@ -1,5 +1,6 @@
 # documentation: https://www.kimai.org/
 # slogan: Open source time-tracking app.
+# category: productivity
 # tags: time-tracking, open-source
 # logo: svgs/kimai.svg
 # port: 8001
@@ -29,7 +30,7 @@ services:
     volumes:
       - kimai-data:/opt/kimai/var/data
     environment:
-      - SERVICE_FQDN_KIMAI_8001
+      - SERVICE_URL_KIMAI_8001
       - APP_SECRET=${SERVICE_PASSWORD_APPSECRET}
       - MAILER_FROM=${MAILER_FROM:-kimai@example.com}
       - MAILER_URL=${MAILER_URL:-null://null}

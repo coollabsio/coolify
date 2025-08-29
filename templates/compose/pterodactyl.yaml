@@ -1,6 +1,6 @@
-# ignore: true
 # documentation: https://pterodactyl.io/
 # slogan: Pterodactyl is a free, open-source game server management panel
+# category: media
 # tags: game, game server, management, panel, minecraft
 # logo: svgs/pterodactyl.png
 # port: 80
@@ -8,8 +8,6 @@
 services:
   mariadb:
     image: mariadb:10.5
-    restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password
     healthcheck:
       test:
         ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized || exit 1"]
@@ -18,17 +16,15 @@ services:
       timeout: 1s
       retries: 3
     environment:
-      - SERVICE_PASSWORD_MYSQL
       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_MYSQLROOT
-      - MYSQL_DATABASE=panel
-      - MYSQL_USER=pterodactyl
+      - MYSQL_DATABASE=pterodactyl-db
+      - MYSQL_USER=$SERVICE_USER_MYSQL
       - MYSQL_PASSWORD=$SERVICE_PASSWORD_MYSQL
     volumes:
       - pterodactyl-db:/var/lib/mysql
 
   redis:
     image: redis:alpine
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping || exit 1"]
       interval: 10s
@@ -37,7 +33,6 @@ services:
 
   pterodactyl:
     image: ghcr.io/pterodactyl/panel:latest
-    restart: unless-stopped
     volumes:
       - "panel-var:/app/var/"
       - "panel-nginx:/etc/nginx/http.d/"
@@ -50,28 +45,26 @@ services:
           #!/bin/sh
           set -e
 
-          echo "Waiting for services to be ready..."
-          sleep 30
+           echo "Setting logs permissions..."
+           chown -R nginx: /app/storage/logs/
 
-          echo "Setting logs permissions..."
-          chown -R nginx: /app/storage/logs/
+           USER_EXISTS=$(php artisan tinker --no-ansi --execute='echo \Pterodactyl\Models\User::where("email", "'"$ADMIN_EMAIL"'")->exists() ? "1" : "0";')
 
-          if ! php artisan p:user:list | grep -q "$ADMIN_EMAIL"; then
-            echo "Creating admin user..."
-            php artisan p:user:make --no-interaction \
-              --admin=1 \
-              --email="$ADMIN_EMAIL" \
-              --username="$ADMIN_USERNAME" \
-              --name-first="$ADMIN_FIRSTNAME" \
-              --name-last="$ADMIN_LASTNAME" \
-              --password="$ADMIN_PASSWORD"
-            echo "Admin user created"
-          else
-            echo "Admin user already exists, skipping creation"
-          fi
+           if [ "$USER_EXISTS" = "0" ]; then
+             echo "Admin User does not exist, creating user now."
+             php artisan p:user:make --no-interaction \
+               --admin=1 \
+               --email="$ADMIN_EMAIL" \
+               --username="$ADMIN_USERNAME" \
+               --name-first="$ADMIN_FIRSTNAME" \
+               --name-last="$ADMIN_LASTNAME" \
+               --password="$ADMIN_PASSWORD"
+             echo "Admin user created successfully!"
+           else
+             echo "Admin User already exists, skipping creation."
+           fi
 
-           exec supervisord -c --nodaemon
-
+           exec supervisord --nodaemon
     command: ["/entrypoint.sh"]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
@@ -79,7 +72,7 @@ services:
       timeout: 1s
       retries: 3
     environment:
-      - SERVICE_FQDN_PTERODACTYL
+      - SERVICE_URL_PTERODACTYL_80
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_USERNAME=${SERVICE_USER_ADMIN}
       - ADMIN_FIRSTNAME=${ADMIN_FIRSTNAME:-Admin}
@@ -88,7 +81,7 @@ services:
       - PTERODACTYL_HTTPS=${PTERODACTYL_HTTPS:-false}
       - APP_ENV=production
       - APP_ENVIRONMENT_ONLY=false
-      - APP_URL=${PTERODACTYL_PUBLIC_FQDN:-$SERVICE_FQDN_PTERODACTYL}
+      - APP_URL=$SERVICE_URL_PTERODACTYL
       - APP_TIMEZONE=${TIMEZONE:-UTC}
       - APP_SERVICE_AUTHOR=${APP_SERVICE_AUTHOR:-author@example.com}
       - LOG_LEVEL=${LOG_LEVEL:-debug}
@@ -96,6 +89,8 @@ services:
       - SESSION_DRIVER=redis
       - QUEUE_DRIVER=redis
       - REDIS_HOST=redis
+      - DB_DATABASE=pterodactyl-db
+      - DB_USERNAME=$SERVICE_USER_MYSQL
       - DB_HOST=mariadb
       - DB_PORT=3306
       - DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
@@ -111,7 +106,7 @@ services:
     image: ghcr.io/pterodactyl/wings:latest
     restart: unless-stopped
     environment:
-      - SERVICE_FQDN_WINGS_8080
+      - SERVICE_URL_WINGS_8080
       - TZ=${TIMEZONE:-UTC}
       - WINGS_USERNAME=pterodactyl
     volumes:

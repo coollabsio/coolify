@@ -79,5 +79,19 @@
                 </div>
             </div>
         </form>
+        
+        <x-domain-conflict-modal 
+            :conflicts="$domainConflicts" 
+            :showModal="$showDomainConflictModal" 
+            confirmAction="confirmDomainUsage">
+            <x-slot:consequences>
+                <ul class="mt-2 ml-4 list-disc">
+                    <li>The Coolify instance domain will conflict with existing resources</li>
+                    <li>SSL certificates might not work correctly</li>
+                    <li>Routing behavior will be unpredictable</li>
+                    <li>You may not be able to access the Coolify dashboard properly</li>
+                </ul>
+            </x-slot:consequences>
+        </x-domain-conflict-modal>
     </div>
 </div>

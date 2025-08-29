@@ -229,16 +229,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Set preview fqdn
         if ($this->pull_request_id !== 0) {
-            if ($this->application->build_pack === 'dockercompose') {
-                // For Docker Compose apps, use the preview model's compose-specific method
-                $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
-                if ($this->preview) {
+            $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
+            if ($this->preview) {
+                if ($this->application->build_pack === 'dockercompose') {
                     $this->preview->generate_preview_fqdn_compose();
-                }
-            } else {
-                // For non-Docker Compose apps, use the preview model's method
-                $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
-                if ($this->preview) {
+                } else {
                     $this->preview->generate_preview_fqdn();
                 }
             }
@@ -1433,6 +1428,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $local_branch = "pull/{$this->pull_request_id}/head";
         }
+        // Build an exact refspec for ls-remote so we don't match similarly named branches (e.g., changeset-release/main)
+        if ($this->pull_request_id === 0) {
+            $lsRemoteRef = "refs/heads/{$local_branch}";
+        } else {
+            if ($this->git_type === 'github' || $this->git_type === 'gitea') {
+                $lsRemoteRef = "refs/pull/{$this->pull_request_id}/head";
+            } elseif ($this->git_type === 'gitlab') {
+                $lsRemoteRef = "refs/merge-requests/{$this->pull_request_id}/head";
+            } else {
+                // Fallback to the original value if provider-specific ref is unknown
+                $lsRemoteRef = $local_branch;
+            }
+        }
         $private_key = data_get($this->application, 'private_key.private_key');
         if ($private_key) {
             $private_key = base64_encode($private_key);
@@ -1447,7 +1455,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     executeInDocker($this->deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$lsRemoteRef}"),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
                 ]
@@ -1455,7 +1463,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$local_branch}"),
+                    executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$lsRemoteRef}"),
                     'hidden' => true,
                     'save' => 'git_commit_sha',
                 ],

@@ -1,5 +1,6 @@
 # documentation: https://filebrowser.org
 # slogan: FileBrowser is a web-based file manager and file explorer with a user-friendly interface.
+# category: storage
 # tags: file-management, storage-access, data-organization, file-utilization, administration-tool
 # logo: svgs/filebrowser.svg
 # port: 80
@@ -8,7 +9,7 @@ services:
   filebrowser:
     image: filebrowser/filebrowser:latest
     environment:
-      - SERVICE_FQDN_FILEBROWSER_80
+      - SERVICE_URL_FILEBROWSER_80
     volumes:
       - type: bind
         source: ./srv

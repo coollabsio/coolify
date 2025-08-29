@@ -1,5 +1,6 @@
 # documentation: https://mosquitto.org/documentation/
 # slogan: Mosquitto is lightweight and suitable for use on all devices, from low-power single-board computers to full servers.
+# category: messaging
 # tags: mosquitto, mqtt, open-source
 # logo: svgs/mosquitto.svg
 # port: 1883
@@ -8,7 +9,7 @@ services:
   mosquitto:
     image: eclipse-mosquitto
     environment:
-      - SERVICE_FQDN_MOSQUITTO_1883
+      - SERVICE_URL_MOSQUITTO_1883
       - MQTT_USERNAME=${SERVICE_USER_MOSQUITTO}
       - MQTT_PASSWORD=${SERVICE_PASSWORD_MOSQUITTO}
       - REQUIRE_CERTIFICATE=${REQUIRE_CERTIFICATE:-false}

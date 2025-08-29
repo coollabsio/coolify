@@ -1,5 +1,6 @@
 # documentation: https://bluewavelabs.gitbook.io/checkmate
 # slogan: An open source server monitoring application
+# category: monitoring
 # tags: monitoring,server,uptime,healthcheck
 # logo: svgs/checkmate.png
 # port: 80
@@ -8,14 +9,14 @@ services:
   client:
     image: bluewaveuptime/uptime_client:latest
     environment:
-      - SERVICE_FQDN_CHECKMATE_80
-      - UPTIME_APP_API_BASE_URL=${SERVICE_FQDN_CHECKMATESERVER_5000}/api/v1
+      - SERVICE_URL_CHECKMATE_80
+      - UPTIME_APP_API_BASE_URL=${SERVICE_URL_CHECKMATESERVER_5000}/api/v1
     depends_on:
       - server
   server:
     image: bluewaveuptime/uptime_server:latest
     environment:
-      - SERVICE_FQDN_CHECKMATESERVER_5000
+      - SERVICE_URL_CHECKMATESERVER_5000
       - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
       - REFRESH_TOKEN_SECRET=${SERVICE_PASSWORD_64_REFRESH}
       - SYSTEM_EMAIL_ADDRESS=${SYSTEM_EMAIL_ADDRESS:-test@example.com}

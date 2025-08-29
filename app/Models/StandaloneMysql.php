@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneMysql extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasSafeStringAttribute, SoftDeletes;
 
     protected $guarded = [];
 

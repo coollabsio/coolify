@@ -1,5 +1,6 @@
 # documentation: https://dashy.to/docs
 # slogan:A self-hostable personal dashboard built for you. Includes status-checking, widgets, themes, icon packs, a UI editor and tons more!
+# category: productivity
 # tags: dashboard, personal, self-hostable
 # logo: svgs/dashy.png
 # port: 8080
@@ -8,7 +9,7 @@ services:
   dashy:
     image: lissy93/dashy
     environment:
-      - SERVICE_FQDN_DASHY_8080
+      - SERVICE_URL_DASHY_8080
       - PUID=1000
       - PGID=1000
       - TZ=${TIMEZONE:-UTC}

@@ -1,7 +1,7 @@
 ---
-description: 
-globs: 
-alwaysApply: false
+description: Security architecture, authentication, authorization patterns, and enhanced form component security
+globs: app/Policies/*.php, app/View/Components/Forms/*.php, app/Http/Middleware/*.php, resources/views/**/*.blade.php
+alwaysApply: true
 ---
 # Coolify Security Architecture & Patterns
 
@@ -62,6 +62,323 @@ class User extends Authenticatable
 ```
 
 ## Authorization & Access Control
+
+### Enhanced Form Component Authorization System
+
+Coolify now features a **centralized authorization system** built into all form components (`Input`, `Select`, `Textarea`, `Checkbox`, `Button`) that automatically handles permission-based UI control.
+
+#### Component Authorization Parameters
+```php
+// Available on all form components
+public ?string $canGate = null;        // Gate name (e.g., 'update', 'view', 'delete')
+public mixed $canResource = null;      // Resource to check against (model instance)
+public bool $autoDisable = true;       // Auto-disable if no permission (default: true)
+```
+
+#### Smart Authorization Logic
+```php
+// Automatic authorization handling in component constructor
+if ($this->canGate && $this->canResource && $this->autoDisable) {
+    $hasPermission = Gate::allows($this->canGate, $this->canResource);
+    
+    if (! $hasPermission) {
+        $this->disabled = true;
+        // For Checkbox: also disables instantSave
+    }
+}
+```
+
+#### Usage Examples
+
+**✅ Recommended Pattern (Single Line):**
+```html
+<!-- Input with automatic authorization -->
+<x-forms.input 
+    canGate="update" 
+    :canResource="$application" 
+    id="application.name" 
+    label="Application Name" />
+
+<!-- Select with automatic authorization -->
+<x-forms.select 
+    canGate="update" 
+    :canResource="$application" 
+    id="application.build_pack" 
+    label="Build Pack">
+    <option value="nixpacks">Nixpacks</option>
+    <option value="static">Static</option>
+</x-forms.select>
+
+<!-- Checkbox with automatic instantSave control -->
+<x-forms.checkbox 
+    instantSave 
+    canGate="update" 
+    :canResource="$application" 
+    id="application.settings.is_static" 
+    label="Is Static Site?" />
+
+<!-- Button with automatic disable -->
+<x-forms.button 
+    canGate="update" 
+    :canResource="$application" 
+    type="submit">
+    Save Configuration
+</x-forms.button>
+```
+
+**❌ Old Pattern (Verbose, Deprecated):**
+```html
+<!-- DON'T use this repetitive pattern anymore -->
+@can('update', $application)
+    <x-forms.input id="application.name" label="Application Name" />
+    <x-forms.button type="submit">Save</x-forms.button>
+@else
+    <x-forms.input disabled id="application.name" label="Application Name" />
+@endcan
+```
+
+#### Advanced Usage with Custom Control
+
+**Custom Authorization Logic:**
+```html
+<!-- Disable auto-control, use custom logic -->
+<x-forms.input 
+    canGate="update" 
+    :canResource="$application" 
+    autoDisable="false"
+    :disabled="$application->is_deployed || !Gate::allows('update', $application)"
+    id="advanced.setting" 
+    label="Advanced Setting" />
+```
+
+**Multiple Permission Checks:**
+```html
+<!-- Complex permission requirements -->
+<x-forms.checkbox 
+    canGate="deploy" 
+    :canResource="$application" 
+    autoDisable="false"
+    :disabled="!$application->canDeploy() || !auth()->user()->hasAdvancedPermissions()"
+    id="deployment.setting" 
+    label="Advanced Deployment Setting" />
+```
+
+#### Supported Gates and Resources
+
+**Common Gates:**
+- `view` - Read access to resource
+- `update` - Modify resource configuration
+- `deploy` - Deploy/restart resource
+- `delete` - Remove resource
+- `createAnyResource` - Create new resources
+
+**Resource Types:**
+- `Application` - Application instances
+- `Service` - Docker Compose services  
+- `Server` - Server instances
+- `Project` - Project containers
+- `Environment` - Environment contexts
+- `Database` - Database instances
+
+#### Benefits
+
+**🔥 Massive Code Reduction:**
+- **90% less code** for authorization-protected forms
+- **Single line** instead of 6-12 lines per form element
+- **No more @can/@else blocks** cluttering templates
+
+**🛡️ Consistent Security:**
+- **Unified authorization logic** across all form components
+- **Automatic disabling** for unauthorized users
+- **Smart behavior** (like disabling instantSave on checkboxes)
+
+**🎨 Better UX:**
+- **Consistent disabled styling** across all components
+- **Proper visual feedback** for restricted access
+- **Clean, professional interface**
+
+#### Implementation Details
+
+**Component Enhancement:**
+```php
+// Enhanced in all form components
+use Illuminate\Support\Facades\Gate;
+
+public function __construct(
+    // ... existing parameters
+    public ?string $canGate = null,
+    public mixed $canResource = null,
+    public bool $autoDisable = true,
+) {
+    // Handle authorization-based disabling
+    if ($this->canGate && $this->canResource && $this->autoDisable) {
+        $hasPermission = Gate::allows($this->canGate, $this->canResource);
+        
+        if (! $hasPermission) {
+            $this->disabled = true;
+            // For Checkbox: $this->instantSave = false;
+        }
+    }
+}
+```
+
+**Backward Compatibility:**
+- All existing form components continue to work unchanged
+- New authorization parameters are optional
+- Legacy @can/@else patterns still function but are discouraged
+
+### Custom Component Authorization Patterns
+
+When dealing with **custom Alpine.js components** or complex UI elements that don't use the standard `x-forms.*` components, manual authorization protection is required since the automatic `canGate` system only applies to enhanced form components.
+
+#### Common Custom Components Requiring Manual Protection
+
+**⚠️ Custom Components That Need Manual Authorization:**
+- Custom dropdowns/selects with Alpine.js
+- Complex form widgets with JavaScript interactions
+- Multi-step wizards or dynamic forms
+- Third-party component integrations
+- Custom date/time pickers
+- File upload components with drag-and-drop
+
+#### Manual Authorization Pattern
+
+**✅ Proper Manual Authorization:**
+```html
+<!-- Custom timezone dropdown example -->
+<div class="w-full">
+    <div class="flex items-center mb-1">
+        <label for="customComponent">Component Label</label>
+        <x-helper helper="Component description" />
+    </div>
+    @can('update', $resource)
+        <!-- Full interactive component for authorized users -->
+        <div x-data="{
+            open: false,
+            value: '{{ $currentValue }}',
+            options: @js($options),
+            init() { /* Alpine.js initialization */ }
+        }">
+            <input x-model="value" @focus="open = true" 
+                   wire:model="propertyName" class="w-full input">
+            <div x-show="open">
+                <!-- Interactive dropdown content -->
+                <template x-for="option in options" :key="option">
+                    <div @click="value = option; open = false; $wire.submit()"
+                         x-text="option"></div>
+                </template>
+            </div>
+        </div>
+    @else
+        <!-- Read-only version for unauthorized users -->
+        <div class="relative">
+            <input readonly disabled autocomplete="off"
+                   class="w-full input opacity-50 cursor-not-allowed" 
+                   value="{{ $currentValue ?: 'No value set' }}">
+            <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50">
+                <!-- Disabled icon -->
+            </svg>
+        </div>
+    @endcan
+</div>
+```
+
+#### Implementation Checklist
+
+When implementing authorization for custom components:
+
+**🔍 1. Identify Custom Components:**
+- Look for Alpine.js `x-data` declarations
+- Find components not using `x-forms.*` prefix
+- Check for JavaScript-heavy interactions
+- Review complex form widgets
+
+**🛡️ 2. Wrap with Authorization:**
+- Use `@can('gate', $resource)` / `@else` / `@endcan` structure
+- Provide full functionality in the `@can` block
+- Create disabled/readonly version in the `@else` block
+
+**🎨 3. Design Disabled State:**
+- Apply `readonly disabled` attributes to inputs
+- Add `opacity-50 cursor-not-allowed` classes for visual feedback
+- Remove interactive JavaScript behaviors
+- Show current value or appropriate placeholder
+
+**🔒 4. Backend Protection:**
+- Ensure corresponding Livewire methods check authorization
+- Add `$this->authorize('gate', $resource)` in relevant methods
+- Validate permissions before processing any changes
+
+#### Real-World Examples
+
+**Custom Date Range Picker:**
+```html
+@can('update', $application)
+    <div x-data="dateRangePicker()" class="date-picker">
+        <!-- Interactive date picker with calendar -->
+    </div>
+@else
+    <div class="flex gap-2">
+        <input readonly disabled value="{{ $startDate }}" class="input opacity-50">
+        <input readonly disabled value="{{ $endDate }}" class="input opacity-50">
+    </div>
+@endcan
+```
+
+**Multi-Select Component:**
+```html
+@can('update', $server)
+    <div x-data="multiSelect({ options: @js($options) })">
+        <!-- Interactive multi-select with checkboxes -->
+    </div>
+@else
+    <div class="space-y-2">
+        @foreach($selectedValues as $value)
+            <div class="px-3 py-1 bg-gray-100 rounded text-sm opacity-50">
+                {{ $value }}
+            </div>
+        @endforeach
+    </div>
+@endcan
+```
+
+**File Upload Widget:**
+```html
+@can('update', $application)
+    <div x-data="fileUploader()" @drop.prevent="handleDrop">
+        <!-- Drag-and-drop file upload interface -->
+    </div>
+@else
+    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center opacity-50">
+        <p class="text-gray-500">File upload restricted</p>
+        @if($currentFile)
+            <p class="text-sm">Current: {{ $currentFile }}</p>
+        @endif
+    </div>
+@endcan
+```
+
+#### Key Principles
+
+**🎯 Consistency:**
+- Maintain similar visual styling between enabled/disabled states
+- Use consistent disabled patterns across the application
+- Apply the same opacity and cursor styling
+
+**🔐 Security First:**
+- Always implement backend authorization checks
+- Never rely solely on frontend hiding/disabling
+- Validate permissions on every server action
+
+**💡 User Experience:**
+- Show current values in disabled state when appropriate
+- Provide clear visual feedback about restricted access
+- Maintain layout stability between states
+
+**🚀 Performance:**
+- Minimize Alpine.js initialization for disabled components
+- Avoid loading unnecessary JavaScript for unauthorized users
+- Use simple HTML structures for read-only states
 
 ### Team-Based Multi-Tenancy
 - **[Team.php](mdc:app/Models/Team.php)** - Multi-tenant organization structure (8.9KB, 308 lines)

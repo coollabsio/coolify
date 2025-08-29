@@ -4,9 +4,11 @@
     </x-slot>
     <div class="flex items-center gap-2">
         <h1>S3 Storages</h1>
-        <x-modal-input buttonTitle="+ Add" title="New S3 Storage" :closeOutside="false">
-            <livewire:storage.create />
-        </x-modal-input>
+        @can('create', App\Models\S3Storage::class)
+            <x-modal-input buttonTitle="+ Add" title="New S3 Storage" :closeOutside="false">
+                <livewire:storage.create />
+            </x-modal-input>
+        @endcan
     </div>
     <div class="subtitle">S3 storages for backups.</div>
     <div class="grid gap-4 lg:grid-cols-2">
