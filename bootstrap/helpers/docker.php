@@ -256,12 +256,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
             if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
                 $MINIO_BROWSER_REDIRECT_URL->update([
-                    'value' => generateFqdn(server: $server, random: 'console-'.$uuid, parserVersion: $resource->service->compose_parsing_version, forceHttps: true),
+                    'value' => generateUrl(server: $server, random: 'console-'.$uuid, forceHttps: true),
                 ]);
             }
             if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
                 $MINIO_SERVER_URL->update([
-                    'value' => generateFqdn(server: $server, random: 'minio-'.$uuid, parserVersion: $resource->service->compose_parsing_version, forceHttps: true),
+                    'value' => generateUrl(server: $server, random: 'minio-'.$uuid, forceHttps: true),
                 ]);
             }
             $payload = collect([
@@ -279,12 +279,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
             if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
                 $LOGTO_ENDPOINT->update([
-                    'value' => generateFqdn(server: $server, random: 'logto-'.$uuid, parserVersion: $resource->service->compose_parsing_version),
+                    'value' => generateUrl(server: $server, random: 'logto-'.$uuid),
                 ]);
             }
             if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
                 $LOGTO_ADMIN_ENDPOINT->update([
-                    'value' => generateFqdn(server: $server, random: 'logto-admin-'.$uuid, parserVersion: $resource->service->compose_parsing_version),
+                    'value' => generateUrl(server: $server, random: 'logto-admin-'.$uuid),
                 ]);
             }
             $payload = collect([

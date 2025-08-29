@@ -133,7 +133,7 @@ class CloneMe extends Component
                 $uuid = (string) new Cuid2;
                 $url = $application->fqdn;
                 if ($this->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                    $url = generateFqdn(server: $this->server, random: $uuid, parserVersion: $application->compose_parsing_version);
+                    $url = generateUrl(server: $this->server, random: $uuid);
                 }
 
                 $newApplication = $application->replicate([

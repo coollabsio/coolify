@@ -15,17 +15,15 @@ class CanAccessTerminal
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if (! auth()->check()) {
+            abort(401, 'Authentication required');
+        }
+
+        // Only admins/owners can access terminal functionality
+        if (! auth()->user()->can('canAccessTerminal')) {
+            abort(403, 'Access to terminal functionality is restricted to team administrators');
+        }
+
         return $next($request);
-
-        // if (! auth()->check()) {
-        //     abort(401, 'Authentication required');
-        // }
-
-        // // Only admins/owners can access terminal functionality
-        // if (! auth()->user()->can('canAccessTerminal')) {
-        //     abort(403, 'Access to terminal functionality is restricted to team administrators');
-        // }
-
-        // return $next($request);
     }
 }

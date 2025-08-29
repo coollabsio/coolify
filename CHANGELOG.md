@@ -4,6 +4,101 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚜 Refactor
+
+- *(policy)* Simplify ServiceDatabasePolicy methods to always return true and add manageBackups method
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Update coolify version to 4.0.0-beta.426 and nightly version to 4.0.0-beta.427
+
+## [4.0.0-beta.425] - 2025-08-28
+
+### 🚀 Features
+
+- *(domains)* Implement domain conflict detection and user confirmation modal across application components
+- *(domains)* Add force_domain_override option and enhance domain conflict detection responses
+
+### 🐛 Bug Fixes
+
+- *(previews)* Simplify FQDN generation logic by removing unnecessary empty check
+- *(templates)* Update Matrix service compose configuration for improved compatibility and clarity
+
+### 🚜 Refactor
+
+- *(urls)* Replace generateFqdn with generateUrl for consistent URL generation across applications
+- *(domains)* Rename check_domain_usage to checkDomainUsage and update references across the application
+- *(auth)* Simplify access control logic in CanAccessTerminal and ServerPolicy by allowing all users to perform actions
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Update coolify version to 4.0.0-beta.425 and nightly version to 4.0.0-beta.426
+
+## [4.0.0-beta.424] - 2025-08-27
+
+### 🐛 Bug Fixes
+
+- *(parsers)* Do not modify service names, only for getting fqdns and related envs
+- *(compose)* Temporary allow to edit volumes in apps (compose based) and services
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Update coolify version to 4.0.0-beta.424 and nightly version to 4.0.0-beta.425
+
+## [4.0.0-beta.423] - 2025-08-27
+
+### 🚜 Refactor
+
+- *(parsers)* Remove unnecessary hyphen-to-underscore replacement for service names in serviceParser function
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Update coolify version to 4.0.0-beta.423 and nightly version to 4.0.0-beta.424
+
+## [4.0.0-beta.422] - 2025-08-27
+
+### 🐛 Bug Fixes
+
+- *(parsers)* Replace hyphens with underscores in service names for consistency. this allows to properly parse custom domains in docker compose based applications
+- *(parsers)* Implement parseDockerVolumeString function to handle various Docker volume formats and modes, including environment variables and Windows paths. Add unit tests for comprehensive coverage.
+- *(git)* Submodule update command uses an unsupported option (#6454)
+- *(service)* Swap URL for FQDN on matrix template (#6466)
+- *(parsers)* Enhance volume string handling by preserving mode in application and service parsers. Update related unit tests for validation.
+- *(docker)* Update parser version in FQDN generation for service-specific URLs
+
+### 🚜 Refactor
+
+- *(git)* Improve submodule cloning
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- Update version
+- Update development node version
+
+## [4.0.0-beta.421] - 2025-08-26
+
 ### 🚀 Features
 
 - *(policies)* Add EnvironmentVariablePolicy for managing environment variables ( it was missing )
