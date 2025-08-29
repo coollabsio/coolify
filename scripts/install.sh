@@ -739,7 +739,7 @@ update_env_var() {
     # If variable "key=" doesn't exist, append it to the file with value
     elif ! grep -q "^${key}=" "$ENV_FILE"; then
         printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
-        echo " - Added ${key} with default value as the variable was missing"
+        echo " - Added ${key} and it's value as the variable was missing"
     fi
 }
 
