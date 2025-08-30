@@ -17,7 +17,6 @@ services:
       - UID=${UID:-1000}
       - GID=${GID:-100}
       - CWA_DB_PATH=${CWA_DB_PATH:-/cwa-config/app.db} # This is using the volume where the  CWA's app.db is located
-    restart: unless-stopped
     volumes:
       - /path/to/cwa/books-ingest:/cwa-book-ingest  # This is where the books will be downloaded to, usually it would be the same as whatever you gave in "calibre-web-automated"
       - /path/to/cwa/configuration:/cwa-config # This is the location of CWA's app.db, which contains authentication details. Use a volume mount.
