@@ -54,7 +54,7 @@
     @if ($environment->isEmpty())
         @can('createAnyResource')
             <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                class="items-center justify-center box">+ Add New Resource</a>
+                class="items-center justify-center box">+ Add Resource</a>
         @else
             <div
                 class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">

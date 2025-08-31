@@ -208,7 +208,7 @@ class GithubPrivateRepository extends Component
                 $application['docker_compose_location'] = $this->docker_compose_location;
                 $application['base_directory'] = $this->base_directory;
             }
-            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
 
             $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);

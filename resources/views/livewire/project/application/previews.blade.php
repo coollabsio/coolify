@@ -219,4 +219,19 @@
             @endforeach
         </div>
     @endif
+    
+    <x-domain-conflict-modal 
+        :conflicts="$domainConflicts" 
+        :showModal="$showDomainConflictModal" 
+        confirmAction="confirmDomainUsage">
+        The preview deployment domain is already in use by other resources. Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.
+        <x-slot:consequences>
+            <ul class="mt-2 ml-4 list-disc">
+                <li>The preview deployment may not be accessible</li>
+                <li>Conflicts with production or other preview deployments</li>
+                <li>SSL certificates might not work correctly</li>
+                <li>Unpredictable routing behavior</li>
+            </ul>
+        </x-slot:consequences>
+    </x-domain-conflict-modal>
 </div>

@@ -67,4 +67,18 @@
                 instantSave="instantSaveAdvanced" id="application.is_log_drain_enabled" label="Drain Logs" />
         </div>
     </form>
+    
+    <x-domain-conflict-modal 
+        :conflicts="$domainConflicts" 
+        :showModal="$showDomainConflictModal" 
+        confirmAction="confirmDomainUsage">
+        <x-slot:consequences>
+            <ul class="mt-2 ml-4 list-disc">
+                <li>Only one service will be accessible at this domain</li>
+                <li>The routing behavior will be unpredictable</li>
+                <li>You may experience service disruptions</li>
+                <li>SSL certificates might not work correctly</li>
+            </ul>
+        </x-slot:consequences>
+    </x-domain-conflict-modal>
 </div>

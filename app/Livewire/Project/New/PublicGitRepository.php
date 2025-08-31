@@ -373,7 +373,7 @@ class PublicGitRepository extends Component
 
             $application->settings->is_static = $this->isStatic;
             $application->settings->save();
-            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
             $application->save();
             if ($this->checkCoolifyConfig) {

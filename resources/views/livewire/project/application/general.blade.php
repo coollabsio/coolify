@@ -462,6 +462,12 @@
             </div>
         </div>
     </form>
+    
+    <x-domain-conflict-modal 
+        :conflicts="$domainConflicts" 
+        :showModal="$showDomainConflictModal" 
+        confirmAction="confirmDomainUsage" />
+    
     @script
         <script>
             $wire.$on('loadCompose', (isInit = true) => {

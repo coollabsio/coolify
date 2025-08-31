@@ -13,7 +13,7 @@ class ServiceDatabasePolicy
      */
     public function view(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        return Gate::allows('view', $serviceDatabase->service);
+        return true;
     }
 
     /**
@@ -30,6 +30,7 @@ class ServiceDatabasePolicy
      */
     public function update(User $user, ServiceDatabase $serviceDatabase): bool
     {
+
         // return Gate::allows('update', $serviceDatabase->service);
         return true;
     }
@@ -58,6 +59,11 @@ class ServiceDatabasePolicy
     public function forceDelete(User $user, ServiceDatabase $serviceDatabase): bool
     {
         // return Gate::allows('delete', $serviceDatabase->service);
+        return true;
+    }
+
+    public function manageBackups(User $user, ServiceDatabase $serviceDatabase): bool
+    {
         return true;
     }
 }

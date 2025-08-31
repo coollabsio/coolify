@@ -25,6 +25,14 @@ class Previews extends Component
 
     public int $rate_limit_remaining;
 
+    public $domainConflicts = [];
+
+    public $showDomainConflictModal = false;
+
+    public $forceSaveDomains = false;
+
+    public $pendingPreviewId = null;
+
     protected $rules = [
         'application.previews.*.fqdn' => 'string|nullable',
     ];
@@ -49,6 +57,16 @@ class Previews extends Component
         }
     }
 
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        if ($this->pendingPreviewId) {
+            $this->save_preview($this->pendingPreviewId);
+            $this->pendingPreviewId = null;
+        }
+    }
+
     public function save_preview($preview_id)
     {
         try {
@@ -63,7 +81,20 @@ class Previews extends Component
                     $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $success = false;
                 }
-                check_domain_usage(resource: $this->application, domain: $preview->fqdn);
+                // Check for domain conflicts if not forcing save
+                if (! $this->forceSaveDomains) {
+                    $result = checkDomainUsage(resource: $this->application, domain: $preview->fqdn);
+                    if ($result['hasConflicts']) {
+                        $this->domainConflicts = $result['conflicts'];
+                        $this->showDomainConflictModal = true;
+                        $this->pendingPreviewId = $preview_id;
+
+                        return;
+                    }
+                } else {
+                    // Reset the force flag after using it
+                    $this->forceSaveDomains = false;
+                }
             }
 
             if (! $preview) {

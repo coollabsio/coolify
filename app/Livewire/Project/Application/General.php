@@ -51,9 +51,16 @@ class General extends Component
 
     public $parsedServiceDomains = [];
 
+    public $domainConflicts = [];
+
+    public $showDomainConflictModal = false;
+
+    public $forceSaveDomains = false;
+
     protected $listeners = [
         'resetDefaultLabels',
         'configurationChanged' => '$refresh',
+        'confirmDomainUsage',
     ];
 
     protected function rules(): array
@@ -430,7 +437,7 @@ class General extends Component
 
             $server = data_get($this->application, 'destination.server');
             if ($server) {
-                $fqdn = generateFqdn(server: $server, random: $this->application->uuid, parserVersion: $this->application->compose_parsing_version);
+                $fqdn = generateUrl(server: $server, random: $this->application->uuid);
                 $this->application->fqdn = $fqdn;
                 $this->application->save();
                 $this->resetDefaultLabels();
@@ -485,10 +492,33 @@ class General extends Component
                     }
                 }
             }
-            check_domain_usage(resource: $this->application);
+
+            // Check for domain conflicts if not forcing save
+            if (! $this->forceSaveDomains) {
+                $result = checkDomainUsage(resource: $this->application);
+                if ($result['hasConflicts']) {
+                    $this->domainConflicts = $result['conflicts'];
+                    $this->showDomainConflictModal = true;
+
+                    return false;
+                }
+            } else {
+                // Reset the force flag after using it
+                $this->forceSaveDomains = false;
+            }
+
             $this->application->fqdn = $domains->implode(',');
             $this->resetDefaultLabels(false);
         }
+
+        return true;
+    }
+
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        $this->submit();
     }
 
     public function setRedirect()
@@ -536,7 +566,9 @@ class General extends Component
                 $this->application->parseHealthcheckFromDockerfile($this->application->dockerfile);
             }
 
-            $this->checkFqdns();
+            if (! $this->checkFqdns()) {
+                return; // Stop if there are conflicts and user hasn't confirmed
+            }
 
             $this->application->save();
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
@@ -588,7 +620,20 @@ class General extends Component
                             }
                         }
                     }
-                    check_domain_usage(resource: $this->application);
+                    // Check for domain conflicts if not forcing save
+                    if (! $this->forceSaveDomains) {
+                        $result = checkDomainUsage(resource: $this->application);
+                        if ($result['hasConflicts']) {
+                            $this->domainConflicts = $result['conflicts'];
+                            $this->showDomainConflictModal = true;
+
+                            return;
+                        }
+                    } else {
+                        // Reset the force flag after using it
+                        $this->forceSaveDomains = false;
+                    }
+
                     $this->application->save();
                     $this->resetDefaultLabels();
                 }

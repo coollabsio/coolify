@@ -998,8 +998,8 @@ class Application extends BaseModel
                 $git_clone_command = "{$git_clone_command} sed -i \"s#git@\(.*\):#https://\\1/#g\" {$baseDir}/.gitmodules || true &&";
             }
             // Add shallow submodules flag if shallow clone is enabled
-            $submoduleFlags = $isShallowCloneEnabled ? '--shallow-submodules' : '';
-            $git_clone_command = "{$git_clone_command} GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive {$submoduleFlags}; fi";
+            $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
+            $git_clone_command = "{$git_clone_command} git submodule sync && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive {$submoduleFlags}; fi";
         }
         if ($this->settings->is_git_lfs_enabled) {
             $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git lfs pull";
@@ -1139,9 +1139,17 @@ class Application extends BaseModel
         $isShallowCloneEnabled = $this->settings?->is_git_shallow_clone_enabled ?? false;
         $depthFlag = $isShallowCloneEnabled ? ' --depth=1' : '';
 
-        $git_clone_command = "git clone{$depthFlag} -b {$escapedBranch}";
+        $submoduleFlags = '';
+        if ($this->settings->is_git_submodules_enabled) {
+            $submoduleFlags = ' --recurse-submodules';
+            if ($isShallowCloneEnabled) {
+                $submoduleFlags .= ' --shallow-submodules';
+            }
+        }
+
+        $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} -b {$escapedBranch}";
         if ($only_checkout) {
-            $git_clone_command = "git clone{$depthFlag} --no-checkout -b {$escapedBranch}";
+            $git_clone_command = "git clone{$depthFlag}{$submoduleFlags} --no-checkout -b {$escapedBranch}";
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";

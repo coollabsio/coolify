@@ -23,6 +23,12 @@ class ServiceApplicationView extends Component
 
     public $delete_volumes = true;
 
+    public $domainConflicts = [];
+
+    public $showDomainConflictModal = false;
+
+    public $forceSaveDomains = false;
+
     protected $rules = [
         'application.human_name' => 'nullable',
         'application.description' => 'nullable',
@@ -129,6 +135,13 @@ class ServiceApplicationView extends Component
         }
     }
 
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
@@ -145,7 +158,20 @@ class ServiceApplicationView extends Component
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
-            check_domain_usage(resource: $this->application);
+            // Check for domain conflicts if not forcing save
+            if (! $this->forceSaveDomains) {
+                $result = checkDomainUsage(resource: $this->application);
+                if ($result['hasConflicts']) {
+                    $this->domainConflicts = $result['conflicts'];
+                    $this->showDomainConflictModal = true;
+
+                    return;
+                }
+            } else {
+                // Reset the force flag after using it
+                $this->forceSaveDomains = false;
+            }
+
             $this->validate();
             $this->application->save();
             updateCompose($this->application);

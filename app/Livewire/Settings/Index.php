@@ -35,6 +35,12 @@ class Index extends Component
     #[Validate('required|string|timezone')]
     public string $instance_timezone;
 
+    public array $domainConflicts = [];
+
+    public bool $showDomainConflictModal = false;
+
+    public bool $forceSaveDomains = false;
+
     public function render()
     {
         return view('livewire.settings.index');
@@ -81,6 +87,13 @@ class Index extends Component
         }
     }
 
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
@@ -108,7 +121,18 @@ class Index extends Component
                 }
             }
             if ($this->fqdn) {
-                check_domain_usage(domain: $this->fqdn);
+                if (! $this->forceSaveDomains) {
+                    $result = checkDomainUsage(domain: $this->fqdn);
+                    if ($result['hasConflicts']) {
+                        $this->domainConflicts = $result['conflicts'];
+                        $this->showDomainConflictModal = true;
+
+                        return;
+                    }
+                } else {
+                    // Reset the force flag after using it
+                    $this->forceSaveDomains = false;
+                }
             }
 
             $this->instantSave(isSave: false);
