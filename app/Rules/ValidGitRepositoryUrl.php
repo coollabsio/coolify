@@ -31,7 +31,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
             '[', ']', '<', '>', '\n', '\r', '\0', '"', "'",
-            '\\', '!', '?', '*', '~', '^', '%', '=', '+',
+            '\\', '!', '?', '*', '^', '%', '=', '+',
             '#', // Comment character that could hide commands
         ];
 
