@@ -1,0 +1,205 @@
+# documentation: https://help.ente.io/
+# slogan: End-to-end encrypted photo backup and sharing platform
+# category: media
+# tags: photos, backup, encryption, sharing, privacy, media, storage, encryption, minio, postgresql
+# logo: svgs/ente.png
+# port: 3000, 3001, 3002, 3003, 3004, 8080, 3200
+
+services:
+  museum:
+    image: ghcr.io/ente-io/server:latest
+    environment:
+      - SERVICE_PASSWORD_POSTGRES= ${SERVICE_PASSWORD_POSTGRES}
+      - SERVICE_URL_MUSEUM_8080=${SERVICE_URL_MUSEUM_8080}
+      - KEY_ENCRYPTION=${KEY_ENCRYPTION}
+      - KEY_HASH=${KEY_HASH}
+      - KEY_JWT=${KEY_JWT}
+      - ARE_LOCAL_S3=${ARE_LOCAL_S3}
+      - USE_PATH_STYLE_URLS_S3=${USE_PATH_STYLE_URLS_S3}
+      - ARE_LOCAL_B2=${ARE_LOCAL_B2}
+      - USE_PATH_STYLE_URLS_B2=${USE_PATH_STYLE_URLS_B2}
+      - KEY_B2=${KEY_B2}
+      - SECRET_B2=${SECRET_B2}
+      - REGION_B2=${REGION_B2}
+      - BUCKET_B2=${BUCKET_B2}
+      - ${ARE_LOCAL_WASABI}
+      - USE_PATH_STYLE_URLS_WASABI=${USE_PATH_STYLE_URLS_WASABI}
+      - KEY_WASABI=${KEY_WASABI}
+      - SECRET_WASABI=${SECRET_WASABI}
+      - REGION_WASABI=${REGION_WASABI}
+      - BUCKET_WASABI=${BUCKET_WASABI}
+      - COMPLIANCE_WASABI=${COMPLIANCE_WASABI}
+      - ARE_LOCAL_SCW=${ARE_LOCAL_SCW}
+      - USE_PATH_STYLE_URLS_SCW=${USE_PATH_STYLE_URLS_SCW}
+      - KEY_SCW=${KEY_SCW}
+      - SECRET_SCW=${SECRET_SCW}
+      - REGION_SCW=${REGION_SCW}
+      - BUCKET_SCW=${BUCKET_SCW}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - museum-data:/data:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/ping"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    command: |
+      sh -c '
+      #!/bin/sh
+
+      # Generate the museum.yaml configuration file
+      cat > /museum.yaml << EOF
+      db:
+            host: postgres
+            port: 5432
+            name: ente_db
+            user: pguser
+            password: ${SERVICE_PASSWORD_POSTGRES}
+
+      s3:
+            are_local_buckets: $ARE_LOCAL_S3
+            use_path_style_urls: $USE_PATH_STYLE_URLS_S3
+            b2-eu-cen:
+              are_local_buckets: ${ARE_LOCAL_B2:false}
+              use_path_style_urls: ${USE_PATH_STYLE_URLS_B2:false}
+              key: ${KEY_B2}
+              secret: ${SECRET_B2}
+              endpoint: ${SERVICE_URL_MINIO_3200}
+              region: ${REGION_B2}
+              bucket: ${BUCKET_B2}
+            wasabi-eu-central-2-v3:
+              are_local_buckets: ${ARE_LOCAL_WASABI:false}
+              use_path_style_urls: ${USE_PATH_STYLE_URLS_WASABI:false}
+              key: ${KEY_WASABI}
+              secret: ${SECRET_WASABI}
+              endpoint: ${SERVICE_URL_MINIO_3200}
+              region: ${REGION_WASABI}
+              bucket: ${BUCKET_WASABI}
+              compliance: ${COMPLIANCE_WASABI}
+            scw-eu-fr-v3:
+              are_local_buckets: ${ARE_LOCAL_SCW:false}
+              use_path_style_urls: ${USE_PATH_STYLE_URLS_SCW:false}
+              key: ${KEY_SCW}
+              secret: ${SECRET_SCW}
+              endpoint: ${SERVICE_URL_MINIO_3200}
+              region: ${REGION_SCW}
+              bucket: ${BUCKET_SCW}
+
+      # Specify the base endpoints for various web apps
+      apps:
+          public-albums: ${SERVICE_URL_WEB_3002}
+          cast: ${SERVICE_URL_WEB_3004}
+          accounts: ${SERVICE_URL_WEB_3001}
+
+      key:
+            encryption: ${KEY_ENCRYPTION}
+            hash: ${KEY_HASH}
+
+      jwt:
+            secret: ${KEY_JWT}
+
+      EOF
+      echo "Generated museum.yaml"
+      exec ./museum
+      '
+
+  socat:
+    image: alpine/socat:latest
+    network_mode: service:museum
+    depends_on: [museum]
+    command: "TCP-LISTEN:3200,fork,reuseaddr TCP:minio:3200"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: ghcr.io/ente-io/web:latest
+    ports:
+      - 3000:3000
+      - 3001:3001
+      - 3002:3002
+      - 3003:3003
+      - 3004:3004
+    environment:
+      - SERVICE_URL_WEB_3000
+      - SERVICE_URL_WEB_3001
+      - SERVICE_URL_WEB_3002
+      - SERVICE_URL_WEB_3003
+      - SERVICE_URL_WEB_3004
+      - ENTE_API_ORIGIN=$SERVICE_URL_MUSEUM_8080
+      - ENTE_ALBUMS_ORIGIN=$SERVICE_URL_WEB_3002
+      - NODE_ENV=production
+      - ENTE_ACCOUNTS_ORIGIN=$SERVICE_URL_WEB_3001
+      - ENTE_AUTH_ORIGIN=$SERVICE_URL_WEB_3003
+      - ENTE_CAST_ORIGIN=$SERVICE_URL_WEB_3004
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=ente_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pguser -d ente_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    environment:
+      - SERVICE_URL_MINIO_3200
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+    command: server /data --address ":3200" --console-address ":3201"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3200/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    post_start:
+      - command: |
+          sh -c '
+          #!/bin/sh
+
+          while ! mc alias set h0 http://minio:3200 $SERVICE_USER_MINIO $SERVICE_PASSWORD_MINIO 2>/dev/null
+          do
+            echo "Waiting for minio..."
+            sleep 0.5
+          done
+
+          mc mb -p b2-eu-cen
+          mc mb -p wasabi-eu-central-2-v3
+          mc mb -p scw-eu-fr-v3
+          '
+
+volumes:
+  postgres-data:
+  minio-data:
+  museum-data:
+networks:
+  default:
+    name: ente-network
