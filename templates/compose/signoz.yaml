@@ -36,7 +36,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
     logging:
       options:
         max-size: 50m
@@ -73,7 +72,6 @@ services:
       nofile:
         soft: 262144
         hard: 262144
-    restart: unless-stopped
     logging:
       options:
         max-size: 50m
@@ -390,7 +388,6 @@ services:
         condition: service_healthy
       schema-migrator-sync:
         condition: service_completed_successfully
-    restart: unless-stopped
     logging:
       options:
         max-size: 50m
@@ -431,7 +428,7 @@ services:
         source: sqlite
         target: /var/lib/signoz/
     environment:
-      - SERVICE_FQDN_SIGNOZ_8080
+      - SERVICE_URL_SIGNOZ_8080
       - SIGNOZ_ALERTMANAGER_PROVIDER=signoz
       - SIGNOZ_JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
       - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://clickhouse:9000
@@ -472,7 +469,6 @@ services:
         condition: service_completed_successfully
       signoz:
         condition: service_healthy
-    restart: unless-stopped
     logging:
       options:
         max-size: 50m
@@ -585,7 +581,7 @@ services:
         content: |
           server_endpoint: ws://signoz:4320/v1/opamp
     environment:
-      - SERVICE_FQDN_OTELCOLLECTORHTTP_4318
+      - SERVICE_URL_OTELCOLLECTORHTTP_4318
       - OTEL_RESOURCE_ATTRIBUTES=host.name=signoz-host,os.type=linux
       - LOW_CARDINAL_EXCEPTION_GROUPING=false
     healthcheck:
