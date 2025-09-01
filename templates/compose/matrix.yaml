@@ -1,5 +1,6 @@
 # documentation: https://matrix.org/docs/chat_basics/matrix-for-im/
 # slogan: Chat securely with your family, friends, community, or build great apps with Matrix!
+# category: messaging
 # tags: chat,slack,discord,voip,video,call
 # logo: svgs/matrix.svg
 # port: 8008
@@ -8,13 +9,13 @@ services:
   matrix:
     image: matrixdotorg/synapse:latest
     environment:
-      - SERVICE_FQDN_MATRIX_8008
-      - SYNAPSE_SERVER_NAME=${SERVICE_URL_MATRIX}
+      - SERVICE_URL_MATRIX_8008
+      - SYNAPSE_SERVER_NAME=${SERVICE_FQDN_MATRIX}
       - SYNAPSE_REPORT_STATS=${SYNAPSE_REPORT_STATS:-no}
       - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-false}
       - RECAPTCHA_PUBLIC_KEY=${RECAPTCHA_PUBLIC_KEY}
       - RECAPTCHA_PRIVATE_KEY=${RECAPTCHA_PRIVATE_KEY}
-      - _SERVER_NAME=${SERVICE_URL_MATRIX}
+      - _SERVER_NAME=${SERVICE_FQDN_MATRIX}
       - _ADMIN_NAME=${SERVICE_USER_ADMIN}
       - _ADMIN_PASS=${SERVICE_PASSWORD_ADMIN}
     volumes:
@@ -43,7 +44,7 @@ services:
         #                        #
         ##########################
         cat <<EOF > /data/homeserver.yaml
-        server_name: "${SERVICE_URL_MATRIX}"
+        server_name: "${SERVICE_FQDN_MATRIX}"
         pid_file: /data/homeserver.pid
 
         # server
@@ -63,7 +64,7 @@ services:
             database: /data/homeserver.db
 
         # general
-        log_config: "/data/${SERVICE_URL_MATRIX}.log.config"
+        log_config: "/data/${SERVICE_FQDN_MATRIX}.log.config"
         media_store_path: /data/media_store
         report_stats: false
 
@@ -71,11 +72,11 @@ services:
         registration_shared_secret: $(<./registration_shared_secret)
         macaroon_secret_key: $(<./macaroon_secret_key)
         form_secret: $(<./form_secret)
-        signing_key_path: "/data/${SERVICE_URL_MATRIX}.signing.key"
+        signing_key_path: "/data/${SERVICE_FQDN_MATRIX}.signing.key"
 
         #rooms
         auto_join_rooms:
-          - "#general:${SERVICE_URL_MATRIX}"
+          - "#general:${SERVICE_FQDN_MATRIX}"
 
         # federation
         trusted_key_servers:
@@ -89,14 +90,14 @@ services:
         #                      #
         ########################
 
-        test -n "${ENABLE_REGISTRATION}" && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
+        [ "${ENABLE_REGISTRATION}" = "true" ] && ! grep "#registration" /data/homeserver.yaml &>/dev/null \
         && echo >> /data/homeserver.yaml \
         && cat <<EOF >> /data/homeserver.yaml
         #registration
         enable_registration: true  # Allows users to register on your server.
         EOF
 
-        ! grep ${RECAPTCHA_PUBLIC_KEY} /data/homeserver.yaml &>/dev/null \
+        [ -n "${RECAPTCHA_PUBLIC_KEY}" ] && ! grep "${RECAPTCHA_PUBLIC_KEY}" /data/homeserver.yaml &>/dev/null \
         && echo >> /data/homeserver.yaml \
         && cat <<EOF >> /data/homeserver.yaml
         # reCAPTCHA settings

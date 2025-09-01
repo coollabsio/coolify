@@ -5,9 +5,11 @@
     <div class="flex items-center gap-2">
         <h1>Destinations</h1>
         @if ($servers->count() > 0)
-            <x-modal-input buttonTitle="+ Add" title="New Destination">
-                <livewire:destination.new.docker />
-            </x-modal-input>
+            @can('createAnyResource')
+                <x-modal-input buttonTitle="+ Add" title="New Destination">
+                    <livewire:destination.new.docker />
+                </x-modal-input>
+            @endcan
         @endif
     </div>
     <div class="subtitle">Network endpoints to deploy your resources.</div>

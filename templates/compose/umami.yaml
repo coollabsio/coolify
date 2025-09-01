@@ -1,5 +1,6 @@
 # documentation: https://umami.is
 # slogan: Umami is web analytics platform which provides insights into visitor behavior without compromising user privacy.
+# category: analytics
 # tags: analytics, insights, privacy
 # logo: svgs/umami.svg
 # port: 3000
@@ -8,7 +9,7 @@ services:
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
     environment:
-      - SERVICE_FQDN_UMAMI_3000
+      - SERVICE_URL_UMAMI_3000
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
       - DATABASE_TYPE=postgres
       - APP_SECRET=$SERVICE_PASSWORD_64_UMAMI

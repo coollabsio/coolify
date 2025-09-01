@@ -13,6 +13,7 @@ use App\Jobs\RegenerateSslCertJob;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -163,6 +164,8 @@ class Server extends BaseModel
     ];
 
     protected $guarded = [];
+
+    use HasSafeStringAttribute;
 
     public function type()
     {

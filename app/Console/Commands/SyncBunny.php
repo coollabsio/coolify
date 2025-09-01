@@ -45,7 +45,7 @@ class SyncBunny extends Command
         $install_script = 'install.sh';
         $upgrade_script = 'upgrade.sh';
         $production_env = '.env.production';
-        $service_template = 'service-templates.json';
+        $service_template = config('constants.services.file_name');
         $versions = 'versions.json';
 
         $compose_file_location = "$parent_dir/$compose_file";
@@ -102,7 +102,7 @@ class SyncBunny extends Command
                 }
             }
             if ($only_template) {
-                $this->info('About to sync service-templates.json to BunnyCDN.');
+                $this->info('About to sync '.config('constants.services.file_name').' to BunnyCDN.');
                 $confirmed = confirm('Are you sure you want to sync?');
                 if (! $confirmed) {
                     return;

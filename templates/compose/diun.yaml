@@ -1,5 +1,6 @@
 # documentation: https://crazymax.dev/diun/
 # slogan: Docker Image Update Notifier is a CLI application to receive notifications when a Docker image is updated on a Docker registry.
+# category: automation
 # tags: docker, notifier, slack
 # logo: svgs/diun.svg
 

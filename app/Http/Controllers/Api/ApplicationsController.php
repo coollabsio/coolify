@@ -15,6 +15,8 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
@@ -188,6 +190,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -214,6 +217,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -308,6 +340,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -334,6 +367,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -428,6 +490,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -454,6 +517,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -532,6 +624,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -558,6 +651,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -633,6 +755,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
                             'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -659,6 +782,35 @@ class ApplicationsController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
             ),
         ]
     )]
@@ -697,6 +849,7 @@ class ApplicationsController extends Controller
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -724,6 +877,35 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function create_dockercompose_application(Request $request)
@@ -738,11 +920,13 @@ class ApplicationsController extends Controller
             return invalidTokenResponse();
         }
 
+        $this->authorize('create', Application::class);
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network'];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -831,8 +1015,8 @@ class ApplicationsController extends Controller
         $destination = $destinations->first();
         if ($type === 'public') {
             $validationRules = [
-                'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'docker_compose_location' => 'string',
@@ -883,7 +1067,7 @@ class ApplicationsController extends Controller
                 $application->source_type = GithubApp::class;
                 $application->source_id = GithubApp::find(0)->id;
             }
-            $application->git_repository = $repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2);
+            $application->git_repository = str($repository_url_parsed->getSegment(1).'/'.$repository_url_parsed->getSegment(2))->trim()->toString();
             $application->fqdn = $fqdn;
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
@@ -935,7 +1119,7 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-gh-app') {
             $validationRules = [
                 'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'github_app_uuid' => 'string|required',
@@ -1043,7 +1227,7 @@ class ApplicationsController extends Controller
                 $application->docker_compose_domains = $dockerComposeDomainsJson;
             }
             $application->fqdn = $fqdn;
-            $application->git_repository = $gitRepository;
+            $application->git_repository = str($gitRepository)->trim()->toString();
             $application->destination_id = $destination->id;
             $application->destination_type = $destination->getMorphClass();
             $application->environment_id = $environment->id;
@@ -1090,8 +1274,8 @@ class ApplicationsController extends Controller
         } elseif ($type === 'private-deploy-key') {
 
             $validationRules = [
-                'git_repository' => 'string|required',
-                'git_branch' => 'string|required',
+                'git_repository' => ['string', 'required', new ValidGitRepositoryUrl],
+                'git_branch' => ['string', 'required', new ValidGitBranch],
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|required',
                 'private_key_uuid' => 'string|required',
@@ -1376,7 +1560,7 @@ class ApplicationsController extends Controller
                 'domains' => data_get($application, 'domains'),
             ]))->setStatusCode(201);
         } elseif ($type === 'dockercompose') {
-            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw'];
+            $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'instant_deploy', 'docker_compose_raw', 'force_domain_override'];
 
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {
@@ -1518,6 +1702,8 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $this->authorize('view', $application);
 
         return response()->json($this->removeSensitiveData($application));
     }
@@ -1697,12 +1883,14 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $application);
+
         DeleteResourceJob::dispatch(
             resource: $application,
-            deleteConfigurations: $request->query->get('delete_configurations', true),
             deleteVolumes: $request->query->get('delete_volumes', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true)
         );
 
         return response()->json([
@@ -1802,6 +1990,7 @@ class ApplicationsController extends Controller
                             'watch_paths' => ['type' => 'string', 'description' => 'The watch paths.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
+                            'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                         ],
                     )
                 ),
@@ -1835,6 +2024,35 @@ class ApplicationsController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 409,
+                description: 'Domain conflicts detected.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Domain conflicts detected. Use force_domain_override=true to proceed.'],
+                                'warning' => ['type' => 'string', 'example' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.'],
+                                'conflicts' => [
+                                    'type' => 'array',
+                                    'items' => new OA\Schema(
+                                        type: 'object',
+                                        properties: [
+                                            'domain' => ['type' => 'string', 'example' => 'example.com'],
+                                            'resource_name' => ['type' => 'string', 'example' => 'My Application'],
+                                            'resource_uuid' => ['type' => 'string', 'nullable' => true, 'example' => 'abc123-def456'],
+                                            'resource_type' => ['type' => 'string', 'enum' => ['application', 'service', 'instance'], 'example' => 'application'],
+                                            'message' => ['type' => 'string', 'example' => 'Domain example.com is already in use by application \'My Application\''],
+                                        ]
+                                    ),
+                                ],
+                            ]
+                        )
+                    ),
+                ]
+            ),
         ]
     )]
     public function update_by_uuid(Request $request)
@@ -1854,8 +2072,11 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('update', $application);
+
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network'];
+        $allowedFields = ['name', 'description', 'is_static', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override'];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -1971,13 +2192,22 @@ class ApplicationsController extends Controller
                     'errors' => $errors,
                 ], 422);
             }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+            // Check for domain conflicts
+            $result = checkIfDomainIsAlreadyUsedViaAPI($fqdn, $teamId, $uuid);
+            if (isset($result['error'])) {
                 return response()->json([
                     'message' => 'Validation failed.',
-                    'errors' => [
-                        'domains' => 'One of the domain is already used.',
-                    ],
+                    'errors' => ['domains' => $result['error']],
                 ], 422);
+            }
+
+            // If there are conflicts and force is not enabled, return warning
+            if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $result['conflicts'],
+                    'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                ], 409);
             }
         }
 
@@ -2138,6 +2368,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('view', $application);
+
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
         $envs = $envs->map(function ($env) {
@@ -2252,6 +2485,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
@@ -2442,6 +2678,8 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        $this->authorize('manageEnvironment', $application);
+
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json([
@@ -2626,6 +2864,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
@@ -2776,6 +3017,9 @@ class ApplicationsController extends Controller
                 'message' => 'Application not found.',
             ], 404);
         }
+
+        $this->authorize('manageEnvironment', $application);
+
         $found_env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Application::class)
             ->where('resourceable_id', $application->id)
@@ -2879,6 +3123,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
+        $this->authorize('deploy', $application);
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
@@ -2971,6 +3217,9 @@ class ApplicationsController extends Controller
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
+
+        $this->authorize('deploy', $application);
+
         StopApplication::dispatch($application);
 
         return response()->json(
@@ -3048,6 +3297,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
+        $this->authorize('deploy', $application);
+
         $deployment_uuid = new Cuid2;
 
         $result = queue_application_deployment(
@@ -3069,131 +3320,6 @@ class ApplicationsController extends Controller
             ],
         );
     }
-
-    // #[OA\Post(
-    //     summary: 'Execute Command',
-    //     description: "Execute a command on the application's current container.",
-    //     path: '/applications/{uuid}/execute',
-    //     operationId: 'execute-command-application',
-    //     security: [
-    //         ['bearerAuth' => []],
-    //     ],
-    //     tags: ['Applications'],
-    //     parameters: [
-    //         new OA\Parameter(
-    //             name: 'uuid',
-    //             in: 'path',
-    //             description: 'UUID of the application.',
-    //             required: true,
-    //             schema: new OA\Schema(
-    //                 type: 'string',
-    //                 format: 'uuid',
-    //             )
-    //         ),
-    //     ],
-    //     requestBody: new OA\RequestBody(
-    //         required: true,
-    //         description: 'Command to execute.',
-    //         content: new OA\MediaType(
-    //             mediaType: 'application/json',
-    //             schema: new OA\Schema(
-    //                 type: 'object',
-    //                 properties: [
-    //                     'command' => ['type' => 'string', 'description' => 'Command to execute.'],
-    //                 ],
-    //             ),
-    //         ),
-    //     ),
-    //     responses: [
-    //         new OA\Response(
-    //             response: 200,
-    //             description: "Execute a command on the application's current container.",
-    //             content: [
-    //                 new OA\MediaType(
-    //                     mediaType: 'application/json',
-    //                     schema: new OA\Schema(
-    //                         type: 'object',
-    //                         properties: [
-    //                             'message' => ['type' => 'string', 'example' => 'Command executed.'],
-    //                             'response' => ['type' => 'string'],
-    //                         ]
-    //                     )
-    //                 ),
-    //             ]
-    //         ),
-    //         new OA\Response(
-    //             response: 401,
-    //             ref: '#/components/responses/401',
-    //         ),
-    //         new OA\Response(
-    //             response: 400,
-    //             ref: '#/components/responses/400',
-    //         ),
-    //         new OA\Response(
-    //             response: 404,
-    //             ref: '#/components/responses/404',
-    //         ),
-    //     ]
-    // )]
-    // public function execute_command_by_uuid(Request $request)
-    // {
-    //     // TODO: Need to review this from security perspective, to not allow arbitrary command execution
-    //     $allowedFields = ['command'];
-    //     $teamId = getTeamIdFromToken();
-    //     if (is_null($teamId)) {
-    //         return invalidTokenResponse();
-    //     }
-    //     $uuid = $request->route('uuid');
-    //     if (! $uuid) {
-    //         return response()->json(['message' => 'UUID is required.'], 400);
-    //     }
-    //     $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
-    //     if (! $application) {
-    //         return response()->json(['message' => 'Application not found.'], 404);
-    //     }
-    //     $return = validateIncomingRequest($request);
-    //     if ($return instanceof \Illuminate\Http\JsonResponse) {
-    //         return $return;
-    //     }
-    //     $validator = customApiValidator($request->all(), [
-    //         'command' => 'string|required',
-    //     ]);
-
-    //     $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-    //     if ($validator->fails() || ! empty($extraFields)) {
-    //         $errors = $validator->errors();
-    //         if (! empty($extraFields)) {
-    //             foreach ($extraFields as $field) {
-    //                 $errors->add($field, 'This field is not allowed.');
-    //             }
-    //         }
-
-    //         return response()->json([
-    //             'message' => 'Validation failed.',
-    //             'errors' => $errors,
-    //         ], 422);
-    //     }
-
-    //     $container = getCurrentApplicationContainerStatus($application->destination->server, $application->id)->firstOrFail();
-    //     $status = getContainerStatus($application->destination->server, $container['Names']);
-
-    //     if ($status !== 'running') {
-    //         return response()->json([
-    //             'message' => 'Application is not running.',
-    //         ], 400);
-    //     }
-
-    //     $commands = collect([
-    //         executeInDocker($container['Names'], $request->command),
-    //     ]);
-
-    //     $res = instant_remote_process(command: $commands, server: $application->destination->server);
-
-    //     return response()->json([
-    //         'message' => 'Command executed.',
-    //         'response' => $res,
-    //     ]);
-    // }
 
     private function validateDataApplications(Request $request, Server $server)
     {
@@ -3254,13 +3380,22 @@ class ApplicationsController extends Controller
                     'errors' => $errors,
                 ], 422);
             }
-            if (checkIfDomainIsAlreadyUsed($fqdn, $teamId, $uuid)) {
+            // Check for domain conflicts
+            $result = checkIfDomainIsAlreadyUsedViaAPI($fqdn, $teamId, $uuid);
+            if (isset($result['error'])) {
                 return response()->json([
                     'message' => 'Validation failed.',
-                    'errors' => [
-                        'domains' => 'One of the domain is already used.',
-                    ],
+                    'errors' => ['domains' => $result['error']],
                 ], 422);
+            }
+
+            // If there are conflicts and force is not enabled, return warning
+            if ($result['hasConflicts'] && ! $request->boolean('force_domain_override')) {
+                return response()->json([
+                    'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                    'conflicts' => $result['conflicts'],
+                    'warning' => 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.',
+                ], 409);
             }
         }
     }

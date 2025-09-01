@@ -17,10 +17,15 @@
                     <div class="flex items-end gap-2">
                         <x-forms.input helper="Content Type in GitHub configuration could be json or form-urlencoded."
                             readonly label="GitHub" id="githubManualWebhook"></x-forms.input>
-                        <x-forms.input type="password"
-                            helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
-                            label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
-
+                        @can('update', $resource)
+                            <x-forms.input type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
+                                label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
+                        @else
+                            <x-forms.input disabled type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitHub."
+                                label="GitHub Webhook Secret" id="githubManualWebhookSecret"></x-forms.input>
+                        @endcan
                     </div>
                     <a target="_blank" class="flex hover:no-underline" href="{{ $resource?->gitWebhook }}">
                         <x-forms.button>Webhook Configuration on GitHub
@@ -29,23 +34,43 @@
                     </a>
                     <div class="flex gap-2">
                         <x-forms.input readonly label="GitLab" id="gitlabManualWebhook"></x-forms.input>
-                        <x-forms.input type="password"
-                            helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
-                            label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
+                        @can('update', $resource)
+                            <x-forms.input type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
+                                label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
+                        @else
+                            <x-forms.input disabled type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
+                                label="GitLab Webhook Secret" id="gitlabManualWebhookSecret"></x-forms.input>
+                        @endcan
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input readonly label="Bitbucket" id="bitbucketManualWebhook"></x-forms.input>
-                        <x-forms.input type="password"
-                            helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
-                            label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
+                        @can('update', $resource)
+                            <x-forms.input type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
+                                label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
+                        @else
+                            <x-forms.input disabled type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket."
+                                label="Bitbucket Webhook Secret" id="bitbucketManualWebhookSecret"></x-forms.input>
+                        @endcan
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input readonly label="Gitea" id="giteaManualWebhook"></x-forms.input>
-                        <x-forms.input type="password"
-                            helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
-                            label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
+                        @can('update', $resource)
+                            <x-forms.input type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
+                                label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
+                        @else
+                            <x-forms.input disabled type="password"
+                                helper="Need to set a secret to be able to use this webhook. It should match with the secret in Gitea."
+                                label="Gitea Webhook Secret" id="giteaManualWebhookSecret"></x-forms.input>
+                        @endcan
                     </div>
-                    <x-forms.button type="submit">Save</x-forms.button>
+                    @can('update', $resource)
+                        <x-forms.button type="submit">Save</x-forms.button>
+                    @endcan
                 </form>
             @else
                 You are using an official Git App. You do not need manual webhooks.

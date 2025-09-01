@@ -66,7 +66,7 @@ class CheckProxy
             if ($server->id === 0) {
                 $ip = 'host.docker.internal';
             }
-            $portsToCheck = ['80', '443'];
+            $portsToCheck = [];
 
             try {
                 if ($server->proxyType() !== ProxyTypes::NONE->value) {

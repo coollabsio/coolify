@@ -351,6 +351,12 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $size = $this->calculate_size();
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
+
+                        // If local backup is disabled, delete the local file immediately after S3 upload
+                        if ($this->backup->disable_local_backup) {
+                            deleteBackupsLocally($this->backup_location, $this->server);
+                            $this->add_to_backup_output('Local backup file deleted after S3 upload (disable_local_backup enabled).');
+                        }
                     }
 
                     $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
@@ -561,7 +567,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             }
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key \"$secret\"";
+            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
 

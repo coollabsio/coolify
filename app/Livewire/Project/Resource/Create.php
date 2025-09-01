@@ -15,6 +15,7 @@ class Create extends Component
 
     public function mount()
     {
+
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
         $server_id = request()->query('server_id');

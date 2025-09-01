@@ -1,5 +1,6 @@
 # documentation: https://github.com/RocketChat/Rocket.Chat
 # slogan: Self-hosted, secure and highly customizable open-source communication platform for organizations with sophisticated security and privacy concerns.
+# category: messaging
 # tags: rocketchat,chat,communication,privacy,mongodb,open,source
 # logo: svgs/rocketchat.svg
 # port: 3000
@@ -8,10 +9,10 @@ services:
   rocketchat:
     image: registry.rocket.chat/rocketchat/rocket.chat:latest
     environment:
-      - SERVICE_FQDN_ROCKETCHAT_3000
+      - SERVICE_URL_ROCKETCHAT_3000
       - MONGO_URL=mongodb://${MONGODB_ADVERTISED_HOSTNAME:-mongodb}:${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}/${MONGODB_DATABASE:-rocketchat}?replicaSet=${MONGODB_REPLICA_SET_NAME:-rs0}
       - MONGO_OPLOG_URL=mongodb://${MONGODB_ADVERTISED_HOSTNAME:-mongodb}:${MONGODB_INITIAL_PRIMARY_PORT_NUMBER:-27017}/local?replicaSet=${MONGODB_REPLICA_SET_NAME:-rs0}
-      - ROOT_URL=$SERVICE_FQDN_ROCKETCHAT
+      - ROOT_URL=$SERVICE_URL_ROCKETCHAT
       - DEPLOY_METHOD=docker
       - REG_TOKEN=$REG_TOKEN
     depends_on:

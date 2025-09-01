@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Testing strategies with Pest PHP, Laravel Dusk, and quality assurance patterns
+globs: tests/**/*.php, database/factories/*.php
 alwaysApply: false
 ---
 # Coolify Testing Architecture & Patterns

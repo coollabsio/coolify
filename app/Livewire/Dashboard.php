@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -30,6 +31,12 @@ class Dashboard extends Component
 
     public function cleanupQueue()
     {
+        try {
+            $this->authorize('cleanupDeploymentQueue', Application::class);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return handleError($e, $this);
+        }
+
         Artisan::queue('cleanup:deployment-queue', [
             '--team-id' => currentTeam()->id,
         ]);

@@ -12,7 +12,7 @@ ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases
 ARG NIXPACKS_VERSION=1.39.0
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-05-21T01-59-54Z
+ARG MINIO_VERSION=RELEASE.2025-03-12T17-29-24Z
 
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 

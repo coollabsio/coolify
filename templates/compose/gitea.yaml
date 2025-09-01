@@ -1,5 +1,6 @@
 # documentation: https://docs.gitea.com
 # slogan: Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
+# category: git
 # tags: version control, collaboration, code, hosting, lightweight
 # logo: svgs/gitea.svg
 
@@ -7,7 +8,7 @@ services:
   gitea:
     image: gitea/gitea:latest
     environment:
-      - SERVICE_FQDN_GITEA_3000
+      - SERVICE_URL_GITEA_3000
       - USER_UID=1000
       - USER_GID=1000
     ports:

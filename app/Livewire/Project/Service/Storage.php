@@ -3,10 +3,13 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\LocalPersistentVolume;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Storage extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $fileStorage;
@@ -42,6 +45,8 @@ class Storage extends Component
     public function addNewVolume($data)
     {
         try {
+            $this->authorize('update', $this->resource);
+
             LocalPersistentVolume::create([
                 'name' => $data['name'],
                 'mount_path' => $data['mount_path'],
