@@ -948,6 +948,21 @@
         "minversion": "0.0.0",
         "port": "6555"
     },
+    "ente-photos": {
+        "documentation": "https://help.ente.io/self-hosting/installation/compose",
+        "slogan": "Self-hosted photo storage and sharing service.",
+        "compose": "<compose>",
+        "tags": [
+            "photos",
+            "gallery",
+            "server",
+            "self-hosted"
+        ],
+        "category": "media",
+        "logo": "svgs/ente-photos.png",
+        "minversion": "0.0.0",
+        "port": "3000"
+    },
     "evolution-api": {
         "documentation": "https://doc.evolution-api.com/v1/pt/get-started/introduction?utm_source=coolify.io",
         "slogan": "Evolution API Installation with Postgres and Redis",
