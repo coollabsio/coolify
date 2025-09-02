@@ -21,6 +21,18 @@
                         Terminal
                     </a>
                 @endcan
+                {{-- ADD FILE BROWSER NAVIGATION HERE --}}
+                @can('view', $application)
+                    <a class="{{ request()->routeIs('project.application.file-browser') ? 'dark:text-white' : '' }}"
+                        href="{{ route('project.application.file-browser', $parameters) }}">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                            </svg>
+                            Files
+                        </span>
+                    </a>
+                @endcan
             @endif
             <x-applications.links :application="$application" />
         </nav>

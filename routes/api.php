@@ -185,3 +185,21 @@ Route::group([
 Route::any('/{any}', function () {
     return response()->json(['message' => 'Not found.', 'docs' => 'https://coolify.io/docs'], 404);
 })->where('any', '.*');
+
+Route::middleware(['auth:sanctum', App\Http\Middleware\ContainerAccessMiddleware::class])
+    ->prefix('containers/{containerId}/files')
+    ->group(function () {
+
+        // File browser routes
+        Route::get('/', [App\Http\Controllers\FileBrowserController::class, 'listFiles']);
+        Route::post('/', [App\Http\Controllers\FileBrowserController::class, 'uploadFile']);
+        Route::get('/download', [App\Http\Controllers\FileBrowserController::class, 'downloadFile']);
+        Route::delete('/', [App\Http\Controllers\FileBrowserController::class, 'deleteItem']);
+        Route::put('/permissions', [App\Http\Controllers\FileBrowserController::class, 'updatePermissions']);
+
+        // Directory operations
+        Route::post('/directories', [App\Http\Controllers\FileBrowserController::class, 'createDirectory']);
+
+        // Container information
+        Route::get('/mounts', [App\Http\Controllers\FileBrowserController::class, 'getContainerMounts']);
+    });

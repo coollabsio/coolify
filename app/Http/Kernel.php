@@ -74,5 +74,6 @@ class Kernel extends HttpKernel
         'can.create.resources' => \App\Http\Middleware\CanCreateResources::class,
         'can.update.resource' => \App\Http\Middleware\CanUpdateResource::class,
         'can.access.terminal' => \App\Http\Middleware\CanAccessTerminal::class,
+        'container.access' => \App\Http\Middleware\ContainerAccessMiddleware::class, // ADD THIS LINE
     ];
 }
