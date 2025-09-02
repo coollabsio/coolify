@@ -3,173 +3,200 @@
 # category: media
 # tags: photos, backup, encryption, sharing, privacy, media, storage, encryption, minio, postgresql
 # logo: svgs/ente.png
-# port: 3000, 3001, 3002, 3003, 3004, 8080, 3200
+# port: 8081 3000, 3001, 3002, 3003, 3004, 3200
 
 services:
   museum:
     image: ghcr.io/ente-io/server:latest
+    ports:
+      - 8081:8080
     environment:
-      - SERVICE_PASSWORD_POSTGRES= ${SERVICE_PASSWORD_POSTGRES}
-      - SERVICE_URL_MUSEUM_8080=${SERVICE_URL_MUSEUM_8080}
-      - KEY_ENCRYPTION=${KEY_ENCRYPTION}
-      - KEY_HASH=${KEY_HASH}
-      - KEY_JWT=${KEY_JWT}
-      - ARE_LOCAL_S3=${ARE_LOCAL_S3}
-      - USE_PATH_STYLE_URLS_S3=${USE_PATH_STYLE_URLS_S3}
-      - ARE_LOCAL_B2=${ARE_LOCAL_B2}
-      - USE_PATH_STYLE_URLS_B2=${USE_PATH_STYLE_URLS_B2}
-      - KEY_B2=${KEY_B2}
-      - SECRET_B2=${SECRET_B2}
-      - REGION_B2=${REGION_B2}
-      - BUCKET_B2=${BUCKET_B2}
-      - ${ARE_LOCAL_WASABI}
-      - USE_PATH_STYLE_URLS_WASABI=${USE_PATH_STYLE_URLS_WASABI}
-      - KEY_WASABI=${KEY_WASABI}
-      - SECRET_WASABI=${SECRET_WASABI}
-      - REGION_WASABI=${REGION_WASABI}
-      - BUCKET_WASABI=${BUCKET_WASABI}
-      - COMPLIANCE_WASABI=${COMPLIANCE_WASABI}
-      - ARE_LOCAL_SCW=${ARE_LOCAL_SCW}
-      - USE_PATH_STYLE_URLS_SCW=${USE_PATH_STYLE_URLS_SCW}
-      - KEY_SCW=${KEY_SCW}
-      - SECRET_SCW=${SECRET_SCW}
-      - REGION_SCW=${REGION_SCW}
-      - BUCKET_SCW=${BUCKET_SCW}
+      SERVICE_URL_MUSEUM_8081: ${SERVICE_URL_MUSEUM_8081:-http://localhost:8081}
+
+      ENTE_HTTP_USE_TLS: ${ENTE_HTTP_USE_TLS:-false}
+
+      ENTE_APPS_PUBLIC_ALBUMS: ${SERVICE_URL_WEB_3002:-http://localhost:3002}
+      ENTE_APPS_CAST: ${SERVICE_URL_WEB_3004:-http://localhost:3004}
+      ENTE_APPS_ACCOUNTS: ${SERVICE_URL_WEB_3001:-http://localhost:3001}
+      ENTE_APPS_PUBLIC_LOCKER: ${SERVICE_URL_WEB_3003:-http://localhost:3003}
+      ENTE_APPS_CUSTOM_DOMAIN_CNAME: ${ENTE_APPS_CUSTOM_DOMAIN_CNAME}
+
+      ENTE_DB_HOST: ${ENTE_DB_HOST:-postgres}
+      ENTE_DB_PORT: ${ENTE_DB_PORT:-5432}
+      ENTE_DB_NAME: ${ENTE_DB_NAME:-ente_db}
+      ENTE_DB_SSLMODE: ${ENTE_DB_SSLMODE:-disable}
+      ENTE_DB_USER: ${SERVICE_USER_POSTGRES:-pguser}
+      ENTE_DB_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+
+      ENTE_KEY_ENCRYPTION: ${MUSEUM_ENCRYPTION_KEY}
+      ENTE_KEY_HASH: ${MUSEUM_HASH_KEY}
+
+      ENTE_JWT_SECRET: ${MUSEUM_JWT_KEY}
+
+      ENTE_SMTP_HOST: ${SMTP_HOST}
+      ENTE_SMTP_PORT: ${SMTP_PORT}
+      ENTE_SMTP_USERNAME: ${SMTP_USERNAME}
+      ENTE_SMTP_PASSWORD: ${SMTP_PASSWORD}
+      ENTE_SMTP_EMAIL: ${SMTP_EMAIL}
+      ENTE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+      ENTE_SMTP_ENCRYPTION: ${SMTP_ENCRYPTION}
+
+      ENTE_TRANSMAIL_KEY: ${ENTE_TRANSMAIL_KEY}
+
+      ENTE_APPLE_SHARED_SECRET: ${ENTE_APPLE_SHARED_SECRET}
+
+      ENTE_STRIPE_US_KEY: ${ENTE_STRIPE_US_KEY}
+      ENTE_STRIPE_US_WEBHOOK_SECRET: ${ENTE_STRIPE_WEBHOOK_SECRET}
+      ENTE_STRIPE_IN_KEY: ${ENTE_STRIPE_US_KEY}
+      ENTE_STRIPE_IN_WEBHOOK_SECRET: ${ENTE_STRIPE_WEBHOOK_SECRET}
+      ENTE_STRIPE_WHITELISTED_REDIRECT_URLS: ${ENTE_WHITELISTED_REDIRECT_URLS}
+
+      ENTE_WEBAUTHN_RPID: ${ENTE_WEBAUTHN_RPID:-localhost}
+      ENTE_WEBAUTHN_RPORIGINS: ${ENTE_WEBAUTHN_RPORIGINS:-https://localhost:3001}
+
+      ENTE_INTERNAL_SILENT: ${ENTE_INTERNAL_SILENT:-false}
+      ENTE_INTERNAL_HEALTH_CHECK_URL: ${ENTE_INTERNAL_HEALTH_CHECK_URL}
+      ENTE_INTERNAL_HARDCODED_OTT_EMAILS: ${ENTE_INTERNAL_HARDCODED_OTT_EMAIL}
+      ENTE_INTERNAL_HARDCODED_OTT_LOCAL_DOMAIN_SUFFIX: ${ENTE_INTERNAL_HARDCODED_OTT_LOCAL_DOMAIN_SUFFIX}
+      ENTE_INTERNAL_HARDCODED_OTT_LOCAL_DOMAIN_VALUE: ${ENTE_INTERNAL_HARDCODED_OTT_LOCAL_DOMAIN_VALUE}
+      ENTE_INTERNAL_ADMINS: ${ENTE_INTERNAL_ADMINS}
+      ENTE_INTERNAL_ADMIN: ${ENTE_INTERNAL_ADMIN}
+      ENTE_INTERNAL_DISABLE_REGISTRATION: ${ENTE_INTERNAL_DISABLE_REGISTRATION:-false}
+
+      ENTE_REPLICATION_ENABLED: ${ENTE_REPLICATION_ENABLED:-false}
+      ENTE_REPLICATION_WORKER_URL: ${ENTE_REPLICATION_WORKER_URL}
+      ENTE_REPLICATION_WORKER_COUNT: ${ENTE_REPLICATION_WORKER_COUNT:-6}
+      ENTE_REPLICATION_TMP_STORAGE: ${ENTE_REPLICATION_TMP_STORAGE:-/tmp/replication}
+
+      ENTE_JOBS_CRON_SKIP: ${ENTE_JOBS_CRON_SKIP:-false}
+      ENTE_JOBS_REMOVE_UNREPORTED_OBJECTS_WORKER_COUNT: ${ENTE_JOBS_REMOVE_UNREPORTED_OBJECTS_WORKER_COUNT:-1}
+      ENTE_JOBS_CLEAR_ORPHAN_OBJECTS_ENABLED: ${ENTE_JOBS_CLEAR_ORPHAN_OBJECTS_ENABLED:-false}
+      ENTE_JOBS_CLEAR_ORPHAN_OBJECTS_PREFIX: ${ENTE_JOBS_CLEAR_ORPHAN_OBJECTS_PREFIX:-""}
+
+      ENTE_S3_ARE_LOCAL_BUCKETS: ${ENTE_S3_ARE_LOCAL_BUCKETS:-true}
+      ENTE_S3_USE_PATH_STYLE_URLS: ${ENTE_S3_USE_PATH_STYLE_URLS:-true}
+
+      ENTE_S3_HOT_STORAGE_PRIMARY: ${ENTE_S3_HOT_STORAGE_PRIMARY:-b2-eu-cen}
+      ENTE_S3_HOT_STORAGE_SECONDARY: ${ENTE_S3_HOT_STORAGE_SECONDARY:-wasabi-eu-central-2-v3}
+
+      ENTE_S3_B2_EU_CEN_KEY: ${SERVICE_USER_MINIO}
+      ENTE_S3_B2_EU_CEN_SECRET: ${SERVICE_PASSWORD_MINIO}
+      ENTE_S3_B2_EU_CEN_ENDPOINT: ${SERVICE_URL_MINIO}:3200
+      ENTE_S3_B2_EU_CEN_REGION: ${PRIMARY_STORAGE_REGION:-eu-central-2}
+      ENTE_S3_B2_EU_CEN_BUCKET: ${PRIMARY_STORAGE_BUCKET:-b2-eu-cen}
+      ENTE_S3_B2_EU_CEN_ARE_LOCAL_BUCKETS: ${PRIMARY_STORAGE_ARE_LOCAL_BUCKETS:-false}
+      ENTE_S3_B2_EU_CEN_USE_PATH_STYLE_URLS: ${PRIMARY_STORAGE_USE_PATH_STYLE_URLS:-false}
+
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_KEY: ${SERVICE_USER_MINIO}
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_SECRET: ${SERVICE_PASSWORD_MINIO}
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_ENDPOINT: ${SERVICE_URL_MINIO}:3200
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_REGION: ${SECONDARY_STORAGE_REGION:-eu-central-2}
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_BUCKET: ${SECONDARY_STORAGE_BUCKET:-wasabi-eu-central-2-v3}
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_ARE_LOCAL_BUCKETS: ${SECONDARY_STORAGE_ARE_LOCAL_BUCKETS:-false}
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_USE_PATH_STYLE_URLS: ${SECONDARY_STORAGE_USE_PATH_STYLE_URLS:-false}
+      ENTE_S3_WASABI_EU_CENTRAL_2_V3_COMPLIANCE: ${SECONDARY_STORAGE_COMPLIANCE:-true}
+
+      ENTE_S3_SCW_EU_FR_V3_KEY: ${SERVICE_USER_MINIO}
+      ENTE_S3_SCW_EU_FR_V3_SECRET: ${SERVICE_PASSWORD_MINIO}
+      ENTE_S3_SCW_EU_FR_V3_ENDPOINT: ${SERVICE_URL_MINIO}:3200
+      ENTE_S3_SCW_EU_FR_V3_REGION: ${SECONDARY_STORAGE_REGION:-eu-central-2}
+      ENTE_S3_SCW_EU_FR_V3_BUCKET: ${COLD_STORAGE_BUCKET:-scw-eu-fr-v3}
+      ENTE_S3_SCW_EU_FR_V3_ARE_LOCAL_BUCKETS: ${COLD_STORAGE_ARE_LOCAL_BUCKETS:-true}
+      ENTE_S3_SCW_EU_FR_V3_USE_PATH_STYLE_URLS: ${COLD_STORAGE_USE_PATH_STYLE_URLS:-true}
+
+      ENTE_S3_WASABI_EU_CENTRAL_2_DERIVED_KEY: ${SECONDARY_STORAGE_DERIVED_KEY}
+      ENTE_S3_WASABI_EU_CENTRAL_2_DERIVED_SECRET: ${SECONDARY_STORAGE_DERIVED_SECRET}
+      ENTE_S3_WASABI_EU_CENTRAL_2_DERIVED_ENDPOINT: ${SECONDARY_STORAGE_DERIVED_ENDPOINT}
+      ENTE_S3_WASABI_EU_CENTRAL_2_DERIVED_REGION: ${SECONDARY_STORAGE_DERIVED_REGION}
+      ENTE_S3_WASABI_EU_CENTRAL_2_DERIVED_BUCKET: ${SECONDARY_STORAGE_DERIVED_BUCKET}
+
+      ENTE_S3_DERIVED_STORAGE: ${ENTE_S3_DERIVED_STORAGE:-wasabi-eu-central-2-derived}
+
+      ENTE_S3_FILE_DATA_CONFIG_MLDATA_PRIMARY_BUCKET: ${ENTE_S3_FILE_DATA_CONFIG_MLDATA_PRIMARY_BUCKET}
+      ENTE_S3_FILE_DATA_CONFIG_MLDATA_REPLICA_BUCKETS: ${ENTE_S3_FILE_DATA_CONFIG_MLDATA_REPLICA_BUCKETS}
+      ENTE_S3_FILE_DATA_CONFIG_IMG_PREVIEW_PRIMARY_BUCKET: ${ENTE_S3_FILE_DATA_CONFIG_IMG_PREVIEW_PRIMARY_BUCKET}
+      ENTE_S3_FILE_DATA_CONFIG_IMG_PREVIEW_REPLICA_BUCKETS: ${ENTE_S3_FILE_DATA_CONFIG_IMG_PREVIEW_REPLICA_BUCKETS}
+
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     volumes:
-      - museum-data:/data:ro
+      - museum-data:/data:rw
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/ping"]
+      test: ["CMD", "curl", "--fail", "http://localhost:8081/ping"]
       interval: 60s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 10s
     restart: unless-stopped
-    command: |
-      sh -c '
-      #!/bin/sh
-
-      # Generate the museum.yaml configuration file
-      cat > /museum.yaml << EOF
-      db:
-            host: postgres
-            port: 5432
-            name: ente_db
-            user: pguser
-            password: ${SERVICE_PASSWORD_POSTGRES}
-
-      s3:
-            are_local_buckets: $ARE_LOCAL_S3
-            use_path_style_urls: $USE_PATH_STYLE_URLS_S3
-            b2-eu-cen:
-              are_local_buckets: ${ARE_LOCAL_B2:false}
-              use_path_style_urls: ${USE_PATH_STYLE_URLS_B2:false}
-              key: ${KEY_B2}
-              secret: ${SECRET_B2}
-              endpoint: ${SERVICE_URL_MINIO_3200}
-              region: ${REGION_B2}
-              bucket: ${BUCKET_B2}
-            wasabi-eu-central-2-v3:
-              are_local_buckets: ${ARE_LOCAL_WASABI:false}
-              use_path_style_urls: ${USE_PATH_STYLE_URLS_WASABI:false}
-              key: ${KEY_WASABI}
-              secret: ${SECRET_WASABI}
-              endpoint: ${SERVICE_URL_MINIO_3200}
-              region: ${REGION_WASABI}
-              bucket: ${BUCKET_WASABI}
-              compliance: ${COMPLIANCE_WASABI}
-            scw-eu-fr-v3:
-              are_local_buckets: ${ARE_LOCAL_SCW:false}
-              use_path_style_urls: ${USE_PATH_STYLE_URLS_SCW:false}
-              key: ${KEY_SCW}
-              secret: ${SECRET_SCW}
-              endpoint: ${SERVICE_URL_MINIO_3200}
-              region: ${REGION_SCW}
-              bucket: ${BUCKET_SCW}
-
-      # Specify the base endpoints for various web apps
-      apps:
-          public-albums: ${SERVICE_URL_WEB_3002}
-          cast: ${SERVICE_URL_WEB_3004}
-          accounts: ${SERVICE_URL_WEB_3001}
-
-      key:
-            encryption: ${KEY_ENCRYPTION}
-            hash: ${KEY_HASH}
-
-      jwt:
-            secret: ${KEY_JWT}
-
-      EOF
-      echo "Generated museum.yaml"
-      exec ./museum
-      '
+    networks:
+      - ente-network
 
   socat:
-    image: alpine/socat:latest
+    image: alpine/socat
     network_mode: service:museum
     depends_on: [museum]
     command: "TCP-LISTEN:3200,fork,reuseaddr TCP:minio:3200"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "3200"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   web:
-    image: ghcr.io/ente-io/web:latest
-    ports:
-      - 3000:3000
-      - 3001:3001
-      - 3002:3002
-      - 3003:3003
-      - 3004:3004
+    image: ghcr.io/ente-io/web
+    # ports:
+    #   - 3000:3000 # Photos web app
+    #   - 3001:3001 # Accounts
+    #   - 3002:3002 # Public albums
+    #   - 3003:3003 # Auth
+    #   - 3004:3004 # Cast
     environment:
-      - SERVICE_URL_WEB_3000
-      - SERVICE_URL_WEB_3001
-      - SERVICE_URL_WEB_3002
-      - SERVICE_URL_WEB_3003
-      - SERVICE_URL_WEB_3004
-      - ENTE_API_ORIGIN=$SERVICE_URL_MUSEUM_8080
-      - ENTE_ALBUMS_ORIGIN=$SERVICE_URL_WEB_3002
-      - NODE_ENV=production
-      - ENTE_ACCOUNTS_ORIGIN=$SERVICE_URL_WEB_3001
-      - ENTE_AUTH_ORIGIN=$SERVICE_URL_WEB_3003
-      - ENTE_CAST_ORIGIN=$SERVICE_URL_WEB_3004
+      ENTE_API_ORIGIN: ${SERVICE_URL_MUSEUM:-http://localhost}:8081
+      SERVICE_URL_WEB_3000: ${SERVICE_URL_WEB_3000:-http://localhost:3000}
+      ENTE_ALBUMS_ORIGIN: ${SERVICE_URL_WEB_3002:-http://localhost:3002}
+      SERVICE_URL_WEB_3001: ${SERVICE_URL_WEB_3001:-http://localhost:3001}
+      SERVICE_URL_WEB_3003: ${SERVICE_URL_WEB_3003:-http://localhost:3003}
+      SERVICE_URL_WEB_3004: ${SERVICE_URL_WEB_3004:-http://localhost:3004}
+
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "--fail", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    networks:
+      - ente-network
 
   postgres:
     image: postgres:15
     environment:
-      - POSTGRES_USER=pguser
-      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - POSTGRES_DB=ente_db
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES:-pguser}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${SERVICE_DB_NAME:-ente_db}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pguser -d ente_db"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${SERVICE_USER_POSTGRES:-pguser} -d ${SERVICE_DB_NAME:-ente_db}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - ente-network
 
   minio:
     image: minio/minio
+    ports:
+      - 3200:3200
     environment:
-      - SERVICE_URL_MINIO_3200
-      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
-      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+      SERVICE_URL_MINIO_3200: ${SERVICE_URL_MINIO_3200}
+      MINIO_ROOT_USER: ${SERVICE_USER_MINIO}
+      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
     command: server /data --address ":3200" --console-address ":3201"
     volumes:
       - minio-data:/data
@@ -179,27 +206,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    restart: unless-stopped
     post_start:
       - command: |
           sh -c '
           #!/bin/sh
 
-          while ! mc alias set h0 http://minio:3200 $SERVICE_USER_MINIO $SERVICE_PASSWORD_MINIO 2>/dev/null
+          while ! mc alias set h0 http://minio:3200 ${SERVICE_USER_MINIO} ${SERVICE_PASSWORD_MINIO} 2>/dev/null
           do
             echo "Waiting for minio..."
             sleep 0.5
           done
 
+          cd /data
+
           mc mb -p b2-eu-cen
           mc mb -p wasabi-eu-central-2-v3
           mc mb -p scw-eu-fr-v3
           '
+    networks:
+      - ente-network
 
 volumes:
   postgres-data:
   minio-data:
   museum-data:
+
 networks:
-  default:
+  ente-network:
     name: ente-network
