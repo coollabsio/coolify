@@ -1,27 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Official Ente Photos logo inspired design -->
   <defs>
     <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#00D4AA;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#00A693;stop-opacity:1" />
     </linearGradient>
   </defs>
-  <rect width="256" height="256" rx="32" fill="url(#gradient)"/>
-  <g fill="white">
-    <!-- Camera body -->
-    <rect x="64" y="96" width="128" height="96" rx="16" fill="white"/>
-    <!-- Camera lens -->
-    <circle cx="128" cy="144" r="32" fill="url(#gradient)"/>
-    <circle cx="128" cy="144" r="20" fill="white"/>
-    <circle cx="128" cy="144" r="12" fill="url(#gradient)"/>
-    <!-- Camera flash -->
-    <rect x="160" y="104" width="16" height="8" rx="4" fill="url(#gradient)"/>
-    <!-- Viewfinder -->
-    <rect x="96" y="80" width="64" height="8" rx="4" fill="white"/>
-    <!-- Lock icon overlay -->
-    <g transform="translate(180, 180)">
-      <rect x="0" y="8" width="24" height="16" rx="2" fill="white"/>
-      <path d="M6 8V6a6 6 0 0 1 12 0v2" stroke="white" stroke-width="2" fill="none"/>
-      <circle cx="12" cy="16" r="2" fill="url(#gradient)"/>
-    </g>
-  </g>
+
+  <!-- Main circular background matching official Ente green -->
+  <circle cx="128" cy="128" r="112" fill="url(#gradient)"/>
+
+  <!-- Stylized "e" letter in Ente style -->
+  <path d="M80 128 C80 96, 96 80, 128 80 C160 80, 176 96, 176 120 L88 120 C88 144, 104 160, 128 160 C144 160, 156 152, 164 140 L180 156 C168 172, 148 184, 128 184 C96 184, 80 168, 80 128 Z M88 104 L168 104 C164 88, 148 88, 128 88 C108 88, 92 88, 88 104 Z" fill="#FFFFFF"/>
 </svg>
