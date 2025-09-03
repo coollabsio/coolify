@@ -63,7 +63,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     environment:
       - SERVICE_URL_MINIO_3200
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
@@ -72,10 +72,10 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3200/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   minio-init:
     image: minio/mc:latest
