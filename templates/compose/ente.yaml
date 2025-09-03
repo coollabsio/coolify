@@ -187,8 +187,3 @@ volumes:
 networks:
   ente-network:
     name: ente-network
-
-
-MUSEUM_ENCRYPTION_KEY= pWe6al9Xtp2exq4g0HKqH9+mTGsF+KIsrKBkKMf80eI=
-MUSEUM_HASH_KEY= OEZIA8F71MVXAe8JxVAAmbmKbb6wyLMiGbWeWuRbCTdqRj92YfTRX0GWEIYkoSZRpWaPnCIxGpgI3AgLKJ3wEA==
-MUSEUM_JWT_KEY= KzyBWIwh5vL9EflM9qeq0BsbkWMl_xI4czGFiQj7UJA=
