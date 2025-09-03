@@ -1,6 +1,6 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
-    <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+    <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item"
                 class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
@@ -35,12 +35,14 @@
                 </div>
                 @if ($serviceDatabase?->isBackupSolutionAvailable() || $serviceDatabase?->is_migrated)
                     <div x-cloak x-show="activeTab === 'backups'">
-                        <div class="flex gap-2 ">
+                        <div class="flex gap-2">
                             <h2 class="pb-4">Scheduled Backups</h2>
                             @if (filled($serviceDatabase->custom_type) || !$serviceDatabase->is_migrated)
-                                <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                                    <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
-                                </x-modal-input>
+                                @can('update', $serviceDatabase)
+                                    <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                                        <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" />
+                                    </x-modal-input>
+                                @endcan
                             @endif
                         </div>
                         <livewire:project.database.scheduled-backups :database="$serviceDatabase" />

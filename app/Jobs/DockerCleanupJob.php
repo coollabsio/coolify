@@ -31,10 +31,15 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping('docker-cleanup-'.$this->server->uuid))->expireAfter(600)->dontRelease()];
     }
 
-    public function __construct(public Server $server, public bool $manualCleanup = false) {}
+    public function __construct(
+        public Server $server,
+        public bool $manualCleanup = false,
+        public bool $deleteUnusedVolumes = false,
+        public bool $deleteUnusedNetworks = false
+    ) {}
 
     public function handle(): void
     {
@@ -50,7 +55,11 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             $this->usageBefore = $this->server->getDiskUsage();
 
             if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {
-                $cleanup_log = CleanupDocker::run(server: $this->server);
+                $cleanup_log = CleanupDocker::run(
+                    server: $this->server,
+                    deleteUnusedVolumes: $this->deleteUnusedVolumes,
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                );
                 $usageAfter = $this->server->getDiskUsage();
                 $message = ($this->manualCleanup ? 'Manual' : 'Forced').' Docker cleanup job executed successfully. Disk usage before: '.$this->usageBefore.'%, Disk usage after: '.$usageAfter.'%.';
 
@@ -67,7 +76,11 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if (str($this->usageBefore)->isEmpty() || $this->usageBefore === null || $this->usageBefore === 0) {
-                $cleanup_log = CleanupDocker::run(server: $this->server);
+                $cleanup_log = CleanupDocker::run(
+                    server: $this->server,
+                    deleteUnusedVolumes: $this->deleteUnusedVolumes,
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                );
                 $message = 'Docker cleanup job executed successfully, but no disk usage could be determined.';
 
                 $this->execution_log->update([
@@ -81,7 +94,11 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             if ($this->usageBefore >= $this->server->settings->docker_cleanup_threshold) {
-                $cleanup_log = CleanupDocker::run(server: $this->server);
+                $cleanup_log = CleanupDocker::run(
+                    server: $this->server,
+                    deleteUnusedVolumes: $this->deleteUnusedVolumes,
+                    deleteUnusedNetworks: $this->deleteUnusedNetworks
+                );
                 $usageAfter = $this->server->getDiskUsage();
                 $diskSaved = $this->usageBefore - $usageAfter;
 

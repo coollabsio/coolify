@@ -1,0 +1,93 @@
+# documentation: https://support.getgrist.com/
+# slogan: Grist is a modern relational spreadsheet. It combines the flexibility of a spreadsheet with the robustness of a database.
+# category: productivity
+# tags: lowcode, nocode, spreadsheet, database, relational
+# logo: svgs/grist.svg
+# port: 443
+
+services:
+  grist:
+    image: gristlabs/grist:latest
+    environment:
+      - SERVICE_URL_GRIST_443
+      - APP_HOME_URL=${SERVICE_URL_GRIST}
+      - APP_DOC_URL=${SERVICE_URL_GRIST}
+      - GRIST_DOMAIN=${SERVICE_URL_GRIST}
+      - TZ=${TZ:-UTC}
+      - GRIST_SUPPORT_ANON=${SUPPORT_ANON:-false}
+      - GRIST_FORCE_LOGIN=${FORCE_LOGIN:-true}
+      - COOKIE_MAX_AGE=${COOKIE_MAX_AGE:-86400000}
+      - GRIST_PAGE_TITLE_SUFFIX=${PAGE_TITLE_SUFFIX:- - Suffix}
+      - GRIST_HIDE_UI_ELEMENTS=${HIDE_UI_ELEMENTS:-billing,sendToDrive,supportGrist,multiAccounts,tutorials}
+      - GRIST_UI_FEATURES=${UI_FEATURES:-helpCenter,billing,templates,createSite,multiSite,sendToDrive,tutorials,supportGrist}
+      - GRIST_DEFAULT_EMAIL=${DEFAULT_EMAIL:-test@example.com}
+      - GRIST_ORG_IN_PATH=${ORG_IN_PATH:-true}
+      - GRIST_OIDC_SP_HOST=${SERVICE_URL_GRIST}
+      - GRIST_OIDC_IDP_SCOPES=${OIDC_IDP_SCOPES:-openid profile email}
+      - GRIST_OIDC_IDP_SKIP_END_SESSION_ENDPOINT=${OIDC_IDP_SKIP_END_SESSION_ENDPOINT:-false}
+      - GRIST_OIDC_IDP_ISSUER=${OIDC_IDP_ISSUER:?}
+      - GRIST_OIDC_IDP_CLIENT_ID=${OIDC_IDP_CLIENT_ID:?}
+      - GRIST_OIDC_IDP_CLIENT_SECRET=${OIDC_IDP_CLIENT_SECRET:?}
+      - GRIST_SESSION_SECRET=${SERVICE_REALBASE64_128}
+      - GRIST_HOME_INCLUDE_STATIC=${HOME_INCLUDE_STATIC:-true}
+      - GRIST_SANDBOX_FLAVOR=${SANDBOX_FLAVOR:-gvisor}
+      - ALLOWED_WEBHOOK_DOMAINS=${ALLOWED_WEBHOOK_DOMAINS}
+      - COMMENTS=${COMMENTS:-true}
+      - TYPEORM_TYPE=${TYPEORM_TYPE:-postgres}
+      - TYPEORM_DATABASE=${POSTGRES_DATABASE:-grist-db}
+      - TYPEORM_USERNAME=${SERVICE_USER_POSTGRES}
+      - TYPEORM_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - TYPEORM_HOST=${TYPEORM_HOST}
+      - TYPEORM_PORT=${TYPEORM_PORT:-5432}
+      - TYPEORM_LOGGING=${TYPEORM_LOGGING:-false}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - GRIST_HELP_CENTER=${SERVICE_URL_GRIST}/help
+      - GRIST_TERMS_OF_SERVICE_URL=${SERVICE_URL_GRIST}/terms
+      - FREE_COACHING_CALL_URL=${FREE_COACHING_CALL_URL}
+      - GRIST_CONTACT_SUPPORT_URL=${CONTACT_SUPPORT_URL}
+    volumes:
+      - grist-data:/persist
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - "-e"
+        - "require('http').get('http://localhost:8484/status', res => process.exit(res.statusCode === 200 ? 0 : 1))"
+        - "> /dev/null 2>&1"
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=${POSTGRES_DATABASE:-grist-db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - grist_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  redis:
+    image: redis:7
+    volumes:
+      - grist_redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20

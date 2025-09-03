@@ -7,6 +7,7 @@ use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -14,6 +15,8 @@ use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $resourceName;
@@ -33,6 +36,8 @@ class Danger extends Component
     public ?string $modalId = null;
 
     public string $resourceDomain = '';
+
+    public bool $canDelete = false;
 
     public function mount()
     {
@@ -77,6 +82,13 @@ class Danger extends Component
             'service-database' => $this->resource->name ?? 'Service Database',
             default => 'Unknown Resource',
         };
+
+        // Check if user can delete this resource
+        try {
+            $this->canDelete = auth()->user()->can('delete', $this->resource);
+        } catch (\Exception $e) {
+            $this->canDelete = false;
+        }
     }
 
     public function delete($password)
@@ -96,13 +108,14 @@ class Danger extends Component
         }
 
         try {
+            $this->authorize('delete', $this->resource);
             $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
-                $this->delete_configurations,
                 $this->delete_volumes,
-                $this->docker_cleanup,
-                $this->delete_connected_networks
+                $this->delete_connected_networks,
+                $this->delete_configurations,
+                $this->docker_cleanup
             );
 
             return redirect()->route('project.resource.index', [

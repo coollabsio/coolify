@@ -28,6 +28,7 @@ class ServicePolicy
      */
     public function create(User $user): bool
     {
+        // return $user->isAdmin();
         return true;
     }
 
@@ -36,6 +37,12 @@ class ServicePolicy
      */
     public function update(User $user, Service $service): bool
     {
+        $team = $service->team();
+        if (! $team) {
+            return false;
+        }
+
+        // return $user->isAdmin() && $user->teams->contains('id', $team->id);
         return true;
     }
 
@@ -44,11 +51,12 @@ class ServicePolicy
      */
     public function delete(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
+        // if ($user->isAdmin()) {
+        //    return true;
+        // }
 
-        return false;
+        // return false;
+        return true;
     }
 
     /**
@@ -56,6 +64,7 @@ class ServicePolicy
      */
     public function restore(User $user, Service $service): bool
     {
+        // return true;
         return true;
     }
 
@@ -64,19 +73,56 @@ class ServicePolicy
      */
     public function forceDelete(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
+        // if ($user->isAdmin()) {
+        //    return true;
+        // }
 
-        return false;
+        // return false;
+        return true;
     }
 
     public function stop(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
+        $team = $service->team();
+        if (! $team) {
+            return false;
         }
 
-        return false;
+        // return $user->teams->contains('id', $team->id);
+        return true;
+    }
+
+    /**
+     * Determine whether the user can manage environment variables.
+     */
+    public function manageEnvironment(User $user, Service $service): bool
+    {
+        $team = $service->team();
+        if (! $team) {
+            return false;
+        }
+
+        // return $user->isAdmin() && $user->teams->contains('id', $team->id);
+        return true;
+    }
+
+    /**
+     * Determine whether the user can deploy the service.
+     */
+    public function deploy(User $user, Service $service): bool
+    {
+        $team = $service->team();
+        if (! $team) {
+            return false;
+        }
+
+        // return $user->teams->contains('id', $team->id);
+        return true;
+    }
+
+    public function accessTerminal(User $user, Service $service): bool
+    {
+        // return $user->isAdmin() || $user->teams->contains('id', $service->team()->id);
+        return true;
     }
 }

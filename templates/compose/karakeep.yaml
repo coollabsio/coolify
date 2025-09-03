@@ -1,0 +1,47 @@
+# documentation: https://docs.karakeep.app/
+# slogan: A self-hostable bookmark-everything app (links, notes and images) with AI-based automatic tagging and full text search
+# category: productivity
+# tags: media,read-it-later,pocket-alternative,omnivore-alternative,instapaper-alternative
+# logo: svgs/karakeep.svg
+# port: 3000
+
+services:
+  web:
+    image: ghcr.io/karakeep-app/karakeep:release
+    volumes:
+      - karakeep-data:/data
+    environment:
+      - SERVICE_URL_KARAKEEP
+      - NEXTAUTH_URL=${SERVICE_URL_KARAKEEP}
+      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      - MEILI_ADDR=http://meilisearch:7700
+      - BROWSER_WEB_URL=http://chrome:9222
+      - OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY}
+      - DISABLE_SIGNUPS=${SERVICE_DISABLE_SIGNUPS:-false}
+      - DATA_DIR=/data
+
+  chrome:
+    image: gcr.io/zenika-hub/alpine-chrome:124
+    command:
+      - '--no-sandbox'
+      - '--disable-gpu'
+      - '--disable-dev-shm-usage'
+      - '--remote-debugging-address=0.0.0.0'
+      - '--remote-debugging-port=9222'
+      - '--hide-scrollbars'
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.13.3
+    environment:
+      - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
+      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      - NEXTAUTH_URL=${SERVICE_URL_KARAKEEP}
+    volumes:
+      - karakeep-meilisearch:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

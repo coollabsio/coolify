@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Server Resources | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
+    <livewire:server.navbar :server="$server" />
     <div x-data="{ activeTab: 'managed' }" class="flex flex-col h-full gap-8 md:flex-row">
         <div class="w-full">
             <div class="flex flex-col">
@@ -13,8 +13,8 @@
                 <div>Here you can find all resources that are managed by Coolify.</div>
                 <div class="flex flex-row gap-4 py-10">
                     <div @class([
-                        'box-without-bg cursor-pointer bg-coolgray-100 text-white w-full text-center items-center justify-center',
-                        'bg-coollabs' => $activeTab === 'managed',
+                        'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
+                        'dark:bg-coollabs bg-coollabs text-white' => $activeTab === 'managed',
                     ]) wire:click="loadManagedContainers">
                         Managed
                         <div class="flex flex-col items-center justify-center">
@@ -22,8 +22,8 @@
                         </div>
                     </div>
                     <div @class([
-                        'box-without-bg cursor-pointer bg-coolgray-100 text-white w-full text-center items-center justify-center',
-                        'bg-coollabs' => $activeTab === 'unmanaged',
+                        'box-without-bg cursor-pointer dark:bg-coolgray-100 dark:text-white w-full text-center items-center justify-center',
+                        'dark:bg-coollabs bg-coollabs text-white' => $activeTab === 'unmanaged',
                     ]) wire:click="loadUnmanagedContainers">
                         Unmanaged
                         <div class="flex flex-col items-center justify-center">

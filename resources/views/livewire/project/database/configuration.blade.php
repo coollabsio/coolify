@@ -5,7 +5,7 @@
     <h1>Configuration</h1>
     <livewire:project.shared.configuration-checker :resource="$database" />
     <livewire:project.database.heading :database="$database" />
-    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">General</a>
@@ -17,9 +17,11 @@
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Persistent
                 Storage</a>
-            <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
-                Backups</a>
+            @can('update', $database)
+                <a class='menu-item' wire:current.exact="menu-item-active"
+                    href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
+                    Backups</a>
+            @endcan
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Webhooks</a>
             <a class="menu-item" wire:current.exact="menu-item-active"

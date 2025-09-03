@@ -11,6 +11,7 @@ use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use App\Support\ValidationPatterns;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -42,11 +43,14 @@ class CloneMe extends Component
 
     public bool $cloneVolumeData = false;
 
-    protected $messages = [
-        'selectedServer' => 'Please select a server.',
-        'selectedDestination' => 'Please select a server & destination.',
-        'newName' => 'Please enter a name for the new project or environment.',
-    ];
+    protected function messages(): array
+    {
+        return array_merge([
+            'selectedServer' => 'Please select a server.',
+            'selectedDestination' => 'Please select a server & destination.',
+            'newName.required' => 'Please enter a name for the new project or environment.',
+        ], ValidationPatterns::nameMessages());
+    }
 
     public function mount($project_uuid)
     {
@@ -54,7 +58,10 @@ class CloneMe extends Component
         $this->project = Project::where('uuid', $project_uuid)->firstOrFail();
         $this->environment = $this->project->environments->where('uuid', $this->environment_uuid)->first();
         $this->project_id = $this->project->id;
-        $this->servers = currentTeam()->servers;
+        $this->servers = currentTeam()
+            ->servers()
+            ->get()
+            ->reject(fn ($server) => $server->isBuildServer());
         $this->newName = str($this->project->name.'-clone-'.(string) new Cuid2)->slug();
     }
 
@@ -87,7 +94,7 @@ class CloneMe extends Component
         try {
             $this->validate([
                 'selectedDestination' => 'required',
-                'newName' => 'required',
+                'newName' => ValidationPatterns::nameRules(),
             ]);
             if ($type === 'project') {
                 $foundProject = Project::where('name', $this->newName)->first();
@@ -126,7 +133,7 @@ class CloneMe extends Component
                 $uuid = (string) new Cuid2;
                 $url = $application->fqdn;
                 if ($this->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                    $url = generateFqdn($this->server, $uuid);
+                    $url = generateUrl(server: $this->server, random: $uuid);
                 }
 
                 $newApplication = $application->replicate([
@@ -451,7 +458,7 @@ class CloneMe extends Component
 
                         if ($this->cloneVolumeData) {
                             try {
-                                StopService::dispatch($application, false, false);
+                                StopService::dispatch($application);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
                                 $sourceServer = $application->service->destination->server;
@@ -505,7 +512,7 @@ class CloneMe extends Component
 
                         if ($this->cloneVolumeData) {
                             try {
-                                StopService::dispatch($database->service, false, false);
+                                StopService::dispatch($database->service);
                                 $sourceVolume = $volume->name;
                                 $targetVolume = $newPersistentVolume->name;
                                 $sourceServer = $database->service->destination->server;

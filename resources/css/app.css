@@ -38,12 +38,13 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
+
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentcolor);
+        border-color: var(--color-coolgray-200, currentcolor);
     }
 }
 
@@ -161,7 +162,7 @@ section {
 * Utility classes
 */
 .input[type="password"] {
-    padding-right: var(--padding-10);
+    @apply pr-[2.4rem];
 }
 
 .lds-heart {

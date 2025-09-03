@@ -2,6 +2,7 @@
 
 namespace App\Actions\Server;
 
+use App\Events\SentinelRestarted;
 use App\Models\Server;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -27,7 +28,7 @@ class StartSentinel
         $mountDir = '/data/coolify/sentinel';
         $image = config('constants.coolify.registry_url').'/coollabsio/sentinel:'.$version;
         if (! $endpoint) {
-            throw new \Exception('You should set FQDN in Instance Settings.');
+            throw new \RuntimeException('You should set FQDN in Instance Settings.');
         }
         $environments = [
             'TOKEN' => $token,
@@ -61,5 +62,8 @@ class StartSentinel
         $server->settings->is_sentinel_enabled = true;
         $server->settings->save();
         $server->sentinelHeartbeat();
+
+        // Dispatch event to notify UI components
+        SentinelRestarted::dispatch($server, $version);
     }
 }

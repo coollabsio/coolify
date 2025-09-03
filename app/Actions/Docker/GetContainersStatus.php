@@ -4,6 +4,7 @@ namespace App\Actions\Docker;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
@@ -273,24 +274,13 @@ class GetContainersStatus
             if (str($application->status)->startsWith('exited')) {
                 continue;
             }
-            $application->update(['status' => 'exited']);
 
-            $name = data_get($application, 'name');
-            $fqdn = data_get($application, 'fqdn');
-
-            $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-            $projectUuid = data_get($application, 'environment.project.uuid');
-            $applicationUuid = data_get($application, 'uuid');
-            $environment = data_get($application, 'environment.name');
-
-            if ($projectUuid && $applicationUuid && $environment) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environment.'/application/'.$applicationUuid;
-            } else {
-                $url = null;
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
             }
 
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            $application->update(['status' => 'exited']);
         }
         $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
         foreach ($notRunningApplicationPreviews as $previewId) {
@@ -298,24 +288,13 @@ class GetContainersStatus
             if (str($preview->status)->startsWith('exited')) {
                 continue;
             }
-            $preview->update(['status' => 'exited']);
 
-            $name = data_get($preview, 'name');
-            $fqdn = data_get($preview, 'fqdn');
-
-            $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-            $projectUuid = data_get($preview, 'application.environment.project.uuid');
-            $environmentName = data_get($preview, 'application.environment.name');
-            $applicationUuid = data_get($preview, 'application.uuid');
-
-            if ($projectUuid && $applicationUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
-            } else {
-                $url = null;
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
             }
 
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            $preview->update(['status' => 'exited']);
         }
         $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
         foreach ($notRunningDatabases as $database) {
@@ -341,5 +320,6 @@ class GetContainersStatus
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
+        ServiceChecked::dispatch($this->server->team->id);
     }
 }

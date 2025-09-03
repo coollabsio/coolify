@@ -1,0 +1,28 @@
+# documentation: https://github.com/myoung34/docker-github-actions-runner/wiki/Usage
+# category: devtools
+# slogan: A GitHub Actions runner for Docker
+# tags: github,actions,runner,docker
+# logo: svgs/github-runner.png
+
+services:
+  runner:
+    image: myoung34/github-runner:latest
+    environment:
+      - REPO_URL=${REPO_URL}
+      - RUNNER_NAME_PREFIX=${RUNNER_NAME_PREFIX:-coolify-runner}
+      - RUNNER_NAME_SUFFIX=${RUNNER_NAME_SUFFIX:-false}
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
+      - RUNNER_WORKDIR=/runner/work
+      - RUNNER_SCOPE=${RUNNER_SCOPE:-repo}
+      - LABELS=${LABELS:-default}
+      - ORG_NAME=${ORG_NAME}
+    security_opt:
+      - label:disable
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner-data:/runner
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep '[R]unner' > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 15

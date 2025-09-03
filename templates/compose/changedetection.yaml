@@ -1,5 +1,6 @@
 # documentation: https://github.com/dgtlmoon/changedetection.io/
 # slogan: Website change detection monitor and notifications.
+# category: monitoring
 # tags: web, alert, monitor
 # logo: svgs/changedetection.png
 # port: 5000
@@ -10,32 +11,37 @@ services:
     volumes:
       - changedetection-data:/datastore
     environment:
-      - SERVICE_FQDN_CHANGEDETECTION_5000
-      - PUID=1000
-      - PGID=1000
-      - BASE_URL=$SERVICE_FQDN_CHANGEDETECTION
-      - PLAYWRIGHT_DRIVER_URL=ws://playwright-chrome:3000/?stealth=1&--disable-web-security=true
-      # Hides the `Referer` header so that monitored websites can't see the changedetection.io hostname.
-      - HIDE_REFERER=true
-    depends_on:
-      playwright-chrome:
-        condition: service_started
+      - SERVICE_URL_CHANGEDETECTION_5000
+      - BASE_URL=${SERVICE_URL_CHANGEDETECTION}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - PLAYWRIGHT_DRIVER_URL=${PLAYWRIGHT_DRIVER_URL:-ws://browser-sockpuppet-chrome:3000}
+      - HIDE_REFERER=${HIDE_REFERER:-true}
+      - FETCH_WORKERS=${FETCH_WORKERS:-10}
+      - MINIMUM_SECONDS_RECHECK_TIME=${MINIMUM_SECONDS_RECHECK_TIME:-3}
+      - DISABLE_VERSION_CHECK=${DISABLE_VERSION_CHECK:-true}
+      - SCREENSHOT_MAX_HEIGHT=${SCREENSHOT_MAX_HEIGHT:-16000}
+      - TZ=${TZ:-UTC}
+      - LOGGER_LEVEL=${LOGGER_LEVEL:-DEBUG}
     healthcheck:
       test: ["CMD", "echo", "ok"]
       interval: 5s
       timeout: 20s
       retries: 10
-  playwright-chrome:
+    depends_on:
+      browser-sockpuppet-chrome:
+        condition: service_started
+
+  browser-sockpuppet-chrome:
+    hostname: browser-sockpuppet-chrome
     image: dgtlmoon/sockpuppetbrowser:latest
-    # cap_add:
-    #   - SYS_ADMIN
-    # SYS_ADMIN might be too much, but it can be needed on your platform https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md#running-puppeteer-on-gitlabci
-    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
     environment:
-      - SCREEN_WIDTH=1920
-      - SCREEN_HEIGHT=1024
-      - SCREEN_DEPTH=16
-      - MAX_CONCURRENT_CHROME_PROCESSES=10
+      - SCREEN_WIDTH=${SCREEN_WIDTH:-1920}
+      - SCREEN_HEIGHT=${SCREEN_HEIGHT:-1024}
+      - SCREEN_DEPTH=${SCREEN_DEPTH:-16}
+      - MAX_CONCURRENT_CHROME_PROCESSES=${MAX_CONCURRENT_CHROME_PROCESSES:-10}
     healthcheck:
       test: ["CMD", "echo", "ok"]
       interval: 5s

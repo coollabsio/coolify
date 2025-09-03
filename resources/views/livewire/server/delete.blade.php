@@ -2,7 +2,7 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Delete Server | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" />
+    <livewire:server.navbar :server="$server" />
     <div class="flex flex-col h-full gap-8 sm:flex-row">
         <x-server.sidebar :server="$server" activeMenu="danger" />
         <div class="w-full">
@@ -18,12 +18,12 @@
                     <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                        shortConfirmationLabel="Server Name" step3ButtonText="Permanently Delete" />
+                        shortConfirmationLabel="Server Name" />
                 @else
                     <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="['This server will be permanently deleted.']" confirmationText="{{ $server->name }}"
                         confirmationLabel="Please confirm the execution of the actions by entering the Server Name below"
-                        shortConfirmationLabel="Server Name" step3ButtonText="Permanently Delete" />
+                        shortConfirmationLabel="Server Name" />
                 @endif
             @endif
         </div>

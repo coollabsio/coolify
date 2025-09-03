@@ -2,10 +2,13 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Add extends Component
 {
+    use AuthorizesRequests;
+
     public $parameters;
 
     public bool $shared = false;

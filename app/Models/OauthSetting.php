@@ -25,11 +25,12 @@ class OauthSetting extends Model
     {
         switch ($this->provider) {
             case 'azure':
-                return filled($this->client_id) && filled($this->client_secret) && filled($this->redirect_uri) && filled($this->tenant);
+                return filled($this->client_id) && filled($this->client_secret) && filled($this->tenant);
             case 'authentik':
-                return filled($this->client_id) && filled($this->client_secret) && filled($this->redirect_uri) && filled($this->base_url);
+            case 'clerk':
+                return filled($this->client_id) && filled($this->client_secret) && filled($this->base_url);
             default:
-                return filled($this->client_id) && filled($this->client_secret) && filled($this->redirect_uri);
+                return filled($this->client_id) && filled($this->client_secret);
         }
     }
 }

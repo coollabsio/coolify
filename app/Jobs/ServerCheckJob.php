@@ -28,7 +28,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping('server-check-'.$this->server->uuid))->expireAfter(60)->dontRelease()];
     }
 
     public function __construct(public Server $server) {}
@@ -68,7 +68,7 @@ class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
                         try {
                             $shouldStart = CheckProxy::run($this->server);
                             if ($shouldStart) {
-                                StartProxy::run($this->server, false);
+                                StartProxy::run($this->server, async: false);
                                 $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                             }
                         } catch (\Throwable $e) {

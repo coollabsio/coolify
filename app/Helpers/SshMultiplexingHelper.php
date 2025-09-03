@@ -103,7 +103,11 @@ class SshMultiplexingHelper
         }
 
         $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
-        $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
+        if ($server->isIpv6()) {
+            $scp_command .= "{$source} {$server->user}@[{$server->ip}]:{$dest}";
+        } else {
+            $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
+        }
 
         return $scp_command;
     }

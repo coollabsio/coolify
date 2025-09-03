@@ -11,7 +11,7 @@ class DeleteService
 {
     use AsAction;
 
-    public function handle(Service $service, bool $deleteConfigurations, bool $deleteVolumes, bool $dockerCleanup, bool $deleteConnectedNetworks)
+    public function handle(Service $service, bool $deleteVolumes, bool $deleteConnectedNetworks, bool $deleteConfigurations, bool $dockerCleanup)
     {
         try {
             $server = data_get($service, 'server');
@@ -53,7 +53,7 @@ class DeleteService
 
             instant_remote_process(["docker rm -f $service->uuid"], $server, throwError: false);
         } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            throw new \RuntimeException($e->getMessage());
         } finally {
             if ($deleteConfigurations) {
                 $service->deleteConfigurations();
@@ -71,7 +71,7 @@ class DeleteService
             $service->forceDelete();
 
             if ($dockerCleanup) {
-                CleanupDocker::dispatch($server, true);
+                CleanupDocker::dispatch($server, false, false);
             }
         }
     }

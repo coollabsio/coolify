@@ -44,6 +44,9 @@ class Terminal extends Component
     public function sendTerminalCommand($isContainer, $identifier, $serverUuid)
     {
         $server = Server::ownedByCurrentTeam()->whereUuid($serverUuid)->firstOrFail();
+        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            abort(403, 'Terminal access is disabled on this server.');
+        }
 
         if ($isContainer) {
             // Validate container identifier format (alphanumeric, dashes, and underscores only)
@@ -65,11 +68,16 @@ class Terminal extends Component
 
             // Escape the identifier for shell usage
             $escapedIdentifier = escapeshellarg($identifier);
-            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$escapedIdentifier} sh -c 'PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && if [ -f ~/.profile ]; then . ~/.profile; fi && if [ -n \"\$SHELL\" ]; then exec \$SHELL; else sh; fi'");
+            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+                            'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
+                            'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
+            $command = SshMultiplexingHelper::generateSshCommand($server, "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'");
         } else {
-            $command = SshMultiplexingHelper::generateSshCommand($server, 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && if [ -f ~/.profile ]; then . ~/.profile; fi && if [ -n "$SHELL" ]; then exec $SHELL; else sh; fi');
+            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+                            'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
+                            'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
+            $command = SshMultiplexingHelper::generateSshCommand($server, $shellCommand);
         }
-
         // ssh command is sent back to frontend then to websocket
         // this is done because the websocket connection is not available here
         // a better solution would be to remove websocket on NodeJS and work with something like

@@ -6,92 +6,126 @@ use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Events\ServerReachabilityChanged;
 use App\Models\Server;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
-    #[Validate(['required'])]
     public string $name;
 
-    #[Validate(['nullable'])]
     public ?string $description = null;
 
-    #[Validate(['required'])]
     public string $ip;
 
-    #[Validate(['required'])]
     public string $user;
 
-    #[Validate(['required'])]
     public string $port;
 
-    #[Validate(['nullable'])]
     public ?string $validationLogs = null;
 
-    #[Validate(['nullable', 'url'])]
     public ?string $wildcardDomain = null;
 
-    #[Validate(['required'])]
     public bool $isReachable;
 
-    #[Validate(['required'])]
     public bool $isUsable;
 
-    #[Validate(['required'])]
     public bool $isSwarmManager;
 
-    #[Validate(['required'])]
     public bool $isSwarmWorker;
 
-    #[Validate(['required'])]
     public bool $isBuildServer;
 
     #[Locked]
     public bool $isBuildServerLocked = false;
 
-    #[Validate(['required'])]
     public bool $isMetricsEnabled;
 
-    #[Validate(['required'])]
     public string $sentinelToken;
 
-    #[Validate(['nullable'])]
     public ?string $sentinelUpdatedAt = null;
 
-    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsRefreshRateSeconds;
 
-    #[Validate(['required', 'integer', 'min:1'])]
     public int $sentinelMetricsHistoryDays;
 
-    #[Validate(['required', 'integer', 'min:10'])]
     public int $sentinelPushIntervalSeconds;
 
-    #[Validate(['nullable', 'url'])]
     public ?string $sentinelCustomUrl = null;
 
-    #[Validate(['required'])]
     public bool $isSentinelEnabled;
 
-    #[Validate(['required'])]
     public bool $isSentinelDebugEnabled;
 
-    #[Validate(['required'])]
     public string $serverTimezone;
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
+        $teamId = $this->server->team_id ?? auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},CloudflareTunnelConfigured" => 'refresh',
             'refreshServerShow' => 'refresh',
+            "echo-private:team.{$teamId},SentinelRestarted" => 'handleSentinelRestarted',
         ];
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'ip' => 'required',
+            'user' => 'required',
+            'port' => 'required',
+            'validationLogs' => 'nullable',
+            'wildcardDomain' => 'nullable|url',
+            'isReachable' => 'required',
+            'isUsable' => 'required',
+            'isSwarmManager' => 'required',
+            'isSwarmWorker' => 'required',
+            'isBuildServer' => 'required',
+            'isMetricsEnabled' => 'required',
+            'sentinelToken' => 'required',
+            'sentinelUpdatedAt' => 'nullable',
+            'sentinelMetricsRefreshRateSeconds' => 'required|integer|min:1',
+            'sentinelMetricsHistoryDays' => 'required|integer|min:1',
+            'sentinelPushIntervalSeconds' => 'required|integer|min:10',
+            'sentinelCustomUrl' => 'nullable|url',
+            'isSentinelEnabled' => 'required',
+            'isSentinelDebugEnabled' => 'required',
+            'serverTimezone' => 'required',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'ip.required' => 'The IP Address field is required.',
+                'user.required' => 'The User field is required.',
+                'port.required' => 'The Port field is required.',
+                'wildcardDomain.url' => 'The Wildcard Domain must be a valid URL.',
+                'sentinelToken.required' => 'The Sentinel Token field is required.',
+                'sentinelMetricsRefreshRateSeconds.required' => 'The Metrics Refresh Rate field is required.',
+                'sentinelMetricsRefreshRateSeconds.integer' => 'The Metrics Refresh Rate must be an integer.',
+                'sentinelMetricsRefreshRateSeconds.min' => 'The Metrics Refresh Rate must be at least 1 second.',
+                'sentinelMetricsHistoryDays.required' => 'The Metrics History Days field is required.',
+                'sentinelMetricsHistoryDays.integer' => 'The Metrics History Days must be an integer.',
+                'sentinelMetricsHistoryDays.min' => 'The Metrics History Days must be at least 1 day.',
+                'sentinelPushIntervalSeconds.required' => 'The Push Interval field is required.',
+                'sentinelPushIntervalSeconds.integer' => 'The Push Interval must be an integer.',
+                'sentinelPushIntervalSeconds.min' => 'The Push Interval must be at least 10 seconds.',
+                'sentinelCustomUrl.url' => 'The Custom Sentinel URL must be a valid URL.',
+                'serverTimezone.required' => 'The Server Timezone field is required.',
+            ]
+        );
     }
 
     public function mount(string $server_uuid)
@@ -121,6 +155,7 @@ class Show extends Component
         if ($toModel) {
             $this->validate();
 
+            $this->authorize('update', $this->server);
             if (Server::where('team_id', currentTeam()->id)
                 ->where('ip', $this->ip)
                 ->where('id', '!=', $this->server->id)
@@ -179,7 +214,7 @@ class Show extends Component
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelEnabled = $this->server->settings->is_sentinel_enabled;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
-            $this->sentinelUpdatedAt = $this->server->settings->updated_at;
+            $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->serverTimezone = $this->server->settings->server_timezone;
         }
     }
@@ -187,12 +222,22 @@ class Show extends Component
     public function refresh()
     {
         $this->syncData();
-        $this->dispatch('$refresh');
+    }
+
+    public function handleSentinelRestarted($event)
+    {
+        // Only refresh if the event is for this server
+        if (isset($event['serverUuid']) && $event['serverUuid'] === $this->server->uuid) {
+            $this->server->refresh();
+            $this->syncData();
+            $this->dispatch('success', 'Sentinel has been restarted successfully.');
+        }
     }
 
     public function validateServer($install = true)
     {
         try {
+            $this->authorize('update', $this->server);
             $this->validationLogs = $this->server->validation_logs = null;
             $this->server->save();
             $this->dispatch('init', $install);
@@ -211,7 +256,6 @@ class Show extends Component
             $this->server->settings->is_usable = $this->isUsable = true;
             $this->server->settings->save();
             ServerReachabilityChanged::dispatch($this->server);
-            $this->dispatch('proxyStatusUpdated');
         } else {
             $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error);
 
@@ -221,40 +265,59 @@ class Show extends Component
 
     public function restartSentinel()
     {
-        $this->server->restartSentinel();
-        $this->dispatch('success', 'Sentinel restarted.');
+        try {
+            $this->authorize('manageSentinel', $this->server);
+            $this->server->restartSentinel();
+            $this->dispatch('success', 'Restarting Sentinel.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
     }
 
     public function updatedIsSentinelDebugEnabled($value)
     {
-        $this->submit();
-        $this->restartSentinel();
+        try {
+            $this->submit();
+            $this->restartSentinel();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function updatedIsMetricsEnabled($value)
     {
-        $this->submit();
-        $this->restartSentinel();
+        try {
+            $this->submit();
+            $this->restartSentinel();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function updatedIsSentinelEnabled($value)
     {
-        if ($value === true) {
-            StartSentinel::run($this->server, true);
-        } else {
-            $this->isMetricsEnabled = false;
-            $this->isSentinelDebugEnabled = false;
-            StopSentinel::dispatch($this->server);
+        try {
+            $this->authorize('manageSentinel', $this->server);
+            if ($value === true) {
+                StartSentinel::run($this->server, true);
+            } else {
+                $this->isMetricsEnabled = false;
+                $this->isSentinelDebugEnabled = false;
+                StopSentinel::dispatch($this->server);
+            }
+            $this->submit();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->submit();
-
     }
 
     public function regenerateSentinelToken()
     {
         try {
+            $this->authorize('manageSentinel', $this->server);
             $this->server->settings->generateSentinelToken();
-            $this->dispatch('success', 'Token regenerated & Sentinel restarted.');
+            $this->dispatch('success', 'Token regenerated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -262,7 +325,11 @@ class Show extends Component
 
     public function instantSave()
     {
-        $this->submit();
+        try {
+            $this->submit();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()

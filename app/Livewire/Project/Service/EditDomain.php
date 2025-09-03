@@ -12,6 +12,12 @@ class EditDomain extends Component
 
     public ServiceApplication $application;
 
+    public $domainConflicts = [];
+
+    public $showDomainConflictModal = false;
+
+    public $forceSaveDomains = false;
+
     protected $rules = [
         'application.fqdn' => 'nullable',
         'application.required_fqdn' => 'required|boolean',
@@ -20,6 +26,13 @@ class EditDomain extends Component
     public function mount()
     {
         $this->application = ServiceApplication::find($this->applicationId);
+    }
+
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        $this->submit();
     }
 
     public function submit()
@@ -37,7 +50,20 @@ class EditDomain extends Component
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
-            check_domain_usage(resource: $this->application);
+            // Check for domain conflicts if not forcing save
+            if (! $this->forceSaveDomains) {
+                $result = checkDomainUsage(resource: $this->application);
+                if ($result['hasConflicts']) {
+                    $this->domainConflicts = $result['conflicts'];
+                    $this->showDomainConflictModal = true;
+
+                    return;
+                }
+            } else {
+                // Reset the force flag after using it
+                $this->forceSaveDomains = false;
+            }
+
             $this->validate();
             $this->application->save();
             updateCompose($this->application);
@@ -47,7 +73,6 @@ class EditDomain extends Component
             $this->application->service->parse();
             $this->dispatch('refresh');
             $this->dispatch('configurationChanged');
-            $this->dispatch('refreshStatus');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {

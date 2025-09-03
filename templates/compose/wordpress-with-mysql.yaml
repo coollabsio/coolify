@@ -1,5 +1,6 @@
 # documentation: https://wordpress.org
-# slogan: Wordpress is open source software you can use to create a beautiful website, blog, or app.
+# slogan: WordPress is open source software you can use to create a beautiful website, blog, or app.
+# category: cms
 # tags: cms, blog, content, management, mysql
 # logo: svgs/wordpress.svg
 
@@ -9,7 +10,7 @@ services:
     volumes:
       - wordpress-files:/var/www/html
     environment:
-      - SERVICE_FQDN_WORDPRESS
+      - SERVICE_URL_WORDPRESS
       - WORDPRESS_DB_HOST=mysql
       - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
       - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS

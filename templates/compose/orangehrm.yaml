@@ -1,0 +1,50 @@
+# documentation: https://starterhelp.orangehrm.com/hc/en-us
+# slogan: OrangeHRM open source HR management software.
+# category: cms
+# tags: HR, HRIS, HRMS, human resource management, OrangeHRM, HR management
+# logo: svgs/orangehrm.svg
+# port: 80
+
+services:
+  orangehrm:
+    image: orangehrm/orangehrm:latest
+    platform: linux/amd64
+    environment:
+      - SERVICE_URL_ORANGEHRM_80
+      - ORANGEHRM_DATABASE_HOST=mariadb
+      - ORANGEHRM_DATABASE_USER=${SERVICE_USER_MYSQL}
+      - ORANGEHRM_DATABASE_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - ORANGEHRM_DATABASE_NAME=${MYSQL_DATABASE:-orangehrm-db}
+    volumes:
+      - orangehrm-data:/orangehrm
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - "-f"
+        - "http://127.0.0.1"
+      interval: 2s
+      timeout: 10s
+      retries: 10
+
+  mariadb:
+    image: mariadb:11
+    volumes:
+      - orangehrm_mariadb_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-orangehrm-db}
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - "--connect"
+        - "--innodb_initialized"
+      interval: 5s
+      timeout: 20s
+      retries: 10

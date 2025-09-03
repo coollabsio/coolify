@@ -17,11 +17,14 @@ class OauthSettingSeeder extends Seeder
             $providers = collect([
                 'azure',
                 'bitbucket',
+                'clerk',
+                'discord',
                 'github',
                 'gitlab',
                 'google',
                 'authentik',
                 'infomaniak',
+                'zitadel',
             ]);
 
             $isOauthSeeded = OauthSetting::count() > 0;

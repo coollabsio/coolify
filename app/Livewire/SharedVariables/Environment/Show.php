@@ -4,10 +4,13 @@ namespace App\Livewire\SharedVariables\Environment;
 
 use App\Models\Application;
 use App\Models\Project;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public Project $project;
 
     public Application $application;
@@ -21,6 +24,8 @@ class Show extends Component
     public function saveKey($data)
     {
         try {
+            $this->authorize('update', $this->environment);
+
             $found = $this->environment->environment_variables()->where('key', $data['key'])->first();
             if ($found) {
                 throw new \Exception('Variable already exists.');

@@ -1,0 +1,41 @@
+# documentation: https://miniflux.app/docs/index.html
+# slogan: Miniflux is a minimalist and opinionated feed reader.
+# category: cms
+# tags: miniflux,rss,feed,self,hosted
+# logo: svgs/miniflux.svg
+# port: 8080
+
+services:
+  miniflux:
+    image: ghcr.io/miniflux/miniflux:latest
+    environment:
+      - SERVICE_URL_MINIFLUX
+      - BASE_URL=${SERVICE_URL_MINIFLUX}
+      - PORT=${PORT:-8080}
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-1}
+      - CREATE_ADMIN=${CREATE_ADMIN:-1}
+      - ADMIN_USERNAME=${SERVICE_USER_ADMIN}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_64_ADMIN}
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-miniflux-db}?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - miniflux-postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-miniflux-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

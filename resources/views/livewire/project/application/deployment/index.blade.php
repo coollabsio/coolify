@@ -3,31 +3,36 @@
     <h1>Deployments</h1>
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" />
-    <div class="flex flex-col gap-2 pb-10"
-        @if (!$skip) wire:poll.5000ms='reload_deployments' @endif>
-        <div class="flex items-end gap-2 pt-4">
+    <div class="flex flex-col gap-2 pb-10" @if (!$skip) wire:poll.5000ms='reloadDeployments' @endif>
+        <div class="flex items-end gap-2">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
             @if ($deployments_count > 0)
-                <x-forms.button disabled="{{ !$show_prev }}" wire:click="previous_page('{{ $default_take }}')">
-                    <svg class="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="m14 6l-6 6l6 6z" />
-                    </svg>
-                </x-forms.button>
-                <x-forms.button disabled="{{ !$show_next }}" wire:click="next_page('{{ $default_take }}')">
-                    <svg class="w-6 h-6" viewBox="0 0 24 24">
-                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2" d="m10 18l6-6l-6-6z" />
-                    </svg>
-                </x-forms.button>
+                <div class="flex items-center gap-2">
+                    <x-forms.button disabled="{{ !$showPrev }}" wire:click="previousPage('{{ $defaultTake }}')">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="m14 6l-6 6l6 6z" />
+                        </svg>
+                    </x-forms.button>
+                    <span class="text-sm text-gray-600 dark:text-gray-400 px-2">
+                        Page {{ $currentPage }} of {{ ceil($deployments_count / $defaultTake) }}
+                    </span>
+                    <x-forms.button disabled="{{ !$showNext }}" wire:click="nextPage('{{ $defaultTake }}')">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="m10 18l6-6l-6-6z" />
+                        </svg>
+                    </x-forms.button>
+                </div>
             @endif
         </div>
-        @if ($deployments_count > 0)
-            <form class="flex items-end gap-2">
-                <x-forms.input id="pull_request_id" label="Pull Request"></x-forms.input>
-                <x-forms.button type="submit">Filter</x-forms.button>
-            </form>
-        @endif
+        <form class="flex items-end gap-2">
+            <x-forms.input id="pull_request_id" type="number" min="1" label="Pull Request Id"></x-forms.input>
+            <x-forms.button type="submit">Filter</x-forms.button>
+            @if ($pull_request_id)
+                <x-forms.button type="button" wire:click="clearFilter">Clear</x-forms.button>
+            @endif
+        </form>
         @forelse ($deployments as $deployment)
             <div @class([
                 'p-2 border-l-2 bg-white dark:bg-coolgray-100',
@@ -45,11 +50,16 @@
                         <div class="flex items-center gap-2 mb-2">
                             <span @class([
                                 'px-3 py-1 rounded-md text-xs font-medium shadow-xs',
-                                'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' => data_get($deployment, 'status') === 'in_progress',
-                                'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' => data_get($deployment, 'status') === 'queued',
-                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' => data_get($deployment, 'status') === 'failed',
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' => data_get($deployment, 'status') === 'finished',
-                                'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' => data_get($deployment, 'status') === 'cancelled-by-user',
+                                'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' =>
+                                    data_get($deployment, 'status') === 'in_progress',
+                                'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' =>
+                                    data_get($deployment, 'status') === 'queued',
+                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' =>
+                                    data_get($deployment, 'status') === 'failed',
+                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' =>
+                                    data_get($deployment, 'status') === 'finished',
+                                'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' =>
+                                    data_get($deployment, 'status') === 'cancelled-by-user',
                             ])>
                                 @php
                                     $statusText = match (data_get($deployment, 'status')) {

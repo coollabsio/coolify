@@ -1,5 +1,6 @@
 # documentation: https://github.com/laurent22/joplin/blob/dev/packages/server/README.md
 # slogan: Self-hosted sync server for Joplin
+# category: productivity
 # tags: joplin
 # logo: svgs/joplin.png
 # port: 22300
@@ -8,7 +9,7 @@ services:
   postgres:
     image: 'postgres:16'
     volumes:
-      - joplin-postgresql-data:/var/lib/postgresql/data'
+      - joplin-postgresql-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -30,8 +31,8 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_JOPLIN_22300
-      - APP_BASE_URL=${SERVICE_FQDN_JOPLIN}
+      - SERVICE_URL_JOPLIN_22300
+      - APP_BASE_URL=${SERVICE_URL_JOPLIN}
       - DB_CLIENT=pg
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
       - POSTGRES_DATABASE=joplin

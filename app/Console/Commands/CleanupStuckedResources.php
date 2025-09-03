@@ -20,6 +20,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\Team;
 use Illuminate\Console\Command;
 
 class CleanupStuckedResources extends Command
@@ -36,6 +37,12 @@ class CleanupStuckedResources extends Command
     private function cleanup_stucked_resources()
     {
         try {
+            $teams = Team::all()->filter(function ($team) {
+                return $team->members()->count() === 0 && $team->servers()->count() === 0;
+            });
+            foreach ($teams as $team) {
+                $team->delete();
+            }
             $servers = Server::all()->filter(function ($server) {
                 return $server->isFunctional();
             });

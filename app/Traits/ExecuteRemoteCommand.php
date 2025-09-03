@@ -49,9 +49,13 @@ trait ExecuteRemoteCommand
                 if ($output->startsWith('╔')) {
                     $output = "\n".$output;
                 }
+
+                // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
+                $sanitized_output = sanitize_utf8_text($output);
+
                 $new_log_entry = [
                     'command' => remove_iip($command),
-                    'output' => remove_iip($output),
+                    'output' => remove_iip($sanitized_output),
                     'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
                     'timestamp' => Carbon::now('UTC'),
                     'hidden' => $hidden,
@@ -60,11 +64,29 @@ trait ExecuteRemoteCommand
                 if (! $this->application_deployment_queue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                    $new_log_entry['order'] = count($previous_logs) + 1;
+                    try {
+                        $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        // If existing logs are corrupted, start fresh
+                        $previous_logs = [];
+                        $new_log_entry['order'] = 1;
+                    }
+                    if (is_array($previous_logs)) {
+                        $new_log_entry['order'] = count($previous_logs) + 1;
+                    } else {
+                        $previous_logs = [];
+                        $new_log_entry['order'] = 1;
+                    }
                 }
                 $previous_logs[] = $new_log_entry;
-                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+
+                try {
+                    $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    // If JSON encoding still fails, use fallback with invalid sequences replacement
+                    $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+
                 $this->application_deployment_queue->save();
 
                 if ($this->save) {
@@ -72,10 +94,10 @@ trait ExecuteRemoteCommand
                         data_set($this->saved_outputs, $this->save, str());
                     }
                     if ($append) {
-                        $this->saved_outputs[$this->save] .= str($output)->trim();
+                        $this->saved_outputs[$this->save] .= str($sanitized_output)->trim();
                         $this->saved_outputs[$this->save] = str($this->saved_outputs[$this->save]);
                     } else {
-                        $this->saved_outputs[$this->save] = str($output)->trim();
+                        $this->saved_outputs[$this->save] = str($sanitized_output)->trim();
                     }
                 }
             });

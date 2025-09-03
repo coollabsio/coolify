@@ -1,5 +1,6 @@
 # documentation: https://docs.soketi.app
 # slogan: Soketi is your simple, fast, and resilient open-source WebSockets server.
+# category: messaging
 # tags: websockets,open,source,messaging
 # logo: svgs/soketi.jpeg
 # port: 6001
@@ -8,7 +9,7 @@ services:
   soketi:
     image: "quay.io/soketi/soketi:1.6-16-debian"
     environment:
-      - SERVICE_FQDN_SOKETI_6001
+      - SERVICE_URL_SOKETI_6001
       - SOKETI_DEBUG=${DEBUG:-0}
       - SOKETI_DEFAULT_APP_ID=${SERVICE_USER_SOKETI}
       - SOKETI_DEFAULT_APP_KEY=${SERVICE_REALBASE64_64_SOKETIKEY}

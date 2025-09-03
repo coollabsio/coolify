@@ -4,11 +4,12 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable;
 use App\Traits\EnvironmentVariableProtection;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class All extends Component
 {
-    use EnvironmentVariableProtection;
+    use AuthorizesRequests, EnvironmentVariableProtection;
 
     public $resource;
 
@@ -44,10 +45,16 @@ class All extends Component
 
     public function instantSave()
     {
-        $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
-        $this->resource->settings->save();
-        $this->sortEnvironmentVariables();
-        $this->dispatch('success', 'Environment variable settings updated.');
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
+            $this->resource->settings->save();
+            $this->sortEnvironmentVariables();
+            $this->dispatch('success', 'Environment variable settings updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function sortEnvironmentVariables()
@@ -96,6 +103,7 @@ class All extends Component
     public function submit($data = null)
     {
         try {
+            $this->authorize('manageEnvironment', $this->resource);
             if ($data === null) {
                 $this->handleBulkSubmit();
             } else {
@@ -177,16 +185,6 @@ class All extends Component
                 $changesMade = true;
             }
         }
-
-        // Debug information
-        \Log::info('Environment variables update status', [
-            'deletedCount' => $deletedCount,
-            'updatedCount' => $updatedCount,
-            'deletedPreviewCount' => $deletedPreviewCount ?? 0,
-            'updatedPreviewCount' => $updatedPreviewCount ?? 0,
-            'changesMade' => $changesMade,
-            'errorOccurred' => $errorOccurred,
-        ]);
 
         // Only show success message if changes were actually made and no errors occurred
         if ($changesMade && ! $errorOccurred) {

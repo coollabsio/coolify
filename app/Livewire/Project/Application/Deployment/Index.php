@@ -18,15 +18,26 @@ class Index extends Component
 
     public int $skip = 0;
 
-    public int $default_take = 10;
+    public int $defaultTake = 10;
 
-    public bool $show_next = false;
+    public bool $showNext = false;
 
-    public bool $show_prev = false;
+    public bool $showPrev = false;
+
+    public int $currentPage = 1;
 
     public ?string $pull_request_id = null;
 
     protected $queryString = ['pull_request_id'];
+
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
 
     public function mount()
     {
@@ -42,68 +53,111 @@ class Index extends Component
         if (! $application) {
             return redirect()->route('dashboard');
         }
-        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, $this->default_take);
+        // Validate pull request ID from URL parameters
+        if ($this->pull_request_id !== null && $this->pull_request_id !== '') {
+            if (! is_numeric($this->pull_request_id) || (float) $this->pull_request_id <= 0 || (float) $this->pull_request_id != (int) $this->pull_request_id) {
+                $this->pull_request_id = null;
+                $this->dispatch('error', 'Invalid Pull Request ID in URL. Filter cleared.');
+            } else {
+                // Ensure it's stored as a string representation of a positive integer
+                $this->pull_request_id = (string) (int) $this->pull_request_id;
+            }
+        }
+
+        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, $this->defaultTake, $this->pull_request_id);
         $this->application = $application;
         $this->deployments = $deployments;
         $this->deployments_count = $count;
         $this->current_url = url()->current();
-        $this->show_pull_request_only();
-        $this->show_more();
+        $this->updateCurrentPage();
+        $this->showMore();
     }
 
-    private function show_pull_request_only()
-    {
-        if ($this->pull_request_id) {
-            $this->deployments = $this->deployments->where('pull_request_id', $this->pull_request_id);
-        }
-    }
-
-    private function show_more()
+    private function showMore()
     {
         if ($this->deployments->count() !== 0) {
-            $this->show_next = true;
-            if ($this->deployments->count() < $this->default_take) {
-                $this->show_next = false;
+            $this->showNext = true;
+            if ($this->deployments->count() < $this->defaultTake) {
+                $this->showNext = false;
             }
 
             return;
         }
     }
 
-    public function reload_deployments()
+    public function reloadDeployments()
     {
-        $this->load_deployments();
+        $this->loadDeployments();
     }
 
-    public function previous_page(?int $take = null)
+    public function previousPage(?int $take = null)
     {
         if ($take) {
             $this->skip = $this->skip - $take;
         }
-        $this->skip = $this->skip - $this->default_take;
+        $this->skip = $this->skip - $this->defaultTake;
         if ($this->skip < 0) {
-            $this->show_prev = false;
+            $this->showPrev = false;
             $this->skip = 0;
         }
-        $this->load_deployments();
+        $this->updateCurrentPage();
+        $this->loadDeployments();
     }
 
-    public function next_page(?int $take = null)
+    public function nextPage(?int $take = null)
     {
         if ($take) {
             $this->skip = $this->skip + $take;
         }
-        $this->show_prev = true;
-        $this->load_deployments();
+        $this->showPrev = true;
+        $this->updateCurrentPage();
+        $this->loadDeployments();
     }
 
-    public function load_deployments()
+    public function loadDeployments()
     {
-        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $this->default_take);
+        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $this->defaultTake, $this->pull_request_id);
         $this->deployments = $deployments;
         $this->deployments_count = $count;
-        $this->show_pull_request_only();
-        $this->show_more();
+        $this->showMore();
+    }
+
+    public function updatedPullRequestId($value)
+    {
+        // Sanitize and validate the pull request ID
+        if ($value !== null && $value !== '') {
+            // Check if it's numeric and positive
+            if (! is_numeric($value) || (float) $value <= 0 || (float) $value != (int) $value) {
+                $this->pull_request_id = null;
+                $this->dispatch('error', 'Invalid Pull Request ID. Please enter a valid positive number.');
+
+                return;
+            }
+            // Ensure it's stored as a string representation of a positive integer
+            $this->pull_request_id = (string) (int) $value;
+        } else {
+            $this->pull_request_id = null;
+        }
+
+        // Reset pagination when filter changes
+        $this->skip = 0;
+        $this->showPrev = false;
+        $this->updateCurrentPage();
+        $this->loadDeployments();
+    }
+
+    public function clearFilter()
+    {
+        $this->pull_request_id = null;
+        $this->skip = 0;
+        $this->showPrev = false;
+        $this->updateCurrentPage();
+        $this->loadDeployments();
+    }
+
+    private function updateCurrentPage()
+    {
+        $this->currentPage = intval($this->skip / $this->defaultTake) + 1;
     }
 
     public function render()

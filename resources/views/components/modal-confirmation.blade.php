@@ -6,6 +6,7 @@
     'buttonFullWidth' => false,
     'customButton' => null,
     'disabled' => false,
+    'dispatchAction' => false,
     'submitAction' => 'delete',
     'content' => null,
     'checkboxes' => [],
@@ -22,11 +23,15 @@
     'dispatchEventType' => 'success',
     'dispatchEventMessage' => '',
     'ignoreWire' => true,
+    'temporaryDisableTwoStepConfirmation' => false,
 ])
 
 @php
     use App\Models\InstanceSettings;
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
+    if ($temporaryDisableTwoStepConfirmation) {
+        $disableTwoStepConfirmation = false;
+    }
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -37,11 +42,16 @@
     deleteText: '',
     password: '',
     actions: @js($actions),
-    confirmationText: @js($confirmationText),
+    confirmationText: (() => {
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = @js($confirmationText);
+        return textarea.value;
+    })(),
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
     confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
     submitAction: @js($submitAction),
+    dispatchAction: @js($dispatchAction),
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
@@ -72,6 +82,10 @@
                 return Promise.resolve(this.passwordError);
             }
         }
+        if (this.dispatchAction) {
+            $wire.dispatch(this.submitAction);
+            return true;
+        }
 
         const methodName = this.submitAction.split('(')[0];
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
@@ -81,7 +95,6 @@
             params.push(this.password);
         }
         params.push(this.selectedActions);
-
         return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {
@@ -248,8 +261,21 @@
                                 <div class="mb-4">
                                     <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
                                     <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
-                                    <div class="relative mb-2">
-                                        <x-forms.copy-button text="{{ $confirmationText }}" />
+                                    <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
+                                        <div class="relative">
+                                            <input type="text" x-model="decodedText" readonly class="input">
+                                            <button x-show="window.isSecureContext"
+                                                @click.prevent="navigator.clipboard.writeText(decodedText); $el.innerHTML = '<svg class=\'w-5 h-5 text-green-500\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\' /></svg>'; setTimeout(() => $el.innerHTML = '<svg class=\'w-5 h-5\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\' /></svg>', 1000)"
+                                                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-300 transition-colors"
+                                                title="Copy to clipboard">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <label for="userConfirmationText"
@@ -257,7 +283,7 @@
                                         {{ $shortConfirmationLabel }}
                                     </label>
                                     <input type="text" x-model="userConfirmationText"
-                                        class="p-2 mt-1 w-full text-black rounded-sm input">
+                                        class="p-2 mt-1 px-3 w-full  rounded-sm input">
                                 </div>
                             @endif
                         @endif

@@ -19,7 +19,7 @@ class DynamicConfigurations extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            "echo-private:team.{$teamId},ProxyStatusChanged" => 'loadDynamicConfigurations',
+            "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'loadDynamicConfigurations',
             'loadDynamicConfigurations',
         ];
     }
@@ -27,6 +27,11 @@ class DynamicConfigurations extends Component
     protected $rules = [
         'contents.*' => 'nullable|string',
     ];
+
+    public function initLoadDynamicConfigurations()
+    {
+        $this->loadDynamicConfigurations();
+    }
 
     public function loadDynamicConfigurations()
     {
@@ -43,6 +48,7 @@ class DynamicConfigurations extends Component
         }
         $this->contents = $contents;
         $this->dispatch('$refresh');
+        $this->dispatch('success', 'Dynamic configurations loaded.');
     }
 
     public function mount()

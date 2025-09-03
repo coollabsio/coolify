@@ -1,5 +1,6 @@
 # documentation: https://supabase.io
 # slogan: The open source Firebase alternative.
+# category: backend
 # tags: firebase, alternative, open-source
 # minversion: 4.0.0-beta.228
 # logo: svgs/supabase.svg
@@ -14,7 +15,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPABASEKONG_8000
+      - SERVICE_URL_SUPABASEKONG_8000
       - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
@@ -279,14 +280,14 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20241202-71e5240
+    image: supabase/studio:2025.06.02-sha-8f2993d
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://127.0.0.1:3000/api/profile', (r) => {if (r.statusCode !== 200) process.exit(1); else process.exit(0); }).on('error', () => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
         ]
       timeout: 5s
       interval: 5s
@@ -303,14 +304,14 @@ services:
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
       - 'SUPABASE_URL=http://supabase-kong:8000'
-      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASEKONG}
+      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
 
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - 'SUPABASE_PUBLIC_API=${SERVICE_FQDN_SUPABASEKONG}'
+      - 'SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}'
       - NEXT_PUBLIC_ENABLE_LOGS=true
       # Comment to use Big Query backend for analytics
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
@@ -913,7 +914,7 @@ services:
     command: ["--config", "etc/vector/vector.yml"]
 
   supabase-rest:
-    image: postgrest/postgrest:v12.2.0
+    image: postgrest/postgrest:v12.2.12
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -931,7 +932,7 @@ services:
     command: "postgrest"
     exclude_from_hc: true
   supabase-auth:
-    image: supabase/gotrue:v2.164.0
+    image: supabase/gotrue:v2.174.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -959,7 +960,7 @@ services:
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       # The base URL your site is located at. Currently used in combination with other settings to construct URLs used in emails.
-      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASEKONG}
+      - GOTRUE_SITE_URL=${SERVICE_URL_SUPABASEKONG}
       # A comma separated list of URIs (e.g. "https://foo.example.com,https://*.foo.example.com,https://bar.example.com") which are permitted as valid redirect_to destinations.
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
@@ -1022,7 +1023,7 @@ services:
 
   realtime-dev:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.33.70
+    image: supabase/realtime:v2.34.47
     container_name: realtime-dev.supabase-realtime
     depends_on:
       supabase-db:
@@ -1191,7 +1192,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.84.2
+    image: supabase/postgres-meta:v0.89.3
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1207,7 +1208,7 @@ services:
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.65.3
+    image: supabase/edge-runtime:v1.67.4
     depends_on:
       supabase-analytics:
         condition: service_healthy
@@ -1218,7 +1219,7 @@ services:
       retries: 3
     environment:
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
-      - SUPABASE_URL=${SERVICE_FQDN_SUPABASEKONG}
+      - SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
@@ -1351,7 +1352,7 @@ services:
       - /home/deno/functions/main
 
   supabase-supavisor:
-    image: 'supabase/supavisor:1.1.56'
+    image: 'supabase/supavisor:2.5.1'
     healthcheck:
       test:
         - CMD

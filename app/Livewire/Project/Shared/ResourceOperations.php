@@ -12,11 +12,14 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class ResourceOperations extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $projectUuid;
@@ -35,7 +38,7 @@ class ResourceOperations extends Component
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
         $this->projects = Project::ownedByCurrentTeam()->get();
-        $this->servers = currentTeam()->servers;
+        $this->servers = currentTeam()->servers->filter(fn ($server) => ! $server->isBuildServer());
     }
 
     public function toggleVolumeCloning(bool $value)
@@ -45,6 +48,8 @@ class ResourceOperations extends Component
 
     public function cloneTo($destination_id)
     {
+        $this->authorize('update', $this->resource);
+
         $new_destination = StandaloneDocker::find($destination_id);
         if (! $new_destination) {
             $new_destination = SwarmDocker::find($destination_id);
@@ -61,7 +66,7 @@ class ResourceOperations extends Component
             $url = $this->resource->fqdn;
 
             if ($server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                $url = generateFqdn($server, $uuid);
+                $url = generateUrl(server: $server, random: $uuid);
             }
 
             $new_resource = $this->resource->replicate([
@@ -412,7 +417,7 @@ class ResourceOperations extends Component
 
                     if ($this->cloneVolumeData) {
                         try {
-                            StopService::dispatch($application, false, false);
+                            StopService::dispatch($application);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
                             $sourceServer = $application->service->destination->server;
@@ -454,7 +459,7 @@ class ResourceOperations extends Component
 
                     if ($this->cloneVolumeData) {
                         try {
-                            StopService::dispatch($database->service, false, false);
+                            StopService::dispatch($database->service);
                             $sourceVolume = $volume->name;
                             $targetVolume = $newPersistentVolume->name;
                             $sourceServer = $database->service->destination->server;
@@ -485,6 +490,7 @@ class ResourceOperations extends Component
     public function moveTo($environment_id)
     {
         try {
+            $this->authorize('update', $this->resource);
             $new_environment = Environment::findOrFail($environment_id);
             $this->resource->update([
                 'environment_id' => $environment_id,

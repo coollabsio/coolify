@@ -1,0 +1,32 @@
+# documentation: https://github.com/stonith404/pingvin-share
+# slogan: A self-hosted file sharing platform that combines lightness and beauty, perfect for seamless and efficient file sharing.
+# category: storage
+# tags: self-hosted, file-sharing, files, cloud, sharing
+# logo: svgs/pingvinshare.svg
+# port: 3000
+
+services:
+  pingvinshare:
+    image: ghcr.io/stonith404/pingvin-share
+    environment:
+      - SERVICE_URL_PINGVINSHARE_3000
+      - TRUST_PROXY=${TRUST_PROXY:-true}
+    volumes:
+      - pingvinshare_data:/opt/app/backend/data
+      - pingvinshare_images:/opt/app/frontend/public/img
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      clamav:
+        condition: service_healthy
+
+  clamav:
+    image: clamav/clamav
+    platform: linux/amd64

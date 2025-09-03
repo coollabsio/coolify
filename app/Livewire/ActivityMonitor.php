@@ -14,20 +14,25 @@ class ActivityMonitor extends Component
 
     public $eventToDispatch = 'activityFinished';
 
+    public $eventData = null;
+
     public $isPollingActive = false;
 
     public bool $fullHeight = false;
 
-    public bool $showWaiting = false;
+    public $activity;
 
-    protected $activity;
+    public bool $showWaiting = true;
+
+    public static $eventDispatched = false;
 
     protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
 
-    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished')
+    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished', $eventData = null)
     {
         $this->activityId = $activityId;
         $this->eventToDispatch = $eventToDispatch;
+        $this->eventData = $eventData;
 
         $this->hydrateActivity();
 
@@ -51,15 +56,27 @@ class ActivityMonitor extends Component
                         $causer_id = data_get($this->activity, 'causer_id');
                         $user = User::find($causer_id);
                         if ($user) {
-                            foreach ($user->teams as $team) {
-                                $teamId = $team->id;
-                                $this->eventToDispatch::dispatch($teamId);
+                            $teamId = $user->currentTeam()->id;
+                            if (! self::$eventDispatched) {
+                                if (filled($this->eventData)) {
+                                    $this->eventToDispatch::dispatch($teamId, $this->eventData);
+                                } else {
+                                    $this->eventToDispatch::dispatch($teamId);
+                                }
+                                self::$eventDispatched = true;
                             }
                         }
 
                         return;
                     }
-                    $this->dispatch($this->eventToDispatch);
+                    if (! self::$eventDispatched) {
+                        if (filled($this->eventData)) {
+                            $this->dispatch($this->eventToDispatch, $this->eventData);
+                        } else {
+                            $this->dispatch($this->eventToDispatch);
+                        }
+                        self::$eventDispatched = true;
+                    }
                 }
             }
         }

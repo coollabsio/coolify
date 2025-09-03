@@ -144,7 +144,7 @@ class Controller extends BaseController
         }
     }
 
-    public function revoke_invitation()
+    public function revokeInvitation()
     {
         $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
         $user = User::whereEmail($invitation->email)->firstOrFail();

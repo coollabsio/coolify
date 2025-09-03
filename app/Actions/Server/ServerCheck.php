@@ -104,7 +104,7 @@ class ServerCheck
                         try {
                             $shouldStart = CheckProxy::run($this->server);
                             if ($shouldStart) {
-                                StartProxy::run($this->server, false);
+                                StartProxy::run($this->server, async: false);
                                 $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                             }
                         } catch (\Throwable $e) {

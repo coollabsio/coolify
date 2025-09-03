@@ -6,12 +6,15 @@ use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public Application|Service $resource;
 
     public ScheduledTask $task;
@@ -45,6 +48,15 @@ class Show extends Component
 
     #[Locked]
     public string $task_uuid;
+
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+        ];
+    }
 
     public function mount(string $task_uuid, string $project_uuid, string $environment_uuid, ?string $application_uuid = null, ?string $service_uuid = null)
     {
@@ -100,6 +112,7 @@ class Show extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
             $this->refreshTasks();
@@ -111,6 +124,7 @@ class Show extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
         } catch (\Exception $e) {
@@ -130,6 +144,7 @@ class Show extends Component
     public function delete()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->task->delete();
 
             if ($this->type === 'application') {
@@ -145,6 +160,7 @@ class Show extends Component
     public function executeNow()
     {
         try {
+            $this->authorize('update', $this->resource);
             ScheduledTaskJob::dispatch($this->task);
             $this->dispatch('success', 'Scheduled task executed.');
         } catch (\Exception $e) {

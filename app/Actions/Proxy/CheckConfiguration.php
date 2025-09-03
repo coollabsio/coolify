@@ -3,6 +3,7 @@
 namespace App\Actions\Proxy;
 
 use App\Models\Server;
+use App\Services\ProxyDashboardCacheService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class CheckConfiguration
@@ -27,6 +28,8 @@ class CheckConfiguration
         if (! $proxy_configuration || is_null($proxy_configuration)) {
             throw new \Exception('Could not generate proxy configuration');
         }
+
+        ProxyDashboardCacheService::isTraefikDashboardAvailableFromConfiguration($server, $proxy_configuration);
 
         return $proxy_configuration;
     }

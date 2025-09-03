@@ -1,5 +1,6 @@
 # documentation: https://docs.hoppscotch.io
 # slogan: The Open Source API Development Platform
+# category: devtools
 # tags: api, development, platform
 # logo: svgs/hoppscotch.png
 # port: 80
@@ -8,7 +9,7 @@ services:
   backend:
     image: hoppscotch/hoppscotch:latest
     environment:
-      - SERVICE_FQDN_HOPPSCOTCH_80
+      - SERVICE_URL_HOPPSCOTCH_80
       - VITE_ALLOWED_AUTH_PROVIDERS=${VITE_ALLOWED_AUTH_PROVIDERS:-GOOGLE,GITHUB,MICROSOFT,EMAIL}
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@hoppscotch-db:5432/${POSTGRES_DB}
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -19,19 +20,19 @@ services:
       - SESSION_SECRET=${SERVICE_PASSWORD_SECRET}
       - ALLOW_SECURE_COOKIES=${ALLOW_SECURE_COOKIES:-true}
       - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-mustbeexactry32characterlikethat}
-      - REDIRECT_URL=${SERVICE_FQDN_HOPPSCOTCH}
-      - WHITELISTED_ORIGINS=${SERVICE_FQDN_HOPPSCOTCH}/backend,${SERVICE_FQDN_HOPPSCOTCH},${SERVICE_FQDN_HOPPSCOTCH}/admin
+      - REDIRECT_URL=${SERVICE_URL_HOPPSCOTCH}
+      - WHITELISTED_ORIGINS=${SERVICE_URL_HOPPSCOTCH}/backend,${SERVICE_URL_HOPPSCOTCH},${SERVICE_URL_HOPPSCOTCH}/admin
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-*****}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-*****}
-      - GOOGLE_CALLBACK_URL=${SERVICE_FQDN_HOPPSCOTCH}/backend/v1/auth/google/callback
+      - GOOGLE_CALLBACK_URL=${SERVICE_URL_HOPPSCOTCH}/backend/v1/auth/google/callback
       - GOOGLE_SCOPE=email,profile
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-*****}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-*****}
-      - GITHUB_CALLBACK_URL=${SERVICE_FQDN_HOPPSCOTCH}/backend/v1/auth/github/callback
+      - GITHUB_CALLBACK_URL=${SERVICE_URL_HOPPSCOTCH}/backend/v1/auth/github/callback
       - GITHUB_SCOPE=user:email
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-*****}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-*****}
-      - MICROSOFT_CALLBACK_URL=${SERVICE_FQDN_HOPPSCOTCH}/backend/v1/auth/microsoft/callback
+      - MICROSOFT_CALLBACK_URL=${SERVICE_URL_HOPPSCOTCH}/backend/v1/auth/microsoft/callback
       - MICROSOFT_SCOPE=user.read
       - MICROSOFT_TENANT=common
       - MAILER_SMTP_ENABLE=${MAILER_SMTP_ENABLE:-false}
@@ -46,12 +47,12 @@ services:
       - MAILER_TLS_REJECT_UNAUTHORIZED=${MAILER_TLS_REJECT_UNAUTHORIZED:-false}
       - RATE_LIMIT_TTL=${RATE_LIMIT_TTL:-60}
       - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
-      - VITE_BASE_URL=${SERVICE_FQDN_HOPPSCOTCH}
-      - VITE_SHORTCODE_BASE_URL=${SERVICE_FQDN_HOPPSCOTCH}
-      - VITE_ADMIN_URL=${SERVICE_FQDN_HOPPSCOTCH}/admin
-      - VITE_BACKEND_GQL_URL=${SERVICE_FQDN_HOPPSCOTCH}/backend/graphql
+      - VITE_BASE_URL=${SERVICE_URL_HOPPSCOTCH}
+      - VITE_SHORTCODE_BASE_URL=${SERVICE_URL_HOPPSCOTCH}
+      - VITE_ADMIN_URL=${SERVICE_URL_HOPPSCOTCH}/admin
+      - VITE_BACKEND_GQL_URL=${SERVICE_URL_HOPPSCOTCH}/backend/graphql
       - VITE_BACKEND_WS_URL=wss://${SERVICE_URL_HOPPSCOTCH}/backend/graphql
-      - VITE_BACKEND_API_URL=${SERVICE_FQDN_HOPPSCOTCH}/backend/v1
+      - VITE_BACKEND_API_URL=${SERVICE_URL_HOPPSCOTCH}/backend/v1
       - VITE_APP_TOS_LINK=https://docs.hoppscotch.io/support/terms
       - VITE_APP_PRIVACY_POLICY_LINK=https://docs.hoppscotch.io/support/privacy
       - ENABLE_SUBPATH_BASED_ACCESS=true

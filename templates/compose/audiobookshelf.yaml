@@ -1,5 +1,6 @@
 # documentation: https://www.audiobookshelf.org/
 # slogan: Self-hosted audiobook, ebook, and podcast server
+# category: media
 # tags: audiobooks, ebooks, podcasts, server, self-hosted
 # logo: svgs/audiobookshelf.svg
 # port: 80
@@ -8,7 +9,7 @@ services:
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:latest
     environment:
-      - SERVICE_FQDN_AUDIOBOOKSHELF_80
+      - SERVICE_URL_AUDIOBOOKSHELF_80
       - TZ=${TIMEZONE:-America/Toronto}
     volumes:
       - audiobookshelf-audiobooks:/audiobooks
@@ -16,7 +17,7 @@ services:
       - audiobookshelf-config:/config
       - audiobookshelf-metadata:/metadata
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80/ping || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --timeout=5 http://localhost:80/ping -O /dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

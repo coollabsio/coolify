@@ -60,7 +60,7 @@ class DockerImage extends Component
             'health_check_enabled' => false,
         ]);
 
-        $fqdn = generateFqdn($destination->server, $application->uuid);
+        $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
         $application->update([
             'name' => 'docker-image-'.$application->uuid,
             'fqdn' => $fqdn,

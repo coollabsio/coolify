@@ -91,21 +91,17 @@ function connectProxyToNetworks(Server $server)
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
             return [
-                "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to $network network.'",
-                "echo 'Proxy started and configured successfully!'",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
             return [
-                "echo 'Connecting coolify-proxy to $network network...'",
                 "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
                 "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
                 "echo 'Successfully connected coolify-proxy to $network network.'",
-                "echo 'Proxy started and configured successfully!'",
             ];
         });
     }
@@ -134,10 +130,16 @@ function generate_default_proxy_configuration(Server $server)
     }
 
     $array_of_networks = collect([]);
-    $networks->map(function ($network) use ($array_of_networks) {
+    $filtered_networks = collect([]);
+    $networks->map(function ($network) use ($array_of_networks, $filtered_networks) {
+        if ($network === 'host') {
+            return; // network-scoped alias is supported only for containers in user defined networks
+        }
+
         $array_of_networks[$network] = [
             'external' => true,
         ];
+        $filtered_networks->push($network);
     });
     if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
@@ -159,7 +161,7 @@ function generate_default_proxy_configuration(Server $server)
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
                     ],
-                    'networks' => $networks->toArray(),
+                    'networks' => $filtered_networks->toArray(),
                     'ports' => [
                         '80:80',
                         '443:443',
@@ -241,7 +243,7 @@ function generate_default_proxy_configuration(Server $server)
                         'CADDY_DOCKER_POLLING_INTERVAL=5s',
                         'CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile',
                     ],
-                    'networks' => $networks->toArray(),
+                    'networks' => $filtered_networks->toArray(),
                     'ports' => [
                         '80:80',
                         '443:443',

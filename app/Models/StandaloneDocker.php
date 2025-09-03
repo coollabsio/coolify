@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\HasSafeStringAttribute;
+
 class StandaloneDocker extends BaseModel
 {
+    use HasSafeStringAttribute;
+
     protected $guarded = [];
 
     protected static function boot()

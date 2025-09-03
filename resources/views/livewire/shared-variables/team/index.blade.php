@@ -4,9 +4,11 @@
     </x-slot>
     <div class="flex gap-2 items-center">
         <h1>Team Shared Variables</h1>
-        <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
-            <livewire:project.shared.environment-variable.add :shared="true" />
-        </x-modal-input>
+        @can('create', App\Models\SharedEnvironmentVariable::class)
+            <x-modal-input buttonTitle="+ Add" title="New Shared Variable">
+                <livewire:project.shared.environment-variable.add :shared="true" />
+            </x-modal-input>
+        @endcan
     </div>
     <div class="flex items-center gap-1 subtitle">You can use these variables anywhere with <span
             class="dark:text-warning text-coollabs">@{{ team.VARIABLENAME }}</span> <x-helper

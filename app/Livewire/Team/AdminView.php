@@ -3,7 +3,6 @@
 namespace App\Livewire\Team;
 
 use App\Models\InstanceSettings;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -53,30 +52,12 @@ class AdminView extends Component
         }
     }
 
-    private function finalizeDeletion(User $user, Team $team)
-    {
-        $servers = $team->servers;
-        foreach ($servers as $server) {
-            $resources = $server->definedResources();
-            foreach ($resources as $resource) {
-                $resource->forceDelete();
-            }
-            $server->forceDelete();
-        }
-
-        $projects = $team->projects;
-        foreach ($projects as $project) {
-            $project->forceDelete();
-        }
-        $team->members()->detach($user->id);
-        $team->delete();
-    }
-
     public function delete($id, $password)
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
+
         if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
             if (! Hash::check($password, Auth::user()->password)) {
                 $this->addError('password', 'The provided password is incorrect.');
@@ -84,52 +65,22 @@ class AdminView extends Component
                 return;
             }
         }
+
         if (! auth()->user()->isInstanceAdmin()) {
             return $this->dispatch('error', 'You are not authorized to delete users');
         }
+
         $user = User::find($id);
-        $teams = $user->teams;
-        foreach ($teams as $team) {
-            $user_alone_in_team = $team->members->count() === 1;
-            if ($team->id === 0) {
-                if ($user_alone_in_team) {
-                    return $this->dispatch('error', 'User is alone in the root team, cannot delete');
-                }
-            }
-            if ($user_alone_in_team) {
-                $this->finalizeDeletion($user, $team);
-
-                continue;
-            }
-            if ($user->isOwner()) {
-                $found_other_owner_or_admin = $team->members->filter(function ($member) {
-                    return $member->pivot->role === 'owner' || $member->pivot->role === 'admin';
-                })->where('id', '!=', $user->id)->first();
-
-                if ($found_other_owner_or_admin) {
-                    $team->members()->detach($user->id);
-
-                    continue;
-                } else {
-                    $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
-                        return $member->pivot->role === 'member';
-                    })->first();
-                    if ($found_other_member_who_is_not_owner) {
-                        $found_other_member_who_is_not_owner->pivot->role = 'owner';
-                        $found_other_member_who_is_not_owner->pivot->save();
-                        $team->members()->detach($user->id);
-                    } else {
-                        $this->finalizeDeletion($user, $team);
-                    }
-
-                    continue;
-                }
-            } else {
-                $team->members()->detach($user->id);
-            }
+        if (! $user) {
+            return $this->dispatch('error', 'User not found');
         }
-        $user->delete();
-        $this->getUsers();
+
+        try {
+            $user->delete();
+            $this->getUsers();
+        } catch (\Exception $e) {
+            return $this->dispatch('error', $e->getMessage());
+        }
     }
 
     public function render()

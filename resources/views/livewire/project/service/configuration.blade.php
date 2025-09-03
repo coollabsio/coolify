@@ -2,9 +2,9 @@
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
-    <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
+    <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
 
-    <div class="flex flex-col h-full gap-8 pt-6 sm:flex-row">
+    <div class="flex flex-col h-full gap-8 sm:flex-row">
         <div class="flex flex-col items-start gap-2 min-w-fit">
             <a class="menu-item sm:min-w-fit" target="_blank" href="{{ $service->documentation() }}">Documentation
                 <x-external-link /></a>
@@ -36,7 +36,7 @@
             @if ($currentRoute === 'project.service.configuration')
                 <livewire:project.service.stack-form :service="$service" />
                 <h3>Services</h3>
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1" wire:poll.10000ms="check_status">
+                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500' => str(
@@ -65,27 +65,29 @@
                                     @endif
                                     @if ($application->fqdn)
                                         <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
-                                            <x-modal-input title="Edit Domains" :closeOutside="false">
-                                                <x-slot:content>
-                                                    <span class="cursor-pointer">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="w-4 h-4 dark:text-warning text-coollabs"
-                                                            viewBox="0 0 24 24">
-                                                            <g fill="none" stroke="currentColor"
-                                                                stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="2">
-                                                                <path
-                                                                    d="m12 15l8.385-8.415a2.1 2.1 0 0 0-2.97-2.97L9 12v3h3zm4-10l3 3" />
-                                                                <path d="M9 7.07A7 7 0 0 0 10 21a7 7 0 0 0 6.929-6" />
-                                                            </g>
-                                                        </svg>
+                                            @can('update', $service)
+                                                <x-modal-input title="Edit Domains" :closeOutside="false">
+                                                    <x-slot:content>
+                                                        <span class="cursor-pointer">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="w-4 h-4 dark:text-warning text-coollabs"
+                                                                viewBox="0 0 24 24">
+                                                                <g fill="none" stroke="currentColor"
+                                                                    stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2">
+                                                                    <path
+                                                                        d="m12 15l8.385-8.415a2.1 2.1 0 0 0-2.97-2.97L9 12v3h3zm4-10l3 3" />
+                                                                    <path d="M9 7.07A7 7 0 0 0 10 21a7 7 0 0 0 6.929-6" />
+                                                                </g>
+                                                            </svg>
 
-                                                    </span>
-                                                </x-slot:content>
-                                                <livewire:project.service.edit-domain
-                                                    applicationId="{{ $application->id }}"
-                                                    wire:key="edit-domain-{{ $application->id }}" />
-                                            </x-modal-input>
+                                                        </span>
+                                                    </x-slot:content>
+                                                    <livewire:project.service.edit-domain
+                                                        applicationId="{{ $application->id }}"
+                                                        wire:key="edit-domain-{{ $application->id }}" />
+                                                </x-modal-input>
+                                            @endcan
                                         </span>
                                     @endif
                                     <div class="pt-2 text-xs">{{ $application->status }}</div>
@@ -96,14 +98,16 @@
                                         Settings
                                     </a>
                                     @if (str($application->status)->contains('running'))
-                                        <x-modal-confirmation title="Confirm Service Application Restart?"
-                                            buttonTitle="Restart"
-                                            submitAction="restartApplication({{ $application->id }})" :actions="[
-                                                'The selected service application will be unavailable during the restart.',
-                                                'If the service application is currently in use data could be lost.',
-                                            ]"
-                                            :confirmWithText="false" :confirmWithPassword="false"
-                                            step2ButtonText="Restart Service Container" />
+                                        @can('update', $service)
+                                            <x-modal-confirmation title="Confirm Service Application Restart?"
+                                                buttonTitle="Restart"
+                                                submitAction="restartApplication({{ $application->id }})" :actions="[
+                                                    'The selected service application will be unavailable during the restart.',
+                                                    'If the service application is currently in use data could be lost.',
+                                                ]"
+                                                :confirmWithText="false" :confirmWithPassword="false"
+                                                step2ButtonText="Restart Service Container" />
+                                        @endcan
                                     @endif
                                 </div>
                             </div>
@@ -149,13 +153,15 @@
                                         Settings
                                     </a>
                                     @if (str($database->status)->contains('running'))
-                                        <x-modal-confirmation title="Confirm Service Database Restart?"
-                                            buttonTitle="Restart" submitAction="restartDatabase({{ $database->id }})"
-                                            :actions="[
-                                                'This service database will be unavailable during the restart.',
-                                                'If the service database is currently in use data could be lost.',
-                                            ]" :confirmWithText="false" :confirmWithPassword="false"
-                                            step2ButtonText="Restart Database" />
+                                        @can('update', $service)
+                                            <x-modal-confirmation title="Confirm Service Database Restart?"
+                                                buttonTitle="Restart" submitAction="restartDatabase({{ $database->id }})"
+                                                :actions="[
+                                                    'This service database will be unavailable during the restart.',
+                                                    'If the service database is currently in use data could be lost.',
+                                                ]" :confirmWithText="false" :confirmWithPassword="false"
+                                                step2ButtonText="Restart Database" />
+                                        @endcan
                                     @endif
                                 </div>
                             </div>

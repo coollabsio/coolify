@@ -17,9 +17,9 @@
     <section>
         <h3 class="pb-2">Projects</h3>
         @if ($projects->count() > 0)
-            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
-                    <div class="gap-2 border border-transparent cursor-pointer box group"
+                    <div class="gap-2 border cursor-pointer box group"
                         wire:click="navigateToProject('{{ $project->uuid }}')">
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
@@ -30,18 +30,22 @@
                             </div>
                             <div class="flex items-center justify-center gap-2 text-xs font-bold">
                                 @if ($project->environments->first())
-                                    <a class="hover:underline" wire:click.stop
-                                        href="{{ route('project.resource.create', [
-                                            'project_uuid' => $project->uuid,
-                                            'environment_uuid' => $project->environments->first()->uuid,
-                                        ]) }}">
-                                        <span class="p-2 font-bold">+ Add Resource</span>
-                                    </a>
+                                    @can('createAnyResource')
+                                        <a class="hover:underline" wire:click.stop
+                                            href="{{ route('project.resource.create', [
+                                                'project_uuid' => $project->uuid,
+                                                'environment_uuid' => $project->environments->first()->uuid,
+                                            ]) }}">
+                                            <span class="p-2 font-bold">+ Add Resource</span>
+                                        </a>
+                                    @endcan
                                 @endif
-                                <a class="hover:underline" wire:click.stop
-                                    href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
-                                    Settings
-                                </a>
+                                @can('update', $project)
+                                    <a class="hover:underline" wire:click.stop
+                                        href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
+                                        Settings
+                                    </a>
+                                @endcan
                             </div>
                         </div>
                     </div>
@@ -63,13 +67,13 @@
     <section>
         <h3 class="pb-2">Servers</h3>
         @if ($servers->count() > 0)
-            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($servers as $server)
                     <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                         @class([
                             'gap-2 border cursor-pointer box group',
-                            'border-transparent' => $server->settings->is_reachable,
-                            'border-red-500' => !$server->settings->is_reachable,
+                            'border-red-500' =>
+                                !$server->settings->is_reachable || $server->settings->force_disabled,
                         ])>
                         <div class="flex flex-col justify-center mx-6">
                             <div class="box-title">
@@ -124,15 +128,17 @@
 
     @if ($servers->count() > 0 && $projects->count() > 0)
         <section>
-            <div class="flex items-center gap-2">
+            <div class="flex items-start gap-2">
                 <h3 class="pb-2">Deployments</h3>
                 @if (count($deploymentsPerServer) > 0)
                     <x-loading />
                 @endif
-                <x-modal-confirmation title="Confirm Cleanup Queues?" buttonTitle="Cleanup Queues" isErrorButton
-                    submitAction="cleanupQueue" :actions="['All running Deployment Queues will be cleaned up.']" :confirmWithText="false" :confirmWithPassword="false"
-                    step2ButtonText="Permanently Cleanup Deployment Queues" :dispatchEvent="true"
-                    dispatchEventType="success" dispatchEventMessage="Deployment Queues cleanup started." />
+                @can('cleanupDeploymentQueue', Application::class)
+                    <x-modal-confirmation title="Confirm Cleanup Queues?" buttonTitle="Cleanup Queues" isErrorButton
+                        submitAction="cleanupQueue" :actions="['All running Deployment Queues will be cleaned up.']" :confirmWithText="false" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Cleanup Deployment Queues" :dispatchEvent="true"
+                        dispatchEventType="success" dispatchEventMessage="Deployment Queues cleanup started." />
+                @endcan
             </div>
             <div wire:poll.3000ms="loadDeployments" class="grid grid-cols-1">
                 @forelse ($deploymentsPerServer as $serverName => $deployments)

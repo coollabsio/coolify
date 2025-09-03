@@ -18,7 +18,15 @@ class Show extends Component
 
     public $isKeepAliveOn = true;
 
-    protected $listeners = ['refreshQueue'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
+            'refreshQueue',
+        ];
+    }
 
     public function mount()
     {

@@ -1,0 +1,27 @@
+# documentation: https://typesense.org/docs
+# slogan: Cutting-edge, in-memory search engine for mere mortals. Knowledge of rocket science optional.
+# category: search
+# tags: search, search-engine, search-api, elasticsearch-alternative
+# logo: svgs/typesense.png
+# port: 8108
+
+services:
+  typesense:
+    image: typesense/typesense:28.0
+    environment:
+      - SERVICE_URL_TYPESENSE_8108
+      - TYPESENSE_ENABLE_CORS=${TYPESENSE_ENABLE_CORS:-true}
+      - TYPESENSE_DATA_DIR=/data
+      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY:?}
+    volumes:
+      - typesense_data:/data
+    healthcheck:
+      test:
+        [
+          CMD,
+          bash,
+          -c,
+          "exec 3<>/dev/tcp/localhost/8108 && printf 'GET /health HTTP/1.1\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep '200' && exec 3>&-",
+        ]
+      retries: 5
+      timeout: 7s

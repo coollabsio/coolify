@@ -6,7 +6,7 @@
     @if (data_get($parameters, 'application_uuid'))
         <x-forms.checkbox id="is_build_time"
             helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for docker file, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-            label="Build Variable?" />
+            label="Is Build Variable?" />
     @endif
     <x-forms.checkbox id="is_multiline" label="Is Multiline?" />
     @if (!$shared)

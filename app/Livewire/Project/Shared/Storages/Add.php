@@ -4,10 +4,13 @@ namespace App\Livewire\Project\Shared\Storages;
 
 use App\Models\Application;
 use App\Models\LocalFileVolume;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Add extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public $uuid;
@@ -77,6 +80,8 @@ class Add extends Component
     public function submitFileStorage()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->validate([
                 'file_storage_path' => 'string',
                 'file_storage_content' => 'nullable|string',
@@ -112,6 +117,8 @@ class Add extends Component
     public function submitFileStorageDirectory()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->validate([
                 'file_storage_directory_source' => 'string',
                 'file_storage_directory_destination' => 'string',
@@ -140,6 +147,8 @@ class Add extends Component
     public function submitPersistentVolume()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->validate([
                 'name' => 'required|string',
                 'mount_path' => 'required|string',

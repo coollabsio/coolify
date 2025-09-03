@@ -3,11 +3,15 @@
 namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Uri;
 use Livewire\Component;
 
 class Create extends Component
 {
+    use AuthorizesRequests;
+
     public string $name;
 
     public string $description;
@@ -24,15 +28,38 @@ class Create extends Component
 
     public S3Storage $storage;
 
-    protected $rules = [
-        'name' => 'required|min:3|max:255',
-        'description' => 'nullable|min:3|max:255',
-        'region' => 'required|max:255',
-        'key' => 'required|max:255',
-        'secret' => 'required|max:255',
-        'bucket' => 'required|max:255',
-        'endpoint' => 'required|url|max:255',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'region' => 'required|max:255',
+            'key' => 'required|max:255',
+            'secret' => 'required|max:255',
+            'bucket' => 'required|max:255',
+            'endpoint' => 'required|url|max:255',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'region.required' => 'The Region field is required.',
+                'region.max' => 'The Region may not be greater than 255 characters.',
+                'key.required' => 'The Access Key field is required.',
+                'key.max' => 'The Access Key may not be greater than 255 characters.',
+                'secret.required' => 'The Secret Key field is required.',
+                'secret.max' => 'The Secret Key may not be greater than 255 characters.',
+                'bucket.required' => 'The Bucket field is required.',
+                'bucket.max' => 'The Bucket may not be greater than 255 characters.',
+                'endpoint.required' => 'The Endpoint field is required.',
+                'endpoint.url' => 'The Endpoint must be a valid URL.',
+                'endpoint.max' => 'The Endpoint may not be greater than 255 characters.',
+            ]
+        );
+    }
 
     protected $validationAttributes = [
         'name' => 'Name',
@@ -70,6 +97,8 @@ class Create extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', S3Storage::class);
+
             $this->validate();
             $this->storage = new S3Storage;
             $this->storage->name = $this->name;

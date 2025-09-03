@@ -3,10 +3,14 @@
 namespace App\Livewire\Security\PrivateKey;
 
 use App\Models\PrivateKey;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Create extends Component
 {
+    use AuthorizesRequests;
+
     public string $name = '';
 
     public string $value = '';
@@ -17,10 +21,25 @@ class Create extends Component
 
     public ?string $publicKey = null;
 
-    protected $rules = [
-        'name' => 'required|string',
-        'value' => 'required|string',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'value' => 'required|string',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'value.required' => 'The Private Key field is required.',
+                'value.string' => 'The Private Key must be a valid string.',
+            ]
+        );
+    }
 
     public function generateNewRSAKey()
     {
@@ -50,6 +69,7 @@ class Create extends Component
         $this->validate();
 
         try {
+            $this->authorize('create', PrivateKey::class);
             $privateKey = PrivateKey::createAndStore([
                 'name' => $this->name,
                 'description' => $this->description,

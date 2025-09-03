@@ -1,0 +1,44 @@
+# documentation: https://github.com/FuzzyGrim/Yamtrack/wiki
+# slogan: Yamtrack is a self hosted media tracker for movies, tv shows, anime, manga, video games and books.
+# category: productivity
+# tags: self-hosted, automation, tracker, media, movies, shows, anime, manga, games, books, comics
+# logo: svgs/yamtrack.svg
+# port: 8000
+
+services:
+  yamtrack:
+    image: ghcr.io/fuzzygrim/yamtrack
+    environment:
+      - SERVICE_URL_YAMTRACK_8000
+      - URLS=${SERVICE_URL_YAMTRACK}
+      - TZ=${TZ:-Europe/Berlin}
+      - SECRET=${SERVICE_PASSWORD_SECRET}
+      - REGISTRATION=${REGISTRATION_ENABLED:-true}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - yamtrack_data:/yamtrack/db
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:8000/health/ || exit 1",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - yamtrack_redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 20s
+      retries: 10

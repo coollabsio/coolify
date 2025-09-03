@@ -34,6 +34,7 @@ class TelegramChannel
             \App\Notifications\Server\HighDiskUsage::class => $settings->telegram_notifications_server_disk_usage_thread_id,
             \App\Notifications\Server\Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
             \App\Notifications\Server\Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
+            \App\Notifications\Server\ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
 
             default => null,
         };

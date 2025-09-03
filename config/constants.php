@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.419',
-        'helper_version' => '1.0.8',
-        'realtime_version' => '1.0.8',
+        'version' => '4.0.0-beta.427',
+        'helper_version' => '1.0.10',
+        'realtime_version' => '1.0.10',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
@@ -12,6 +12,7 @@ return [
         'helper_image' => env('HELPER_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-helper'),
         'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'ghcr.io').'/coollabsio/coolify-realtime'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
+        'releases_url' => 'https://cdn.coollabs.io/coolify/releases.json',
     ],
 
     'urls' => [
@@ -22,7 +23,8 @@ return [
     'services' => [
         // Temporary disabled until cache is implemented
         // 'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
-        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/main/templates/service-templates.json',
+        'official' => 'https://raw.githubusercontent.com/coollabsio/coolify/v4.x/templates/service-templates-latest.json',
+        'file_name' => 'service-templates-latest.json',
     ],
 
     'terminal' => [
@@ -67,6 +69,10 @@ return [
             'base_url' => '/invitations/',
             'expiration_days' => 3,
         ],
+    ],
+
+    'email_change' => [
+        'verification_code_expiry_minutes' => 10,
     ],
 
     'sentry' => [
