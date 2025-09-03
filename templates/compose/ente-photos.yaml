@@ -21,13 +21,15 @@ services:
       - S3_USE_PATH_STYLE_URLS=true
       - S3_B2_EU_CEN_KEY=${SERVICE_USER_MINIO}
       - S3_B2_EU_CEN_SECRET=${SERVICE_PASSWORD_MINIO}
-      - S3_B2_EU_CEN_ENDPOINT=minio:3200
+      - S3_B2_EU_CEN_ENDPOINT=${SERVICE_URL_MINIO_3200}
       - S3_B2_EU_CEN_REGION=eu-central-2
       - S3_B2_EU_CEN_BUCKET=b2-eu-cen
       # Security keys
       - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_ENCRYPTION}
       - HASH_KEY=${SERVICE_PASSWORD_64_HASH}
       - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      # Admin permissions (grants first account admin access)
+      - ENTE_INTERNAL_ADMIN=1580559962386438
       # App URLs (optional - for web interface)
       - APPS_PUBLIC_ALBUMS=${APPS_PUBLIC_ALBUMS:-}
       - APPS_CAST=${APPS_CAST:-}
@@ -63,6 +65,7 @@ services:
   minio:
     image: minio/minio:latest
     environment:
+      - SERVICE_URL_MINIO_3200
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     command: server /data --address ":3200" --console-address ":3201"
