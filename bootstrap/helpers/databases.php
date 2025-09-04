@@ -7,6 +7,7 @@ use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -168,6 +169,24 @@ function create_standalone_clickhouse($environment_id, $destination_uuid, ?array
     $database->uuid = (new Cuid2);
     $database->name = 'clickhouse-database-'.$database->uuid;
     $database->clickhouse_admin_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
+function create_standalone_libsql($environment_id, $destination_uuid, ?array $otherData = null): StandaloneLibsql
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->firstOrFail();
+    $database = new StandaloneLibsql;
+    $database->uuid = (new Cuid2);
+    $database->name = 'libsql-database-'.$database->uuid;
+    $database->libsql_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

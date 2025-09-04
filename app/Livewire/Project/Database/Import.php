@@ -142,7 +142,8 @@ EOD;
             $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneLibsql::class
         ) {
             $this->unsupported = true;
         }

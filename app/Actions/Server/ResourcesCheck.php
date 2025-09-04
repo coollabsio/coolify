@@ -8,6 +8,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -34,6 +35,7 @@ class ResourcesCheck
             StandaloneKeydb::where('last_online_at', '<', now()->subSeconds($seconds))->update(['status' => 'exited']);
             StandaloneDragonfly::where('last_online_at', '<', now()->subSeconds($seconds))->update(['status' => 'exited']);
             StandaloneClickhouse::where('last_online_at', '<', now()->subSeconds($seconds))->update(['status' => 'exited']);
+            StandaloneLibsql::where('last_online_at', '<', now()->subSeconds($seconds))->update(['status' => 'exited']);
         } catch (\Throwable $e) {
             return handleError($e);
         }

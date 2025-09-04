@@ -11,6 +11,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -25,7 +26,7 @@ class GetLogs extends Component
 
     public string $errors = '';
 
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|null $resource = null;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneLibsql|null $resource = null;
 
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
 

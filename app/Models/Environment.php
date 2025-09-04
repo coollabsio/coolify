@@ -40,6 +40,7 @@ class Environment extends BaseModel
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
             $this->keydbs()->count() == 0 &&
+            $this->libsqls()->count() == 0 &&
             $this->dragonflies()->count() == 0 &&
             $this->clickhouses()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
@@ -87,6 +88,11 @@ class Environment extends BaseModel
         return $this->hasMany(StandaloneKeydb::class);
     }
 
+    public function libsqls()
+    {
+        return $this->hasMany(StandaloneLibsql::class);
+    }
+
     public function dragonflies()
     {
         return $this->hasMany(StandaloneDragonfly::class);
@@ -105,10 +111,11 @@ class Environment extends BaseModel
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
         $keydbs = $this->keydbs;
+        $libsqls = $this->libsqls;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($libsqls)->concat($dragonflies)->concat($clickhouses);
     }
 
     public function project()

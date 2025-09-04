@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -18,7 +19,7 @@ class ConfigurationChecker extends Component
 {
     public bool $isConfigurationChanged = false;
 
-    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
+    public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneLibsql $resource;
 
     protected $listeners = ['configurationChanged'];
 

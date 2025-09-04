@@ -15,6 +15,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -159,6 +160,15 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mariadb: {$e->getMessage()}\n";
+        }
+        try {
+            $libsqls = StandaloneLibsql::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($libsqls as $libsql) {
+                echo "Deleting stuck libsql: {$libsql->name}\n";
+                $libsql->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck libsql: {$e->getMessage()}\n";
         }
         try {
             $services = Service::withTrashed()->whereNotNull('deleted_at')->get();

@@ -1,7 +1,7 @@
 <?php
 
 const REDACTED = '<REDACTED>';
-const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse'];
+const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse', 'libsql'];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
     'hourly' => '0 * * * *',
@@ -37,6 +37,7 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
+    'ghcr.io/tursodatabase/libsql-server',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',

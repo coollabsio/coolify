@@ -13,6 +13,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -26,7 +27,7 @@ use Illuminate\Support\Facades\Log;
 
 class CleanupNames extends Command
 {
-    protected $signature = 'cleanup:names 
+    protected $signature = 'cleanup:names
                             {--dry-run : Preview changes without applying them}
                             {--model= : Clean specific model (e.g., Project, Server)}
                             {--backup : Create database backup before changes}
@@ -49,6 +50,7 @@ class CleanupNames extends Command
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneLibsql' => StandaloneLibsql::class,
         'S3Storage' => S3Storage::class,
         'Tag' => Tag::class,
         'PrivateKey' => PrivateKey::class,

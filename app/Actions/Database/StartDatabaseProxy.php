@@ -6,6 +6,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -20,7 +21,7 @@ class StartDatabaseProxy
 
     public string $jobQueue = 'high';
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneLibsql|ServiceDatabase $database)
     {
         $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
@@ -42,6 +43,7 @@ class StartDatabaseProxy
             'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
             'standalone-clickhouse' => 9000,
             'standalone-mongodb' => 27017,
+            'standalone-libsql' => 8080,
             default => throw new \Exception("Unsupported database type: $databaseType"),
         };
         if ($isSSLEnabled) {
