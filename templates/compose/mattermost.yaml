@@ -27,7 +27,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8065"]
+      test: ["CMD", "/mattermost/bin/mmctl", "system", "status"]
       interval: 5s
       timeout: 20s
       retries: 10
