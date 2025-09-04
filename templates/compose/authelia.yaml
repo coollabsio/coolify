@@ -1,0 +1,139 @@
+# documentation: https://www.authelia.com/integration/deployment/docker/
+# slogan: The Single Sign-On Multi-Factor portal for web apps.
+# category: auth
+# tags: identity, login, auth, openid, user
+# logo: svgs/authelia.svg
+# port: 9091
+
+networks:
+  coolify:
+    external: true
+
+services:
+  authelia:
+    image: authelia/authelia
+    hostname: authelia
+    networks:
+      - coolify
+    environment:
+      - TZ=America/Santo_Domingo
+      - SERVICE_URL_AUTHELIA_9091
+      - EMAIL=${EMAIL:-admin@example.com}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME}
+      - DOMAIN=${SERVICE_FQDN_AUTHELIA}
+      - USERNAME=${SERVICE_USER_ADMIN}
+      - PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - STORAGE_SECRET=${SERVICE_PASSWORD_64_STORAGE}
+      - POLICY=${POLICY:-two_factor}
+    volumes:
+      - authelia-config:/config
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo ${DOMAIN} | sed 's/^[^.]*\.//' > /tmp/domain
+
+        authelia crypto hash generate argon2 --password ${PASSWORD} |
+          sed 's/Digest: //g' > /tmp/password
+
+        cat <<EOF >/config/configuration.yml
+        ---
+        server:
+          address: 'tcp://:9091'
+
+        log:
+          level: 'debug'
+
+        telemetry:
+          metrics:
+            enabled: false
+            address: 'tcp://:9959'
+
+        totp:
+          issuer: 'authelia.com'
+
+        identity_validation:
+          reset_password:
+            jwt_secret: '${JWT_SECRET}'
+
+        authentication_backend:
+          file:
+            path: '/config/users_database.yml'
+
+        access_control:
+          default_policy: 'deny'
+          rules:
+            - domain_regex: '^.*\.$(cat /tmp/domain | sed 's/\./\\./g')$'
+              policy: '${POLICY}'
+
+        session:
+          secret: 'insecure_session_secret'
+
+          cookies:
+            - name: 'authelia_session'
+              domain: '$(cat /tmp/domain)'
+              authelia_url: '${SERVICE_URL_AUTHELIA}'
+              expiration: '1 hour'
+              inactivity: '5 minutes'
+              default_redirection_url: 'https://$(cat /tmp/domain)'
+
+        regulation:
+          max_retries: 3
+          find_time: '2 minutes'
+          ban_time: '5 minutes'
+
+        storage:
+          encryption_key: '${STORAGE_SECRET}'
+          local:
+            path: '/config/db.sqlite3'
+
+        EOF
+
+        if [ -n "${SMTP_HOST}" ] &&
+           [ -n "${SMTP_PORT}" ] &&
+           [ -n "${SMTP_USERNAME}" ] &&
+           [ -n "${SMTP_PASSWORD}" ] &&
+           [ -n "${SMTP_FROM_NAME}" ] &&
+           [ -n "${SMTP_FROM_ADDRESS}" ]
+        then
+          cat <<EOF >>/config/configuration.yml
+        notifier:
+          smtp:
+            address: "${SMTP_HOST}:${SMTP_PORT}"
+            username: "${SMTP_USERNAME}"
+            password: "${SMTP_PASSWORD}"
+            sender: "${SMTP_FROM_NAME} <${SMTP_FROM_ADDRESS}>"
+        EOF
+        else
+          cat <<EOF >>/config/configuration.yml
+        notifier:
+          filesystem:
+            filename: "/config/notification.txt"
+        EOF
+        fi
+
+        cat <<EOF >>/config/configuration.yml
+        ...
+        EOF
+
+        cat <<EOF >/config/users_database.yml
+        ---
+        users:
+          ${USERNAME}:
+            disabled: false
+            displayname: '${USERNAME}'
+            password: '$(cat /tmp/password)'
+            email: '${EMAIL}'
+            groups:
+              - 'admins'
+              - 'dev'
+        ...
+        EOF
+
+        /app/entrypoint.sh
