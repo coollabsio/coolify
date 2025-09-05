@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
-use App\Jobs\PullChangelogFromGitHub;
+use App\Jobs\PullChangelog;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
@@ -140,7 +140,7 @@ class Init extends Command
     private function pullChangelogFromGitHub()
     {
         try {
-            PullChangelogFromGitHub::dispatch();
+            PullChangelog::dispatch();
             echo "Changelog fetch initiated\n";
         } catch (\Throwable $e) {
             echo "Could not fetch changelog from GitHub: {$e->getMessage()}\n";
