@@ -38,9 +38,9 @@ services:
     image: 'postgres:16-alpine'
     container_name: metamcp-pg
     environment:
-      - 'POSTGRES_DB=${POSTGRES_DB:-metamcp_db}'
-      - 'POSTGRES_USER=${POSTGRES_USER:-metamcp_user}'
-      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-m3t4mcp}'
+      - 'POSTGRES_DB=${POSTGRES_DB}'
+      - 'POSTGRES_USER=${POSTGRES_USER}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
     ports:
       - '9433:5432'
     volumes:
@@ -48,6 +48,6 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - 'pg_isready -U ${POSTGRES_USER:-metamcp_user} -d ${POSTGRES_DB:-metamcp_db}'
+        - 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}'
       interval: 10s
       timeout: 5s
