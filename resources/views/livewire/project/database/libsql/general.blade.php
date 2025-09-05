@@ -12,25 +12,87 @@
             <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://ghcr.io/tursodatabase/libsql-server'>https://ghcr.io/tursodatabase/libsql-server</a>" />
         </div>
+        <div class="flex flex-col gap-2">
+            <h3 class="py-2">Libsql</h3>
 
-        @if ($database->started_at)
+            @if (str($database->status)->contains('exited'))
+                <x-forms.select wire:model.live="sqldNode" id="sqldNode" label="Node Type" canGate="update"
+                    :canResource="$database">
+                    <option value="primary" {{ $sqldNode === 'primary' ? 'selected' : '' }}>Primary</option>
+                    <option value="replica" {{ $sqldNode === 'replica' ? 'selected' : '' }}>Replica</option>
+                </x-forms.select>
+            @else
+                <x-forms.select wire:model.live="sqldNode" id="sqldNode" label="Node Type" disabled canGate="update"
+                    :canResource="$database" helper="Database should be stopped to change this settings.">
+                    <option value="primary" {{ $sqldNode === 'primary' ? 'selected' : '' }}>Primary</option>
+                    <option value="replica" {{ $sqldNode === 'replica' ? 'selected' : '' }}>Replica</option>
+                </x-forms.select>
+            @endif
+
+            @if ($sqldNode === 'replica')
+                @if (str($database->status)->contains('exited'))
+                    <x-forms.input id="sqldPrimaryUrl" label="Primary URL" placeholder="https://<host>:<port>" required
+                        canGate="update" :canResource="$database"
+                        helper="URL of the primary LibSQL server to replicate from" />
+                @else
+                    <x-forms.input id="sqldPrimaryUrl" label="Primary URL" placeholder="https://<host>:<port>" required
+                        disabled canGate="update" :canResource="$database"
+                        helper="Database should be stopped to change this settings." />
+                @endif
+            @endif
             <div class="flex gap-2">
-                <x-forms.input label="Initial Encryption Password" id="libsqlPassword" type="password" required readonly
-                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
-            </div>
-        @else
-            <div class=" dark:text-warning">Please verify these values. You can only modify them before the initial
-                start. After that, you need to modify it in the database.
+
+                @if (str($database->status)->contains('exited'))
+                    <x-forms.input id="sqldHttpAuthUser" label="HTTP Basic user" canGate="update" :canResource="$database" />
+                @else
+                    <x-forms.input id="sqldHttpAuthUser" label="HTTP Basic user" disabled canGate="update"
+                        :canResource="$database" helper="Database should be stopped to change this settings." />
+                @endif
+
+                @if (str($database->status)->contains('exited'))
+                    <x-forms.input type="password" id="sqldHttpAuthPassword" label="HTTP Basic password"
+                        canGate="update" :canResource="$database" />
+                @else
+                    <x-forms.input type="password" id="sqldHttpAuthPassword" label="HTTP Basic password" disabled
+                        canGate="update" :canResource="$database"
+                        helper="Database should be stopped to change this settings." />
+                @endif
+
+                @if (str($database->status)->contains('exited'))
+                    <x-forms.input id="sqldAuthJwtKey" label="HTTP JWT key" canGate="update" :canResource="$database" />
+                @else
+                    <x-forms.input id="sqldAuthJwtKey" label="HTTP JWT key" disabled canGate="update" :canResource="$database"
+                        helper="Database should be stopped to change this settings." />
+                @endif
             </div>
             <div class="flex gap-2">
-                <x-forms.input label="Password" id="libsqlPassword" type="password" required canGate="update"
-                    :canResource="$database" />
+
+                @if (str($database->status)->contains('exited'))
+                    <x-forms.input id="sqldHttpPort" label="HTTP Listen Port" placeholder="8080" canGate="update"
+                        :canResource="$database" helper="Port for HTTP connections (sets SQLD_HTTP_LISTEN_ADDR)" />
+                @else
+                    <x-forms.input id="sqldHttpPort" label="HTTP Listen Port" placeholder="8080" canGate="update"
+                        disabled :canResource="$database" helper="Database should be stopped to change this settings." />
+                @endif
+                @if ($sqldNode === 'primary')
+
+                    @if (str($database->status)->contains('exited'))
+                        <x-forms.input id="sqldGrpcPort" label="gRPC Listen Port" placeholder="5001" canGate="update"
+                            :canResource="$database"
+                            helper="Port for gRPC connections (sets SQLD_GRPC_LISTEN_ADDR) - Only for primary nodes" />
+                    @else
+                        <x-forms.input id="sqldGrpcPort" label="gRPC Listen Port" placeholder="5001" canGate="update"
+                            disabled :canResource="$database" helper="Database should be stopped to change this settings." />
+                    @endif
+                @endif
             </div>
-        @endif
-        <x-forms.input
-            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
-            placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-            id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
+            @if ($sqldNode === 'primary')
+                <x-forms.input label="Libsql Replication URL (internal)"
+                    helper="If you change the user/password/port, this could be different. This is with the default values."
+                    type="password" readonly wire:model="dbReplicationUrl" canGate="update" :canResource="$database" />
+            @endif
+        </div>
+
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
             <div class="flex items-end gap-2">
@@ -90,33 +152,34 @@
                     @endif
                 </div>
             </div>
-        </div>
-        <div>
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
+
+            <div>
+                <div class="flex flex-col py-2 w-64">
+                    <div class="flex items-center gap-2 pb-2">
+                        <div class="flex items-center">
+                            <h3>Proxy</h3>
+                            <x-loading wire:loading wire:target="instantSave" />
+                        </div>
+                        @if ($isPublic)
+                            <x-slide-over fullScreen>
+                                <x-slot:title>Proxy Logs</x-slot:title>
+                                <x-slot:content>
+                                    <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                        container="{{ data_get($database, 'uuid') }}-proxy" lazy />
+                                </x-slot:content>
+                                <x-forms.button disabled="{{ !$isPublic }}"
+                                    @click="slideOverOpen=true">Logs</x-forms.button>
+                            </x-slide-over>
+                        @endif
                     </div>
-                    @if ($isPublic)
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !$isPublic }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
+                    <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available" canGate="update"
+                        :canResource="$database" />
                 </div>
-                <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available" canGate="update"
-                    :canResource="$database" />
+                <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
+                    canGate="update" :canResource="$database" />
             </div>
-            <x-forms.input placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
-                canGate="update" :canResource="$database" />
-        </div>
     </form>
+
     <h3 class="pt-4">Advanced</h3>
     <div class="w-64">
         <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
@@ -124,4 +187,3 @@
             :canResource="$database" />
     </div>
 </div>
-

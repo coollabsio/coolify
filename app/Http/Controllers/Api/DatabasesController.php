@@ -35,7 +35,7 @@ class DatabasesController extends Controller
                 'mongo_initdb_root_password',
                 'keydb_password',
                 'clickhouse_admin_password',
-                'libsql_password',
+                'sqld_http_auth_password',
             ]);
         }
 
@@ -201,7 +201,11 @@ class DatabasesController extends Controller
                         'clickhouse_admin_user' => ['type' => 'string', 'description' => 'Clickhouse admin user'],
                         'clickhouse_admin_password' => ['type' => 'string', 'description' => 'Clickhouse admin password'],
                         'dragonfly_password' => ['type' => 'string', 'description' => 'DragonFly password'],
-                        'libsql_password' => ['type' => 'string', 'description' => 'Libsql password'],
+                        'sqld_http_auth_user' => ['type' => 'string', 'description' => 'Libsql HTTP basic user'],
+                        'sqld_http_auth_password' => ['type' => 'string', 'description' => 'Libsql HTTP basic password'],
+                        'sqld_auth_jwt_key' => ['type' => 'string', 'description' => 'Libsql JWT key'],
+                        'sqld_http_port' => ['type' => 'integer', 'description' => 'Libsql HTTP listen port'],
+                        'sqld_grpc_port' => ['type' => 'integer', 'description' => 'Libsql gRPC listen port (only applicable for primary nodes)'],
                         'redis_password' => ['type' => 'string', 'description' => 'Redis password'],
                         'redis_conf' => ['type' => 'string', 'description' => 'Redis conf'],
                         'keydb_password' => ['type' => 'string', 'description' => 'KeyDB password'],
@@ -245,7 +249,7 @@ class DatabasesController extends Controller
     )]
     public function update_by_uuid(Request $request)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'libsql_user', 'libsql_password', 'libsql_db'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqld_http_auth_user', 'sqld_http_auth_password', 'sqld_auth_jwt_key', 'sqld_http_port', 'sqld_grpc_port'];
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
@@ -390,9 +394,13 @@ class DatabasesController extends Controller
                 }
                 break;
             case 'standalone-libsql':
-                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'libsql_password'];
+                $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'sqld_http_auth_user', 'sqld_http_auth_password', 'sqld_auth_jwt_key', 'sqld_http_port', 'sqld_grpc_port'];
                 $validator = customApiValidator($request->all(), [
-                    'libsql_password' => 'string',
+                    'sqld_http_auth_user' => 'string',
+                    'sqld_http_auth_password' => 'string',
+                    'sqld_auth_jwt_key' => 'string',
+                    'sqld_http_port' => 'integer|min:1|max:65535',
+                    'sqld_grpc_port' => 'nullable|integer|min:1|max:65535',
                 ]);
                 break;
             case 'standalone-mariadb':
@@ -864,7 +872,11 @@ class DatabasesController extends Controller
                         'environment_name' => ['type' => 'string', 'description' => 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'],
                         'environment_uuid' => ['type' => 'string', 'description' => 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'],
                         'destination_uuid' => ['type' => 'string', 'description' => 'UUID of the destination if the server has multiple destinations'],
-                        'libsql_password' => ['type' => 'string', 'description' => 'LibSQL password'],
+                        'sqld_http_auth_user' => ['type' => 'string', 'description' => 'Libsql HTTP basic user'],
+                        'sqld_http_auth_password' => ['type' => 'string', 'description' => 'Libsql HTTP basic password'],
+                        'sqld_auth_jwt_key' => ['type' => 'string', 'description' => 'Libsql JWT key'],
+                        'sqld_http_port' => ['type' => 'integer', 'description' => 'Libsql HTTP listen port'],
+                        'sqld_grpc_port' => ['type' => 'integer', 'description' => 'Libsql gRPC listen port (only applicable for primary nodes)'],
                         'name' => ['type' => 'string', 'description' => 'Name of the database'],
                         'description' => ['type' => 'string', 'description' => 'Description of the database'],
                         'image' => ['type' => 'string', 'description' => 'Docker Image of the database'],
@@ -1099,7 +1111,7 @@ class DatabasesController extends Controller
 
     public function create_database(Request $request, NewDatabaseTypes $type)
     {
-        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'libsql_user', 'libsql_password', 'libsql_db'];
+        $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'postgres_user', 'postgres_password', 'postgres_db', 'postgres_initdb_args', 'postgres_host_auth_method', 'postgres_conf', 'clickhouse_admin_user', 'clickhouse_admin_password', 'dragonfly_password', 'redis_password', 'redis_conf', 'keydb_password', 'keydb_conf', 'mariadb_conf', 'mariadb_root_password', 'mariadb_user', 'mariadb_password', 'mariadb_database', 'mongo_conf', 'mongo_initdb_root_username', 'mongo_initdb_root_password', 'mongo_initdb_database', 'mysql_root_password', 'mysql_password', 'mysql_user', 'mysql_database', 'mysql_conf', 'sqld_node', 'sqld_primary_url', 'sqld_http_auth_user', 'sqld_http_auth_password', 'sqld_auth_jwt_key', 'sqld_http_port', 'sqld_grpc_port'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -1519,9 +1531,13 @@ class DatabasesController extends Controller
 
             return response()->json(serializeApiResponse($payload))->setStatusCode(201);
         } elseif ($type === NewDatabaseTypes::LIBSQL) {
-            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'libsql_password'];
+            $allowedFields = ['name', 'description', 'image', 'public_port', 'is_public', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'sqld_http_auth_user', 'sqld_http_auth_password', 'sqld_auth_jwt_key', 'sqld_http_port', 'sqld_grpc_port'];
             $validator = customApiValidator($request->all(), [
-                'libsql_password' => 'string',
+                'sqld_http_auth_user' => 'string',
+                'sqld_http_auth_password' => 'string',
+                'sqld_auth_jwt_key' => 'string',
+                'sqld_http_port' => 'integer|min:1|max:65535',
+                'sqld_grpc_port' => 'nullable|integer|min:1|max:65535',
             ]);
             $extraFields = array_diff(array_keys($request->all()), $allowedFields);
             if ($validator->fails() || ! empty($extraFields)) {

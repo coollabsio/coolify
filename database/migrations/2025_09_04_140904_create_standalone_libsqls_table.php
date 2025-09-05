@@ -18,8 +18,11 @@ return new class extends Migration
             $table->string('description')->nullable();
 
             // LibSQL specific fields
-            $table->text('libsql_password');
-            $table->string('libsql_db')->nullable();
+            $table->string('sqld_node')->default("primary");
+            $table->string('sqld_primary_url')->nullable();
+            $table->text('sqld_http_auth_user')->nullable();
+            $table->text('sqld_http_auth_password')->nullable();
+            $table->text('sqld_auth_jwt_key')->nullable();
 
             $table->string('status')->default('exited');
 
@@ -47,7 +50,6 @@ return new class extends Migration
             $table->text('s3_access_key')->nullable();
             $table->text('s3_secret_key')->nullable();
             $table->string('s3_endpoint')->nullable();
-            $table->string('sqld_node')->nullable();
             $table->integer('sqld_http_port')->nullable();
             $table->integer('sqld_grpc_port')->nullable();
 

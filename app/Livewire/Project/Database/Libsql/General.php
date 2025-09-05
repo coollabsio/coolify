@@ -27,7 +27,19 @@ class General extends Component
 
     public ?string $description = null;
 
-    public string $libsqlPassword;
+    public string $sqldNode = 'primary';
+
+    public ?string $sqldPrimaryUrl = null;
+
+    public ?string $sqldHttpAuthUser = null;
+
+    public ?string $sqldHttpAuthPassword = null;
+
+    public ?string $sqldAuthJwtKey = null;
+
+    public ?int $sqldHttpPort = null;
+
+    public ?int $sqldGrpcPort = null;
 
     public string $image;
 
@@ -40,6 +52,8 @@ class General extends Component
     public ?string $customDockerRunOptions = null;
 
     public ?string $dbUrl = null;
+
+    public ?string $dbReplicationUrl = null;
 
     public ?string $dbUrlPublic = null;
 
@@ -82,13 +96,20 @@ class General extends Component
         $baseRules = [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'libsqlPassword' => 'required|string',
+            'sqldNode' => 'required|string|in:primary,replica',
+            'sqldPrimaryUrl' => 'nullable|string|required_if:sqldNode,replica',
+            'sqldHttpAuthUser' => 'nullable|string|required_with:sqldHttpAuthPassword',
+            'sqldHttpAuthPassword' => 'nullable|string|required_with:sqldHttpAuthUser',
+            'sqldAuthJwtKey' => 'nullable|string',
+            'sqldHttpPort' => 'nullable|integer|min:1|max:65535',
+            'sqldGrpcPort' => 'nullable|required_if:sqldNode,primary|integer|min:1|max:65535',
             'image' => 'required|string',
             'portsMappings' => 'nullable|string',
             'isPublic' => 'nullable|boolean',
             'publicPort' => 'nullable|integer',
             'customDockerRunOptions' => 'nullable|string',
             'dbUrl' => 'nullable|string',
+            'dbReplicationUrl' => 'nullable|string',
             'dbUrlPublic' => 'nullable|string',
             'isLogDrainEnabled' => 'nullable|boolean',
             'enable_ssl' => 'boolean',
@@ -117,8 +138,8 @@ class General extends Component
     /*         'database.s3_secret_key' => 'nullable|string', */
     /*         'database.s3_endpoint' => 'nullable|string', */
     /*         'database.sqld_node' => 'nullable|string', */
-    /*         'database.sqld_http_port' => 'required|string', */
-    /*         'database.sqld_grpc_port' => 'required|string', */
+    /*         'database.sqld_http_port' => 'nullable|integer|min:1|max:65535', */
+    /*         'database.sqld_grpc_port' => 'nullable|required_if:database.sqld_node,primary|integer|min:1|max:65535', */
     /*     ]; */
     }
 
@@ -127,7 +148,12 @@ class General extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
-                'libsqlPassword.required' => 'The Libsql Password field is required.',
+                'sqldNode.required' => 'The node type is required.',
+                'sqldNode.in' => 'The node type must be either primary or replica.',
+                'sqldPrimaryUrl.required_if' => 'The primary URL is required when node type is replica.',
+                'sqldHttpAuthUser.required_with' => 'The Basic Auth user is required when the password is set.',
+                'sqldHttpAuthPassword.required_with' => 'The Basic Auth password is required when the user is set.',
+                'sqldGrpcPort.required_if' => 'The gRPC port is required when node type is primary.',
                 'image.required' => 'The Docker Image field is required.',
                 'image.string' => 'The Docker Image must be a string.',
                 'publicPort.integer' => 'The Public Port must be an integer.',
@@ -141,7 +167,14 @@ class General extends Component
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->libsql_password = $this->libsqlPassword;
+            $this->database->sqld_node = $this->sqldNode;
+            $this->database->sqld_primary_url = $this->sqldPrimaryUrl;
+            $this->database->sqld_http_auth_user = $this->sqldHttpAuthUser;
+            $this->database->sqld_http_auth_password = $this->sqldHttpAuthPassword;
+            $this->database->sqld_auth_jwt_key = $this->sqldAuthJwtKey;
+            $this->database->sqld_http_port = $this->sqldHttpPort;
+            // Only set gRPC port for primary nodes
+            $this->database->sqld_grpc_port = $this->sqldNode === 'primary' ? $this->sqldGrpcPort : null;
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
@@ -152,11 +185,18 @@ class General extends Component
             $this->database->save();
 
             $this->dbUrl = $this->database->internal_db_url;
+            $this->dbInternalUrl = $this->database->internal_replication_db_url;
             $this->dbUrlPublic = $this->database->external_db_url;
         } else {
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->libsqlPassword = $this->database->libsql_password;
+            $this->sqldNode = $this->database->sqld_node;
+            $this->sqldPrimaryUrl = $this->database->sqld_primary_url;
+            $this->sqldHttpAuthUser = $this->database->sqld_http_auth_user;
+            $this->sqldHttpAuthPassword = $this->database->sqld_http_auth_password;
+            $this->sqldAuthJwtKey = $this->database->sqld_auth_jwt_key;
+            $this->sqldHttpPort = $this->database->sqld_http_port;
+            $this->sqldGrpcPort = $this->database->sqld_grpc_port;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
@@ -165,6 +205,7 @@ class General extends Component
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
             $this->enable_ssl = $this->database->enable_ssl;
             $this->dbUrl = $this->database->internal_db_url;
+            $this->dbReplicationUrl = $this->database->internal_replication_db_url;
             $this->dbUrlPublic = $this->database->external_db_url;
         }
     }
@@ -246,6 +287,24 @@ class General extends Component
             } else {
                 $this->dispatch('configurationChanged');
             }
+        }
+    }
+
+    public function getDisableHttpAuthProperty()
+    {
+        return !empty($this->sqldAuthJwtKey);
+    }
+
+    public function getDisableJwtKeyProperty()
+    {
+        return !empty($this->sqldHttpAuthUser) || !empty($this->sqldHttpAuthPassword);
+    }
+
+    public function updatedSqldNode()
+    {
+        // Clear gRPC port when switching to replica
+        if ($this->sqldNode === 'replica') {
+            $this->sqldGrpcPort = null;
         }
     }
 

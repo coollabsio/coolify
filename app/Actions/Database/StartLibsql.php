@@ -173,6 +173,55 @@ class StartLibsql
             $environment_variables->push("$env->key=$env->real_value");
         }
 
+        $environment_variables->push("SQLD_NODE={$this->database->sqld_node}");
+
+        // Libsql specific environment variables
+        if ($this->database->sqld_node === 'replica' && $this->database->sqld_primary_url) {
+            $environment_variables->push("SQLD_PRIMARY_URL={$this->database->sqld_primary_url}");
+        }
+
+        if ($this->database->sqld_http_auth_user && $this->database->sqld_http_auth_password) {
+            $authString = $this->database->sqld_http_auth_user . ':' . $this->database->sqld_http_auth_password;
+            $encoded = base64_encode($authString);
+
+            $environment_variables->push("SQLD_HTTP_AUTH=basic:{$encoded}");
+        }
+
+        if ($this->database->sqld_auth_jwt_key) {
+            $environment_variables->push("SQLD_AUTH_JWT_KEY={$this->database->sqld_auth_jwt_key}");
+        }
+
+        if ($this->database->sqld_http_port) {
+            $environment_variables->push("SQLD_HTTP_LISTEN_ADDR=0.0.0.0:{$this->database->sqld_http_port}");
+        }
+
+        if ($this->database->sqld_grpc_port && $this->database->sqld_node === 'primary') {
+            $environment_variables->push("SQLD_GRPC_LISTEN_ADDR=0.0.0.0:{$this->database->sqld_grpc_port}");
+        }
+
+
+
+        if ($this->database->enable_bottomless_replication && $this->database->s3_bucket) {
+            $environment_variables->push("LIBSQL_BOTTOMLESS_REPLICATION=1");
+            $environment_variables->push("LIBSQL_S3_BUCKET={$this->database->s3_bucket}");
+
+            if ($this->database->s3_region) {
+                $environment_variables->push("LIBSQL_S3_REGION={$this->database->s3_region}");
+            }
+
+            if ($this->database->s3_access_key) {
+                $environment_variables->push("LIBSQL_S3_ACCESS_KEY_ID={$this->database->s3_access_key}");
+            }
+
+            if ($this->database->s3_secret_key) {
+                $environment_variables->push("LIBSQL_S3_SECRET_ACCESS_KEY={$this->database->s3_secret_key}");
+            }
+
+            if ($this->database->s3_endpoint) {
+                $environment_variables->push("LIBSQL_S3_ENDPOINT={$this->database->s3_endpoint}");
+            }
+        }
+
         add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
 
         return $environment_variables->all();

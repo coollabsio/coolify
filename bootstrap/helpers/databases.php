@@ -186,7 +186,14 @@ function create_standalone_libsql($environment_id, $destination_uuid, ?array $ot
     $database = new StandaloneLibsql;
     $database->uuid = (new Cuid2);
     $database->name = 'libsql-database-'.$database->uuid;
-    $database->libsql_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->sqld_node = 'primary';
+    $database->sqld_http_auth_user = "libsql";
+    $database->sqld_http_auth_password = \Illuminate\Support\Str::password(length: 64, symbols: false);
+    $database->sqld_http_port = 8080;
+    // Only set gRPC port for primary nodes
+    if (($otherData['sqld_node'] ?? 'primary') === 'primary') {
+        $database->sqld_grpc_port = 5001;
+    }
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

@@ -16,7 +16,11 @@ class StandaloneLibsql extends BaseModel
     protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
 
     protected $casts = [
-        'libsql_password' => 'encrypted',
+        'libsql_http_auth_user' => 'encrypted',
+        'libsql_http_auth_password' => 'encrypted',
+        'libsql_auth_jwt_key' => 'encrypted',
+        'sqld_http_port' => 'integer',
+        'sqld_grpc_port' => 'integer',
     ];
 
     protected static function booted()
@@ -84,6 +88,10 @@ class StandaloneLibsql extends BaseModel
         $newConfigHash = $this->image.$this->ports_mappings;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
         $newConfigHash .= $this->enable_bottomless_replication ? 'bottomless' : '';
+        $newConfigHash .= $this->sqld_http_port ?? '';
+        if ($this->sqld_node === 'primary') {
+            $newConfigHash .= $this->sqld_grpc_port ?? '';
+        }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -221,10 +229,11 @@ class StandaloneLibsql extends BaseModel
     {
         return new Attribute(
             get: function () {
-                $url = "libsql://{$this->uuid}:8080";
-                if ($this->libsql_password) {
-                    $encodedPass = rawurlencode($this->libsql_password);
-                    $url = "libsql://admin:{$encodedPass}@{$this->uuid}:8080";
+                $url = "http://{$this->uuid}:{$this->sqld_http_port}";
+                if ($this->sqld_http_auth_password) {
+                    $encodedUser = rawurlencode($this->sqld_http_auth_user);
+                    $encodedPass = rawurlencode($this->sqld_http_auth_password);
+                    $url = "http://{$encodedUser}:{$encodedPass}@{$this->uuid}:{$this->sqld_http_port}";
                 }
 
                 return $url;
@@ -232,15 +241,27 @@ class StandaloneLibsql extends BaseModel
         );
     }
 
+    protected function internalReplicationDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $url = "http://{$this->uuid}:{$this->sqld_grpc_port}";
+                return $url;
+            },
+        );
+    }
+
+
     protected function externalDbUrl(): Attribute
     {
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    $url = "libsql://{$this->destination->server->getIp}:{$this->public_port}";
+                    $url = "https://{$this->destination->server->getIp}:{$this->public_port}";
                     if ($this->libsql_password) {
+                        $encodedUser = rawurlencode($this->sqld_http_auth_user);
                         $encodedPass = rawurlencode($this->libsql_password);
-                        $url = "libsql://admin:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}";
+                        $url = "https://{$encodedUser}:{$encodedPass}@{$this->destination->server->getIp}:{$this->public_port}";
                     }
 
                     return $url;
