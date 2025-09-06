@@ -49,7 +49,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    restart: unless-stopped
 
   web:
     image: ghcr.io/ente-io/web
@@ -58,7 +57,6 @@ services:
       - ENTE_API_ORIGIN=${SERVICE_URL_MUSEUM}
       - ENTE_ALBUMS_ORIGIN=${SERVICE_URL_WEB_3002}
 
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:3000"]
       interval: 30s
@@ -80,7 +78,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    restart: unless-stopped
 
 volumes:
   postgres-data:
