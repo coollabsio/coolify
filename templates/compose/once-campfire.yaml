@@ -14,13 +14,13 @@ services:
     volumes:
       - campfire-storage:/rails/storage
     environment:
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE} # required, set this to a secure random value
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}                    # optional, for notifications
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}                  # optional, for notifications
-      DISABLE_SSL: ${DISABLE_SSL-true}                         # uncomment to disable SSL
-      SSL_DOMAIN: ${SSL_DOMAIN-false}                          # optional, for SSL
-      SKIP_TELEMETRY: ${SKIP_TELEMETRY-true}                   # optional, set to disable telemetry
-      SENTRY_DSN: ${SENTRY_DSN}                                # optional, for error reporting
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}     # required, set this to a secure random value
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}   # optional, for notifications
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY} # optional, for notifications
+      DISABLE_SSL: ${DISABLE_SSL-true}        # uncomment to disable SSL
+      SSL_DOMAIN: ${SSL_DOMAIN-false}         # optional, for SSL
+      SKIP_TELEMETRY: ${SKIP_TELEMETRY-true}  # optional, set to disable telemetry
+      SENTRY_DSN: ${SENTRY_DSN}               # optional, for error reporting
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/up"]
       interval: 10s
