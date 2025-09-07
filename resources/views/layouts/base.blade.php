@@ -35,9 +35,9 @@
     @endphp
     <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
     @env('local')
-        <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/x-icon" />
+        <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/png" />
     @else
-        <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/x-icon" />
+        <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/svg+xml" />
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
