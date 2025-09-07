@@ -3,7 +3,7 @@
 # category: messaging
 # tags: campfire,chat,communication,rails,once,basecamp,37signals
 # logo: svgs/once-campfire.png
-# port: 80
+# port: 3000
 
 services:
   campfire:
