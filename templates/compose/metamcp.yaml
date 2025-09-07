@@ -9,16 +9,14 @@ services:
   app:
     container_name: metamcp
     image: 'ghcr.io/metatool-ai/metamcp:latest'
-    ports:
-      - '12008:12008'
     environment:
       - SERVICE_URL_METAMCP_12008
-      - 'POSTGRES_HOST=${POSTGRES_HOST:?postgres}'
-      - 'POSTGRES_PORT=${POSTGRES_PORT:?5432}'
-      - 'POSTGRES_USER=${SERVICE_USER_DB}'
-      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}'
-      - 'POSTGRES_DB=${POSTGRES_DB:-metamcp_db}'
-      - 'DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}'
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${SERVICE_USER_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-metamcp_db}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}'
       - APP_URL=$SERVICE_URL_METAMCP
       - 'NEXT_PUBLIC_APP_URL=${APP_URL}'
       - BETTER_AUTH_SECRET=$SERVICE_PASSWORD_AUTH
@@ -32,22 +30,23 @@ services:
         - curl
         - '-f'
         - 'http://localhost:12008/health'
-      interval: 30s
-      timeout: 10s
+      interval: 5s
+      timeout: 20s
+      retries: 10
   postgres:
     image: 'postgres:16-alpine'
-    container_name: metamcp-pg
+    container_name: metamcp-DB
     environment:
-      - 'POSTGRES_DB=${POSTGRES_DB}'
-      - 'POSTGRES_USER=${POSTGRES_USER}'
-      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
-    ports:
-      - '9433:5432'
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
       test:
         - CMD-SHELL
         - 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}'
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 20s
+      retries: 10
