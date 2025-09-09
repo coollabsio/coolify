@@ -6,7 +6,7 @@
 
 services:
   init-clickhouse:
-    image: clickhouse/clickhouse-server:24.1.2-alpine
+    image: clickhouse/clickhouse-server:25.5.6-alpine
     command:
       - bash
       - -c
@@ -50,7 +50,7 @@ services:
 
   clickhouse:
     # addding non LTS version due to this fix https://github.com/ClickHouse/ClickHouse/commit/32caf8716352f45c1b617274c7508c86b7d1afab
-    image: clickhouse/clickhouse-server:24.1.2-alpine
+    image: clickhouse/clickhouse-server:25.5.6-alpine
     tty: true
     depends_on:
       init-clickhouse:
@@ -76,6 +76,8 @@ services:
       options:
         max-size: 50m
         max-file: "3"
+    environment:
+      - "CLICKHOUSE_SKIP_USER_SETUP=1"
     volumes:
       - type: volume
         source: clickhouse
