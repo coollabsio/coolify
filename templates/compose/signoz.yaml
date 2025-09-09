@@ -27,7 +27,7 @@ services:
         max-file: "3"
 
   zookeeper:
-    image: signoz/zookeeper:3.7.1
+    image: signoz/zookeeper:latest
     user: root
     healthcheck:
       test:
