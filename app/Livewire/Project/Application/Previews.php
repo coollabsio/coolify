@@ -77,7 +77,7 @@ class Previews extends Component
                 $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->trim()->lower();
-                if (! validate_dns_entry($preview->fqdn, $this->application->destination->server)) {
+                if (! validateDNSEntry($preview->fqdn, $this->application->destination->server)) {
                     $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $success = false;
                 }

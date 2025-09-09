@@ -12,7 +12,7 @@
                 </svg>
                 In progress
             </button>
-            <button class="menu-item" @click="modalOpen=true" x-show="!showProgress">
+            <button class="menu-item cursor-pointer" @click="modalOpen=true" x-show="!showProgress">
                 <svg xmlns="http://www.w3.org/2000/svg"
                     class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"

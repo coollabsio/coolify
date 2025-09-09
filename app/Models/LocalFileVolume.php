@@ -119,6 +119,7 @@ class LocalFileVolume extends BaseModel
         $commands = collect([]);
         if ($this->is_directory) {
             $commands->push("mkdir -p $this->fs_path > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p $workdir > /dev/null 2>&1 || true");
             $commands->push("cd $workdir");
         }
         if (str($this->fs_path)->startsWith('.') || str($this->fs_path)->startsWith('/') || str($this->fs_path)->startsWith('~')) {
@@ -158,8 +159,7 @@ class LocalFileVolume extends BaseModel
             $chmod = data_get($this, 'chmod');
             $chown = data_get($this, 'chown');
             if ($content) {
-                $content = base64_encode($content);
-                $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
+                transfer_file_to_server($content, $path, $server);
             } else {
                 $commands->push("touch $path");
             }
@@ -174,7 +174,9 @@ class LocalFileVolume extends BaseModel
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
         }
 
-        return instant_remote_process($commands, $server);
+        if ($commands->count() > 0) {
+            return instant_remote_process($commands, $server);
+        }
     }
 
     // Accessor for convenient access

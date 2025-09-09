@@ -20,6 +20,8 @@ class StartPostgresql
 
     public string $configuration_dir;
 
+    public string $volume_configuration_dir;
+
     private ?SslCertificate $ssl_certificate = null;
 
     public function handle(StandalonePostgresql $database)
@@ -27,8 +29,9 @@ class StartPostgresql
         $this->database = $database;
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        $this->volume_configuration_dir = $this->configuration_dir;
         if (isDev()) {
-            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
+            $this->volume_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
         }
 
         $this->commands = [
@@ -192,7 +195,7 @@ class StartPostgresql
                 $docker_compose['services'][$container_name]['volumes'],
                 [[
                     'type' => 'bind',
-                    'source' => $this->configuration_dir.'/custom-postgres.conf',
+                    'source' => $this->volume_configuration_dir.'/custom-postgres.conf',
                     'target' => '/etc/postgresql/postgresql.conf',
                     'read_only' => true,
                 ]]
@@ -217,8 +220,12 @@ class StartPostgresql
         }
 
         $docker_compose = Yaml::dump($docker_compose, 10);
-        $docker_compose_base64 = base64_encode($docker_compose);
-        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
+        $this->commands[] = [
+            'transfer_file' => [
+                'content' => $docker_compose,
+                'destination' => "$this->volume_configuration_dir/docker-compose.yml",
+            ],
+        ];
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
@@ -302,8 +309,12 @@ class StartPostgresql
         foreach ($this->database->init_scripts as $init_script) {
             $filename = data_get($init_script, 'filename');
             $content = data_get($init_script, 'content');
-            $content_base64 = base64_encode($content);
-            $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/{$filename} > /dev/null";
+            $this->commands[] = [
+                'transfer_file' => [
+                    'content' => $content,
+                    'destination' => "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}",
+                ],
+            ];
             $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
         }
     }
@@ -325,7 +336,11 @@ class StartPostgresql
             $this->database->postgres_conf = $content;
             $this->database->save();
         }
-        $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+        $this->commands[] = [
+            'transfer_file' => [
+                'content' => $content,
+                'destination' => $config_file_path,
+            ],
+        ];
     }
 }

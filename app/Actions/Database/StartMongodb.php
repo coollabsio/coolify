@@ -18,6 +18,8 @@ class StartMongodb
 
     public string $configuration_dir;
 
+    public string $volume_configuration_dir;
+
     private ?SslCertificate $ssl_certificate = null;
 
     public function handle(StandaloneMongodb $database)
@@ -27,9 +29,9 @@ class StartMongodb
         $startCommand = 'mongod';
 
         $container_name = $this->database->uuid;
-        $this->configuration_dir = database_configuration_dir().'/'.$container_name;
+        $this->volume_configuration_dir = $this->configuration_dir = database_configuration_dir().'/'.$container_name;
         if (isDev()) {
-            $this->configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
+            $this->volume_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$container_name;
         }
 
         $this->commands = [
@@ -176,7 +178,7 @@ class StartMongodb
                 $docker_compose['services'][$container_name]['volumes'] ?? [],
                 [[
                     'type' => 'bind',
-                    'source' => $this->configuration_dir.'/mongod.conf',
+                    'source' => $this->volume_configuration_dir.'/mongod.conf',
                     'target' => '/etc/mongo/mongod.conf',
                     'read_only' => true,
                 ]]
@@ -190,7 +192,7 @@ class StartMongodb
             $docker_compose['services'][$container_name]['volumes'] ?? [],
             [[
                 'type' => 'bind',
-                'source' => $this->configuration_dir.'/docker-entrypoint-initdb.d',
+                'source' => $this->volume_configuration_dir.'/docker-entrypoint-initdb.d',
                 'target' => '/docker-entrypoint-initdb.d',
                 'read_only' => true,
             ]]
@@ -254,8 +256,12 @@ class StartMongodb
         }
 
         $docker_compose = Yaml::dump($docker_compose, 10);
-        $docker_compose_base64 = base64_encode($docker_compose);
-        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
+        $this->commands[] = [
+            'transfer_file' => [
+                'content' => $docker_compose,
+                'destination' => "$this->volume_configuration_dir/docker-compose.yml",
+            ],
+        ];
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
@@ -332,15 +338,22 @@ class StartMongodb
         }
         $filename = 'mongod.conf';
         $content = $this->database->mongo_conf;
-        $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        $this->commands[] = [
+            'transfer_file' => [
+                'content' => $content,
+                'destination' => "$this->configuration_dir/{$filename}",
+            ],
+        ];
     }
 
     private function add_default_database()
     {
         $content = "db = db.getSiblingDB(\"{$this->database->mongo_initdb_database}\");db.createCollection('init_collection');db.createUser({user: \"{$this->database->mongo_initdb_root_username}\", pwd: \"{$this->database->mongo_initdb_root_password}\",roles: [{role:\"readWrite\",db:\"{$this->database->mongo_initdb_database}\"}]});";
-        $content_base64 = base64_encode($content);
-        $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";
-        $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/docker-entrypoint-initdb.d/01-default-database.js > /dev/null";
+        $this->commands[] = [
+            'transfer_file' => [
+                'content' => $content,
+                'destination' => "$this->configuration_dir/docker-entrypoint-initdb.d/01-default-database.js",
+            ],
+        ];
     }
 }

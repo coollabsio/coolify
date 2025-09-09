@@ -1069,9 +1069,9 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
                 }
             }
         }
-        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
+        $compose_content = Yaml::dump($yaml_compose);
+        transfer_file_to_server($compose_content, "/tmp/{$uuid}.yml", $server);
         instant_remote_process([
-            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
             "chmod 600 /tmp/{$uuid}.yml",
             "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
             "rm /tmp/{$uuid}.yml",

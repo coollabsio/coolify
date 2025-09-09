@@ -204,7 +204,6 @@ function get_latest_version_of_coolify(): string
 
         return data_get($versions, 'coolify.v4.version');
     } catch (\Throwable $e) {
-        ray($e->getMessage());
 
         return '0.0.0';
     }
@@ -962,7 +961,7 @@ function getRealtime()
     }
 }
 
-function validate_dns_entry(string $fqdn, Server $server)
+function validateDNSEntry(string $fqdn, Server $server)
 {
     // https://www.cloudflare.com/ips-v4/#
     $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
@@ -995,7 +994,7 @@ function validate_dns_entry(string $fqdn, Server $server)
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                        if (ipMatch($result->getData(), $cloudflare_ips->toArray(), $match)) {
                             $found_matching_ip = true;
                             break;
                         }
@@ -1013,7 +1012,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function ip_match($ip, $cidrs, &$match = null)
+function ipMatch($ip, $cidrs, &$match = null)
 {
     foreach ((array) $cidrs as $cidr) {
         [$subnet, $mask] = explode('/', $cidr);
@@ -1027,7 +1026,7 @@ function ip_match($ip, $cidrs, &$match = null)
     return false;
 }
 
-function check_ip_against_allowlist($ip, $allowlist)
+function checkIPAgainstAllowlist($ip, $allowlist)
 {
     if (empty($allowlist)) {
         return false;
@@ -1083,78 +1082,6 @@ function check_ip_against_allowlist($ip, $allowlist)
     }
 
     return false;
-}
-
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array
-{
-    $commands = $commands->map(function ($line) {
-        if (
-            ! str(trim($line))->startsWith([
-                'cd',
-                'command',
-                'echo',
-                'true',
-                'if',
-                'fi',
-            ])
-        ) {
-            return "sudo $line";
-        }
-
-        if (str(trim($line))->startsWith('if')) {
-            return str_replace('if', 'if sudo', $line);
-        }
-
-        return $line;
-    });
-
-    $commands = $commands->map(function ($line) use ($server) {
-        if (Str::startsWith($line, 'sudo mkdir -p')) {
-            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
-        }
-
-        return $line;
-    });
-
-    $commands = $commands->map(function ($line) {
-        $line = str($line);
-        if (str($line)->contains('$(')) {
-            $line = $line->replace('$(', '$(sudo ');
-        }
-        if (str($line)->contains('||')) {
-            $line = $line->replace('||', '|| sudo');
-        }
-        if (str($line)->contains('&&')) {
-            $line = $line->replace('&&', '&& sudo');
-        }
-        if (str($line)->contains(' | ')) {
-            $line = $line->replace(' | ', ' | sudo ');
-        }
-
-        return $line->value();
-    });
-
-    return $commands->toArray();
-}
-function parseLineForSudo(string $command, Server $server): string
-{
-    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
-        $command = "sudo $command";
-    }
-    if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
-    }
-    if (str($command)->contains('$(') || str($command)->contains('`')) {
-        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-    }
-    if (str($command)->contains('||')) {
-        $command = str($command)->replace('||', '|| sudo ')->value();
-    }
-    if (str($command)->contains('&&')) {
-        $command = str($command)->replace('&&', '&& sudo ')->value();
-    }
-
-    return $command;
 }
 
 function get_public_ips()

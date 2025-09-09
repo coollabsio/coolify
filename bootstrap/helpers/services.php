@@ -69,12 +69,11 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->content = $content;
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
-                $content = base64_encode($content);
                 $dir = str($fileLocation)->dirname();
                 instant_remote_process([
                     "mkdir -p $dir",
-                    "echo '$content' | base64 -d | tee $fileLocation",
                 ], $server);
+                transfer_file_to_server($content, $fileLocation, $server);
             } elseif ($isFile === 'NOK' && $isDir === 'NOK' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
                 $fileVolume->content = null;
