@@ -23,15 +23,21 @@ class SendMessageToSlackJob implements ShouldQueue
 
     public function handle(): void
     {
+        $username = config('app.name');
+        $appUrl = config('app.url');
+        $iconUrl = ($appUrl && !str_contains($appUrl, 'localhost') && !str_contains($appUrl, '127.0.0.1'))
+            ? $appUrl . '/coolify-transparent.png'
+            : 'https://coolify.io/docs/coolify-logo-transparent.png';
+
         Http::post($this->webhookUrl, [
-            "username" => "Coolify",
-            "icon_url" => "https://coolify.io/docs/coolify-logo-transparent.png",
+            "username" => $username,
+            "icon_url" => $iconUrl,
             "attachments" => [
                 [
                     "title" => $this->message->title,
                     "color" => $this->message->color,
                     "text" => $this->message->description,
-                    "footer" => "Coolify"
+                    "footer" => $username
                 ]
             ]
         ]);
