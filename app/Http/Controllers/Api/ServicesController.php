@@ -1258,4 +1258,174 @@ class ServicesController extends Controller
             200
         );
     }
+
+    #[OA\Patch(
+        summary: 'Update by UUID',
+        description: 'Update service by UUID.',
+        path: '/services/{uuid}',
+        operationId: 'update-service-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', description: 'Service UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => new OA\Property(property: 'name', description: 'Service name', type: 'string'),
+                        'description' => new OA\Property(property: 'description', description: 'Service description', type: 'string'),
+                        'applications' => new OA\Property(
+                            property: 'applications',
+                            description: 'Service applications to update',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    'uuid' => new OA\Property(property: 'uuid', description: 'Application UUID', type: 'string'),
+                                    'fqdn' => new OA\Property(property: 'fqdn', description: 'Application FQDN', type: 'string'),
+                                    'human_name' => new OA\Property(property: 'human_name', description: 'Human-readable name', type: 'string'),
+                                    'description' => new OA\Property(property: 'description', description: 'Application description', type: 'string'),
+                                    'required_fqdn' => new OA\Property(property: 'required_fqdn', description: 'Whether FQDN is required', type: 'boolean'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Service updated.',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'uuid' => new OA\Property(property: 'uuid', type: 'string'),
+                        ]
+                    )
+                )
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function update_by_uuid(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        if ($request->collect()->count() == 0) {
+            return response()->json([
+                'message' => 'Invalid request.',
+            ], 400);
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof \Illuminate\Http\JsonResponse) {
+            return $return;
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json([
+                'message' => 'Service not found.',
+            ], 404);
+        }
+
+        // Handle service-level updates
+        $allowedServiceFields = ['name', 'description'];
+        $serviceValidationRules = [
+            'name' => 'string|max:255',
+            'description' => 'string|nullable',
+        ];
+
+        foreach ($request->all() as $key => $value) {
+            if (in_array($key, $allowedServiceFields)) {
+                $service->{$key} = $value;
+            }
+        }
+
+        // Handle application updates
+        if ($request->has('applications') && is_array($request->applications)) {
+            $appValidationRules = [
+                'applications.*.uuid' => 'required|string',
+                'applications.*.fqdn' => 'nullable|string',
+                'applications.*.human_name' => 'nullable|string',
+                'applications.*.description' => 'nullable|string',
+                'applications.*.required_fqdn' => 'boolean',
+            ];
+
+            $validator = customApiValidator($request->all(), array_merge($serviceValidationRules, $appValidationRules));
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            foreach ($request->applications as $appData) {
+                if (isset($appData['uuid'])) {
+                    $application = $service->applications()->where('uuid', $appData['uuid'])->first();
+
+                    if (! $application) {
+                        return response()->json([
+                            'message' => "Service application with UUID {$appData['uuid']} not found.",
+                        ], 404);
+                    }
+
+                    $allowedAppFields = ['fqdn', 'human_name', 'description', 'required_fqdn'];
+                    $updated = false;
+
+                    foreach ($appData as $key => $value) {
+                        if (in_array($key, $allowedAppFields) && $key !== 'uuid') {
+                            if ($key === 'fqdn' && ! is_null($value)) {
+                                // Sanitize FQDN like Livewire does
+                                $value = str($value)->replaceEnd(',', '')->trim();
+                                $value = str($value)->replaceStart(',', '')->trim();
+                                $value = str($value)->trim()->explode(',')->map(function ($domain) {
+                                    return str($domain)->trim()->lower();
+                                })->unique()->implode(',');
+                            }
+
+                            if ($application->{$key} !== $value) {
+                                $application->{$key} = $value;
+                                $updated = true;
+                            }
+                        }
+                    }
+
+                    if ($updated) {
+                        $application->save();
+                        updateCompose($application); // Regenerate Docker Compose
+                    }
+                }
+            }
+        } else {
+            // Validate service-only updates
+            $validator = customApiValidator($request->all(), $serviceValidationRules);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+        }
+
+        $service->save();
+
+        return response()->json([
+            'uuid' => $service->uuid,
+        ], 200);
+    }
 }
