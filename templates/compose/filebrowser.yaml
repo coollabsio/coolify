@@ -29,8 +29,3 @@ services:
             "address": "0.0.0.0",
             "port": 80
           }
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:80 || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
