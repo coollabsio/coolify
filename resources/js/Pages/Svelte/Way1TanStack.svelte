@@ -1,6 +1,7 @@
 <script lang="ts">
-    import { createForm } from "@tanstack/svelte-form";
+    import { createForm, revalidateLogic } from "@tanstack/svelte-form";
     import { router } from "@inertiajs/svelte";
+    import { storeUserSchema } from "./schema/storeUserSchema";
 
     type Props = {
         username: string;
@@ -15,20 +16,27 @@
             username: username,
             notifications_enabled: notifications_enabled,
         },
+        validationLogic: revalidateLogic(),
+        validators: {
+            onDynamic: storeUserSchema, // First submit the form and then onChange Zod validation.
+        },
         onSubmit: async ({ value }) => {
             // Way 1 -> Manual form submission via Inertia router.
-            router.post("/test-form", value, {
-                preserveScroll: true,
-                onError: (errors) => {
-                    console.log("Inertia Errors received:", errors);
-
-                    form.setErrorMap({
-                        onSubmit: {
-                            fields: errors,
-                            form: errors,
-                        },
-                    });
-                },
+            return new Promise((resolve, reject) => {
+                router.post("/test-form", value, {
+                    onSuccess: () => {
+                        resolve(undefined);
+                    },
+                    onError: (errors) => {
+                        form.setErrorMap({
+                            onSubmit: {
+                                fields: errors,
+                                form: errors,
+                            },
+                        });
+                        reject(errors);
+                    },
+                });
             });
         },
     }));
@@ -37,9 +45,14 @@
         form.reset();
     }
 
-    function clearErrors() {
-        form.setErrorMap({});
-    }
+    const isSubmitSuccessful = form.useStore((state) => state.isSubmitSuccessful);
+
+    // Debug states.
+    const isSubmitting = form.useStore((state) => state.isSubmitting);
+    const isValid = form.useStore((state) => state.isValid);
+    const canSubmit = form.useStore((state) => state.canSubmit);
+    const errorMap = form.useStore((state) => state.errorMap);
+    const errors = form.useStore((state) => state.errors);
 </script>
 
 <div class="min-h-screen bg-gray-50 py-8">
@@ -50,44 +63,33 @@
             </h1>
         </div>
 
+        <!-- Debug states. -->
         <div class="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-md">
             <h3 class="text-lg font-medium text-blue-800 mb-2">
                 Debug - TanStack Form State:
             </h3>
             <div class="text-sm text-blue-700 space-y-1">
                 <p>
-                    <strong>form.state.isSubmitSuccessful:</strong>
-                    {form.state.isSubmitSuccessful}
+                    <strong>form.state.isSubmitSuccessful:</strong
+                    >{isSubmitSuccessful.current}
                 </p>
-                <p><strong>form.state.isValid:</strong> {form.state.isValid}</p>
+
                 <p>
-                    <strong>form.state.errors.length:</strong>
-                    {form.state.errors.length}
+                    <strong>form.state.isSubmitting:</strong>
+                    {isSubmitting.current}
+                </p>
+                <p><strong>form.state.isValid:</strong> {isValid.current}</p>
+                <p>
+                    <strong>form.state.canSubmit:</strong>
+                    {canSubmit.current}
+                </p>
+                <p>
+                    <strong>form.state.errorMap:</strong>
+                    {JSON.stringify(errorMap.current)}
                 </p>
                 <p>
                     <strong>form.state.errors:</strong>
-                    {JSON.stringify(form.state.errors)}
-                </p>
-                <p>
-                    <strong>form.state.errorMap.onSubmit:</strong>
-                    {JSON.stringify(
-                        (form.state.errorMap as any).onSubmit || {},
-                    )}
-                </p>
-                <p>
-                    <strong>form.state.errorMap.onSubmit?.username:</strong>
-                    {JSON.stringify(
-                        (form.state.errorMap as any).onSubmit?.username || {},
-                    )}
-                </p>
-                <p>
-                    <strong
-                        >form.state.errorMap.onSubmit?.notifications_enabled:</strong
-                    >
-                    {JSON.stringify(
-                        (form.state.errorMap as any).onSubmit
-                            ?.notifications_enabled || {},
-                    )}
+                    {JSON.stringify(errors.current)}
                 </p>
             </div>
         </div>
@@ -96,7 +98,6 @@
             <form
                 onsubmit={(e) => {
                     e.preventDefault();
-                    e.stopPropagation();
                     form.handleSubmit();
                 }}
                 class="p-6"
@@ -126,13 +127,18 @@
                         />
 
                         {#if !field.state.meta.isValid}
-                            <p class="mt-2 text-sm text-red-600">
-                                TanStack Form Errors: {field.state.meta.errors.join(
-                                    ", ",
-                                )}
-                            </p>
+                            <div class="mt-2 space-y-1">
+                                {#each field.state.meta.errors as error}
+                                    <p class="text-sm text-red-600">
+                                        {typeof error === "string"
+                                            ? error
+                                            : error.message}
+                                    </p>
+                                {/each}
+                            </div>
                         {/if}
 
+                        <!-- Debug states. -->
                         <div
                             class="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded"
                         >
@@ -150,6 +156,15 @@
                                 >
                                 {JSON.stringify(
                                     field.state.meta.errorMap.onSubmit ||
+                                        "undefined",
+                                )}
+                            </p>
+                            <p>
+                                <strong
+                                    >field.state.meta.errorMap.onChange</strong
+                                >
+                                {JSON.stringify(
+                                    field.state.meta.errorMap.onChange ||
                                         "undefined",
                                 )}
                             </p>
@@ -191,7 +206,7 @@
                     {/snippet}
                 </form.Field>
 
-                {#if form.state.isSubmitSuccessful}
+                {#if isSubmitSuccessful.current}
                     <div
                         class="mt-6 bg-green-50 border border-green-200 p-4 rounded-md flex"
                     >
@@ -234,25 +249,17 @@
                     </form.Subscribe>
 
                     <div class="flex space-x-3">
-                        {#if form.state.errors.length > 0}
-                            <button
-                                type="button"
-                                onclick={clearErrors}
-                                class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md shadow-sm hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                            >
-                                Clear Errors
-                            </button>
-                        {/if}
-
                         <form.Subscribe
                             selector={(state) => ({
                                 isSubmitting: state.isSubmitting,
+                                canSubmit: state.canSubmit,
                             })}
                         >
                             {#snippet children(state)}
                                 <button
                                     type="submit"
-                                    class="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                                    disabled={!state.canSubmit}
+                                    class="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 disabled:bg-gray-400"
                                 >
                                     {#if state.isSubmitting}
                                         Saving...
