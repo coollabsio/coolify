@@ -1,0 +1,69 @@
+# documentation: https://docs.openarchiver.com
+# slogan: A self-hosted, open-source email archiving solution with full-text search capability.
+# tags: email archiving,email,compliance,search
+# logo: svgs/openarchiver.svg
+# port: 3000
+
+services:
+    open-archiver:
+        image: logiclabshq/open-archiver:latest
+        environment:
+            - SERVICE_FQDN_3000
+            - SERVICE_URL=${SERVICE_FQDN_3000}
+            - PORT_BACKEND=${PORT_BACKEND:-4000}
+            - PORT_FRONTEND=${PORT_FRONTEND:-3000}
+            - NODE_ENV=${NODE_ENV:-production}
+            - SYNC_FREQUENCY=${SYNC_FREQUENCY:-* * * * *}
+            - POSTGRES_DB=${POSTGRES_DB:-open_archive}
+            - POSTGRES_USER=${POSTGRES_USER:-admin}
+            - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+            - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+            - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
+            - MEILI_HOST=http://meilisearch:7700
+            - REDIS_HOST=valkey
+            - REDIS_PORT=6379
+            - REDIS_PASSWORD=${SERVICE_PASSWORD_VALKEY}
+            - REDIS_TLS_ENABLED=false
+            - STORAGE_TYPE=${STORAGE_TYPE:-local}
+            - STORAGE_LOCAL_ROOT_PATH=${STORAGE_LOCAL_ROOT_PATH:-/var/data/open-archiver}
+            - BODY_SIZE_LIMIT=${BODY_SIZE_LIMIT:-100M}
+            - STORAGE_S3_ENDPOINT=${STORAGE_S3_ENDPOINT}
+            - STORAGE_S3_BUCKET=${STORAGE_S3_BUCKET}
+            - STORAGE_S3_ACCESS_KEY_ID=${STORAGE_S3_ACCESS_KEY_ID}
+            - STORAGE_S3_SECRET_ACCESS_KEY=${STORAGE_S3_SECRET_ACCESS_KEY}
+            - STORAGE_S3_REGION=${STORAGE_S3_REGION}
+            - STORAGE_S3_FORCE_PATH_STYLE=${STORAGE_S3_FORCE_PATH_STYLE:-false}
+            - JWT_SECRET=${SERVICE_BASE64_128_JWT}
+            - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+            - ENCRYPTION_KEY=${SERVICE_BASE64_64_ENCRYPTIONKEY}
+            - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+            - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+        volumes:
+            - ${COOLIFY_VOLUME_APP_DATA}:/var/data/open-archiver
+        depends_on:
+            - postgres
+            - valkey
+            - meilisearch
+
+    postgres:
+        image: postgres:17-alpine
+        environment:
+            - POSTGRES_DB=${POSTGRES_DB:-open_archive}
+            - POSTGRES_USER=${POSTGRES_USER:-admin}
+            - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+            - LC_ALL=C
+        volumes:
+            - ${COOLIFY_VOLUME_POSTGRES}:/var/lib/postgresql/data
+
+    valkey:
+        image: valkey/valkey:8-alpine
+        command: valkey-server --requirepass ${SERVICE_PASSWORD_VALKEY}
+        volumes:
+            - ${COOLIFY_VOLUME_VALKEY}:/data
+
+    meilisearch:
+        image: getmeili/meilisearch:v1.15
+        environment:
+            - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
+        volumes:
+            - ${COOLIFY_VOLUME_MEILISEARCH}:/meili_data
