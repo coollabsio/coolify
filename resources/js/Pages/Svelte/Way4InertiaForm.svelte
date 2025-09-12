@@ -22,10 +22,8 @@
             <Form action="/test-form" method="post" class="p-6">
                 {#snippet children({
                     errors,
-                    hasErrors,
                     processing,
                     wasSuccessful,
-                    resetAndClearErrors,
                     isDirty,
                 })}
                     <div>
