@@ -3,35 +3,41 @@
     "private": true,
     "type": "module",
     "devDependencies": {
-        "@tailwindcss/vite": "^4.1.4",
-        "@vitejs/plugin-vue": "^5.2.3",
-        "concurrently": "^9.1.2",
-        "laravel-vite-plugin": "^1.2.0",
-        "tailwindcss": "^4.1.4",
-        "typescript": "^5.8.3",
-        "vite": "^6.3.2"
+        "@sveltejs/vite-plugin-svelte": "^6.2.0",
+        "@tailwindcss/vite": "^4.1.13",
+        "@vitejs/plugin-vue": "^5.2.4",
+        "concurrently": "^9.2.1",
+        "laravel-vite-plugin": "^1.3.0",
+        "svelte": "^5.38.10",
+        "tailwindcss": "^4.1.13",
+        "typescript": "^5.9.2",
+        "vite": "^6.3.6"
     },
     "scripts": {
         "build": "vite build",
         "dev": "vite"
     },
     "dependencies": {
-        "@inertiajs/vue3": "^2.0.8",
+        "@inertiajs/svelte": "^2.1.6",
+        "@inertiajs/vue3": "^2.1.6",
+        "@tanstack/svelte-form": "^1.19.5",
+        "@tanstack/vue-form": "^1.19.5",
         "@tanstack/vue-table": "^8.21.3",
-        "@vee-validate/zod": "^4.15.0",
-        "@vueuse/core": "^13.1.0",
+        "@vee-validate/zod": "^4.15.1",
+        "@vueuse/core": "^13.9.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "embla-carousel-vue": "^8.6.0",
         "lucide-vue-next": "^0.507.0",
-        "reka-ui": "^2.2.0",
-        "tailwind-merge": "^3.2.0",
-        "tw-animate-css": "^1.2.9",
+        "reka-ui": "^2.5.0",
+        "sveltekit-superforms": "^2.27.1",
+        "tailwind-merge": "^3.3.1",
+        "tw-animate-css": "^1.3.8",
         "vaul-vue": "^0.4.1",
-        "vee-validate": "^4.15.0",
-        "vue": "^3.5.13",
+        "vee-validate": "^4.15.1",
+        "vue": "^3.5.21",
         "vue-sonner": "^1.3.2",
-        "ziggy-js": "^2.5.2",
-        "zod": "^3.24.4"
+        "ziggy-js": "^2.5.3",
+        "zod": "^4.1.8"
     }
 }

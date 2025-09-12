@@ -54,6 +54,9 @@ final class HandleInertiaRequests extends Middleware
                 'id' => 1,
                 'name' => 'Team 1',
             ],
+            'flash' => [
+                'message' => fn () => $request->session()->get('message'),
+            ],
         ];
     }
 }
