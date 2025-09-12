@@ -8,37 +8,40 @@
         flash?: { message?: string };
     };
 
+    type FormState = {
+        username: string;
+        notifications_enabled: boolean;
+    };
+
     let { username, notifications_enabled, flash = {} }: Props = $props();
 
     // Restore form state from Inertia history state or use props as fallback
     const FORM_STATE_KEY = "TANSTACK_FORM_STATE";
-    const restoredState = router.restore(FORM_STATE_KEY) || {
+    const restoredState = router.restore<FormState>(FORM_STATE_KEY) || {
+        // This TS type is not working yet.
         username: username,
         notifications_enabled: notifications_enabled,
     };
 
-    let submitSuccess = $state(false);
-
     const form = createForm(() => ({
         defaultValues: restoredState,
         onSubmit: async ({ value }) => {
-            router.post("/test-form", value, { // Now we have a type Error here??
+            router.post("/test-form", value, {
                 preserveScroll: true,
                 onSuccess: () => {
-                    submitSuccess = true;
                     router.remember(null, FORM_STATE_KEY); // Clear saved state after successful submission
                 },
                 onError: (errors) => {
                     form.setErrorMap({
                         onSubmit: {
                             fields: errors,
-                            form: errors, 
+                            form: errors,
                         },
                     });
                 },
             });
         },
-        
+
         // Add listeners to automatically save form state to history
         listeners: {
             onChange: ({ formApi }) => {
@@ -49,7 +52,6 @@
 
     function handleReset() {
         form.reset();
-        submitSuccess = false;
         // Clear saved state when resetting
         router.remember(null, FORM_STATE_KEY);
     }
@@ -57,6 +59,10 @@
     function clearErrors() {
         form.setErrorMap({});
     }
+
+    const isSubmitSuccessful = form.useStore(
+        (state) => state.isSubmitSuccessful,
+    );
 </script>
 
 <div class="min-h-screen bg-gray-50 py-8">
@@ -140,7 +146,7 @@
                     {/snippet}
                 </form.Field>
 
-                {#if submitSuccess}
+                {#if isSubmitSuccessful.current}
                     <div
                         class="mt-6 bg-green-50 border border-green-200 p-4 rounded-md flex"
                     >
