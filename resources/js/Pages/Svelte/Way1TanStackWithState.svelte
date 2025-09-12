@@ -17,8 +17,7 @@
 
     // Restore form state from Inertia history state or use props as fallback
     const FORM_STATE_KEY = "TANSTACK_FORM_STATE";
-    const restoredState = router.restore<FormState>(FORM_STATE_KEY) || {
-        // This TS type is not working yet.
+    const restoredState = router.restore<FormState>(FORM_STATE_KEY) || { // This TS type is not working yet.
         username: username,
         notifications_enabled: notifications_enabled,
     };
@@ -27,7 +26,6 @@
         defaultValues: restoredState,
         onSubmit: async ({ value }) => {
             router.post("/test-form", value, {
-                preserveScroll: true,
                 onSuccess: () => {
                     router.remember(null, FORM_STATE_KEY); // Clear saved state after successful submission
                 },
@@ -56,10 +54,6 @@
         router.remember(null, FORM_STATE_KEY);
     }
 
-    function clearErrors() {
-        form.setErrorMap({});
-    }
-
     const isSubmitSuccessful = form.useStore(
         (state) => state.isSubmitSuccessful,
     );
@@ -69,7 +63,7 @@
     <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-900 mb-2">
-                Svelte TanStack - Way 1 "$props()"
+                Svelte TanStack - Way 1 "$props()" with history state
             </h1>
         </div>
 
@@ -77,7 +71,6 @@
             <form
                 onsubmit={(e) => {
                     e.preventDefault();
-                    e.stopPropagation();
                     form.handleSubmit();
                 }}
                 class="p-6"
@@ -189,16 +182,6 @@
                     </form.Subscribe>
 
                     <div class="flex space-x-3">
-                        {#if form.state.errors.length > 0}
-                            <button
-                                type="button"
-                                onclick={clearErrors}
-                                class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md shadow-sm hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                            >
-                                Clear Errors
-                            </button>
-                        {/if}
-
                         <form.Subscribe
                             selector={(state) => ({
                                 isSubmitting: state.isSubmitting,

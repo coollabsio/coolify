@@ -65,13 +65,12 @@
                             </p>
                         </div>
                         <div class="flex items-center">
-                            <!-- If I select this boolean the following error happens: "The notifications enabled field must be true or false." Issue: https://github.com/inertiajs/inertia/issues/2522 -->
                             <input
                                 type="checkbox"
                                 id="notifications_enabled"
                                 name="notifications_enabled"
                                 checked={notifications_enabled}
-                                value="true"
+                                value=1
                                 class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                             />
                             {#if errors.notifications_enabled}
@@ -106,7 +105,6 @@
                     <div
                         class="flex justify-between items-center pt-6 mt-8 border-t border-gray-200"
                     >
-                        <!-- This resets the entire form but does not respect the default values of each field - the resetAndClearErrors() method does reset and respect the default values of each field. Issue: https://github.com/inertiajs/inertia/issues/2521 -->
                         <button
                             type="reset"
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
@@ -116,16 +114,6 @@
                         </button>
 
                         <div class="flex space-x-3">
-                            {#if hasErrors}
-                                <button
-                                    type="button"
-                                    onclick={() => resetAndClearErrors()}
-                                    class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-300 rounded-md shadow-sm hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                                >
-                                    Clear Errors
-                                </button>
-                            {/if}
-
                             <button
                                 type="submit"
                                 class="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
