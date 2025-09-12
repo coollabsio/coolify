@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="#2A2E3A"/>
+  
+  <!-- IRC-style connection nodes -->
+  <g stroke="#00D9FF" stroke-width="3" fill="none">
+    <!-- Central hub -->
+    <circle cx="128" cy="128" r="20" fill="#00D9FF"/>
+    
+    <!-- Connection lines -->
+    <line x1="128" y1="108" x2="128" y2="60" stroke-linecap="round"/>
+    <line x1="148" y1="128" x2="196" y2="128" stroke-linecap="round"/>
+    <line x1="108" y1="128" x2="60" y2="128" stroke-linecap="round"/>
+    <line x1="128" y1="148" x2="128" y2="196" stroke-linecap="round"/>
+    
+    <!-- Diagonal connections -->
+    <line x1="143" y1="113" x2="175" y2="81" stroke-linecap="round"/>
+    <line x1="113" y1="113" x2="81" y2="81" stroke-linecap="round"/>
+    <line x1="143" y1="143" x2="175" y2="175" stroke-linecap="round"/>
+    <line x1="113" y1="143" x2="81" y2="175" stroke-linecap="round"/>
+    
+    <!-- Outer connection nodes -->
+    <circle cx="128" cy="60" r="8" fill="#00D9FF"/>
+    <circle cx="196" cy="128" r="8" fill="#00D9FF"/>
+    <circle cx="60" cy="128" r="8" fill="#00D9FF"/>
+    <circle cx="128" cy="196" r="8" fill="#00D9FF"/>
+    <circle cx="175" cy="81" r="8" fill="#00D9FF"/>
+    <circle cx="81" cy="81" r="8" fill="#00D9FF"/>
+    <circle cx="175" cy="175" r="8" fill="#00D9FF"/>
+    <circle cx="81" cy="175" r="8" fill="#00D9FF"/>
+  </g>
+  
+  <!-- Soju text -->
+  <text x="128" y="235" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#00D9FF" text-anchor="middle">SOJU</text>
+</svg>

@@ -1,0 +1,42 @@
+# documentation: https://soju.im
+# slogan: Soju is a user-friendly IRC bouncer that keeps you connected to your IRC channels.
+# category: messaging
+# tags: irc,bouncer,chat,messaging,open,source
+# logo: svgs/soju.svg
+# port: 6667
+
+services:
+  soju:
+    image: "mpldr/soju:latest"
+    container_name: "${SERVICE_NAME:-soju}"
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_SOJU_6667
+      - SOJU_HOSTNAME=${SOJU_HOSTNAME:-localhost}
+    volumes:
+      - 'soju-data:/data'
+    entrypoint: ["/bin/sh"]
+    command: 
+      - -c
+      - |
+        mkdir -p /data /data/logs
+        
+        # Create config if it doesn't exist
+        if [ ! -f /data/config ]; then
+          cat > /data/config <<EOF
+        listen irc+insecure://:6667
+        hostname ${SOJU_HOSTNAME}
+        db sqlite3 /data/soju.db
+        message-store fs /data/logs
+        title "Soju IRC Bouncer"
+        accept-proxy-ip localhost
+        EOF
+        fi
+        
+        # Start soju
+        exec soju -config /data/config
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6667 || exit 1"]
+      interval: 5s
+      timeout: 20s
+      retries: 3
