@@ -728,21 +728,20 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->orderBy('key', 'asc');
+            ->orderByRaw("
+                CASE 
+                    WHEN LOWER(key) LIKE 'service_%' THEN 1
+                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            ");
     }
 
     public function runtime_environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->where('key', 'not like', 'NIXPACKS_%');
-    }
-
-    public function build_environment_variables()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', false)
-            ->where('is_build_time', true)
             ->where('key', 'not like', 'NIXPACKS_%');
     }
 
@@ -757,21 +756,20 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+            ->orderByRaw("
+                CASE 
+                    WHEN LOWER(key) LIKE 'service_%' THEN 1
+                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            ");
     }
 
     public function runtime_environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->where('key', 'not like', 'NIXPACKS_%');
-    }
-
-    public function build_environment_variables_preview()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', true)
-            ->where('is_build_time', true)
             ->where('key', 'not like', 'NIXPACKS_%');
     }
 
@@ -936,9 +934,9 @@ class Application extends BaseModel
     {
         $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->custom_labels);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+            $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal'])->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get('value')->sort());
+            $newConfigHash .= json_encode($this->environment_variables_preview->get(['value',  'is_multiline', 'is_literal'])->sort());
         }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1075,26 +1073,20 @@ class Application extends BaseModel
             if (is_null($private_key)) {
                 throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
             }
-            $private_key = base64_encode($private_key);
             $base_comamnd = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$base_command} {$customRepository}";
 
-            if ($exec_in_docker) {
-                $commands = collect([
-                    executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'),
-                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                    executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
-                ]);
-            } else {
-                $commands = collect([
-                    'mkdir -p /root/.ssh',
-                    "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
-                    'chmod 600 /root/.ssh/id_rsa',
-                ]);
-            }
+            $commands = collect([]);
 
             if ($exec_in_docker) {
+                $commands->push(executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'));
+                // SSH key transfer handled by ApplicationDeploymentJob, assume key is already in container
+                $commands->push(executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'));
                 $commands->push(executeInDocker($deployment_uuid, $base_comamnd));
             } else {
+                $server = $this->destination->server;
+                $commands->push('mkdir -p /root/.ssh');
+                transfer_file_to_server($private_key, '/root/.ssh/id_rsa', $server);
+                $commands->push('chmod 600 /root/.ssh/id_rsa');
                 $commands->push($base_comamnd);
             }
 
@@ -1220,7 +1212,6 @@ class Application extends BaseModel
             if (is_null($private_key)) {
                 throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
             }
-            $private_key = base64_encode($private_key);
             $escapedCustomRepository = escapeshellarg($customRepository);
             $git_clone_command_base = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
             if ($only_checkout) {
@@ -1228,18 +1219,18 @@ class Application extends BaseModel
             } else {
                 $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base);
             }
+
+            $commands = collect([]);
+
             if ($exec_in_docker) {
-                $commands = collect([
-                    executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'),
-                    executeInDocker($deployment_uuid, "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null"),
-                    executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'),
-                ]);
+                $commands->push(executeInDocker($deployment_uuid, 'mkdir -p /root/.ssh'));
+                // SSH key transfer handled by ApplicationDeploymentJob, assume key is already in container
+                $commands->push(executeInDocker($deployment_uuid, 'chmod 600 /root/.ssh/id_rsa'));
             } else {
-                $commands = collect([
-                    'mkdir -p /root/.ssh',
-                    "echo '{$private_key}' | base64 -d | tee /root/.ssh/id_rsa > /dev/null",
-                    'chmod 600 /root/.ssh/id_rsa',
-                ]);
+                $server = $this->destination->server;
+                $commands->push('mkdir -p /root/.ssh');
+                transfer_file_to_server($private_key, '/root/.ssh/id_rsa', $server);
+                $commands->push('chmod 600 /root/.ssh/id_rsa');
             }
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {
@@ -1481,14 +1472,14 @@ class Application extends BaseModel
                 $json = collect(json_decode($this->docker_compose_domains));
                 foreach ($json as $key => $value) {
                     if (str($key)->contains('-')) {
-                        $key = str($key)->replace('-', '_');
+                        $key = str($key)->replace('-', '_')->replace('.', '_');
                     }
                     $json->put((string) $key, $value);
                 }
                 $services = collect(data_get($parsedServices, 'services', []));
                 foreach ($services as $name => $service) {
                     if (str($name)->contains('-')) {
-                        $replacedName = str($name)->replace('-', '_');
+                        $replacedName = str($name)->replace('-', '_')->replace('.', '_');
                         $services->put((string) $replacedName, $service);
                         $services->forget((string) $name);
                     }

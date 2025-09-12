@@ -40,7 +40,12 @@ class ConfigureCloudflared
             $commands = collect([
                 'mkdir -p /tmp/cloudflared',
                 'cd /tmp/cloudflared',
-                "echo '$docker_compose_yml_base64' | base64 -d | tee docker-compose.yml > /dev/null",
+                [
+                    'transfer_file' => [
+                        'content' => base64_decode($docker_compose_yml_base64),
+                        'destination' => '/tmp/cloudflared/docker-compose.yml',
+                    ],
+                ],
                 'echo Pulling latest Cloudflare Tunnel image.',
                 'docker compose pull',
                 'echo Stopping existing Cloudflare Tunnel container.',

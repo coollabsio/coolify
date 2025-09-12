@@ -2284,6 +2284,9 @@ class ApplicationsController extends Controller
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
         }
         $application->fill($data);
+        if ($application->settings->is_container_label_readonly_enabled && $requestHasDomains && $server->isProxyShouldRun()) {
+            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
+        }
         $application->save();
 
         if ($instantDeploy) {
@@ -2426,7 +2429,6 @@ class ApplicationsController extends Controller
                             'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                            'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -2467,7 +2469,7 @@ class ApplicationsController extends Controller
     )]
     public function update_env_by_uuid(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -2492,7 +2494,6 @@ class ApplicationsController extends Controller
             'key' => 'string|required',
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -2513,16 +2514,12 @@ class ApplicationsController extends Controller
             ], 422);
         }
         $is_preview = $request->is_preview ?? false;
-        $is_build_time = $request->is_build_time ?? false;
         $is_literal = $request->is_literal ?? false;
         $key = str($request->key)->trim()->replace(' ', '_')->value;
         if ($is_preview) {
             $env = $application->environment_variables_preview->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
                 if ($env->is_literal != $is_literal) {
                     $env->is_literal = $is_literal;
                 }
@@ -2534,6 +2531,9 @@ class ApplicationsController extends Controller
                 }
                 if ($env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
+                }
+                if ($request->has('is_buildtime_only') && $env->is_buildtime_only != $request->is_buildtime_only) {
+                    $env->is_buildtime_only = $request->is_buildtime_only;
                 }
                 $env->save();
 
@@ -2547,9 +2547,6 @@ class ApplicationsController extends Controller
             $env = $application->environment_variables->where('key', $key)->first();
             if ($env) {
                 $env->value = $request->value;
-                if ($env->is_build_time != $is_build_time) {
-                    $env->is_build_time = $is_build_time;
-                }
                 if ($env->is_literal != $is_literal) {
                     $env->is_literal = $is_literal;
                 }
@@ -2561,6 +2558,9 @@ class ApplicationsController extends Controller
                 }
                 if ($env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
+                }
+                if ($request->has('is_buildtime_only') && $env->is_buildtime_only != $request->is_buildtime_only) {
+                    $env->is_buildtime_only = $request->is_buildtime_only;
                 }
                 $env->save();
 
@@ -2616,7 +2616,6 @@ class ApplicationsController extends Controller
                                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -2687,7 +2686,7 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            return collect($item)->only(['key', 'value', 'is_preview', 'is_build_time', 'is_literal']);
+            return collect($item)->only(['key', 'value', 'is_preview',  'is_literal']);
         });
         $returnedEnvs = collect();
         foreach ($bulk_data as $item) {
@@ -2695,7 +2694,6 @@ class ApplicationsController extends Controller
                 'key' => 'string|required',
                 'value' => 'string|nullable',
                 'is_preview' => 'boolean',
-                'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
@@ -2707,7 +2705,6 @@ class ApplicationsController extends Controller
                 ], 422);
             }
             $is_preview = $item->get('is_preview') ?? false;
-            $is_build_time = $item->get('is_build_time') ?? false;
             $is_literal = $item->get('is_literal') ?? false;
             $is_multi_line = $item->get('is_multiline') ?? false;
             $is_shown_once = $item->get('is_shown_once') ?? false;
@@ -2716,9 +2713,7 @@ class ApplicationsController extends Controller
                 $env = $application->environment_variables_preview->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
-                    if ($env->is_build_time != $is_build_time) {
-                        $env->is_build_time = $is_build_time;
-                    }
+
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }
@@ -2728,16 +2723,19 @@ class ApplicationsController extends Controller
                     if ($env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
+                    if ($item->has('is_buildtime_only') && $env->is_buildtime_only != $item->get('is_buildtime_only')) {
+                        $env->is_buildtime_only = $item->get('is_buildtime_only');
+                    }
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
-                        'is_build_time' => $is_build_time,
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'is_buildtime_only' => $item->get('is_buildtime_only', false),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -2746,9 +2744,6 @@ class ApplicationsController extends Controller
                 $env = $application->environment_variables->where('key', $key)->first();
                 if ($env) {
                     $env->value = $item->get('value');
-                    if ($env->is_build_time != $is_build_time) {
-                        $env->is_build_time = $is_build_time;
-                    }
                     if ($env->is_literal != $is_literal) {
                         $env->is_literal = $is_literal;
                     }
@@ -2758,16 +2753,19 @@ class ApplicationsController extends Controller
                     if ($env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
+                    if ($item->has('is_buildtime_only') && $env->is_buildtime_only != $item->get('is_buildtime_only')) {
+                        $env->is_buildtime_only = $item->get('is_buildtime_only');
+                    }
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
                         'key' => $item->get('key'),
                         'value' => $item->get('value'),
                         'is_preview' => $is_preview,
-                        'is_build_time' => $is_build_time,
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
+                        'is_buildtime_only' => $item->get('is_buildtime_only', false),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -2811,7 +2809,6 @@ class ApplicationsController extends Controller
                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -2851,7 +2848,7 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_build_time', 'is_literal'];
+        $allowedFields = ['key', 'value', 'is_preview',  'is_literal'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -2871,7 +2868,6 @@ class ApplicationsController extends Controller
             'key' => 'string|required',
             'value' => 'string|nullable',
             'is_preview' => 'boolean',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -2905,10 +2901,10 @@ class ApplicationsController extends Controller
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
-                    'is_build_time' => $request->is_build_time ?? false,
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'is_buildtime_only' => $request->is_buildtime_only ?? false,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -2928,10 +2924,10 @@ class ApplicationsController extends Controller
                     'key' => $request->key,
                     'value' => $request->value,
                     'is_preview' => $request->is_preview ?? false,
-                    'is_build_time' => $request->is_build_time ?? false,
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
+                    'is_buildtime_only' => $request->is_buildtime_only ?? false,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);

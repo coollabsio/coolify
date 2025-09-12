@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Project;
 
-use App\Actions\Application\StopApplication;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StartService;
@@ -128,144 +127,10 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
-                $applicationSettings = $application->settings;
-
-                $uuid = (string) new Cuid2;
-                $url = $application->fqdn;
-                if ($this->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                    $url = generateUrl(server: $this->server, random: $uuid);
-                }
-
-                $newApplication = $application->replicate([
-                    'id',
-                    'created_at',
-                    'updated_at',
-                    'additional_servers_count',
-                    'additional_networks_count',
-                ])->fill([
-                    'uuid' => $uuid,
-                    'fqdn' => $url,
-                    'status' => 'exited',
+                $selectedDestination = $this->servers->flatMap(fn ($server) => $server->destinations)->where('id', $this->selectedDestination)->first();
+                clone_application($application, $selectedDestination, [
                     'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
-                ]);
-                $newApplication->save();
-
-                if ($newApplication->destination->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {
-                    $customLabels = str(implode('|coolify|', generateLabelsApplication($newApplication)))->replace('|coolify|', "\n");
-                    $newApplication->custom_labels = base64_encode($customLabels);
-                    $newApplication->save();
-                }
-
-                $newApplication->settings()->delete();
-                if ($applicationSettings) {
-                    $newApplicationSettings = $applicationSettings->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'application_id' => $newApplication->id,
-                    ]);
-                    $newApplicationSettings->save();
-                }
-
-                $tags = $application->tags;
-                foreach ($tags as $tag) {
-                    $newApplication->tags()->attach($tag->id);
-                }
-
-                $scheduledTasks = $application->scheduled_tasks()->get();
-                foreach ($scheduledTasks as $task) {
-                    $newTask = $task->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'uuid' => (string) new Cuid2,
-                        'application_id' => $newApplication->id,
-                        'team_id' => currentTeam()->id,
-                    ]);
-                    $newTask->save();
-                }
-
-                $applicationPreviews = $application->previews()->get();
-                foreach ($applicationPreviews as $preview) {
-                    $newPreview = $preview->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'application_id' => $newApplication->id,
-                        'status' => 'exited',
-                    ]);
-                    $newPreview->save();
-                }
-
-                $persistentVolumes = $application->persistentStorages()->get();
-                foreach ($persistentVolumes as $volume) {
-                    $newName = '';
-                    if (str_starts_with($volume->name, $application->uuid)) {
-                        $newName = str($volume->name)->replace($application->uuid, $newApplication->uuid);
-                    } else {
-                        $newName = $newApplication->uuid.'-'.$volume->name;
-                    }
-
-                    $newPersistentVolume = $volume->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'name' => $newName,
-                        'resource_id' => $newApplication->id,
-                    ]);
-                    $newPersistentVolume->save();
-
-                    if ($this->cloneVolumeData) {
-                        try {
-                            StopApplication::dispatch($application, false, false);
-                            $sourceVolume = $volume->name;
-                            $targetVolume = $newPersistentVolume->name;
-                            $sourceServer = $application->destination->server;
-                            $targetServer = $newApplication->destination->server;
-
-                            VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
-
-                            queue_application_deployment(
-                                deployment_uuid: (string) new Cuid2,
-                                application: $application,
-                                server: $sourceServer,
-                                destination: $application->destination,
-                                no_questions_asked: true
-                            );
-                        } catch (\Exception $e) {
-                            \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
-                        }
-                    }
-                }
-
-                $fileStorages = $application->fileStorages()->get();
-                foreach ($fileStorages as $storage) {
-                    $newStorage = $storage->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'resource_id' => $newApplication->id,
-                    ]);
-                    $newStorage->save();
-                }
-
-                $environmentVaribles = $application->environment_variables()->get();
-                foreach ($environmentVaribles as $environmentVarible) {
-                    $newEnvironmentVariable = $environmentVarible->replicate([
-                        'id',
-                        'created_at',
-                        'updated_at',
-                    ])->fill([
-                        'resourceable_id' => $newApplication->id,
-                    ]);
-                    $newEnvironmentVariable->save();
-                }
+                ], $this->cloneVolumeData);
             }
 
             foreach ($databases as $database) {

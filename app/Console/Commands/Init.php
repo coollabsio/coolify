@@ -5,9 +5,10 @@ namespace App\Console\Commands;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
-use App\Jobs\PullChangelogFromGitHub;
+use App\Jobs\PullChangelog;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
@@ -19,80 +20,18 @@ use Illuminate\Support\Facades\Http;
 
 class Init extends Command
 {
-    protected $signature = 'app:init {--force-cloud}';
+    protected $signature = 'app:init';
 
     protected $description = 'Cleanup instance related stuffs';
 
     public $servers = null;
 
+    public InstanceSettings $settings;
+
     public function handle()
     {
-        $this->optimize();
-
-        if (isCloud() && ! $this->option('force-cloud')) {
-            echo "Skipping init as we are on cloud and --force-cloud option is not set\n";
-
-            return;
-        }
-
-        $this->servers = Server::all();
-        if (! isCloud()) {
-            $this->sendAliveSignal();
-            get_public_ips();
-        }
-
-        // Backward compatibility
-        $this->replaceSlashInEnvironmentName();
-        $this->restoreCoolifyDbBackup();
-        $this->updateUserEmails();
-        //
-        $this->updateTraefikLabels();
-        if (! isCloud() || $this->option('force-cloud')) {
-            $this->cleanupUnusedNetworkFromCoolifyProxy();
-        }
-
-        $this->call('cleanup:redis');
-
-        try {
-            $this->call('cleanup:names');
-        } catch (\Throwable $e) {
-            echo "Error in cleanup:names command: {$e->getMessage()}\n";
-        }
-        $this->call('cleanup:stucked-resources');
-
-        try {
-            $this->pullHelperImage();
-        } catch (\Throwable $e) {
-            //
-        }
-
-        if (isCloud()) {
-            try {
-                $this->cleanupInProgressApplicationDeployments();
-            } catch (\Throwable $e) {
-                echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
-            }
-
-            try {
-                $this->pullTemplatesFromCDN();
-            } catch (\Throwable $e) {
-                echo "Could not pull templates from CDN: {$e->getMessage()}\n";
-            }
-
-            try {
-                $this->pullChangelogFromGitHub();
-            } catch (\Throwable $e) {
-                echo "Could not changelogs from github: {$e->getMessage()}\n";
-            }
-
-            return;
-        }
-
-        try {
-            $this->cleanupInProgressApplicationDeployments();
-        } catch (\Throwable $e) {
-            echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
-        }
+        Artisan::call('optimize:clear');
+        Artisan::call('optimize');
 
         try {
             $this->pullTemplatesFromCDN();
@@ -105,20 +44,80 @@ class Init extends Command
         } catch (\Throwable $e) {
             echo "Could not changelogs from github: {$e->getMessage()}\n";
         }
+
+        try {
+            $this->pullHelperImage();
+        } catch (\Throwable $e) {
+            echo "Error in pullHelperImage command: {$e->getMessage()}\n";
+        }
+
+        if (isCloud()) {
+            return;
+        }
+
+        $this->settings = instanceSettings();
+        $this->servers = Server::all();
+
+        $do_not_track = data_get($this->settings, 'do_not_track', true);
+        if ($do_not_track == false) {
+            $this->sendAliveSignal();
+        }
+        get_public_ips();
+
+        // Backward compatibility
+        $this->replaceSlashInEnvironmentName();
+        $this->restoreCoolifyDbBackup();
+        $this->updateUserEmails();
+        //
+        $this->updateTraefikLabels();
+        $this->cleanupUnusedNetworkFromCoolifyProxy();
+
+        try {
+            $this->call('cleanup:redis');
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:redis command: {$e->getMessage()}\n";
+        }
+        try {
+            $this->call('cleanup:names');
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:names command: {$e->getMessage()}\n";
+        }
+        try {
+            $this->call('cleanup:stucked-resources');
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
+        }
+        try {
+            $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ApplicationDeploymentStatus::QUEUED->value,
+            ])->update([
+                'status' => ApplicationDeploymentStatus::FAILED->value,
+            ]);
+
+            if ($updatedCount > 0) {
+                echo "Marked {$updatedCount} stuck deployments as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+        }
+
         try {
             $localhost = $this->servers->where('id', 0)->first();
-            $localhost->setupDynamicProxyConfiguration();
+            if ($localhost) {
+                $localhost->setupDynamicProxyConfiguration();
+            }
         } catch (\Throwable $e) {
             echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
         }
-        $settings = instanceSettings();
+
         if (! is_null(config('constants.coolify.autoupdate', null))) {
             if (config('constants.coolify.autoupdate') == true) {
                 echo "Enabling auto-update\n";
-                $settings->update(['is_auto_update_enabled' => true]);
+                $this->settings->update(['is_auto_update_enabled' => true]);
             } else {
                 echo "Disabling auto-update\n";
-                $settings->update(['is_auto_update_enabled' => false]);
+                $this->settings->update(['is_auto_update_enabled' => false]);
             }
         }
     }
@@ -140,24 +139,18 @@ class Init extends Command
     private function pullChangelogFromGitHub()
     {
         try {
-            PullChangelogFromGitHub::dispatch();
+            PullChangelog::dispatch();
             echo "Changelog fetch initiated\n";
         } catch (\Throwable $e) {
             echo "Could not fetch changelog from GitHub: {$e->getMessage()}\n";
         }
     }
 
-    private function optimize()
-    {
-        Artisan::call('optimize:clear');
-        Artisan::call('optimize');
-    }
-
     private function updateUserEmails()
     {
         try {
             User::whereRaw('email ~ \'[A-Z]\'')->get()->each(function (User $user) {
-                $user->update(['email' => strtolower($user->email)]);
+                $user->update(['email' => $user->email]);
             });
         } catch (\Throwable $e) {
             echo "Error in updating user emails: {$e->getMessage()}\n";
@@ -170,27 +163,6 @@ class Init extends Command
             Server::where('proxy->type', 'TRAEFIK_V2')->update(['proxy->type' => 'TRAEFIK']);
         } catch (\Throwable $e) {
             echo "Error in updating traefik labels: {$e->getMessage()}\n";
-        }
-    }
-
-    private function cleanupUnnecessaryDynamicProxyConfiguration()
-    {
-        foreach ($this->servers as $server) {
-            try {
-                if (! $server->isFunctional()) {
-                    continue;
-                }
-                if ($server->id === 0) {
-                    continue;
-                }
-                $file = $server->proxyPath().'/dynamic/coolify.yaml';
-
-                return instant_remote_process([
-                    "rm -f $file",
-                ], $server, false);
-            } catch (\Throwable $e) {
-                echo "Error in cleaning up unnecessary dynamic proxy configuration: {$e->getMessage()}\n";
-            }
         }
     }
 
@@ -263,34 +235,10 @@ class Init extends Command
     {
         $id = config('app.id');
         $version = config('constants.coolify.version');
-        $settings = instanceSettings();
-        $do_not_track = data_get($settings, 'do_not_track');
-        if ($do_not_track == true) {
-            echo "Do_not_track is enabled\n";
-
-            return;
-        }
         try {
             Http::get("https://undead.coolify.io/v4/alive?appId=$id&version=$version");
         } catch (\Throwable $e) {
             echo "Error in sending live signal: {$e->getMessage()}\n";
-        }
-    }
-
-    private function cleanupInProgressApplicationDeployments()
-    {
-        // Cleanup any failed deployments
-        try {
-            if (isCloud()) {
-                return;
-            }
-            $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
-            foreach ($queued_inprogress_deployments as $deployment) {
-                $deployment->status = ApplicationDeploymentStatus::FAILED->value;
-                $deployment->save();
-            }
-        } catch (\Throwable $e) {
-            echo "Error: {$e->getMessage()}\n";
         }
     }
 

@@ -19,28 +19,28 @@ class Add extends Component
 
     public ?string $value = null;
 
-    public bool $is_build_time = false;
-
     public bool $is_multiline = false;
 
     public bool $is_literal = false;
+
+    public bool $is_buildtime_only = false;
 
     protected $listeners = ['clearAddEnv' => 'clear'];
 
     protected $rules = [
         'key' => 'required|string',
         'value' => 'nullable',
-        'is_build_time' => 'required|boolean',
         'is_multiline' => 'required|boolean',
         'is_literal' => 'required|boolean',
+        'is_buildtime_only' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
         'key' => 'key',
         'value' => 'value',
-        'is_build_time' => 'build',
         'is_multiline' => 'multiline',
         'is_literal' => 'literal',
+        'is_buildtime_only' => 'buildtime only',
     ];
 
     public function mount()
@@ -54,9 +54,9 @@ class Add extends Component
         $this->dispatch('saveKey', [
             'key' => $this->key,
             'value' => $this->value,
-            'is_build_time' => $this->is_build_time,
             'is_multiline' => $this->is_multiline,
             'is_literal' => $this->is_literal,
+            'is_buildtime_only' => $this->is_buildtime_only,
             'is_preview' => $this->is_preview,
         ]);
         $this->clear();
@@ -66,8 +66,8 @@ class Add extends Component
     {
         $this->key = '';
         $this->value = '';
-        $this->is_build_time = false;
         $this->is_multiline = false;
         $this->is_literal = false;
+        $this->is_buildtime_only = false;
     }
 }

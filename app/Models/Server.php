@@ -309,10 +309,7 @@ class Server extends BaseModel
                 $conf = Yaml::dump($dynamic_conf, 12, 2);
             }
             $conf = $banner.$conf;
-            $base64 = base64_encode($conf);
-            instant_remote_process([
-                "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
-            ], $this);
+            transfer_file_to_server($conf, $default_redirect_file, $this);
         }
 
         if ($proxy_type === 'CADDY') {
@@ -446,11 +443,10 @@ class Server extends BaseModel
                     "# Do not edit it manually (only if you know what are you doing).\n\n".
                     $yaml;
 
-                $base64 = base64_encode($yaml);
                 instant_remote_process([
                     "mkdir -p $dynamic_config_path",
-                    "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
+                transfer_file_to_server($yaml, $file, $this);
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";
@@ -473,10 +469,7 @@ $schema://$host {
     }
     reverse_proxy coolify:8080
 }";
-                $base64 = base64_encode($caddy_file);
-                instant_remote_process([
-                    "echo '$base64' | base64 -d | tee $file > /dev/null",
-                ], $this);
+                transfer_file_to_server($caddy_file, $file, $this);
                 $this->reloadCaddy();
             }
         }
@@ -1319,7 +1312,6 @@ $schema://$host {
     public function generateCaCertificate()
     {
         try {
-            ray('Generating CA certificate for server', $this->id);
             SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $this->id,
@@ -1327,7 +1319,6 @@ $schema://$host {
                 validityDays: 10 * 365
             );
             $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
-            ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;
                 $caCertPath = config('constants.coolify.base_config_path').'/ssl/';

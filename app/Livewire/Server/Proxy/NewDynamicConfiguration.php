@@ -78,10 +78,7 @@ class NewDynamicConfiguration extends Component
                 $yaml = Yaml::dump($yaml, 10, 2);
                 $this->value = $yaml;
             }
-            $base64_value = base64_encode($this->value);
-            instant_remote_process([
-                "echo '{$base64_value}' | base64 -d | tee {$file} > /dev/null",
-            ], $this->server);
+            transfer_file_to_server($this->value, $file, $this->server);
             if ($proxy_type === 'CADDY') {
                 $this->server->reloadCaddy();
             }

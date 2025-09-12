@@ -56,6 +56,22 @@ class User extends Authenticatable implements SendsEmail
         'email_change_code_expires_at' => 'datetime',
     ];
 
+    /**
+     * Set the email attribute to lowercase.
+     */
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower($value);
+    }
+
+    /**
+     * Set the pending_email attribute to lowercase.
+     */
+    public function setPendingEmailAttribute($value)
+    {
+        $this->attributes['pending_email'] = $value ? strtolower($value) : null;
+    }
+
     protected static function boot()
     {
         parent::boot();

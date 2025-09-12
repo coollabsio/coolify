@@ -14,6 +14,7 @@ class InstallDocker
 
     public function handle(Server $server)
     {
+        ray('install docker');
         $dockerVersion = config('constants.docker.minimum_required_version');
         $supported_os_type = $server->validateOS();
         if (! $supported_os_type) {
@@ -103,8 +104,15 @@ class InstallDocker
                 "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$dockerVersion}",
                 "echo 'Configuring Docker Engine (merging existing configuration with the required)...'",
                 'test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json "/etc/docker/daemon.json.original-$(date +"%Y%m%d-%H%M%S")"',
-                "test ! -s /etc/docker/daemon.json && echo '{$config}' | base64 -d | tee /etc/docker/daemon.json > /dev/null",
-                "echo '{$config}' | base64 -d | tee /etc/docker/daemon.json.coolify > /dev/null",
+                [
+                    'transfer_file' => [
+                        'content' => base64_decode($config),
+                        'destination' => '/tmp/daemon.json.new',
+                    ],
+                ],
+                'test ! -s /etc/docker/daemon.json && cp /tmp/daemon.json.new /etc/docker/daemon.json',
+                'cp /tmp/daemon.json.new /etc/docker/daemon.json.coolify',
+                'rm -f /tmp/daemon.json.new',
                 'jq . /etc/docker/daemon.json.coolify | tee /etc/docker/daemon.json.coolify.pretty > /dev/null',
                 'mv /etc/docker/daemon.json.coolify.pretty /etc/docker/daemon.json.coolify',
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
