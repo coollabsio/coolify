@@ -16,8 +16,8 @@
             }
         }" x-cloak class="mx-auto" :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
-                <div class="fixed inset-0 bg-black/80"></div>
-                <div class="fixed inset-0 flex">
+                <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
+                <div class="fixed h-full flex">
                     <div class="relative flex flex-1 w-full mr-16 max-w-56 ">
                         <div class="absolute top-0 flex justify-center w-16 pt-5 left-full">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
