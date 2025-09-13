@@ -278,7 +278,7 @@
                             Teams
                         </a>
                     </li>
-                    @if (isCloud())
+                    @if (isCloud() && auth()->user()->isAdmin())
                         <li>
                             <a title="Subscription"
                                 class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
