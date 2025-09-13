@@ -7,9 +7,9 @@ services:
   newt:
     image: fosrl/newt:latest
     environment:
-      - 'PANGOLIN_ENDPOINT=$SERVICE_FQDN_PANGOLIN'
-      - 'NEWT_ID=${NEWT_ID}'
-      - 'NEWT_SECRET=${NEWT_SECRET}'
+      - PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT:-https://pangolin.domain.tld}
+      - NEWT_ID=${NEWT_ID:-2ix2t8xk22ubpfy}
+      - NEWT_SECRET=${NEWT_SECRET:-nnisrfsdfc7prqsp9ewo1dvtvci50j5uiqotez00dgap0ii2}
     healthcheck:
       test: ["CMD", "newt", "--version"]
       interval: 5s
