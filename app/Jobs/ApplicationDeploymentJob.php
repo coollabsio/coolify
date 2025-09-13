@@ -1662,7 +1662,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables_preview);
-
         } else {
             // Add SOURCE_COMMIT if not exists
             if ($this->application->environment_variables->where('key', 'SOURCE_COMMIT')->isEmpty()) {
@@ -1700,7 +1699,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             add_coolify_default_environment_variables($this->application, $coolify_envs, $this->application->environment_variables);
-
         }
 
         return $coolify_envs;
@@ -2153,11 +2151,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
 
                     $base64_build_command = base64_encode($build_command);
+                    transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server);
                     $this->execute_remote_command(
-                        [
-                            transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server),
-                            'hidden' => true,
-                        ],
                         [
                             executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
@@ -2176,11 +2171,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $build_command = "docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
                         $base64_build_command = base64_encode($build_command);
                     }
+                    transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server);
                     $this->execute_remote_command(
-                        [
-                            transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server),
-                            'hidden' => true,
-                        ],
                         [
                             executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
@@ -2208,17 +2200,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
             $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
             $base64_build_command = base64_encode($build_command);
+            transfer_file_to_container(base64_decode($dockerfile), "{$this->workdir}/Dockerfile", $this->deployment_uuid, $this->server);
+            transfer_file_to_container(base64_decode($nginx_config), "{$this->workdir}/nginx.conf", $this->deployment_uuid, $this->server);
+            transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server);
+
             $this->execute_remote_command(
-                [
-                    transfer_file_to_container(base64_decode($dockerfile), "{$this->workdir}/Dockerfile", $this->deployment_uuid, $this->server),
-                ],
-                [
-                    transfer_file_to_container(base64_decode($nginx_config), "{$this->workdir}/nginx.conf", $this->deployment_uuid, $this->server),
-                ],
-                [
-                    transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server),
-                    'hidden' => true,
-                ],
                 [
                     executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                     'hidden' => true,
@@ -2237,11 +2223,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                 }
                 $base64_build_command = base64_encode($build_command);
+                transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server);
                 $this->execute_remote_command(
-                    [
-                        transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server),
-                        'hidden' => true,
-                    ],
                     [
                         executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                         'hidden' => true,
@@ -2276,11 +2259,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}";
                     }
                     $base64_build_command = base64_encode($build_command);
+                    transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server);
                     $this->execute_remote_command(
-                        [
-                            transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server),
-                            'hidden' => true,
-                        ],
                         [
                             executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
@@ -2299,11 +2279,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $build_command = "docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                         $base64_build_command = base64_encode($build_command);
                     }
+                    transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server);
                     $this->execute_remote_command(
-                        [
-                            transfer_file_to_container(base64_decode($base64_build_command), '/artifacts/build.sh', $this->deployment_uuid, $this->server),
-                            'hidden' => true,
-                        ],
                         [
                             executeInDocker($this->deployment_uuid, 'cat /artifacts/build.sh'),
                             'hidden' => true,
@@ -2433,10 +2410,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-        $this->execute_remote_command([
-            transfer_file_to_container(base64_decode($dockerfile_base64), "{$this->workdir}{$this->dockerfile_location}", $this->deployment_uuid, $this->server),
-            'hidden' => true,
-        ]);
+        transfer_file_to_container(base64_decode($dockerfile_base64), "{$this->workdir}{$this->dockerfile_location}", $this->deployment_uuid, $this->server, true);
     }
 
     private function run_pre_deployment_command()
