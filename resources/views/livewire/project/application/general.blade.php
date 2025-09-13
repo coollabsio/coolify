@@ -270,6 +270,14 @@
                                             helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                             label="Custom Start Command" />
                                     </div>
+                                    @if ($this->application->is_github_based())
+                                        <div class="pt-4">
+                                            <x-forms.textarea
+                                                helper="Gitignore-style rules to filter Git based webhook deployments."
+                                                placeholder="services/api/**" id="application.watch_paths"
+                                                label="Watch Paths" x-bind:disabled="shouldDisable()" />
+                                        </div>
+                                    @endif
                                 </div>
                             @else
                                 <div class="flex flex-col gap-2 xl:flex-row">
@@ -301,7 +309,7 @@
                                     @endif
 
                                 </div>
-                                @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                                @if ($this->application->is_github_based())
                                     <div class="pb-4">
                                         <x-forms.textarea
                                             helper="Gitignore-style rules to filter Git based webhook deployments."
