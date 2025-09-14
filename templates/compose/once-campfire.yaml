@@ -8,24 +8,20 @@
 services:
   campfire:
     build: https://github.com/basecamp/once-campfire.git#${BRANCH:-main}
-    ports:
-      - "3000:80"
     restart: unless-stopped
     volumes:
       - campfire-storage:/rails/storage
     environment:
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE}     # required, set this to a secure random value
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}   # optional, for notifications
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY} # optional, for notifications
-      DISABLE_SSL: ${DISABLE_SSL-true}        # uncomment to disable SSL
-      SSL_DOMAIN: ${SSL_DOMAIN-false}         # optional, for SSL
-      SKIP_TELEMETRY: ${SKIP_TELEMETRY-true}  # optional, set to disable telemetry
-      SENTRY_DSN: ${SENTRY_DSN}               # optional, for error reporting
+      - SERVICE_URL_CAMPFIRE_80
+      - SECRET_KEY_BASE=${SERVICE_BASE64_64_CAMPFIRE}    # required, set this to a secure random value
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}             # optional, for notifications
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}           # optional, for notifications
+      - DISABLE_SSL=${DISABLE_SSL:-true}                 # uncomment to disable SSL
+      - SSL_DOMAIN=${SSL_DOMAIN:-false}                  # optional, for SSL
+      - SKIP_TELEMETRY=${SKIP_TELEMETRY:-true}           # optional, set to disable telemetry
+      - SENTRY_DSN=${SENTRY_DSN}                         # optional, for error reporting
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/up"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  campfire-storage:
