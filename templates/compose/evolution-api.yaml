@@ -11,11 +11,14 @@ services:
     image: 'evoapicloud/evolution-api:latest' # Change to specific version if needed.
     restart: always
     depends_on:
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - SERVICE_URL_EVO_8080
-      - SERVER_URL=$SERVICE_URL_EVO
+      - SERVER_URL=${SERVICE_URL_EVO}
+
       - DB_TYPE=${DB_TYPE:-postgresdb}
       - 'DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}'
       - DB_POSTGRESDB_HOST=${DB_POSTGRESDB_HOST:-postgres}
@@ -137,13 +140,28 @@ services:
     volumes:
       - 'evolution_instances:/evolution/instances'
     expose:
-      - 8080
+      - "8080"
+    healthcheck:
+      # Internal healthcheck: success if "/" returns 2xx
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8080/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
   redis:
     image: 'redis:latest'
     command: "redis-server --port 6379 --appendonly yes\n"
     restart: always
     volumes:
       - 'evolution_redis:/data'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
   postgres:
     image: 'postgres:16-alpine'
     command:
@@ -158,6 +176,15 @@ services:
     restart: always
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -h 127.0.0.1'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
 volumes:
   evolution_instances: null
   evolution_redis: null
