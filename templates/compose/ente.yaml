@@ -79,6 +79,3 @@ services:
       retries: 5
       start_period: 30s
 
-volumes:
-  postgres-data:
-  museum-data:
