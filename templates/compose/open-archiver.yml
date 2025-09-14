@@ -1,4 +1,4 @@
-# documentation: https://docs.openarchiver.com
+# documentation: https://openarchiver.com
 # slogan: A self-hosted, open-source email archiving solution with full-text search capability.
 # tags: email archiving,email,compliance,search
 # logo: svgs/openarchiver.svg
@@ -8,8 +8,8 @@ services:
     open-archiver:
         image: logiclabshq/open-archiver:latest
         environment:
-            - SERVICE_FQDN_3000
-            - SERVICE_URL=${SERVICE_FQDN_3000}
+            - SERVICE_URL_3000
+            - SERVICE_URL=${SERVICE_URL_3000}
             - PORT_BACKEND=${PORT_BACKEND:-4000}
             - PORT_FRONTEND=${PORT_FRONTEND:-3000}
             - NODE_ENV=${NODE_ENV:-production}
@@ -39,31 +39,39 @@ services:
             - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
             - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
         volumes:
-            - ${COOLIFY_VOLUME_APP_DATA}:/var/data/open-archiver
+            - archiver-data:/var/data/open-archiver
         depends_on:
-            - postgres
-            - valkey
-            - meilisearch
+            postgres:
+                condition: service_healthy
+            valkey:
+                condition: service_started
+            meilisearch:
+                condition: service_started
 
     postgres:
         image: postgres:17-alpine
         environment:
-            - POSTGRES_DB=${POSTGRES_DB:-open_archive}
-            - POSTGRES_USER=${POSTGRES_USER:-admin}
+            - POSTGRES_DB=${POSTGRES_DB}
+            - POSTGRES_USER=${POSTGRES_USER}
             - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
             - LC_ALL=C
         volumes:
-            - ${COOLIFY_VOLUME_POSTGRES}:/var/lib/postgresql/data
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+            interval: 10s
+            timeout: 20s
+            retries: 10
 
     valkey:
         image: valkey/valkey:8-alpine
         command: valkey-server --requirepass ${SERVICE_PASSWORD_VALKEY}
         volumes:
-            - ${COOLIFY_VOLUME_VALKEY}:/data
+            - valkeydata:/data
 
     meilisearch:
         image: getmeili/meilisearch:v1.15
         environment:
             - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
         volumes:
-            - ${COOLIFY_VOLUME_MEILISEARCH}:/meili_data
+            - meilidata:/meili_data
