@@ -1843,7 +1843,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ],
         ];
         if (filled($this->env_filename)) {
-            $docker_compose['services'][$this->container_name]['env_file'] = ["/artifacts/{$this->env_filename}"];
+            $docker_compose['services'][$this->container_name]['env_file'] = [addPreviewDeploymentSuffix("{$this->env_filename}", $this->pull_request_id)];
         }
         $docker_compose['services'][$this->container_name]['healthcheck'] = [
             'test' => [
