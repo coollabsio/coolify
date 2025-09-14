@@ -211,6 +211,14 @@
                                         :canResource="$server">Save</x-forms.button>
                                     <x-forms.button wire:click='restartSentinel' canGate="update"
                                         :canResource="$server">Restart</x-forms.button>
+                                    <x-slide-over fullScreen>
+                                        <x-slot:title>Sentinel Logs</x-slot:title>
+                                        <x-slot:content>
+                                            <livewire:project.shared.get-logs :server="$server"
+                                                container="coolify-sentinel" lazy />
+                                        </x-slot:content>
+                                        <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
+                                    </x-slide-over>
                                 @else
                                     <x-status.stopped status="Out of sync" noLoading
                                         title="{{ $sentinelUpdatedAt }}" />
@@ -218,6 +226,14 @@
                                         :canResource="$server">Save</x-forms.button>
                                     <x-forms.button wire:click='restartSentinel' canGate="update"
                                         :canResource="$server">Sync</x-forms.button>
+                                    <x-slide-over fullScreen>
+                                        <x-slot:title>Sentinel Logs</x-slot:title>
+                                        <x-slot:content>
+                                            <livewire:project.shared.get-logs :server="$server"
+                                                container="coolify-sentinel" lazy />
+                                        </x-slot:content>
+                                        <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
+                                    </x-slide-over>
                                 @endif
                             </div>
                         @endif
@@ -243,6 +259,22 @@
                                     label="Enable Metrics (enable Sentinel first)" />
                             @endif
                         </div>
+                        @if (isDev() && $server->isSentinelEnabled())
+                            <div class="pt-4" x-data="{
+                                customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
+                                saveCustomImage() {
+                                    localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
+                                    $wire.set('sentinelCustomDockerImage', this.customImage);
+                                }
+                            }" x-init="$wire.set('sentinelCustomDockerImage', customImage)">
+                                <x-forms.input 
+                                    x-model="customImage"
+                                    @input.debounce.500ms="saveCustomImage()"
+                                    placeholder="e.g., sentinel:latest or myregistry/sentinel:dev"
+                                    label="Custom Sentinel Docker Image (Dev Only)"
+                                    helper="Override the default Sentinel Docker image for testing. Leave empty to use the default." />
+                            </div>
+                        @endif
                         @if ($server->isSentinelEnabled())
                             <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
                                 <x-forms.input canGate="update" :canResource="$server" type="password" id="sentinelToken"
