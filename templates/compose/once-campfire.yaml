@@ -7,7 +7,7 @@
 
 services:
   campfire:
-    build: https://github.com/basecamp/once-campfire.git#${BRANCH:-main}
+    image: ghcr.io/basecamp/once-campfire:${TAG:-main}
     restart: unless-stopped
     volumes:
       - campfire-storage:/rails/storage
