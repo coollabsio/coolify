@@ -1,0 +1,31 @@
+# documentation: https://www.home-assistant.io/
+# slogan: Open source home automation that puts local control and privacy first.
+# category: home-automation
+# tags: home-assistant, home-automation, smart-home, mqtt, zigbee, zwave
+# logo: svgs/home-assistant.svg
+# port: 8123
+
+services:
+  homeassistant:
+    image: homeassistant/home-assistant:${IMAGE_TAG:-stable}
+    container_name: ${CONTAINER_NAME:-homeassistant}
+    environment:
+      - TZ=Europe/Berlin
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    volumes:
+      - homeassistant-data:/config
+    ports:
+      - "8123:8123"       # Home Assistant UI
+      - "1900:1900/udp"  # SSDP (optional, discovery)
+      - "5353:5353/udp"  # mDNS (optional, discovery)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  homeassistant-data: {}
