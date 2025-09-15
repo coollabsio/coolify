@@ -1,0 +1,12 @@
+# documentation: https://plark.com
+# slogan: Self-hosted Website Builder
+# category: cms
+# tags: cms, blog, content, management, website, builder, landing, page
+# logo: svgs/plark.svg
+# port: 80
+
+services:
+  plark:
+    image: plarkinc/plark:latest
+    volumes:
+      - plark-data:/var/data
