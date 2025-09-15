@@ -487,7 +487,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if (filled($this->env_filename)) {
                 $services = collect(data_get($composeFile, 'services', []));
                 $services = $services->map(function ($service, $name) {
-                    $service['env_file'] = ["/artifacts/{$this->env_filename}"];
+                    $service['env_file'] = [$this->env_filename];
 
                     return $service;
                 });
@@ -516,7 +516,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $command = "{$this->coolify_variables} docker compose";
             if (filled($this->env_filename)) {
-                $command .= " --env-file /artifacts/{$this->env_filename}";
+                $command .= " --env-file {$this->workdir}/{$this->env_filename}";
             }
             if ($this->force_rebuild) {
                 $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
@@ -562,7 +562,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 $command = "{$this->coolify_variables} docker compose";
                 if (filled($this->env_filename)) {
-                    $command .= " --env-file /artifacts/{$this->env_filename}";
+                    $command .= " --env-file {$server_workdir}/{$this->env_filename}";
                 }
                 $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
                 $this->execute_remote_command(
@@ -579,7 +579,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->preserveRepository) {
                     if (filled($this->env_filename)) {
-                        $command .= " --env-file /artifacts/{$this->env_filename}";
+                        $command .= " --env-file {$server_workdir}/{$this->env_filename}";
                     }
                     $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
                     $this->write_deployment_configurations();
@@ -589,7 +589,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     );
                 } else {
                     if (filled($this->env_filename)) {
-                        $command .= " --env-file /artifacts/{$this->env_filename}";
+                        $command .= " --env-file {$this->workdir}/{$this->env_filename}";
                     }
                     $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
                     $this->execute_remote_command(
