@@ -14,6 +14,7 @@ ARG NIXPACKS_VERSION=1.40.0
 # https://github.com/minio/mc/releases
 ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 
+
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 
 FROM ${BASE_IMAGE} AS base
