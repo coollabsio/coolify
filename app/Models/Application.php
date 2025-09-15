@@ -1563,7 +1563,19 @@ class Application extends BaseModel
         if (is_null($this->watch_paths)) {
             return false;
         }
-        $watch_paths = collect(explode("\n", $this->watch_paths));
+        $watch_paths = collect(explode("\n", $this->watch_paths))
+            ->map(function (string $path): string {
+                return trim($path);
+            })
+            ->filter(function (string $path): bool {
+                return strlen($path) > 0;
+            });
+
+        // If no valid patterns after filtering, don't trigger
+        if ($watch_paths->isEmpty()) {
+            return false;
+        }
+
         $matches = $modified_files->filter(function ($file) use ($watch_paths) {
             return $watch_paths->contains(function ($glob) use ($file) {
                 return fnmatch($glob, $file);
