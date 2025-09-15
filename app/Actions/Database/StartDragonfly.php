@@ -183,12 +183,8 @@ class StartDragonfly
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
 
         $docker_compose = Yaml::dump($docker_compose, 10);
-        $this->commands[] = [
-            'transfer_file' => [
-                'content' => $docker_compose,
-                'destination' => "$this->configuration_dir/docker-compose.yml",
-            ],
-        ];
+        $docker_compose_base64 = base64_encode($docker_compose);
+        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";

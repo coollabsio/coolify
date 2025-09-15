@@ -52,9 +52,8 @@ class StartDatabaseProxy
         }
 
         $configuration_dir = database_proxy_dir($database->uuid);
-        $volume_configuration_dir = $configuration_dir;
         if (isDev()) {
-            $volume_configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
+            $configuration_dir = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/databases/'.$database->uuid.'/proxy';
         }
         $nginxconf = <<<EOF
     user  nginx;
@@ -87,7 +86,7 @@ class StartDatabaseProxy
                     'volumes' => [
                         [
                             'type' => 'bind',
-                            'source' => "$volume_configuration_dir/nginx.conf",
+                            'source' => "$configuration_dir/nginx.conf",
                             'target' => '/etc/nginx/nginx.conf',
                         ],
                     ],
@@ -116,18 +115,8 @@ class StartDatabaseProxy
         instant_remote_process(["docker rm -f $proxyContainerName"], $server, false);
         instant_remote_process([
             "mkdir -p $configuration_dir",
-            [
-                'transfer_file' => [
-                    'content' => base64_decode($nginxconf_base64),
-                    'destination' => "$configuration_dir/nginx.conf",
-                ],
-            ],
-            [
-                'transfer_file' => [
-                    'content' => base64_decode($dockercompose_base64),
-                    'destination' => "$configuration_dir/docker-compose.yaml",
-                ],
-            ],
+            "echo '{$nginxconf_base64}' | base64 -d | tee $configuration_dir/nginx.conf > /dev/null",
+            "echo '{$dockercompose_base64}' | base64 -d | tee $configuration_dir/docker-compose.yaml > /dev/null",
             "docker compose --project-directory {$configuration_dir} pull",
             "docker compose --project-directory {$configuration_dir} up -d",
         ], $server);

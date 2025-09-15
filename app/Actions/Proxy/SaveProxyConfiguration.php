@@ -21,12 +21,7 @@ class SaveProxyConfiguration
         // Transfer the configuration file to the server
         instant_remote_process([
             "mkdir -p $proxy_path",
-            [
-                'transfer_file' => [
-                    'content' => base64_decode($docker_compose_yml_base64),
-                    'destination' => "$proxy_path/docker-compose.yml",
-                ],
-            ],
+            "echo '$docker_compose_yml_base64' | base64 -d | tee $proxy_path/docker-compose.yml > /dev/null",
         ], $server);
     }
 }

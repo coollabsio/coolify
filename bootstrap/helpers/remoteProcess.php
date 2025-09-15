@@ -47,10 +47,10 @@ function remote_process(
     }
 
     if ($server->isNonRoot()) {
-        $processed_commands = parseCommandsByLineForSudo(collect($processed_commands), $server);
+        $command = parseCommandsByLineForSudo(collect($command), $server);
     }
 
-    $command_string = implode("\n", $processed_commands);
+    $command_string = implode("\n", $command);
 
     if (Auth::check()) {
         $teams = Auth::user()->teams->pluck('id');
@@ -215,9 +215,9 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
     }
 
     if ($server->isNonRoot() && ! $no_sudo) {
-        $processed_commands = parseCommandsByLineForSudo(collect($processed_commands), $server);
+        $command = parseCommandsByLineForSudo(collect($command), $server);
     }
-    $command_string = implode("\n", $processed_commands);
+    $command_string = implode("\n", $command);
 
     return \App\Helpers\SshRetryHandler::retry(
         function () use ($server, $command_string) {

@@ -1280,10 +1280,8 @@ class Service extends BaseModel
         if ($envs->count() === 0) {
             $commands[] = 'touch .env';
         } else {
-            $envs_content = $envs->implode("\n");
-            transfer_file_to_server($envs_content, $this->workdir().'/.env', $this->server);
-
-            return;
+            $envs_base64 = base64_encode($envs->implode("\n"));
+            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
         }
 
         instant_remote_process($commands, $this->server);
