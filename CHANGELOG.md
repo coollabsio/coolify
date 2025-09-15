@@ -4,6 +4,114 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(command)* Add option to sync GitHub releases to BunnyCDN and refactor sync logic
+- *(ui)* Display current version in settings dropdown and update UI accordingly
+- *(settings)* Add option to restrict PR deployments to repository members and contributors
+- *(command)* Implement SSH command retry logic with exponential backoff and logging for better error handling
+- *(ssh)* Add Sentry tracking for SSH retry events to enhance error monitoring
+- *(exceptions)* Introduce NonReportableException to handle known errors and update Handler for selective reporting
+- *(sudo-helper)* Add helper functions for command parsing and ownership management with sudo
+- *(dev-command)* Dispatch CheckHelperImageJob during instance initialization to enhance setup process
+- *(ssh-multiplexing)* Enhance multiplexed connection management with health checks and metadata caching
+- *(ssh-multiplexing)* Add connection age metadata handling to improve multiplexed connection management
+- *(database-backup)* Enhance error handling and output management in DatabaseBackupJob
+- *(application)* Display parsing version in development mode and clean up domain conflict modal markup
+- *(deployment)* Add SERVICE_NAME variables for service discovery
+- *(storages)* Add method to retrieve the first storage ID for improved stability in storage display
+- *(environment)* Add 'is_literal' attribute to environment variable for enhanced configuration options
+- *(pre-commit)* Automate generation of service templates and OpenAPI documentation during pre-commit hook
+- *(execute-container)* Enhance container command form with auto-connect feature for single container scenarios
+- *(environment)* Introduce 'is_buildtime_only' attribute to environment variables for improved build-time configuration
+- *(templates)* Add n8n service with PostgreSQL and worker support for enhanced workflow automation
+- *(user-management)* Implement user deletion command with phased resource and subscription cancellation, including dry run option
+- *(sentinel)* Add support for custom Docker images in StartSentinel and related methods
+- *(sentinel)* Add slide-over for viewing Sentinel logs and custom Docker image input for development
+- *(executions)* Add 'Load All' button to view all logs and implement loadAllLogs method for complete log retrieval
+- *(auth)* Enhance user login flow to handle team invitations, attaching users to invited teams upon first login and maintaining personal team logic for regular logins
+- *(laravel-boost)* Add Laravel Boost guidelines and MCP server configuration to enhance development experience
+
+### 🐛 Bug Fixes
+
+- *(ui)* Transactional email settings link on members page (#6491)
+- *(api)* Add custom labels generation for applications with readonly container label setting enabled
+- *(ui)* Add cursor pointer to upgrade button for better user interaction
+- *(templates)* Update SECRET_KEY environment variable in getoutline.yaml to use SERVICE_HEX_32_OUTLINE
+- *(command)* Enhance database deletion command to support multiple database types
+- *(command)* Enhance cleanup process for stuck application previews by adding force delete for trashed records
+- *(user)* Ensure email attributes are stored in lowercase for consistency and prevent case-related issues
+- *(webhook)* Replace delete with forceDelete for application previews to ensure immediate removal
+- *(ssh)* Introduce SshRetryHandler and SshRetryable trait for enhanced SSH command retry logic with exponential backoff and error handling
+- Appwrite template - 500 errors, missing env vars etc.
+- *(LocalFileVolume)* Add missing directory creation command for workdir in saveStorageOnServer method
+- *(ScheduledTaskJob)* Replace generic Exception with NonReportableException for better error handling
+- *(web-routes)* Enhance backup response messages to clarify local and S3 availability
+- *(proxy)* Replace CheckConfiguration with GetProxyConfiguration and SaveConfiguration with SaveProxyConfiguration for improved clarity and consistency in proxy management
+- *(private-key)* Implement transaction handling and error verification for private key storage operations
+- *(deployment)* Add COOLIFY_* environment variables to Nixpacks build context for enhanced deployment configuration
+- *(application)* Add functionality to stop and remove Docker containers on server
+- *(templates)* Update 'compose' configuration for Appwrite service to enhance compatibility and streamline deployment
+- *(security)* Update contact email for reporting vulnerabilities to enhance privacy
+- *(feedback)* Update feedback email address to improve communication with users
+- *(security)* Update contact email for vulnerability reports to improve security communication
+- *(navbar)* Restrict subscription link visibility to admin users in cloud environment
+- *(docker)* Enhance container status aggregation for multi-container applications, including exclusion handling based on docker-compose configuration
+
+### 🚜 Refactor
+
+- *(jobs)* Pull github changelogs from cdn instead of github
+- *(command)* Streamline database deletion process to handle multiple database types and improve user experience
+- *(command)* Improve database collection logic for deletion command by using unique identifiers and enhancing user experience
+- *(command)* Remove InitChangelog command as it is no longer needed
+- *(command)* Streamline Init command by removing unnecessary options and enhancing error handling for various operations
+- *(webhook)* Replace direct forceDelete calls with DeleteResourceJob dispatch for application previews
+- *(command)* Replace forceDelete calls with DeleteResourceJob dispatch for all stuck resources in cleanup process
+- *(command)* Simplify SSH command retry logic by removing unnecessary logging and improving delay calculation
+- *(ssh)* Enhance error handling in SSH command execution and improve connection validation logging
+- *(backlog)* Remove outdated guidelines and project manager agent files to streamline task management documentation
+- *(error-handling)* Remove ray debugging statements from CheckUpdates and shared helper functions to clean up error reporting
+- *(file-transfer)* Replace base64 encoding with direct file transfer method across multiple database actions for improved clarity and efficiency
+- *(remoteProcess)* Remove debugging statement from transfer_file_to_server function to clean up code
+- *(dns-validation)* Rename DNS validation functions for consistency and clarity, and remove unused code
+- *(file-transfer)* Replace base64 encoding with direct file transfer method in various components for improved clarity and efficiency
+- *(private-key)* Remove debugging statement from storeInFileSystem method for cleaner code
+- *(github-webhook)* Restructure application processing by grouping applications by server for improved deployment handling
+- *(deployment)* Enhance queuing logic to support concurrent deployments by including pull request ID in checks
+- *(remoteProcess)* Remove debugging statement from transfer_file_to_container function for cleaner code
+- *(deployment)* Streamline next deployment queuing logic by repositioning queue_next_deployment call
+- *(deployment)* Add validation for pull request existence in deployment process to enhance error handling
+- *(database)* Remove volume_configuration_dir and streamline configuration directory usage in MongoDB and PostgreSQL handlers
+- *(application-source)* Improve layout and accessibility of Git repository links in the application source view
+- *(models)* Remove 'is_readonly' attribute from multiple database models for consistency
+- *(webhook)* Remove Webhook model and related logic; add migrations to drop webhooks and kubernetes tables
+- *(clone)* Consolidate application cloning logic into a dedicated function for improved maintainability and readability
+- *(clone)* Integrate preview cloning logic directly into application cloning function for improved clarity and maintainability
+- *(application)* Enhance environment variable retrieval in configuration change check for improved accuracy
+- *(clone)* Enhance application cloning by separating production and preview environment variable handling
+- *(deployment)* Add environment variable copying logic to Docker build commands for pull requests
+- *(environment)* Standardize service name formatting by replacing '-' and '.' with '_' in environment variable keys
+- *(deployment)* Update environment file handling in Docker commands to use '/artifacts/' path and streamline variable management
+- *(openapi)* Remove 'is_build_time' attribute from environment variable definitions to streamline configuration
+- *(environment)* Remove 'is_build_time' attribute from environment variable handling across the application to simplify configuration
+- *(environment)* Streamline environment variable handling by replacing sorting methods with direct property access and enhancing query ordering for improved performance
+- *(stripe-jobs)* Comment out internal notification calls and add subscription status verification before sending failure notifications
+
+### 📚 Documentation
+
+- Update changelog
+- *(testing-patterns)* Add important note to always run tests inside the `coolify` container for clarity
+
+### ⚙️ Miscellaneous Tasks
+
+- Update coolify version to 4.0.0-beta.427 and nightly version to 4.0.0-beta.428
+- Use main value then fallback to service_ values
+- Remove webhooks table cleanup
+- *(cleanup)* Remove deprecated ServerCheck and related job classes to streamline codebase
+- *(versions)* Update sentinel version from 0.0.15 to 0.0.16 in versions.json files
+
+## [4.0.0-beta.426] - 2025-08-28
+
 ### 🚜 Refactor
 
 - *(policy)* Simplify ServiceDatabasePolicy methods to always return true and add manageBackups method
