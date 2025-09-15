@@ -922,24 +922,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         });
         if ($this->pull_request_id === 0) {
             $this->env_filename = '.env';
-            // Filter out buildtime-only variables from runtime environment
-            $runtime_environment_variables = $sorted_environment_variables->filter(function ($env) {
-                return ! $env->is_buildtime_only;
-            });
-            foreach ($runtime_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->real_value);
-            }
-            // Add PORT if not exists, use the first port as default
-            if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
-                    $envs->push("PORT={$ports[0]}");
-                }
-            }
-            // Add HOST if not exists
-            if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
-                $envs->push('HOST=0.0.0.0');
-            }
 
+            // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
                 $domains = collect(json_decode($this->application->docker_compose_domains)) ?? collect([]);
 
@@ -968,26 +952,38 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
                 }
             }
-        } else {
-            $this->env_filename = '.env';
-            // Filter out buildtime-only variables from runtime environment for preview
-            $runtime_environment_variables_preview = $sorted_environment_variables_preview->filter(function ($env) {
+
+            // Filter out buildtime-only variables from runtime environment
+            $runtime_environment_variables = $sorted_environment_variables->filter(function ($env) {
                 return ! $env->is_buildtime_only;
             });
-            foreach ($runtime_environment_variables_preview as $env) {
+
+            // Sort runtime environment variables: those referencing SERVICE_ variables come after others
+            $runtime_environment_variables = $runtime_environment_variables->sortBy(function ($env) {
+                if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->contains('${SERVICE_')) {
+                    return 2;
+                }
+
+                return 1;
+            });
+
+            foreach ($runtime_environment_variables as $env) {
                 $envs->push($env->key.'='.$env->real_value);
             }
             // Add PORT if not exists, use the first port as default
             if ($this->build_pack !== 'dockercompose') {
-                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                if ($this->application->environment_variables->where('key', 'PORT')->isEmpty()) {
                     $envs->push("PORT={$ports[0]}");
                 }
             }
             // Add HOST if not exists
-            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
+            if ($this->application->environment_variables->where('key', 'HOST')->isEmpty()) {
                 $envs->push('HOST=0.0.0.0');
             }
+        } else {
+            $this->env_filename = '.env';
 
+            // Generate SERVICE_ variables first for dockercompose preview
             if ($this->build_pack === 'dockercompose') {
                 $domains = collect(json_decode(data_get($this->preview, 'docker_compose_domains'))) ?? collect([]);
 
@@ -1011,6 +1007,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 foreach ($rawServices as $rawServiceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
                 }
+            }
+
+            // Filter out buildtime-only variables from runtime environment for preview
+            $runtime_environment_variables_preview = $sorted_environment_variables_preview->filter(function ($env) {
+                return ! $env->is_buildtime_only;
+            });
+
+            // Sort runtime environment variables: those referencing SERVICE_ variables come after others
+            $runtime_environment_variables_preview = $runtime_environment_variables_preview->sortBy(function ($env) {
+                if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->contains('${SERVICE_')) {
+                    return 2;
+                }
+
+                return 1;
+            });
+
+            foreach ($runtime_environment_variables_preview as $env) {
+                $envs->push($env->key.'='.$env->real_value);
+            }
+            // Add PORT if not exists, use the first port as default
+            if ($this->build_pack !== 'dockercompose') {
+                if ($this->application->environment_variables_preview->where('key', 'PORT')->isEmpty()) {
+                    $envs->push("PORT={$ports[0]}");
+                }
+            }
+            // Add HOST if not exists
+            if ($this->application->environment_variables_preview->where('key', 'HOST')->isEmpty()) {
+                $envs->push('HOST=0.0.0.0');
             }
         }
         if ($envs->isEmpty()) {
