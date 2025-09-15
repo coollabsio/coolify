@@ -29,23 +29,6 @@ function remote_process(
     $type = $type ?? ActivityTypes::INLINE->value;
     $command = $command instanceof Collection ? $command->toArray() : $command;
 
-    // Process commands and handle file transfers
-    $processed_commands = [];
-    foreach ($command as $cmd) {
-        if (is_array($cmd) && isset($cmd['transfer_file'])) {
-            // Handle file transfer command
-            $transfer_data = $cmd['transfer_file'];
-            $content = $transfer_data['content'];
-            $destination = $transfer_data['destination'];
-
-            // Execute file transfer immediately
-            transfer_file_to_server($content, $destination, $server, ! $ignore_errors);
-        } else {
-            // Regular string command
-            $processed_commands[] = $cmd;
-        }
-    }
-
     if ($server->isNonRoot()) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
@@ -196,23 +179,6 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
-
-    // Process commands and handle file transfers
-    $processed_commands = [];
-    foreach ($command as $cmd) {
-        if (is_array($cmd) && isset($cmd['transfer_file'])) {
-            // Handle file transfer command
-            $transfer_data = $cmd['transfer_file'];
-            $content = $transfer_data['content'];
-            $destination = $transfer_data['destination'];
-
-            // Execute file transfer immediately
-            transfer_file_to_server($content, $destination, $server, $throwError);
-        } else {
-            // Regular string command
-            $processed_commands[] = $cmd;
-        }
-    }
 
     if ($server->isNonRoot() && ! $no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
