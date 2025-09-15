@@ -40,9 +40,6 @@ function remote_process(
 
             // Execute file transfer immediately
             transfer_file_to_server($content, $destination, $server, ! $ignore_errors);
-
-            // Add a comment to the command log for visibility
-            $processed_commands[] = "# File transferred via SCP: $destination";
         } else {
             // Regular string command
             $processed_commands[] = $cmd;
@@ -211,9 +208,6 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
             // Execute file transfer immediately
             transfer_file_to_server($content, $destination, $server, $throwError);
-
-            // Add a comment to the command log for visibility
-            $processed_commands[] = "# File transferred via SCP: $destination";
         } else {
             // Regular string command
             $processed_commands[] = $cmd;
