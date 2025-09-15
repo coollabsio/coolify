@@ -159,7 +159,8 @@ class LocalFileVolume extends BaseModel
             $chmod = data_get($this, 'chmod');
             $chown = data_get($this, 'chown');
             if ($content) {
-                transfer_file_to_server($content, $path, $server);
+                $content = base64_encode($content);
+                $commands->push("echo '$content' | base64 -d | tee $path > /dev/null");
             } else {
                 $commands->push("touch $path");
             }
@@ -174,9 +175,7 @@ class LocalFileVolume extends BaseModel
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
         }
 
-        if ($commands->count() > 0) {
-            return instant_remote_process($commands, $server);
-        }
+        return instant_remote_process($commands, $server);
     }
 
     // Accessor for convenient access

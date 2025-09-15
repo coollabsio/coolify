@@ -232,12 +232,8 @@ EOD;
                     break;
             }
 
-            $this->importCommands[] = [
-                'transfer_file' => [
-                    'content' => $restoreCommand,
-                    'destination' => $scriptPath,
-                ],
-            ];
+            $restoreCommandBase64 = base64_encode($restoreCommand);
+            $this->importCommands[] = "echo \"{$restoreCommandBase64}\" | base64 -d > {$scriptPath}";
             $this->importCommands[] = "chmod +x {$scriptPath}";
             $this->importCommands[] = "docker cp {$scriptPath} {$this->container}:{$scriptPath}";
 
