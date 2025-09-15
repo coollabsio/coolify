@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(deployment)* Enhance deployment status reporting with detailed information on active deployments and team members
+
+### 🐛 Bug Fixes
+
+- *(application)* Improve watch paths handling by trimming and filtering empty paths to prevent unnecessary triggers
+
+### 🚜 Refactor
+
+- *(deployment)* Streamline environment variable handling for dockercompose and improve sorting of runtime variables
+- *(remoteProcess)* Remove command log comments for file transfers to simplify code
+- *(remoteProcess)* Remove file transfer handling from remote_process and instant_remote_process functions to simplify code
+- *(deployment)* Update environment file paths in docker compose commands to use working directory for improved consistency
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(constants)* Update realtime_version from 1.0.10 to 1.0.11
+- *(versions)* Increment coolify version to 4.0.0-beta.428 and update realtime_version to 1.0.10
+
+## [4.0.0-beta.427] - 2025-09-15
+
+### 🚀 Features
+
 - *(command)* Add option to sync GitHub releases to BunnyCDN and refactor sync logic
 - *(ui)* Display current version in settings dropdown and update UI accordingly
 - *(settings)* Add option to restrict PR deployments to repository members and contributors
