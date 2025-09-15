@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(docker)* Add a blank line for improved readability in Dockerfile
+
+## [4.0.0-beta.428] - 2025-09-15
+
 ### 🚀 Features
 
 - *(deployment)* Enhance deployment status reporting with detailed information on active deployments and team members
