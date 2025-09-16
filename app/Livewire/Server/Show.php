@@ -310,6 +310,8 @@ class Show extends Component
                 $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
             }
             $this->submit();
+            // Dispatch event to refresh the navbar
+            $this->dispatch('refreshServerShow');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
