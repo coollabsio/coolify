@@ -8,7 +8,6 @@
 services:
   homeassistant:
     image: homeassistant/home-assistant:${IMAGE_TAG:-stable}
-    container_name: ${CONTAINER_NAME:-homeassistant}
     environment:
       - TZ=Europe/Berlin
       - PUID=${PUID:-1000}
