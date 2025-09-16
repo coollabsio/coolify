@@ -58,18 +58,15 @@
                 <div class="flex flex-col w-full gap-2 lg:flex-row">
                     @if (!$is_redis_credential)
                         @if ($type === 'service')
-                            <x-forms.checkbox instantSave id="is_build_time"
-                                helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for docker file, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-                                label="Is Build Variable?" />
+                            <x-forms.checkbox instantSave id="is_buildtime_only"
+                                helper="This variable will ONLY be available during build and not in the running container. Useful for build secrets that shouldn't persist at runtime."
+                                label="Buildtime Only?" />
                             <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                             <x-forms.checkbox instantSave id="is_literal"
                                 helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                 label="Is Literal?" />
                         @else
                             @if ($is_shared)
-                                <x-forms.checkbox instantSave id="is_build_time"
-                                    helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for docker file, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-                                    label="Is Build Variable?" />
                                 <x-forms.checkbox instantSave id="is_literal"
                                     helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                     label="Is Literal?" />
@@ -77,9 +74,9 @@
                                 @if ($isSharedVariable)
                                     <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                 @else
-                                    <x-forms.checkbox instantSave id="is_build_time"
-                                        helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for dockerfile, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-                                        label="Is Build Variable?" />
+                                    <x-forms.checkbox instantSave id="is_buildtime_only"
+                                        helper="This variable will ONLY be available during build and not in the running container. Useful for build secrets that shouldn't persist at runtime."
+                                        label="Buildtime Only?" />
                                     <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
                                     @if ($is_multiline === false)
                                         <x-forms.checkbox instantSave id="is_literal"
@@ -123,18 +120,15 @@
                 <div class="flex flex-col w-full gap-2 flex-wrap lg:flex-row">
                     @if (!$is_redis_credential)
                         @if ($type === 'service')
-                            <x-forms.checkbox disabled id="is_build_time"
-                                helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for docker file, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-                                label="Is Build Variable?" />
+                            <x-forms.checkbox disabled id="is_buildtime_only"
+                                helper="This variable will ONLY be available during build and not in the running container. Useful for build secrets that shouldn't persist at runtime."
+                                label="Buildtime Only?" />
                             <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
                             <x-forms.checkbox disabled id="is_literal"
                                 helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                 label="Is Literal?" />
                         @else
                             @if ($is_shared)
-                                <x-forms.checkbox disabled id="is_build_time"
-                                    helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for docker file, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-                                    label="Is Build Variable?" />
                                 <x-forms.checkbox disabled id="is_literal"
                                     helper="This means that when you use $VARIABLES in a value, it should be interpreted as the actual characters '$VARIABLES' and not as the value of a variable named VARIABLE.<br><br>Useful if you have $ sign in your value and there are some characters after it, but you would not like to interpolate it from another value. In this case, you should set this to true."
                                     label="Is Literal?" />
@@ -142,9 +136,9 @@
                                 @if ($isSharedVariable)
                                     <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
                                 @else
-                                    <x-forms.checkbox disabled id="is_build_time"
-                                        helper="If you are using Docker, remember to modify the file to be ready to receive the build time args. Ex.: for dockerfile, add `ARG name_of_the_variable`, or dockercompose add `- 'name_of_the_variable=${name_of_the_variable}'`"
-                                        label="Is Build Variable?" />
+                                    <x-forms.checkbox disabled id="is_buildtime_only"
+                                        helper="This variable will ONLY be available during build and not in the running container. Useful for build secrets that shouldn't persist at runtime."
+                                        label="Buildtime Only?" />
                                     <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
                                     @if ($is_multiline === false)
                                         <x-forms.checkbox disabled id="is_literal"

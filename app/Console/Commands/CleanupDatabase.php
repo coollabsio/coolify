@@ -64,13 +64,5 @@ class CleanupDatabase extends Command
         if ($this->option('yes')) {
             $scheduled_task_executions->delete();
         }
-
-        // Cleanup webhooks table
-        $webhooks = DB::table('webhooks')->where('created_at', '<', now()->subDays($keep_days));
-        $count = $webhooks->count();
-        echo "Delete $count entries from webhooks.\n";
-        if ($this->option('yes')) {
-            $webhooks->delete();
-        }
     }
 }
