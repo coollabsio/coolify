@@ -2836,8 +2836,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Find all RUN commands and add secret mounts to them
         $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($variables, &$modified) {
-            // Check if this is a RUN command
-            if (str_starts_with(trim($line), 'RUN')) {
+            $trim = ltrim($line);
+            // Only handle shell-form RUN; skip JSON-form and already-mounted lines
+            if (str_starts_with($trim, 'RUN') && !preg_match('/^RUN\s*\[/i', $trim) && !str_contains($line, '--mount=type=secret')) {
 
                 // Build the mount flags for all secrets
                 $mounts = [];
@@ -2857,7 +2858,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $envString = implode(' ', $envAssignments);
 
                     // Extract the original command
-                    $originalCommand = trim(substr($line, 3)); // Remove 'RUN'
+                    $originalCommand = trim(substr($trim, 3)); // Remove 'RUN'
 
                     // Create the new RUN command with mounts and inline environment variables
                     // Format: RUN --mount=secret,id=X --mount=secret,id=Y KEY1=$(cat...) KEY2=$(cat...) original_command
