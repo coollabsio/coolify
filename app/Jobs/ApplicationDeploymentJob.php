@@ -2774,19 +2774,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             '',
         ];
 
-        // Get the environment variables to document which secrets are available
-        $envs = $this->pull_request_id === 0
-            ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get()
-            : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
-
-        if ($envs->count() > 0) {
-            $secretsComment[] = '# Available secrets:';
-            foreach ($envs as $env) {
-                $secretsComment[] = "# - {$env->key}";
-            }
-            $secretsComment[] = '';
-        }
-
         // Find where to insert the comments (after FROM statement)
         $fromIndex = $dockerfile->search(function ($line) {
             return str_starts_with(trim(strtoupper($line)), 'FROM');
