@@ -15,10 +15,6 @@ services:
       - PGID=${PGID:-1000}
     volumes:
       - homeassistant-data:/config
-    ports:
-      - "8123:8123"       # Home Assistant UI
-      - "1900:1900/udp"  # SSDP (optional, discovery)
-      - "5353:5353/udp"  # mDNS (optional, discovery)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8123"]
