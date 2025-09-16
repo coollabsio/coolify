@@ -11,14 +11,14 @@ services:
     environment:
       - SERVICE_URL_PDS_3000
       - PDS_HOSTNAME=${SERVICE_FQDN_PDS}
-      - PDS_JWT_SECRET=${PDS_JWT_SECRET:?}
       - PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - PDS_JWT_SECRET=${SERVICE_BASE64_PDS}
+      - PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${SERVICE_HEX_32_ROTATIONKEY}
       - PDS_ADMIN_EMAIL=${PDS_ADMIN_EMAIL}
       - PDS_EMAIL_SMTP_URL=${PDS_EMAIL_SMTP_URL}
       - PDS_EMAIL_FROM_ADDRESS=${PDS_EMAIL_FROM_ADDRESS}
-      - PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX:?}
       - PDS_DATA_DIRECTORY=${PDS_DATA_DIRECTORY:-/pds}
-      - PDS_BLOBSTORE_DISK_LOCATION=${PDS_DATA_DIRECTORY:-/pds}/blocks
+      - PDS_BLOBSTORE_DISK_LOCATION=${PDS_DATA_DIRECTORY}/blocks
       - PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-104857600}
       - PDS_DID_PLC_URL=${PDS_DID_PLC_URL:-https://plc.directory}
       - PDS_BSKY_APP_VIEW_URL=${PDS_BSKY_APP_VIEW_URL:-https://api.bsky.app}
@@ -36,11 +36,6 @@ services:
         curl -o /usr/local/bin/pdsadmin.sh https://raw.githubusercontent.com/bluesky-social/pds/main/pdsadmin.sh && \
         chmod 700 /usr/local/bin/pdsadmin.sh && \
         ln -sf /usr/local/bin/pdsadmin.sh /usr/local/bin/pdsadmin
-        
-        echo "Generating /pds/pds.env..."
-        env | grep PDS > /pds/pds.env
-        printf "%s\n" "LOG_ENABLED=$${LOG_ENABLED}" >> /pds/pds.env
-
         echo "Launching PDS..."
         exec node --enable-source-maps index.js
       '
