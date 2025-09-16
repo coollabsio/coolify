@@ -2675,14 +2675,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // Generate a secret file for each environment variable
         foreach ($variables as $key => $value) {
-            $secret_file = "{$this->secrets_dir}/{$key}";
+            // keep id as-is, sanitize only filename
+            $safe_filename = preg_replace('/[^A-Za-z0-9._-]/', '_', (string) $key);
+            $secret_file_path = "{$this->secrets_dir}/{$safe_filename}";
             $escaped_value = base64_encode($value);
 
             $this->execute_remote_command([executeInDocker($this->deployment_uuid,
-                "echo '{$escaped_value}' | base64 -d > {$secret_file} && chmod 600 {$secret_file}"
+                "echo '{$escaped_value}' | base64 -d > {$secret_file_path} && chmod 600 {$secret_file_path}"
             ), 'hidden' => true]);
 
-            $this->build_secrets->push("--secret id={$key},src={$secret_file}");
+            $this->build_secrets->push("--secret id={$key},src={$secret_file_path}");
         }
 
         $this->build_secrets = $this->build_secrets->implode(' ');
