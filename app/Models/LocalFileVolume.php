@@ -119,6 +119,7 @@ class LocalFileVolume extends BaseModel
         $commands = collect([]);
         if ($this->is_directory) {
             $commands->push("mkdir -p $this->fs_path > /dev/null 2>&1 || true");
+            $commands->push("mkdir -p $workdir > /dev/null 2>&1 || true");
             $commands->push("cd $workdir");
         }
         if (str($this->fs_path)->startsWith('.') || str($this->fs_path)->startsWith('/') || str($this->fs_path)->startsWith('~')) {

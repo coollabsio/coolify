@@ -248,402 +248,407 @@ For more detailed guidelines and patterns, refer to the `.cursor/rules/` directo
 - [Technology Stack](.cursor/rules/technology-stack.mdc) - Detailed tech stack information
 - [Cursor Rules Guide](.cursor/rules/cursor_rules.mdc) - How to maintain cursor rules
 
+===
 
-# === BACKLOG.MD GUIDELINES START ===
-# Instructions for the usage of Backlog.md CLI Tool
+<laravel-boost-guidelines>
+=== foundation rules ===
 
-## What is Backlog.md?
+# Laravel Boost Guidelines
 
-**Backlog.md is the complete project management system for this codebase.** It provides everything needed to manage tasks, track progress, and collaborate on development - all through a powerful CLI that operates on markdown files.
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to enhance the user's satisfaction building Laravel applications.
 
-### Core Capabilities
+## Foundational Context
+This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
-✅ **Task Management**: Create, edit, assign, prioritize, and track tasks with full metadata
-✅ **Acceptance Criteria**: Granular control with add/remove/check/uncheck by index
-✅ **Board Visualization**: Terminal-based Kanban board (`backlog board`) and web UI (`backlog browser`)
-✅ **Git Integration**: Automatic tracking of task states across branches
-✅ **Dependencies**: Task relationships and subtask hierarchies
-✅ **Documentation & Decisions**: Structured docs and architectural decision records
-✅ **Export & Reporting**: Generate markdown reports and board snapshots
-✅ **AI-Optimized**: `--plain` flag provides clean text output for AI processing
+- php - 8.4.7
+- laravel/fortify (FORTIFY) - v1
+- laravel/framework (LARAVEL) - v12
+- laravel/horizon (HORIZON) - v5
+- laravel/prompts (PROMPTS) - v0
+- laravel/sanctum (SANCTUM) - v4
+- laravel/socialite (SOCIALITE) - v5
+- livewire/livewire (LIVEWIRE) - v3
+- laravel/dusk (DUSK) - v8
+- laravel/pint (PINT) - v1
+- laravel/telescope (TELESCOPE) - v5
+- pestphp/pest (PEST) - v3
+- phpunit/phpunit (PHPUNIT) - v11
+- rector/rector (RECTOR) - v2
+- laravel-echo (ECHO) - v2
+- tailwindcss (TAILWINDCSS) - v4
+- vue (VUE) - v3
 
-### Why This Matters to You (AI Agent)
 
-1. **Comprehensive system** - Full project management capabilities through CLI
-2. **The CLI is the interface** - All operations go through `backlog` commands
-3. **Unified interaction model** - You can use CLI for both reading (`backlog task 1 --plain`) and writing (`backlog task edit 1`)
-4. **Metadata stays synchronized** - The CLI handles all the complex relationships
+## Conventions
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
 
-### Key Understanding
+## Verification Scripts
+- Do not create verification scripts or tinker when tests cover that functionality and prove it works. Unit and feature tests are more important.
 
-- **Tasks** live in `backlog/tasks/` as `task-<id> - <title>.md` files
-- **You interact via CLI only**: `backlog task create`, `backlog task edit`, etc.
-- **Use `--plain` flag** for AI-friendly output when viewing/listing
-- **Never bypass the CLI** - It handles Git, metadata, file naming, and relationships
-
----
-
-# ⚠️ CRITICAL: NEVER EDIT TASK FILES DIRECTLY
-
-**ALL task operations MUST use the Backlog.md CLI commands**
-- ✅ **DO**: Use `backlog task edit` and other CLI commands
-- ✅ **DO**: Use `backlog task create` to create new tasks
-- ✅ **DO**: Use `backlog task edit <id> --check-ac <index>` to mark acceptance criteria
-- ❌ **DON'T**: Edit markdown files directly
-- ❌ **DON'T**: Manually change checkboxes in files
-- ❌ **DON'T**: Add or modify text in task files without using CLI
+## Application Structure & Architecture
+- Stick to existing directory structure - don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
 
-**Why?** Direct file editing breaks metadata synchronization, Git tracking, and task relationships.
+## Frontend Bundling
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
 
----
+## Replies
+- Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
-## 1. Source of Truth & File Structure
+## Documentation Files
+- You must only create documentation files if explicitly requested by the user.
 
-### 📖 **UNDERSTANDING** (What you'll see when reading)
-- Markdown task files live under **`backlog/tasks/`** (drafts under **`backlog/drafts/`**)
-- Files are named: `task-<id> - <title>.md` (e.g., `task-42 - Add GraphQL resolver.md`)
-- Project documentation is in **`backlog/docs/`**
-- Project decisions are in **`backlog/decisions/`**
 
-### 🔧 **ACTING** (How to change things)
-- **All task operations MUST use the Backlog.md CLI tool**
-- This ensures metadata is correctly updated and the project stays in sync
-- **Always use `--plain` flag** when listing or viewing tasks for AI-friendly text output
+=== boost rules ===
 
----
+## Laravel Boost
+- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
 
-## 2. Common Mistakes to Avoid
+## Artisan
+- Use the `list-artisan-commands` tool when you need to call an Artisan command to double check the available parameters.
 
-### ❌ **WRONG: Direct File Editing**
-```markdown
-# DON'T DO THIS:
-1. Open backlog/tasks/task-7 - Feature.md in editor
-2. Change "- [ ]" to "- [x]" manually
-3. Add notes directly to the file
-4. Save the file
-```
+## URLs
+- Whenever you share a project URL with the user you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain / IP, and port.
 
-### ✅ **CORRECT: Using CLI Commands**
-```bash
-# DO THIS INSTEAD:
-backlog task edit 7 --check-ac 1  # Mark AC #1 as complete
-backlog task edit 7 --notes "Implementation complete"  # Add notes
-backlog task edit 7 -s "In Progress" -a @agent-k  # Multiple commands: change status and assign the task
-```
+## Tinker / Debugging
+- You should use the `tinker` tool when you need to execute PHP to debug code or query Eloquent models directly.
+- Use the `database-query` tool when you only need to read from the database.
 
----
+## Reading Browser Logs With the `browser-logs` Tool
+- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
+- Only recent browser logs will be useful - ignore old logs.
 
-## 3. Understanding Task Format (Read-Only Reference)
+## Searching Documentation (Critically Important)
+- Boost comes with a powerful `search-docs` tool you should use before any other approaches. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation specific for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
+- The 'search-docs' tool is perfect for all Laravel related packages, including Laravel, Inertia, Livewire, Filament, Tailwind, Pest, Nova, Nightwatch, etc.
+- You must use this tool to search for Laravel-ecosystem documentation before falling back to other approaches.
+- Search the documentation before making code changes to ensure we are taking the correct approach.
+- Use multiple, broad, simple, topic based queries to start. For example: `['rate limiting', 'routing rate limiting', 'routing']`.
+- Do not add package names to queries - package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
 
-⚠️ **FORMAT REFERENCE ONLY** - The following sections show what you'll SEE in task files.
-**Never edit these directly! Use CLI commands to make changes.**
+### Available Search Syntax
+- You can and should pass multiple queries at once. The most relevant results will be returned first.
 
-### Task Structure You'll See
+1. Simple Word Searches with auto-stemming - query=authentication - finds 'authenticate' and 'auth'
+2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit"
+3. Quoted Phrases (Exact Position) - query="infinite scroll" - Words must be adjacent and in that order
+4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit"
+5. Multiple Queries - queries=["authentication", "middleware"] - ANY of these terms
 
-```markdown
----
-id: task-42
-title: Add GraphQL resolver
-status: To Do
-assignee: [@sara]
-labels: [backend, api]
----
 
-## Description
-Brief explanation of the task purpose.
-
-## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [ ] #1 First criterion
-- [x] #2 Second criterion (completed)
-- [ ] #3 Third criterion
-<!-- AC:END -->
-
-## Implementation Plan
-1. Research approach
-2. Implement solution
-
-## Implementation Notes
-Summary of what was done.
-```
+=== php rules ===
 
-### How to Modify Each Section
+## PHP
 
-| What You Want to Change | CLI Command to Use |
-|------------------------|-------------------|
-| Title | `backlog task edit 42 -t "New Title"` |
-| Status | `backlog task edit 42 -s "In Progress"` |
-| Assignee | `backlog task edit 42 -a @sara` |
-| Labels | `backlog task edit 42 -l backend,api` |
-| Description | `backlog task edit 42 -d "New description"` |
-| Add AC | `backlog task edit 42 --ac "New criterion"` |
-| Check AC #1 | `backlog task edit 42 --check-ac 1` |
-| Uncheck AC #2 | `backlog task edit 42 --uncheck-ac 2` |
-| Remove AC #3 | `backlog task edit 42 --remove-ac 3` |
-| Add Plan | `backlog task edit 42 --plan "1. Step one\n2. Step two"` |
-| Add Notes | `backlog task edit 42 --notes "What I did"` |
-
----
+- Always use curly braces for control structures, even if it has one line.
 
-## 4. Defining Tasks
-
-### Creating New Tasks
-
-**Always use CLI to create tasks:**
-```bash
-backlog task create "Task title" -d "Description" --ac "First criterion" --ac "Second criterion"
-```
-
-### Title (one liner)
-Use a clear brief title that summarizes the task.
+### Constructors
+- Use PHP 8 constructor property promotion in `__construct()`.
+    - <code-snippet>public function __construct(public GitHub $github) { }</code-snippet>
+- Do not allow empty `__construct()` methods with zero parameters.
 
-### Description (The "why")
-Provide a concise summary of the task purpose and its goal. Explains the context without implementation details.
+### Type Declarations
+- Always use explicit return type declarations for methods and functions.
+- Use appropriate PHP type hints for method parameters.
 
-### Acceptance Criteria (The "what")
+<code-snippet name="Explicit Return Types and Method Params" lang="php">
+protected function isAccessible(User $user, ?string $path = null): bool
+{
+    ...
+}
+</code-snippet>
 
-**Understanding the Format:**
-- Acceptance criteria appear as numbered checkboxes in the markdown files
-- Format: `- [ ] #1 Criterion text` (unchecked) or `- [x] #1 Criterion text` (checked)
+## Comments
+- Prefer PHPDoc blocks over comments. Never use comments within the code itself unless there is something _very_ complex going on.
 
-**Managing Acceptance Criteria via CLI:**
+## PHPDoc Blocks
+- Add useful array shape type definitions for arrays when appropriate.
 
-⚠️ **IMPORTANT: How AC Commands Work**
-- **Adding criteria (`--ac`)** accepts multiple flags: `--ac "First" --ac "Second"` ✅
-- **Checking/unchecking/removing** accept multiple flags too: `--check-ac 1 --check-ac 2` ✅
-- **Mixed operations** work in a single command: `--check-ac 1 --uncheck-ac 2 --remove-ac 3` ✅
+## Enums
+- Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
 
-```bash
-# Add new criteria (MULTIPLE values allowed)
-backlog task edit 42 --ac "User can login" --ac "Session persists"
 
-# Check specific criteria by index (MULTIPLE values supported)
-backlog task edit 42 --check-ac 1 --check-ac 2 --check-ac 3  # Check multiple ACs
-# Or check them individually if you prefer:
-backlog task edit 42 --check-ac 1    # Mark #1 as complete
-backlog task edit 42 --check-ac 2    # Mark #2 as complete
+=== laravel/core rules ===
 
-# Mixed operations in single command
-backlog task edit 42 --check-ac 1 --uncheck-ac 2 --remove-ac 3
+## Do Things the Laravel Way
 
-# ❌ STILL WRONG - These formats don't work:
-# backlog task edit 42 --check-ac 1,2,3  # No comma-separated values
-# backlog task edit 42 --check-ac 1-3    # No ranges
-# backlog task edit 42 --check 1         # Wrong flag name
+- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using the `list-artisan-commands` tool.
+- If you're creating a generic PHP class, use `artisan make:class`.
+- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-# Multiple operations of same type
-backlog task edit 42 --uncheck-ac 1 --uncheck-ac 2  # Uncheck multiple ACs
-backlog task edit 42 --remove-ac 2 --remove-ac 4    # Remove multiple ACs (processed high-to-low)
-```
+### Database
+- Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins.
+- Use Eloquent models and relationships before suggesting raw database queries
+- Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing them.
+- Generate code that prevents N+1 query problems by using eager loading.
+- Use Laravel's query builder for very complex database operations.
 
-**Key Principles for Good ACs:**
-- **Outcome-Oriented:** Focus on the result, not the method
-- **Testable/Verifiable:** Each criterion should be objectively testable
-- **Clear and Concise:** Unambiguous language
-- **Complete:** Collectively cover the task scope
-- **User-Focused:** Frame from end-user or system behavior perspective
+### Model Creation
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `list-artisan-commands` to check the available options to `php artisan make:model`.
 
-Good Examples:
-- "User can successfully log in with valid credentials"
-- "System processes 1000 requests per second without errors"
+### APIs & Eloquent Resources
+- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
 
-Bad Example (Implementation Step):
-- "Add a new function handleLogin() in auth.ts"
+### Controllers & Validation
+- Always create Form Request classes for validation rather than inline validation in controllers. Include both validation rules and custom error messages.
+- Check sibling Form Requests to see if the application uses array or string based validation rules.
 
-### Task Breakdown Strategy
+### Queues
+- Use queued jobs for time-consuming operations with the `ShouldQueue` interface.
 
-1. Identify foundational components first
-2. Create tasks in dependency order (foundations before features)
-3. Ensure each task delivers value independently
-4. Avoid creating tasks that block each other
+### Authentication & Authorization
+- Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum, etc.).
 
-### Task Requirements
+### URL Generation
+- When generating links to other pages, prefer named routes and the `route()` function.
 
-- Tasks must be **atomic** and **testable** or **verifiable**
-- Each task should represent a single unit of work for one PR
-- **Never** reference future tasks (only tasks with id < current task id)
-- Ensure tasks are **independent** and don't depend on future work
+### Configuration
+- Use environment variables only in configuration files - never use the `env()` function directly outside of config files. Always use `config('app.name')`, not `env('APP_NAME')`.
 
----
+### Testing
+- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
+- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
+- When creating tests, make use of `php artisan make:test [options] <name>` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
 
-## 5. Implementing Tasks
+### Vite Error
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
 
-### Implementation Plan (The "how") (only after starting work)
-```bash
-backlog task edit 42 -s "In Progress" -a @{myself}
-backlog task edit 42 --plan "1. Research patterns\n2. Implement\n3. Test"
-```
 
-### Implementation Notes (Imagine you need to copy paste this into a PR description)
-```bash
-backlog task edit 42 --notes "Implemented using pattern X, modified files Y and Z"
-```
+=== laravel/v12 rules ===
 
-**IMPORTANT**: Do NOT include an Implementation Plan when creating a task. The plan is added only after you start implementation.
-- Creation phase: provide Title, Description, Acceptance Criteria, and optionally labels/priority/assignee.
-- When you begin work, switch to edit and add the plan: `backlog task edit <id> --plan "..."`.
-- Add Implementation Notes only after completing the work: `backlog task edit <id> --notes "..."`.
+## Laravel 12
 
-Phase discipline: What goes where
-- Creation: Title, Description, Acceptance Criteria, labels/priority/assignee.
-- Implementation: Implementation Plan (after moving to In Progress).
-- Wrap-up: Implementation Notes, AC and Definition of Done checks.
+- Use the `search-docs` tool to get version specific documentation.
+- This project upgraded from Laravel 10 without migrating to the new streamlined Laravel file structure.
+- This is **perfectly fine** and recommended by Laravel. Follow the existing structure from Laravel 10. We do not to need migrate to the new Laravel structure unless the user explicitly requests that.
 
-**IMPORTANT**: Only implement what's in the Acceptance Criteria. If you need to do more, either:
-1. Update the AC first: `backlog task edit 42 --ac "New requirement"`
-2. Or create a new task: `backlog task create "Additional feature"`
-
----
-
-## 6. Typical Workflow
-
-```bash
-# 1. Identify work
-backlog task list -s "To Do" --plain
-
-# 2. Read task details
-backlog task 42 --plain
-
-# 3. Start work: assign yourself & change status
-backlog task edit 42 -a @myself -s "In Progress"
-
-# 4. Add implementation plan
-backlog task edit 42 --plan "1. Analyze\n2. Refactor\n3. Test"
-
-# 5. Work on the task (write code, test, etc.)
-
-# 6. Mark acceptance criteria as complete (supports multiple in one command)
-backlog task edit 42 --check-ac 1 --check-ac 2 --check-ac 3  # Check all at once
-# Or check them individually if preferred:
-# backlog task edit 42 --check-ac 1
-# backlog task edit 42 --check-ac 2
-# backlog task edit 42 --check-ac 3
-
-# 7. Add implementation notes
-backlog task edit 42 --notes "Refactored using strategy pattern, updated tests"
-
-# 8. Mark task as done
-backlog task edit 42 -s Done
-```
-
----
-
-## 7. Definition of Done (DoD)
-
-A task is **Done** only when **ALL** of the following are complete:
-
-### ✅ Via CLI Commands:
-1. **All acceptance criteria checked**: Use `backlog task edit <id> --check-ac <index>` for each
-2. **Implementation notes added**: Use `backlog task edit <id> --notes "..."`
-3. **Status set to Done**: Use `backlog task edit <id> -s Done`
-
-### ✅ Via Code/Testing:
-4. **Tests pass**: Run test suite and linting
-5. **Documentation updated**: Update relevant docs if needed
-6. **Code reviewed**: Self-review your changes
-7. **No regressions**: Performance, security checks pass
-
-⚠️ **NEVER mark a task as Done without completing ALL items above**
-
----
-
-## 8. Quick Reference: DO vs DON'T
-
-### Viewing Tasks
-| Task | ✅ DO | ❌ DON'T |
-|------|-------|----------|
-| View task | `backlog task 42 --plain` | Open and read .md file directly |
-| List tasks | `backlog task list --plain` | Browse backlog/tasks folder |
-| Check status | `backlog task 42 --plain` | Look at file content |
-
-### Modifying Tasks
-| Task | ✅ DO | ❌ DON'T |
-|------|-------|----------|
-| Check AC | `backlog task edit 42 --check-ac 1` | Change `- [ ]` to `- [x]` in file |
-| Add notes | `backlog task edit 42 --notes "..."` | Type notes into .md file |
-| Change status | `backlog task edit 42 -s Done` | Edit status in frontmatter |
-| Add AC | `backlog task edit 42 --ac "New"` | Add `- [ ] New` to file |
-
----
-
-## 9. Complete CLI Command Reference
-
-### Task Creation
-| Action | Command |
-|--------|---------|
-| Create task | `backlog task create "Title"` |
-| With description | `backlog task create "Title" -d "Description"` |
-| With AC | `backlog task create "Title" --ac "Criterion 1" --ac "Criterion 2"` |
-| With all options | `backlog task create "Title" -d "Desc" -a @sara -s "To Do" -l auth --priority high` |
-| Create draft | `backlog task create "Title" --draft` |
-| Create subtask | `backlog task create "Title" -p 42` |
-
-### Task Modification
-| Action | Command |
-|--------|---------|
-| Edit title | `backlog task edit 42 -t "New Title"` |
-| Edit description | `backlog task edit 42 -d "New description"` |
-| Change status | `backlog task edit 42 -s "In Progress"` |
-| Assign | `backlog task edit 42 -a @sara` |
-| Add labels | `backlog task edit 42 -l backend,api` |
-| Set priority | `backlog task edit 42 --priority high` |
-
-### Acceptance Criteria Management
-| Action | Command |
-|--------|---------|
-| Add AC | `backlog task edit 42 --ac "New criterion" --ac "Another"` |
-| Remove AC #2 | `backlog task edit 42 --remove-ac 2` |
-| Remove multiple ACs | `backlog task edit 42 --remove-ac 2 --remove-ac 4` |
-| Check AC #1 | `backlog task edit 42 --check-ac 1` |
-| Check multiple ACs | `backlog task edit 42 --check-ac 1 --check-ac 3` |
-| Uncheck AC #3 | `backlog task edit 42 --uncheck-ac 3` |
-| Mixed operations | `backlog task edit 42 --check-ac 1 --uncheck-ac 2 --remove-ac 3 --ac "New"` |
-
-### Task Content
-| Action | Command |
-|--------|---------|
-| Add plan | `backlog task edit 42 --plan "1. Step one\n2. Step two"` |
-| Add notes | `backlog task edit 42 --notes "Implementation details"` |
-| Add dependencies | `backlog task edit 42 --dep task-1 --dep task-2` |
-
-### Task Operations
-| Action | Command |
-|--------|---------|
-| View task | `backlog task 42 --plain` |
-| List tasks | `backlog task list --plain` |
-| Filter by status | `backlog task list -s "In Progress" --plain` |
-| Filter by assignee | `backlog task list -a @sara --plain` |
-| Archive task | `backlog task archive 42` |
-| Demote to draft | `backlog task demote 42` |
-
----
-
-## 10. Troubleshooting
-
-### If You Accidentally Edited a File Directly
-
-1. **DON'T PANIC** - But don't save or commit
-2. Revert the changes
-3. Make changes properly via CLI
-4. If already saved, the metadata might be out of sync - use `backlog task edit` to fix
-
-### Common Issues
-
-| Problem | Solution |
-|---------|----------|
-| "Task not found" | Check task ID with `backlog task list --plain` |
-| AC won't check | Use correct index: `backlog task 42 --plain` to see AC numbers |
-| Changes not saving | Ensure you're using CLI, not editing files |
-| Metadata out of sync | Re-edit via CLI to fix: `backlog task edit 42 -s <current-status>` |
-
----
-
-## Remember: The Golden Rule
-
-**🎯 If you want to change ANYTHING in a task, use the `backlog task edit` command.**
-**📖 Only READ task files directly, never WRITE to them.**
-
-Full help available: `backlog --help`
-
-# === BACKLOG.MD GUIDELINES END ===
+### Laravel 10 Structure
+- Middleware typically lives in `app/Http/Middleware/` and service providers in `app/Providers/`.
+- There is no `bootstrap/app.php` application configuration in a Laravel 10 structure:
+    - Middleware registration happens in `app/Http/Kernel.php`
+    - Exception handling is in `app/Exceptions/Handler.php`
+    - Console commands and schedule register in `app/Console/Kernel.php`
+    - Rate limits likely exist in `RouteServiceProvider` or `app/Http/Kernel.php`
 
+### Database
+- When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
+- Laravel 11 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
+
+### Models
+- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
+
+
+=== livewire/core rules ===
+
+## Livewire Core
+- Use the `search-docs` tool to find exact version specific documentation for how to write Livewire & Livewire tests.
+- Use the `php artisan make:livewire [Posts\\CreatePost]` artisan command to create new components
+- State should live on the server, with the UI reflecting it.
+- All Livewire requests hit the Laravel backend, they're like regular HTTP requests. Always validate form data, and run authorization checks in Livewire actions.
+
+## Livewire Best Practices
+- Livewire components require a single root element.
+- Use `wire:loading` and `wire:dirty` for delightful loading states.
+- Add `wire:key` in loops:
+
+    ```blade
+    @foreach ($items as $item)
+        <div wire:key="item-{{ $item->id }}">
+            {{ $item->name }}
+        </div>
+    @endforeach
+    ```
+
+- Prefer lifecycle hooks like `mount()`, `updatedFoo()`) for initialization and reactive side effects:
+
+<code-snippet name="Lifecycle hook examples" lang="php">
+    public function mount(User $user) { $this->user = $user; }
+    public function updatedSearch() { $this->resetPage(); }
+</code-snippet>
+
+
+## Testing Livewire
+
+<code-snippet name="Example Livewire component test" lang="php">
+    Livewire::test(Counter::class)
+        ->assertSet('count', 0)
+        ->call('increment')
+        ->assertSet('count', 1)
+        ->assertSee(1)
+        ->assertStatus(200);
+</code-snippet>
+
+
+    <code-snippet name="Testing a Livewire component exists within a page" lang="php">
+        $this->get('/posts/create')
+        ->assertSeeLivewire(CreatePost::class);
+    </code-snippet>
+
+
+=== livewire/v3 rules ===
+
+## Livewire 3
+
+### Key Changes From Livewire 2
+- These things changed in Livewire 2, but may not have been updated in this application. Verify this application's setup to ensure you conform with application conventions.
+    - Use `wire:model.live` for real-time updates, `wire:model` is now deferred by default.
+    - Components now use the `App\Livewire` namespace (not `App\Http\Livewire`).
+    - Use `$this->dispatch()` to dispatch events (not `emit` or `dispatchBrowserEvent`).
+    - Use the `components.layouts.app` view as the typical layout path (not `layouts.app`).
+
+### New Directives
+- `wire:show`, `wire:transition`, `wire:cloak`, `wire:offline`, `wire:target` are available for use. Use the documentation to find usage examples.
+
+### Alpine
+- Alpine is now included with Livewire, don't manually include Alpine.js.
+- Plugins included with Alpine: persist, intersect, collapse, and focus.
+
+### Lifecycle Hooks
+- You can listen for `livewire:init` to hook into Livewire initialization, and `fail.status === 419` for the page expiring:
+
+<code-snippet name="livewire:load example" lang="js">
+document.addEventListener('livewire:init', function () {
+    Livewire.hook('request', ({ fail }) => {
+        if (fail && fail.status === 419) {
+            alert('Your session expired');
+        }
+    });
+
+    Livewire.hook('message.failed', (message, component) => {
+        console.error(message);
+    });
+});
+</code-snippet>
+
+
+=== pint/core rules ===
+
+## Laravel Pint Code Formatter
+
+- You must run `vendor/bin/pint --dirty` before finalizing changes to ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test`, simply run `vendor/bin/pint` to fix any formatting issues.
+
+
+=== pest/core rules ===
+
+## Pest
+
+### Testing
+- If you need to verify a feature is working, write or update a Unit / Feature test.
+
+### Pest Tests
+- All tests must be written using Pest. Use `php artisan make:test --pest <name>`.
+- You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files - these are core to the application.
+- Tests should test all of the happy paths, failure paths, and weird paths.
+- Tests live in the `tests/Feature` and `tests/Unit` directories.
+- Pest tests look and behave like this:
+<code-snippet name="Basic Pest Test Example" lang="php">
+it('is true', function () {
+    expect(true)->toBeTrue();
+});
+</code-snippet>
+
+### Running Tests
+- Run the minimal number of tests using an appropriate filter before finalizing code edits.
+- To run all tests: `php artisan test`.
+- To run all tests in a file: `php artisan test tests/Feature/ExampleTest.php`.
+- To filter on a particular test name: `php artisan test --filter=testName` (recommended after making a change to a related file).
+- When the tests relating to your changes are passing, ask the user if they would like to run the entire test suite to ensure everything is still passing.
+
+### Pest Assertions
+- When asserting status codes on a response, use the specific method like `assertForbidden` and `assertNotFound` instead of using `assertStatus(403)` or similar, e.g.:
+<code-snippet name="Pest Example Asserting postJson Response" lang="php">
+it('returns all', function () {
+    $response = $this->postJson('/api/docs', []);
+
+    $response->assertSuccessful();
+});
+</code-snippet>
+
+### Mocking
+- Mocking can be very helpful when appropriate.
+- When mocking, you can use the `Pest\Laravel\mock` Pest function, but always import it via `use function Pest\Laravel\mock;` before using it. Alternatively, you can use `$this->mock()` if existing tests do.
+- You can also create partial mocks using the same import or self method.
+
+### Datasets
+- Use datasets in Pest to simplify tests which have a lot of duplicated data. This is often the case when testing validation rules, so consider going with this solution when writing tests for validation rules.
+
+<code-snippet name="Pest Dataset Example" lang="php">
+it('has emails', function (string $email) {
+    expect($email)->not->toBeEmpty();
+})->with([
+    'james' => 'james@laravel.com',
+    'taylor' => 'taylor@laravel.com',
+]);
+</code-snippet>
+
+
+=== tailwindcss/core rules ===
+
+## Tailwind Core
+
+- Use Tailwind CSS classes to style HTML, check and use existing tailwind conventions within the project before writing your own.
+- Offer to extract repeated patterns into components that match the project's conventions (i.e. Blade, JSX, Vue, etc..)
+- Think through class placement, order, priority, and defaults - remove redundant classes, add classes to parent or child carefully to limit repetition, group elements logically
+- You can use the `search-docs` tool to get exact examples from the official documentation when needed.
+
+### Spacing
+- When listing items, use gap utilities for spacing, don't use margins.
+
+    <code-snippet name="Valid Flex Gap Spacing Example" lang="html">
+        <div class="flex gap-8">
+            <div>Superior</div>
+            <div>Michigan</div>
+            <div>Erie</div>
+        </div>
+    </code-snippet>
+
+
+### Dark Mode
+- If existing pages and components support dark mode, new pages and components must support dark mode in a similar way, typically using `dark:`.
+
+
+=== tailwindcss/v4 rules ===
+
+## Tailwind 4
+
+- Always use Tailwind CSS v4 - do not use the deprecated utilities.
+- `corePlugins` is not supported in Tailwind v4.
+- In Tailwind v4, you import Tailwind using a regular CSS `@import` statement, not using the `@tailwind` directives used in v3:
+
+<code-snippet name="Tailwind v4 Import Tailwind Diff" lang="diff"
+   - @tailwind base;
+   - @tailwind components;
+   - @tailwind utilities;
+   + @import "tailwindcss";
+</code-snippet>
+
+
+### Replaced Utilities
+- Tailwind v4 removed deprecated utilities. Do not use the deprecated option - use the replacement.
+- Opacity values are still numeric.
+
+| Deprecated |	Replacement |
+|------------+--------------|
+| bg-opacity-* | bg-black/* |
+| text-opacity-* | text-black/* |
+| border-opacity-* | border-black/* |
+| divide-opacity-* | divide-black/* |
+| ring-opacity-* | ring-black/* |
+| placeholder-opacity-* | placeholder-black/* |
+| flex-shrink-* | shrink-* |
+| flex-grow-* | grow-* |
+| overflow-ellipsis | text-ellipsis |
+| decoration-slice | box-decoration-slice |
+| decoration-clone | box-decoration-clone |
+
+
+=== tests rules ===
+
+## Test Enforcement
+
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter.
+</laravel-boost-guidelines>

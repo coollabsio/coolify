@@ -63,6 +63,8 @@ class Show extends Component
 
     public bool $isSentinelDebugEnabled;
 
+    public ?string $sentinelCustomDockerImage = null;
+
     public string $serverTimezone;
 
     public function getListeners()
@@ -267,7 +269,8 @@ class Show extends Component
     {
         try {
             $this->authorize('manageSentinel', $this->server);
-            $this->server->restartSentinel();
+            $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
+            $this->server->restartSentinel($customImage);
             $this->dispatch('success', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -300,7 +303,8 @@ class Show extends Component
         try {
             $this->authorize('manageSentinel', $this->server);
             if ($value === true) {
-                StartSentinel::run($this->server, true);
+                $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
+                StartSentinel::run($this->server, true, null, $customImage);
             } else {
                 $this->isMetricsEnabled = false;
                 $this->isSentinelDebugEnabled = false;

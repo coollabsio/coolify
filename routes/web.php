@@ -326,7 +326,11 @@ Route::middleware(['auth'])->group(function () {
                 'root' => '/',
             ]);
             if (! $disk->exists($filename)) {
-                return response()->json(['message' => 'Backup not found.'], 404);
+                if ($execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
+                    return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
+                }
+
+                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
             }
 
             return new StreamedResponse(function () use ($disk, $filename) {

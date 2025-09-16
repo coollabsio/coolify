@@ -229,6 +229,8 @@ class StartPostgresql
         }
         $this->commands[] = "echo 'Database started.'";
 
+        ray($this->commands);
+
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
