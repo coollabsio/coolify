@@ -2883,8 +2883,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Add top-level secrets definition
         $secrets = [];
         foreach ($variables as $env) {
+            $safe_filename = preg_replace('/[^A-Za-z0-9._-]/', '_', (string) $env->key);
             $secrets[$env->key] = [
-                'file' => "{$this->secrets_dir}/{$env->key}",
+                'file' => "{$this->secrets_dir}/{$safe_filename}",
             ];
         }
 
@@ -2914,7 +2915,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // Update the compose file
         $composeFile['services'] = $services;
-        $composeFile['secrets'] = $secrets;
+        // merge with existing secrets if present
+        $existingSecrets = data_get($composeFile, 'secrets', []);
+        $composeFile['secrets'] = array_replace($existingSecrets, $secrets);
 
         $this->application_deployment_queue->addLogEntry('Added build secrets configuration to docker-compose file.');
 
