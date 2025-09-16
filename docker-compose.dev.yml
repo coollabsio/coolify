@@ -20,6 +20,7 @@ services:
       - .:/var/www/html/:cached
       - dev_backups_data:/var/www/html/storage/app/backups
   postgres:
+    image: postgres:15-alpine
     pull_policy: always
     ports:
       - "${FORWARD_DB_PORT:-5432}:5432"
@@ -33,6 +34,7 @@ services:
     volumes:
       - dev_postgres_data:/var/lib/postgresql/data
   redis:
+    image: redis:7-alpine
     pull_policy: always
     ports:
       - "${FORWARD_REDIS_PORT:-6379}:6379"

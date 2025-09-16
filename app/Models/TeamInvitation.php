@@ -15,6 +15,14 @@ class TeamInvitation extends Model
         'via',
     ];
 
+    /**
+     * Set the email attribute to lowercase.
+     */
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower($value);
+    }
+
     public function team()
     {
         return $this->belongsTo(Team::class);
