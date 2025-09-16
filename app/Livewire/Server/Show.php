@@ -298,11 +298,34 @@ class Show extends Component
         }
     }
 
+    public function updatedIsBuildServer($value)
+    {
+        try {
+            $this->authorize('update', $this->server);
+            if ($value === true && $this->isSentinelEnabled) {
+                $this->isSentinelEnabled = false;
+                $this->isMetricsEnabled = false;
+                $this->isSentinelDebugEnabled = false;
+                StopSentinel::dispatch($this->server);
+                $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
+            }
+            $this->submit();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function updatedIsSentinelEnabled($value)
     {
         try {
             $this->authorize('manageSentinel', $this->server);
             if ($value === true) {
+                if ($this->isBuildServer) {
+                    $this->isSentinelEnabled = false;
+                    $this->dispatch('error', 'Sentinel cannot be enabled on build servers.');
+
+                    return;
+                }
                 $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
                 StartSentinel::run($this->server, true, null, $customImage);
             } else {
