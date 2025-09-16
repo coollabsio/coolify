@@ -46,6 +46,14 @@ trait ExecuteRemoteCommand
                 }
             }
 
+            // Check for cancellation before executing commands
+            if (isset($this->application_deployment_queue)) {
+                $this->application_deployment_queue->refresh();
+                if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                    throw new \RuntimeException('Deployment cancelled by user', 69420);
+                }
+            }
+
             $maxRetries = config('constants.ssh.max_retries');
             $attempt = 0;
             $lastError = null;
@@ -73,6 +81,12 @@ trait ExecuteRemoteCommand
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
                             $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
+
+                            // Check for cancellation during retry wait
+                            $this->application_deployment_queue->refresh();
+                            if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                                throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                            }
                         }
 
                         sleep($delay);
@@ -85,6 +99,11 @@ trait ExecuteRemoteCommand
 
             // If we exhausted all retries and still failed
             if (! $commandExecuted && $lastError) {
+                // Now we can set the status to FAILED since all retries have been exhausted
+                if (isset($this->application_deployment_queue)) {
+                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
+                    $this->application_deployment_queue->save();
+                }
                 throw $lastError;
             }
         });
@@ -160,8 +179,8 @@ trait ExecuteRemoteCommand
         $process_result = $process->wait();
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
-                $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
-                $this->application_deployment_queue->save();
+                // Don't immediately set to FAILED - let the retry logic handle it
+                // This prevents premature status changes during retryable SSH errors
                 throw new \RuntimeException($process_result->errorOutput());
             }
         }

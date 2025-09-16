@@ -250,6 +250,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        // Check if deployment was cancelled before we even started
+        $this->application_deployment_queue->refresh();
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+            $this->application_deployment_queue->addLogEntry('Deployment was cancelled before starting.');
+
+            return;
+        }
+
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
@@ -1157,6 +1165,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function rolling_update()
     {
+        $this->checkForCancellation();
         if ($this->server->isSwarm()) {
             $this->application_deployment_queue->addLogEntry('Rolling update started.');
             $this->execute_remote_command(
@@ -1353,6 +1362,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function prepare_builder_image()
     {
+        $this->checkForCancellation();
         $settings = instanceSettings();
         $helperImage = config('constants.coolify.helper_image');
         $helperImage = "{$helperImage}:{$settings->helper_version}";
@@ -1822,6 +1832,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function generate_compose_file()
     {
+        $this->checkForCancellation();
         $this->create_workdir();
         $ports = $this->application->main_port();
         $persistent_storages = $this->generate_local_persistent_volumes();
@@ -2556,8 +2567,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         throw new RuntimeException('Post-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
+    /**
+     * Check if the deployment was cancelled and abort if it was
+     */
+    private function checkForCancellation(): void
+    {
+        $this->application_deployment_queue->refresh();
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+            $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
+            throw new \RuntimeException('Deployment cancelled by user', 69420);
+        }
+    }
+
     private function next(string $status)
     {
+        // Refresh to get latest status
+        $this->application_deployment_queue->refresh();
+
         // Never allow changing status from FAILED or CANCELLED_BY_USER to anything else
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
@@ -2565,7 +2591,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return;
         }
         if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
-            return;
+            // Job was cancelled, stop execution
+            $this->application_deployment_queue->addLogEntry('Deployment cancelled by user, stopping execution.');
+            throw new \RuntimeException('Deployment cancelled by user', 69420);
         }
 
         $this->application_deployment_queue->update([
