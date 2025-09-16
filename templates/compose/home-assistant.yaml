@@ -9,6 +9,7 @@ services:
   homeassistant:
     image: homeassistant/home-assistant:${IMAGE_TAG:-stable}
     environment:
+      - SERVICE_URL_HOMEASSISTANT_8123
       - TZ=Europe/Berlin
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
