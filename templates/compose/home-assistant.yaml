@@ -1,4 +1,4 @@
-# documentation: https://www.home-assistant.io/
+# documentation: https://www.home-assistant.io/installation/linux#install-home-assistant-container
 # slogan: Open source home automation that puts local control and privacy first.
 # category: home-automation
 # tags: home-assistant, home-automation, smart-home, mqtt, zigbee, zwave
@@ -10,12 +10,11 @@ services:
     image: homeassistant/home-assistant:${IMAGE_TAG:-stable}
     environment:
       - SERVICE_URL_HOMEASSISTANT_8123
-      - TZ=Europe/Berlin
+      - TZ=${TZ:-Europe/Berlin}
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
     volumes:
       - homeassistant-data:/config
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8123"]
       interval: 30s
