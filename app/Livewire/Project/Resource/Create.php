@@ -97,7 +97,6 @@ class Create extends Component
                                     'value' => $value,
                                     'resourceable_id' => $service->id,
                                     'resourceable_type' => $service->getMorphClass(),
-                                    'is_build_time' => false,
                                     'is_preview' => false,
                                 ]);
                             }

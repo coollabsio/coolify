@@ -9,6 +9,8 @@ alwaysApply: false
 
 Coolify employs **comprehensive testing strategies** using modern PHP testing frameworks to ensure reliability of deployment operations, infrastructure management, and user interactions.
 
+!Important: Always run tests inside `coolify` container.
+
 ## Testing Framework Stack
 
 ### Core Testing Tools

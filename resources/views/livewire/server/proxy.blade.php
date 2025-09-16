@@ -7,9 +7,11 @@
                     <div class="flex items-center gap-2">
                         <h2>Configuration</h2>
                         @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
-                            <x-forms.button canGate="update" :canResource="$server" wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                            <x-forms.button canGate="update" :canResource="$server" wire:click.prevent="changeProxy">Switch
+                                Proxy</x-forms.button>
                         @else
-                            <x-forms.button canGate="update" :canResource="$server" disabled wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
+                            <x-forms.button canGate="update" :canResource="$server" disabled
+                                wire:click.prevent="changeProxy">Switch Proxy</x-forms.button>
                         @endif
                         <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
                     </div>
@@ -27,11 +29,11 @@
                             id="server.settings.generate_exact_labels"
                             label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave="instantSaveRedirect"
-                            id="redirect_enabled" label="Override default request handler"
+                            id="redirectEnabled" label="Override default request handler"
                             helper="Requests to unknown hosts or stopped services will receive a 503 response or be redirected to the URL you set below (need to enable this first)." />
-                        @if ($redirect_enabled)
+                        @if ($redirectEnabled)
                             <x-forms.input canGate="update" :canResource="$server" placeholder="https://app.coolify.io"
-                                id="redirect_url" label="Redirect to (optional)" />
+                                id="redirectUrl" label="Redirect to (optional)" />
                         @endif
                     </div>
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
@@ -50,15 +52,26 @@
                         <x-loading text="Loading proxy configuration..." />
                     </div>
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
-                        @if ($proxy_settings)
+                        @if ($proxySettings)
                             <div class="flex flex-col gap-2 pt-4">
                                 <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
-                                    monacoEditorLanguage="yaml" label="Configuration file" name="proxy_settings"
-                                    id="proxy_settings" rows="30" />
-                                <x-forms.button canGate="update" :canResource="$server"
-                                    wire:click.prevent="reset_proxy_configuration">
-                                    Reset configuration to default
-                                </x-forms.button>
+                                    monacoEditorLanguage="yaml"
+                                    label="Configuration file ({{ $this->configurationFilePath }})" name="proxySettings"
+                                    id="proxySettings" rows="30" />
+                                @can('update', $server)
+                                    <x-modal-confirmation title="Reset Proxy Configuration?"
+                                        buttonTitle="Reset configuration to default" isErrorButton
+                                        submitAction="resetProxyConfiguration" :actions="[
+                                            'Reset proxy configuration to default settings',
+                                            'All custom configurations will be lost',
+                                            'Custom ports and entrypoints will be removed',
+                                        ]"
+                                        confirmationText="{{ $server->name }}"
+                                        confirmationLabel="Please confirm by entering the server name below"
+                                        shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
+                                        :confirmWithPassword="false" :confirmWithText="true">
+                                    </x-modal-confirmation>
+                                @endcan
                             </div>
                         @endif
                     </div>

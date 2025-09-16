@@ -1082,6 +1082,7 @@ $schema://$host {
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
+        ray('validateConnection', $this->id);
         $this->disableSshMux();
 
         if ($this->skipServer()) {
@@ -1259,13 +1260,13 @@ $schema://$host {
         return str($this->ip)->contains(':');
     }
 
-    public function restartSentinel(bool $async = true)
+    public function restartSentinel(?string $customImage = null, bool $async = true)
     {
         try {
             if ($async) {
-                StartSentinel::dispatch($this, true);
+                StartSentinel::dispatch($this, true, null, $customImage);
             } else {
-                StartSentinel::run($this, true);
+                StartSentinel::run($this, true, null, $customImage);
             }
         } catch (\Throwable $e) {
             return handleError($e);

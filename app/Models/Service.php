@@ -1113,7 +1113,6 @@ class Service extends BaseModel
                 $this->environment_variables()->create([
                     'key' => $key,
                     'value' => $value,
-                    'is_build_time' => false,
                     'resourceable_id' => $this->id,
                     'resourceable_type' => $this->getMorphClass(),
                     'is_preview' => false,
@@ -1230,14 +1229,14 @@ class Service extends BaseModel
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderBy('key', 'asc');
-    }
-
-    public function environment_variables_preview()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', true)
-            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+            ->orderByRaw("
+                CASE 
+                    WHEN LOWER(key) LIKE 'service_%' THEN 1
+                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            ");
     }
 
     public function workdir()

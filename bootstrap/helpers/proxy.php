@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
@@ -267,7 +267,7 @@ function generate_default_proxy_configuration(Server $server)
     }
 
     $config = Yaml::dump($config, 12, 2);
-    SaveConfiguration::run($server, $config);
+    SaveProxyConfiguration::run($server, $config);
 
     return $config;
 }
