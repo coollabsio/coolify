@@ -355,8 +355,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->write_deployment_configurations();
             }
 
-            // Cleanup build secrets if they were used
-            $this->cleanup_build_secrets();
+            if ($this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
+                $this->cleanup_build_secrets();
+            }
 
             $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
             $this->graceful_shutdown_container($this->deployment_uuid);
@@ -617,11 +618,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
 
-        // Cleanup build secrets after build completes
-        if ($this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
-            $this->cleanup_build_secrets();
-        }
-
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
@@ -722,7 +718,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->cleanup_build_secrets();
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -2297,7 +2292,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->build_args->push("--build-arg '{$key}'");
             });
 
-            $this->build_args = $this->build_args->implode(' ');
+            $this->build_args = $this->build_args instanceof \Illuminate\Support\Collection
+                ? $this->build_args->implode(' ')
+                : (string) $this->build_args;
         }
 
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
