@@ -35,94 +35,100 @@ class StartLogDrain
                     throw new \Exception('New Relic log drain is not enabled.');
                 }
                 $config = base64_encode("
-[SERVICE]
-    Flush     5
-    Daemon    off
-    Tag container_logs
-    Log_Level debug
-    Parsers_File  parsers.conf
-[INPUT]
-    Name              forward
-    Buffer_Chunk_Size 1M
-    Buffer_Max_Size   6M
-[FILTER]
-    Name grep
-    Match *
-    Exclude log 127.0.0.1
-[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$server->name}
-    Rename              coolify.name coolify.app_name
-    Rename              coolify.projectName coolify.project_name
-    Rename              coolify.environmentName coolify.environment_name
-[OUTPUT]
-    Name nrlogs
-    Match *
-    license_key \${LICENSE_KEY}
-    # https://log-api.eu.newrelic.com/log/v1 - EU
-    # https://log-api.newrelic.com/log/v1 - US
-    base_uri \${BASE_URI}
+service:
+    flush: 5
+    daemon: off
+    log_level: debug
+    parsers_file: parsers.yml
+pipeline:
+    inputs:
+        - name: forward
+          buffer_chunk_size: 1M
+          buffer_max_size: 6M
+          tag: container_logs
+    filters:
+        - name: grep
+          match: '*'
+          exclude: log 127.0.0.1
+        - name: modify
+          match: '*'
+          Add:
+            - coolify.server_name {$server->name}
+          Rename:
+            - coolify.name coolify.app_name
+            - coolify.projectName coolify.project_name
+            - coolify.environmentName coolify.environment_name
+    outputs:
+        - name: nrlogs
+          match: '*'
+          license_key: \${LICENSE_KEY}
+          # https://log-api.eu.newrelic.com/log/v1 - EU
+          # https://log-api.newrelic.com/log/v1 - US
+          base_uri: \${BASE_URI}
 ");
             } elseif ($type === 'highlight') {
                 if (! $server->settings->is_logdrain_highlight_enabled) {
                     throw new \Exception('Highlight log drain is not enabled.');
                 }
                 $config = base64_encode('
-[SERVICE]
-    Flush     5
-    Daemon    off
-    Log_Level debug
-    Parsers_File  parsers.conf
-[INPUT]
-    Name              forward
-    tag               ${HIGHLIGHT_PROJECT_ID}
-    Buffer_Chunk_Size 1M
-    Buffer_Max_Size   6M
-[OUTPUT]
-    Name                forward
-    Match               *
-    Host                otel.highlight.io
-    Port                24224
+service:
+    flush: 5
+    daemon: off
+    log_level: debug
+    parsers_file: parsers.yml
+pipeline:
+    inputs:
+        - name: forward
+          buffer_chunk_size: 1M
+          buffer_max_size: 6M
+          tag: ${HIGHLIGHT_PROJECT_ID}
+    outputs:
+        - name: forward
+          match: '*'
+          host: otel.highlight.io
+          port: 24224
 ');
             } elseif ($type === 'axiom') {
                 if (! $server->settings->is_logdrain_axiom_enabled) {
                     throw new \Exception('Axiom log drain is not enabled.');
                 }
                 $config = base64_encode("
-[SERVICE]
-    Flush     5
-    Daemon    off
-    Log_Level debug
-    Parsers_File  parsers.conf
-[INPUT]
-    Name              forward
-    Buffer_Chunk_Size 1M
-    Buffer_Max_Size   6M
-[FILTER]
-    Name grep
-    Match *
-    Exclude log 127.0.0.1
-[FILTER]
-    Name                modify
-    Match               *
-    Set                 coolify.server_name {$server->name}
-    Rename              coolify.name coolify.app_name
-    Rename              coolify.projectName coolify.project_name
-    Rename              coolify.environmentName coolify.environment_name
-[OUTPUT]
-    Name            http
-    Match           *
-    Host            api.axiom.co
-    Port            443
-    URI             /v1/datasets/\${AXIOM_DATASET_NAME}/ingest
-    # Authorization Bearer should be an API token
-    Header Authorization Bearer \${AXIOM_API_KEY}
-    compress gzip
-    format json
-    json_date_key _time
-    json_date_format iso8601
-    tls On
+service:
+    flush: 5
+    daemon: off
+    log_level: debug
+    parsers_file: parsers.yml
+pipeline:
+    inputs:
+        - name: forward
+          buffer_chunk_size: 1M
+          buffer_max_size: 6M
+    filters:
+        - name: grep
+          match: '*'
+          exclude: log 127.0.0.1
+        - name: modify
+          match: '*'
+          Add:
+            - coolify.server_name {$server->name}
+          Rename:
+            - coolify.name coolify.app_name
+            - coolify.projectName coolify.project_name
+            - coolify.environmentName coolify.environment_name
+    outputs:
+        - name: http
+          match: '*'
+          host: api.axiom.co
+          port: 443
+          uri: /v1/datasets/\${AXIOM_DATASET_NAME}/ingest
+          header:
+            # Authorization Bearer should be an API token
+            - Authorization Bearer \${AXIOM_API_KEY}
+          compress: gzip
+          format: json
+          json_date_key _time
+          json_date_format: iso8601
+          tls: on
 ");
             } elseif ($type === 'custom') {
                 if (! $server->settings->is_logdrain_custom_enabled) {
@@ -135,23 +141,23 @@ class StartLogDrain
             }
             if ($type !== 'custom') {
                 $parsers = base64_encode("
-[PARSER]
-    Name        empty_line_skipper
-    Format      regex
-    Regex       /^(?!\s*$).+/
+parsers:
+    - name: empty_line_skipper
+      format: regex
+      regex: '/^(?!\s*$).+/'
 ");
             }
             $compose = base64_encode('
 services:
   coolify-log-drain:
-    image: cr.fluentbit.io/fluent/fluent-bit:2.0
+    image: cr.fluentbit.io/fluent/fluent-bit:4.0
     container_name: coolify-log-drain
-    command: -c /fluent-bit.conf
+    command: -c /fluent-bit.yml
     env_file:
       - .env
     volumes:
-      - ./fluent-bit.conf:/fluent-bit.conf
-      - ./parsers.conf:/parsers.conf
+      - ./fluent-bit.yml:/fluent-bit.yml
+      - ./parsers.yml:/parsers.yml
     ports:
       - 127.0.0.1:24224:24224
     labels:
@@ -162,7 +168,7 @@ services:
 This log drain is based on [Fluent Bit](https://fluentbit.io/) and New Relic Log Forwarder.
 
 Files:
-- `fluent-bit.conf` - configuration file for Fluent Bit
+- `fluent-bit.yml` - configuration file for Fluent Bit
 - `docker-compose.yml` - docker-compose file to run Fluent Bit
 - `.env` - environment variables for Fluent Bit
 ');
@@ -171,8 +177,8 @@ Files:
             $base_path = config('constants.coolify.base_config_path');
 
             $config_path = $base_path.'/log-drains';
-            $fluent_bit_config = $config_path.'/fluent-bit.conf';
-            $parsers_config = $config_path.'/parsers.conf';
+            $fluent_bit_config = $config_path.'/fluent-bit.yml';
+            $parsers_config = $config_path.'/parsers.yml';
             $compose_path = $config_path.'/docker-compose.yml';
             $readme_path = $config_path.'/README.md';
             $command = [
