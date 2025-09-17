@@ -361,6 +361,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function detectBuildKitCapabilities(): void
     {
+        // If build secrets are not enabled, skip detection and use traditional args
+        if (! $this->application->settings->use_build_secrets) {
+            $this->dockerBuildkitSupported = false;
+
+            return;
+        }
+
         $serverToCheck = $this->use_build_server ? $this->build_server : $this->server;
         $serverName = $this->use_build_server ? "build server ({$serverToCheck->name})" : "deployment server ({$serverToCheck->name})";
 
@@ -376,7 +383,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             if ($majorVersion < 18 || ($majorVersion == 18 && $minorVersion < 9)) {
                 $this->dockerBuildkitSupported = false;
-                $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} on {$serverName} does not support BuildKit (requires 18.09+). Using traditional build arguments.");
+                $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} on {$serverName} does not support BuildKit (requires 18.09+). Build secrets feature disabled.");
 
                 return;
             }
@@ -395,11 +402,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if (trim($buildkitTest) === 'supported') {
                     $this->dockerBuildkitSupported = true;
                     $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} with BuildKit secrets support detected on {$serverName}.");
-                    $this->application_deployment_queue->addLogEntry('✓ Build secrets will be used for enhanced security during builds.');
+                    $this->application_deployment_queue->addLogEntry('Build secrets are enabled and will be used for enhanced security.');
                 } else {
                     $this->dockerBuildkitSupported = false;
-                    $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} on {$serverName} does not have BuildKit secrets support enabled.");
-                    $this->application_deployment_queue->addLogEntry('⚠ Using traditional build arguments (less secure but compatible).');
+                    $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} on {$serverName} does not have BuildKit secrets support.");
+                    $this->application_deployment_queue->addLogEntry('Build secrets feature is enabled but not supported. Using traditional build arguments.');
                 }
             } else {
                 // Buildx is available, which means BuildKit is available
@@ -412,17 +419,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if (trim($secretsTest) === 'supported') {
                     $this->dockerBuildkitSupported = true;
                     $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} with BuildKit and Buildx detected on {$serverName}.");
-                    $this->application_deployment_queue->addLogEntry('✓ Build secrets will be used for enhanced security during builds.');
+                    $this->application_deployment_queue->addLogEntry('Build secrets are enabled and will be used for enhanced security.');
                 } else {
                     $this->dockerBuildkitSupported = false;
                     $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} with Buildx on {$serverName}, but secrets not supported.");
-                    $this->application_deployment_queue->addLogEntry('⚠ Using traditional build arguments (less secure but compatible).');
+                    $this->application_deployment_queue->addLogEntry('Build secrets feature is enabled but not supported. Using traditional build arguments.');
                 }
             }
         } catch (\Exception $e) {
             $this->dockerBuildkitSupported = false;
             $this->application_deployment_queue->addLogEntry("Could not detect BuildKit capabilities on {$serverName}: {$e->getMessage()}");
-            $this->application_deployment_queue->addLogEntry('⚠ Using traditional build arguments as fallback.');
+            $this->application_deployment_queue->addLogEntry('Build secrets feature is enabled but detection failed. Using traditional build arguments.');
         }
     }
 
@@ -560,7 +567,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_image_names();
         $this->cleanup_git();
 
-        $this->detectBuildKitCapabilities();
         $this->generate_build_env_variables();
 
         $this->application->loadComposeFile(isInit: false);
@@ -571,7 +577,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             // For raw compose, we cannot automatically add secrets configuration
             // User must define it manually in their docker-compose file
-            if ($this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
+            if ($this->application->settings->use_build_secrets && $this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
                 $this->application_deployment_queue->addLogEntry('Build secrets are configured. Ensure your docker-compose file includes build.secrets configuration for services that need them.');
             }
         } else {
@@ -593,8 +599,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            // Add build secrets to compose file if BuildKit is supported
-            if ($this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
+            // Add build secrets to compose file if enabled and BuildKit is supported
+            if ($this->application->settings->use_build_secrets && $this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
                 $composeFile = $this->add_build_secrets_to_compose($composeFile);
             }
 
@@ -721,7 +727,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->dockerfile_location = $this->application->dockerfile_location;
         }
         $this->prepare_builder_image();
-        $this->detectBuildKitCapabilities();
         $this->check_git_if_build_needed();
         $this->generate_image_names();
         $this->clone_repository();
@@ -2345,11 +2350,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
                         'hidden' => true,
                     ]);
-                    if ($this->dockerBuildkitSupported) {
+                    if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
                         // Modify the nixpacks Dockerfile to use build secrets
                         $this->modify_nixpacks_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                         $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                         $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                    } elseif ($this->dockerBuildkitSupported) {
+                        // BuildKit without secrets
+                        $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}";
                     } else {
                         $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}";
                     }
@@ -2659,10 +2667,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $variables = collect([])->merge($this->env_args);
         }
 
-        if ($this->dockerBuildkitSupported) {
+        // Check if build secrets are enabled and BuildKit is supported
+        if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
             $this->generate_build_secrets($variables);
             $this->build_args = '';
         } else {
+            // Fall back to traditional build args
             $this->build_args = $variables->map(function ($value, $key) {
                 $value = escapeshellarg($value);
 
@@ -2673,6 +2683,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_docker_env_flags_for_secrets()
     {
+        // Only generate env flags if build secrets are enabled
+        if (! $this->application->settings->use_build_secrets) {
+            return '';
+        }
+
         $variables = $this->pull_request_id === 0
             ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get()
             : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
@@ -2747,8 +2762,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function modify_nixpacks_dockerfile_for_secrets($dockerfile_path)
     {
-        // Only process if we have secrets to mount
-        if (empty($this->build_secrets)) {
+        // Only process if build secrets are enabled and we have secrets to mount
+        if (! $this->application->settings->use_build_secrets || empty($this->build_secrets)) {
             return;
         }
 

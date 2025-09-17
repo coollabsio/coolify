@@ -25,6 +25,8 @@ class All extends Component
 
     public bool $is_env_sorting_enabled = false;
 
+    public bool $use_build_secrets = false;
+
     protected $listeners = [
         'saveKey' => 'submit',
         'refreshEnvs',
@@ -34,6 +36,7 @@ class All extends Component
     public function mount()
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
+        $this->use_build_secrets = data_get($this->resource, 'settings.use_build_secrets', false);
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [\App\Models\Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
@@ -49,6 +52,7 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
 
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
+            $this->resource->settings->use_build_secrets = $this->use_build_secrets;
             $this->resource->settings->save();
             $this->getDevView();
             $this->dispatch('success', 'Environment variable settings updated.');

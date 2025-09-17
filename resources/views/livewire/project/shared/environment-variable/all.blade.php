@@ -13,17 +13,32 @@
             @endcan
         </div>
         <div>Environment variables (secrets) for this resource. </div>
-        @if ($resourceClass === 'App\Models\Application' && data_get($resource, 'build_pack') !== 'dockercompose')
-            <div class="w-64 pt-2">
-                @can('manageEnvironment', $resource)
-                    <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                        helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
-                        instantSave></x-forms.checkbox>
-                @else
-                    <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                        helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
-                        disabled></x-forms.checkbox>
-                @endcan
+        @if ($resourceClass === 'App\Models\Application')
+            <div class="flex flex-col gap-2 pt-2">
+                @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                    <div class="w-64">
+                        @can('manageEnvironment', $resource)
+                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
+                                helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                                instantSave></x-forms.checkbox>
+                        @else
+                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
+                                helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                                disabled></x-forms.checkbox>
+                        @endcan
+                    </div>
+                @endif
+                <div class="w-64">
+                    @can('manageEnvironment', $resource)
+                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
+                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                            instantSave></x-forms.checkbox>
+                    @else
+                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
+                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                            disabled></x-forms.checkbox>
+                    @endcan
+                </div>
             </div>
         @endif
         @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
