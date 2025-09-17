@@ -171,8 +171,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private Collection|string $build_secrets;
 
-    private string $secrets_dir = '';
-
     public function tags()
     {
         // Do not remove this one, it needs to properly identify which worker is running the job
@@ -279,8 +277,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
 
-            // Check Docker Version
-            $this->checkDockerVersion();
+            $this->detectBuildKitCapabilities();
 
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
@@ -355,10 +352,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->write_deployment_configurations();
             }
 
-            if ($this->dockerBuildkitSupported && ! empty($this->build_secrets)) {
-                $this->cleanup_build_secrets();
-            }
-
             $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
             $this->graceful_shutdown_container($this->deployment_uuid);
 
@@ -366,25 +359,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function checkDockerVersion(): void
+    private function detectBuildKitCapabilities(): void
     {
-        // Use the build server if available, otherwise use the deployment server
         $serverToCheck = $this->use_build_server ? $this->build_server : $this->server;
+        $serverName = $this->use_build_server ? "build server ({$serverToCheck->name})" : "deployment server ({$serverToCheck->name})";
 
         try {
-            // Check Docker version (BuildKit requires Docker 18.09+)
             $dockerVersion = instant_remote_process(
                 ["docker version --format '{{.Server.Version}}'"],
                 $serverToCheck
             );
 
-            // Parse version and check if >= 18.09
             $versionParts = explode('.', $dockerVersion);
             $majorVersion = (int) $versionParts[0];
             $minorVersion = (int) ($versionParts[1] ?? 0);
 
-            if ($majorVersion > 18 || ($majorVersion == 18 && $minorVersion >= 9)) {
-                // Test if BuildKit is available with secrets support
+            if ($majorVersion < 18 || ($majorVersion == 18 && $minorVersion < 9)) {
+                $this->dockerBuildkitSupported = false;
+                $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} on {$serverName} does not support BuildKit (requires 18.09+). Using traditional build arguments.");
+
+                return;
+            }
+
+            $buildkitEnabled = instant_remote_process(
+                ["docker buildx version >/dev/null 2>&1 && echo 'available' || echo 'not-available'"],
+                $serverToCheck
+            );
+
+            if (trim($buildkitEnabled) !== 'available') {
                 $buildkitTest = instant_remote_process(
                     ["DOCKER_BUILDKIT=1 docker build --help 2>&1 | grep -q 'secret' && echo 'supported' || echo 'not-supported'"],
                     $serverToCheck
@@ -392,18 +394,35 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
                 if (trim($buildkitTest) === 'supported') {
                     $this->dockerBuildkitSupported = true;
-                    $serverName = $this->use_build_server ? "build server ({$serverToCheck->name})" : "deployment server ({$serverToCheck->name})";
-                    $this->application_deployment_queue->addLogEntry("Docker BuildKit with secrets support detected on {$serverName}. Build secrets will be used for enhanced security.");
+                    $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} with BuildKit secrets support detected on {$serverName}.");
+                    $this->application_deployment_queue->addLogEntry('✓ Build secrets will be used for enhanced security during builds.');
                 } else {
-                    $this->application_deployment_queue->addLogEntry('Docker BuildKit secrets not available. Falling back to build arguments.');
+                    $this->dockerBuildkitSupported = false;
+                    $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} on {$serverName} does not have BuildKit secrets support enabled.");
+                    $this->application_deployment_queue->addLogEntry('⚠ Using traditional build arguments (less secure but compatible).');
                 }
             } else {
-                $this->application_deployment_queue->addLogEntry("Docker version {$dockerVersion} detected. BuildKit requires 18.09+. Using build arguments.");
+                // Buildx is available, which means BuildKit is available
+                // Now specifically test for secrets support
+                $secretsTest = instant_remote_process(
+                    ["docker build --help 2>&1 | grep -q 'secret' && echo 'supported' || echo 'not-supported'"],
+                    $serverToCheck
+                );
+
+                if (trim($secretsTest) === 'supported') {
+                    $this->dockerBuildkitSupported = true;
+                    $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} with BuildKit and Buildx detected on {$serverName}.");
+                    $this->application_deployment_queue->addLogEntry('✓ Build secrets will be used for enhanced security during builds.');
+                } else {
+                    $this->dockerBuildkitSupported = false;
+                    $this->application_deployment_queue->addLogEntry("Docker {$dockerVersion} with Buildx on {$serverName}, but secrets not supported.");
+                    $this->application_deployment_queue->addLogEntry('⚠ Using traditional build arguments (less secure but compatible).');
+                }
             }
         } catch (\Exception $e) {
-            // If check fails, default to false
             $this->dockerBuildkitSupported = false;
-            $this->application_deployment_queue->addLogEntry('Could not determine Docker BuildKit support. Using build arguments as fallback.');
+            $this->application_deployment_queue->addLogEntry("Could not detect BuildKit capabilities on {$serverName}: {$e->getMessage()}");
+            $this->application_deployment_queue->addLogEntry('⚠ Using traditional build arguments as fallback.');
         }
     }
 
@@ -541,8 +560,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_image_names();
         $this->cleanup_git();
 
-        // Check for BuildKit support and generate build secrets
-        $this->checkDockerVersion();
+        $this->detectBuildKitCapabilities();
         $this->generate_build_env_variables();
 
         $this->application->loadComposeFile(isInit: false);
@@ -703,7 +721,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->dockerfile_location = $this->application->dockerfile_location;
         }
         $this->prepare_builder_image();
-        $this->checkDockerVersion();
+        $this->detectBuildKitCapabilities();
         $this->check_git_if_build_needed();
         $this->generate_image_names();
         $this->clone_repository();
@@ -1452,16 +1470,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(['echo $HOME'], $this->server);
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
+
+        $env_flags = $this->generate_docker_env_flags_for_secrets();
+        ray($env_flags);
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
                 throw new RuntimeException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
             }
-            $runCommand = "docker run -d --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             if ($this->dockerConfigFileExists === 'OK') {
-                $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             } else {
-                $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} {$env_flags} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
         $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
@@ -2639,12 +2660,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         if ($this->dockerBuildkitSupported) {
-            // Generate build secrets instead of build args
             $this->generate_build_secrets($variables);
-            // Ensure build_args is empty string when using secrets
             $this->build_args = '';
         } else {
-            // Fallback to traditional build args
             $this->build_args = $variables->map(function ($value, $key) {
                 $value = escapeshellarg($value);
 
@@ -2653,57 +2671,45 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
     }
 
+    private function generate_docker_env_flags_for_secrets()
+    {
+        $variables = $this->pull_request_id === 0
+            ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get()
+            : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
+
+        if ($variables->isEmpty()) {
+            return '';
+        }
+
+        return $variables
+            ->map(function ($env) {
+                $escaped_value = escapeshellarg($env->real_value);
+
+                return "-e {$env->key}={$escaped_value}";
+            })
+            ->implode(' ');
+    }
+
     private function generate_build_secrets(Collection $variables)
     {
-        $this->build_secrets = collect([]);
-
-        // Only create secrets if there are variables to process
         if ($variables->isEmpty()) {
             $this->build_secrets = '';
 
             return;
         }
 
-        $this->secrets_dir = "/tmp/.build_secrets_{$this->deployment_uuid}";
-
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid,
-            "mkdir -p {$this->secrets_dir}"
-        ), 'hidden' => true]);
-
-        // Generate a secret file for each environment variable
-        foreach ($variables as $key => $value) {
-            // keep id as-is, sanitize only filename
-            $safe_filename = preg_replace('/[^A-Za-z0-9._-]/', '_', (string) $key);
-            $secret_file_path = "{$this->secrets_dir}/{$safe_filename}";
-            $escaped_value = base64_encode($value);
-
-            $this->execute_remote_command([executeInDocker($this->deployment_uuid,
-                "echo '{$escaped_value}' | base64 -d > {$secret_file_path} && chmod 600 {$secret_file_path}"
-            ), 'hidden' => true]);
-
-            $this->build_secrets->push("--secret id={$key},src={$secret_file_path}");
-        }
-
-        $this->build_secrets = $this->build_secrets->implode(' ');
-    }
-
-    private function cleanup_build_secrets()
-    {
-        if ($this->dockerBuildkitSupported && $this->secrets_dir) {
-            // Clean up the secrets directory from the host
-            $this->execute_remote_command([executeInDocker($this->deployment_uuid,
-                "rm -rf {$this->secrets_dir}",
-            ), 'hidden' => true, 'ignore_errors' => true]);
-        }
+        $this->build_secrets = $variables
+            ->map(function ($value, $key) {
+                return "--secret id={$key},env={$key}";
+            })
+            ->implode(' ');
     }
 
     private function add_build_env_variables_to_dockerfile()
     {
         if ($this->dockerBuildkitSupported) {
-            // When using BuildKit, we need to add the syntax directive and instructions on how to use secrets
-            $this->add_buildkit_secrets_to_dockerfile();
+            // $this->add_buildkit_secrets_to_dockerfile();
         } else {
-            // Traditional approach - add ARGs to the Dockerfile
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
                 'hidden' => true,
@@ -2711,9 +2717,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ]);
             $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
 
-            // Include ALL environment variables as build args (deprecating is_build_time flag)
             if ($this->pull_request_id === 0) {
-                // Get all environment variables except NIXPACKS_ prefixed ones
                 $envs = $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
@@ -2739,58 +2743,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'hidden' => true,
             ]);
         }
-    }
-
-    private function add_buildkit_secrets_to_dockerfile()
-    {
-        $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
-            'hidden' => true,
-            'save' => 'dockerfile',
-        ]);
-        $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
-
-        // Check if BuildKit syntax is already present
-        $firstLine = $dockerfile->first();
-        if (! str_starts_with($firstLine, '# syntax=')) {
-            // Add BuildKit syntax directive at the very beginning
-            $dockerfile->prepend('# syntax=docker/dockerfile:1');
-        }
-
-        // Create a comment block explaining how to use the secrets in RUN commands
-        $secretsComment = [
-            '',
-            '# Build secrets are available. Use them in RUN commands like:',
-            '# For a single secret (inline environment variable):',
-            '# RUN --mount=type=secret,id=MY_SECRET MY_SECRET=$(cat /run/secrets/MY_SECRET) npm run build',
-            '',
-            '# For multiple secrets (inline environment variables):',
-            '# RUN --mount=type=secret,id=API_KEY --mount=type=secret,id=DB_URL \\',
-            '#     API_KEY=$(cat /run/secrets/API_KEY) \\',
-            '#     DB_URL=$(cat /run/secrets/DB_URL) \\',
-            '#     npm run build',
-            '',
-            '# Note: Do NOT use export. Variables are set inline for the specific command only.',
-            '',
-        ];
-
-        // Find where to insert the comments (after FROM statement)
-        $fromIndex = $dockerfile->search(function ($line) {
-            return str_starts_with(trim(strtoupper($line)), 'FROM');
-        });
-
-        if ($fromIndex !== false) {
-            // Insert comments after FROM statement
-            foreach (array_reverse($secretsComment) as $comment) {
-                $dockerfile->splice($fromIndex + 1, 0, [$comment]);
-            }
-        }
-
-        $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-        $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
-            'hidden' => true,
-        ]);
     }
 
     private function modify_nixpacks_dockerfile_for_secrets($dockerfile_path)
@@ -2820,36 +2772,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get()
             : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
 
-        // Find all RUN commands and add secret mounts to them
         $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($variables, &$modified) {
             $trim = ltrim($line);
-            // Only handle shell-form RUN; skip JSON-form and already-mounted lines
-            if (str_starts_with($trim, 'RUN') && !preg_match('/^RUN\s*\[/i', $trim) && !str_contains($line, '--mount=type=secret')) {
 
-                // Build the mount flags for all secrets
+            if (str_contains($line, '--mount=type=secret')) {
+                return $line;
+            }
+
+            if (str_starts_with($trim, 'RUN')) {
                 $mounts = [];
                 foreach ($variables as $env) {
-                    $mounts[] = "--mount=type=secret,id={$env->key}";
+                    $mounts[] = "--mount=type=secret,id={$env->key},env={$env->key}";
                 }
 
                 if (! empty($mounts)) {
-                    // Build inline environment variable assignments (no export)
-                    $envAssignments = [];
-                    foreach ($variables as $env) {
-                        $envAssignments[] = "{$env->key}=\$(cat /run/secrets/{$env->key})";
-                    }
-
-                    // Replace RUN with RUN with mounts and inline env vars
                     $mountString = implode(' ', $mounts);
-                    $envString = implode(' ', $envAssignments);
+                    $originalCommand = trim(substr($trim, 3));
 
-                    // Extract the original command
-                    $originalCommand = trim(substr($trim, 3)); // Remove 'RUN'
-
-                    // Create the new RUN command with mounts and inline environment variables
-                    // Format: RUN --mount=secret,id=X --mount=secret,id=Y KEY1=$(cat...) KEY2=$(cat...) original_command
-                    $line = "RUN {$mountString} {$envString} {$originalCommand}";
+                    $line = "RUN {$mountString} {$originalCommand}";
                     $modified = true;
                 }
             }
@@ -2880,28 +2821,21 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return $composeFile;
         }
 
-        // Add top-level secrets definition
         $secrets = [];
         foreach ($variables as $env) {
-            $safe_filename = preg_replace('/[^A-Za-z0-9._-]/', '_', (string) $env->key);
             $secrets[$env->key] = [
-                'file' => "{$this->secrets_dir}/{$safe_filename}",
+                'environment' => $env->key,
             ];
         }
 
-        // Add build.secrets to services that have a build context
         $services = data_get($composeFile, 'services', []);
         foreach ($services as $serviceName => &$service) {
-            // Only add secrets if the service has a build context defined
             if (isset($service['build'])) {
-                // Handle both string and array build configurations
                 if (is_string($service['build'])) {
-                    // Convert string build to array format
                     $service['build'] = [
                         'context' => $service['build'],
                     ];
                 }
-                // Add secrets to build configuration
                 if (! isset($service['build']['secrets'])) {
                     $service['build']['secrets'] = [];
                 }
@@ -2913,13 +2847,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         }
 
-        // Update the compose file
         $composeFile['services'] = $services;
-        // merge with existing secrets if present
         $existingSecrets = data_get($composeFile, 'secrets', []);
+        if ($existingSecrets instanceof \Illuminate\Support\Collection) {
+            $existingSecrets = $existingSecrets->toArray();
+        }
         $composeFile['secrets'] = array_replace($existingSecrets, $secrets);
 
-        $this->application_deployment_queue->addLogEntry('Added build secrets configuration to docker-compose file.');
+        $this->application_deployment_queue->addLogEntry('Added build secrets configuration to docker-compose file (using environment variables).');
 
         return $composeFile;
     }
