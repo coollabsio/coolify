@@ -2349,7 +2349,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ]);
                     if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
                         // Modify the nixpacks Dockerfile to use build secrets
-                        $this->modify_nixpacks_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                        $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                         $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                         $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}";
                     } elseif ($this->dockerBuildkitSupported) {
@@ -2368,7 +2368,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ]);
                     if ($this->dockerBuildkitSupported) {
                         // Modify the nixpacks Dockerfile to use build secrets
-                        $this->modify_nixpacks_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                        $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                         $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                         $build_command = "DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}";
                     } else {
@@ -2394,8 +2394,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
             } else {
                 // Dockerfile buildpack
-                if ($this->dockerBuildkitSupported) {
-                    // Use BuildKit with secrets
+                if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
+                    // Modify the Dockerfile to use build secrets
+                    $this->modify_dockerfile_for_secrets("{$this->workdir}{$this->dockerfile_location}");
                     $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                     if ($this->force_rebuild) {
                         $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->workdir}";
@@ -2466,8 +2467,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             // Pure Dockerfile based deployment
             if ($this->application->dockerfile) {
-                if ($this->dockerBuildkitSupported) {
-                    // Use BuildKit with secrets (only if secrets exist)
+                if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
+                    // Modify the Dockerfile to use build secrets
+                    $this->modify_dockerfile_for_secrets("{$this->workdir}{$this->dockerfile_location}");
                     $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                     if ($this->force_rebuild) {
                         $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
@@ -2511,7 +2513,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ]);
                         if ($this->dockerBuildkitSupported) {
                             // Modify the nixpacks Dockerfile to use build secrets
-                            $this->modify_nixpacks_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                            $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                             $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                             $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
                         } else {
@@ -2527,7 +2529,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         ]);
                         if ($this->dockerBuildkitSupported) {
                             // Modify the nixpacks Dockerfile to use build secrets
-                            $this->modify_nixpacks_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                            $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                             $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                             $build_command = "DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
                         } else {
@@ -2757,57 +2759,53 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
     }
 
-    private function modify_nixpacks_dockerfile_for_secrets($dockerfile_path)
+    private function modify_dockerfile_for_secrets($dockerfile_path)
     {
         // Only process if build secrets are enabled and we have secrets to mount
         if (! $this->application->settings->use_build_secrets || empty($this->build_secrets)) {
             return;
         }
 
-        // Read the nixpacks-generated Dockerfile
+        // Read the Dockerfile
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "cat {$dockerfile_path}"),
             'hidden' => true,
-            'save' => 'nixpacks_dockerfile',
+            'save' => 'dockerfile_content',
         ]);
 
-        $dockerfile = collect(str($this->saved_outputs->get('nixpacks_dockerfile'))->trim()->explode("\n"));
+        $dockerfile = str($this->saved_outputs->get('dockerfile_content'))->trim()->explode("\n");
 
         // Add BuildKit syntax directive if not present
-        $firstLine = $dockerfile->first();
-        if (! str_starts_with($firstLine, '# syntax=')) {
+        if (! str_starts_with($dockerfile->first(), '# syntax=')) {
             $dockerfile->prepend('# syntax=docker/dockerfile:1');
         }
 
-        // Get the list of available secrets
+        // Get environment variables for secrets
         $variables = $this->pull_request_id === 0
             ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get()
             : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
 
-        $modified = false;
-        $dockerfile = $dockerfile->map(function ($line) use ($variables, &$modified) {
-            $trim = ltrim($line);
+        if ($variables->isEmpty()) {
+            return;
+        }
 
-            if (str_contains($line, '--mount=type=secret')) {
+        // Generate mount strings for all secrets
+        $mountStrings = $variables->map(fn ($env) => "--mount=type=secret,id={$env->key},env={$env->key}")->implode(' ');
+
+        $modified = false;
+        $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
+            $trimmed = ltrim($line);
+
+            // Skip lines that already have secret mounts or are not RUN commands
+            if (str_contains($line, '--mount=type=secret') || ! str_starts_with($trimmed, 'RUN')) {
                 return $line;
             }
 
-            if (str_starts_with($trim, 'RUN')) {
-                $mounts = [];
-                foreach ($variables as $env) {
-                    $mounts[] = "--mount=type=secret,id={$env->key},env={$env->key}";
-                }
+            // Add mount strings to RUN command
+            $originalCommand = trim(substr($trimmed, 3));
+            $modified = true;
 
-                if (! empty($mounts)) {
-                    $mountString = implode(' ', $mounts);
-                    $originalCommand = trim(substr($trim, 3));
-
-                    $line = "RUN {$mountString} {$originalCommand}";
-                    $modified = true;
-                }
-            }
-
-            return $line;
+            return "RUN {$mountStrings} {$originalCommand}";
         });
 
         if ($modified) {
@@ -2818,7 +2816,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'hidden' => true,
             ]);
 
-            $this->application_deployment_queue->addLogEntry('Modified Dockerfile to use build secrets: '.$dockerfile->implode("\n"), hidden: true);
+            $this->application_deployment_queue->addLogEntry('Modified Dockerfile to use build secrets.');
         }
     }
 
