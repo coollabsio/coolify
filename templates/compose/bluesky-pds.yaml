@@ -9,9 +9,9 @@ services:
   pds:
     image: 'ghcr.io/bluesky-social/pds:latest'
     volumes:
-      - ./pds-data:/pds
+      - /root/pds-data:/pds
     environment:
-      - SERVICE_URL_PDS_3000
+      - SERVICE_FQDN_PDS_3000
       - PDS_HOSTNAME=${SERVICE_URL_PDS}
       - PDS_JWT_SECRET=${SERVICE_PASSWORD_JWT_SECRET}
       - PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
@@ -27,11 +27,11 @@ services:
       - PDS_REPORT_SERVICE_DID=${PDS_REPORT_SERVICE_DID:-did:plc:ar7c4by46qjdydhdevvrndac}
       - PDS_CRAWLERS=${PDS_CRAWLERS:-https://bsky.network}
       - LOG_ENABLED=${LOG_ENABLED:-true}
-
+  
     command: >
       sh -c '
-        echo "Installing curl, bash, and pdsadmin..."
-        apk add --no-cache curl bash && \
+        echo "Installing required packages and pdsadmin..."
+        apk add --no-cache curl bash jq coreutils && \
         curl -o /usr/local/bin/pdsadmin.sh https://raw.githubusercontent.com/bluesky-social/pds/main/pdsadmin.sh && \
         chmod +x /usr/local/bin/pdsadmin.sh && \
         ln -sf /usr/local/bin/pdsadmin.sh /usr/local/bin/pdsadmin
