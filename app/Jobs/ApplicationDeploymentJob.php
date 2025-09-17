@@ -276,9 +276,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
-
-            $this->detectBuildKitCapabilities();
-
             // Generate custom host<->ip mapping
             $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
 
@@ -334,6 +331,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->build_server = $this->server;
                 $this->original_server = $this->server;
             }
+            $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
@@ -1432,7 +1430,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->build_image();
         $this->push_to_docker_registry();
-        // $this->stop_running_container();
         $this->rolling_update();
     }
 
@@ -1477,7 +1474,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
 
         $env_flags = $this->generate_docker_env_flags_for_secrets();
-        ray($env_flags);
+
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
                 throw new RuntimeException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
@@ -2723,7 +2720,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function add_build_env_variables_to_dockerfile()
     {
         if ($this->dockerBuildkitSupported) {
-            // $this->add_buildkit_secrets_to_dockerfile();
+            // We dont need to add build secrets to dockerfile for buildkit, as we already added them with --secret flag in function generate_docker_env_flags_for_secrets
         } else {
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
