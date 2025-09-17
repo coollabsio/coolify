@@ -2,23 +2,27 @@
 # slogan: Open-source, privacy-first web analytics.
 # tags: analytics,web,privacy,self-hosted,clickhouse,postgres
 # logo: svgs/rybbit.svg
-# port: 3000
+# port: 3002
 
 services:
   rybbit:
     image: 'ghcr.io/rybbit-io/rybbit-client:latest'
-    container_name: rybbit-client
     environment:
+      - SERVICE_URL_RYBBIT_3002
       - NODE_ENV=production
       - 'NEXT_PUBLIC_BACKEND_URL=${SERVICE_URL_RYBBIT}'
       - 'NEXT_PUBLIC_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}'
     depends_on:
       - rybbit_backend
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 3002"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   rybbit_backend:
     image: 'ghcr.io/rybbit-io/rybbit-backend:latest'
-    container_name: rybbit-backend
     environment:
       - NODE_ENV=production
       - TRUST_PROXY=true
@@ -32,12 +36,12 @@ services:
       - 'DISABLE_TELEMETRY=${DISABLE_TELEMETRY:-true}'
       # --- Internal Config ---
       - 'CLICKHOUSE_HOST=http://rybbit_clickhouse:8123'
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_DB=analytics
+      - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
+      - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
       - POSTGRES_HOST=rybbit_postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=analytics
-      - POSTGRES_USER=frog
+      - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-frog}'
     depends_on:
       rybbit_clickhouse:
         condition: service_healthy
@@ -49,14 +53,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    restart: unless-stopped
 
   rybbit_postgres:
     image: 'postgres:17.4'
-    container_name: rybbit-postgres
     environment:
-      - POSTGRES_DB=analytics
-      - POSTGRES_USER=frog
+      - 'POSTGRES_DB=${POSTGRES_DB:-analytics}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-frog}'
       - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
@@ -65,14 +67,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
 
   rybbit_clickhouse:
     image: 'clickhouse/clickhouse-server:25.4.2'
-    container_name: rybbit-clickhouse
     environment:
-      - CLICKHOUSE_DB=analytics
-      - CLICKHOUSE_USER=default
+      - 'CLICKHOUSE_DB=${CLICKHOUSE_DB:-analytics}'
+      - 'CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}'
       - 'CLICKHOUSE_PASSWORD=${SERVICE_PASSWORD_CLICKHOUSE}'
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
@@ -80,7 +80,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    restart: unless-stopped
     volumes:
       - 'clickhouse_data:/var/lib/clickhouse'
       - type: bind
@@ -132,7 +131,3 @@ services:
                   </default>
               </profiles>
           </clickhouse>
-
-volumes:
-  postgres_data:
-  clickhouse_data:
