@@ -13,13 +13,13 @@ services:
     environment:
       - SERVICE_FQDN_PDS_3000
       - 'PDS_HOSTNAME=${SERVICE_FQDN_PDS_3000}'
-      - 'PDS_JWT_SECRET=${SERVICE_PASSWORD_JWT_SECRET}'
+      - 'PDS_JWT_SECRET=${SERVICE_HEX_32_JWTSECRET}'
       - 'PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}'
       - 'PDS_ADMIN_EMAIL=${SERVICE_EMAIL_ADMIN}'
-      - 'PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX}'
+      - 'PDS_PLC_ROTATION_KEY_K256_PRIVATE_KEY_HEX=${SERVICE_HEX_32_ROTATIONKEY}'
       - 'PDS_DATA_DIRECTORY=${PDS_DATA_DIRECTORY:-/pds}'
       - 'PDS_BLOBSTORE_DISK_LOCATION=${PDS_DATA_DIRECTORY:-/pds}/blocks'
-      - 'PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-52428800}'
+      - 'PDS_BLOB_UPLOAD_LIMIT=${PDS_BLOB_UPLOAD_LIMIT:-104857600}'
       - 'PDS_DID_PLC_URL=${PDS_DID_PLC_URL:-https://plc.directory}'
       - 'PDS_BSKY_APP_VIEW_URL=${PDS_BSKY_APP_VIEW_URL:-https://api.bsky.app}'
       - 'PDS_BSKY_APP_VIEW_DID=${PDS_BSKY_APP_VIEW_DID:-did:web:api.bsky.app}'
@@ -30,7 +30,7 @@ services:
     command: |
       sh -c '
         set -euo pipefail; echo "Installing required packages and pdsadmin..."
-        apk add --no-cache curl bash jq coreutils >/dev/null && \
+        apk add --no-cache openssl curl bash jq coreutils >/dev/null && \
         curl -o /usr/local/bin/pdsadmin.sh https://raw.githubusercontent.com/bluesky-social/pds/main/pdsadmin.sh && \
         chmod +x /usr/local/bin/pdsadmin.sh && \
         ln -sf /usr/local/bin/pdsadmin.sh /usr/local/bin/pdsadmin
