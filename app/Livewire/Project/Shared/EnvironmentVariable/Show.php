@@ -38,7 +38,9 @@ class Show extends Component
 
     public bool $is_shown_once = false;
 
-    public bool $is_buildtime_only = false;
+    public bool $is_runtime = true;
+
+    public bool $is_buildtime = true;
 
     public bool $is_required = false;
 
@@ -58,7 +60,8 @@ class Show extends Component
         'is_multiline' => 'required|boolean',
         'is_literal' => 'required|boolean',
         'is_shown_once' => 'required|boolean',
-        'is_buildtime_only' => 'required|boolean',
+        'is_runtime' => 'required|boolean',
+        'is_buildtime' => 'required|boolean',
         'real_value' => 'nullable',
         'is_required' => 'required|boolean',
     ];
@@ -102,7 +105,8 @@ class Show extends Component
             } else {
                 $this->validate();
                 $this->env->is_required = $this->is_required;
-                $this->env->is_buildtime_only = $this->is_buildtime_only;
+                $this->env->is_runtime = $this->is_runtime;
+                $this->env->is_buildtime = $this->is_buildtime;
                 $this->env->is_shared = $this->is_shared;
             }
             $this->env->key = $this->key;
@@ -117,7 +121,8 @@ class Show extends Component
             $this->is_multiline = $this->env->is_multiline;
             $this->is_literal = $this->env->is_literal;
             $this->is_shown_once = $this->env->is_shown_once;
-            $this->is_buildtime_only = $this->env->is_buildtime_only ?? false;
+            $this->is_runtime = $this->env->is_runtime ?? true;
+            $this->is_buildtime = $this->env->is_buildtime ?? true;
             $this->is_required = $this->env->is_required ?? false;
             $this->is_really_required = $this->env->is_really_required ?? false;
             $this->is_shared = $this->env->is_shared ?? false;

@@ -17,7 +17,8 @@ use OpenApi\Attributes as OA;
         'is_literal' => ['type' => 'boolean'],
         'is_multiline' => ['type' => 'boolean'],
         'is_preview' => ['type' => 'boolean'],
-        'is_buildtime_only' => ['type' => 'boolean'],
+        'is_runtime' => ['type' => 'boolean'],
+        'is_buildtime' => ['type' => 'boolean'],
         'is_shared' => ['type' => 'boolean'],
         'is_shown_once' => ['type' => 'boolean'],
         'key' => ['type' => 'string'],
@@ -37,13 +38,14 @@ class EnvironmentVariable extends BaseModel
         'value' => 'encrypted',
         'is_multiline' => 'boolean',
         'is_preview' => 'boolean',
-        'is_buildtime_only' => 'boolean',
+        'is_runtime' => 'boolean',
+        'is_buildtime' => 'boolean',
         'version' => 'string',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
     ];
 
-    protected $appends = ['real_value', 'is_shared', 'is_really_required'];
+    protected $appends = ['real_value', 'is_shared', 'is_really_required', 'is_nixpacks', 'is_coolify'];
 
     protected static function booted()
     {
@@ -134,6 +136,32 @@ class EnvironmentVariable extends BaseModel
     {
         return Attribute::make(
             get: fn () => $this->is_required && str($this->real_value)->isEmpty(),
+        );
+    }
+
+    protected function isNixpacks(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (str($this->key)->startsWith('NIXPACKS_')) {
+                    return true;
+                }
+
+                return false;
+            }
+        );
+    }
+
+    protected function isCoolify(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (str($this->key)->startsWith('SERVICE_')) {
+                    return true;
+                }
+
+                return false;
+            }
         );
     }
 

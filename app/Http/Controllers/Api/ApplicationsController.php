@@ -2532,8 +2532,11 @@ class ApplicationsController extends Controller
                 if ($env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
                 }
-                if ($request->has('is_buildtime_only') && $env->is_buildtime_only != $request->is_buildtime_only) {
-                    $env->is_buildtime_only = $request->is_buildtime_only;
+                if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
+                    $env->is_runtime = $request->is_runtime;
+                }
+                if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
+                    $env->is_buildtime = $request->is_buildtime;
                 }
                 $env->save();
 
@@ -2559,8 +2562,11 @@ class ApplicationsController extends Controller
                 if ($env->is_shown_once != $request->is_shown_once) {
                     $env->is_shown_once = $request->is_shown_once;
                 }
-                if ($request->has('is_buildtime_only') && $env->is_buildtime_only != $request->is_buildtime_only) {
-                    $env->is_buildtime_only = $request->is_buildtime_only;
+                if ($request->has('is_runtime') && $env->is_runtime != $request->is_runtime) {
+                    $env->is_runtime = $request->is_runtime;
+                }
+                if ($request->has('is_buildtime') && $env->is_buildtime != $request->is_buildtime) {
+                    $env->is_buildtime = $request->is_buildtime;
                 }
                 $env->save();
 
@@ -2723,8 +2729,11 @@ class ApplicationsController extends Controller
                     if ($env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
-                    if ($item->has('is_buildtime_only') && $env->is_buildtime_only != $item->get('is_buildtime_only')) {
-                        $env->is_buildtime_only = $item->get('is_buildtime_only');
+                    if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
+                        $env->is_runtime = $item->get('is_runtime');
+                    }
+                    if ($item->has('is_buildtime') && $env->is_buildtime != $item->get('is_buildtime')) {
+                        $env->is_buildtime = $item->get('is_buildtime');
                     }
                     $env->save();
                 } else {
@@ -2735,7 +2744,8 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
-                        'is_buildtime_only' => $item->get('is_buildtime_only', false),
+                        'is_runtime' => $item->get('is_runtime', true),
+                        'is_buildtime' => $item->get('is_buildtime', true),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -2753,8 +2763,11 @@ class ApplicationsController extends Controller
                     if ($env->is_shown_once != $item->get('is_shown_once')) {
                         $env->is_shown_once = $item->get('is_shown_once');
                     }
-                    if ($item->has('is_buildtime_only') && $env->is_buildtime_only != $item->get('is_buildtime_only')) {
-                        $env->is_buildtime_only = $item->get('is_buildtime_only');
+                    if ($item->has('is_runtime') && $env->is_runtime != $item->get('is_runtime')) {
+                        $env->is_runtime = $item->get('is_runtime');
+                    }
+                    if ($item->has('is_buildtime') && $env->is_buildtime != $item->get('is_buildtime')) {
+                        $env->is_buildtime = $item->get('is_buildtime');
                     }
                     $env->save();
                 } else {
@@ -2765,7 +2778,8 @@ class ApplicationsController extends Controller
                         'is_literal' => $is_literal,
                         'is_multiline' => $is_multi_line,
                         'is_shown_once' => $is_shown_once,
-                        'is_buildtime_only' => $item->get('is_buildtime_only', false),
+                        'is_runtime' => $item->get('is_runtime', true),
+                        'is_buildtime' => $item->get('is_buildtime', true),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -2904,7 +2918,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
-                    'is_buildtime_only' => $request->is_buildtime_only ?? false,
+                    'is_runtime' => $request->is_runtime ?? true,
+                    'is_buildtime' => $request->is_buildtime ?? true,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -2927,7 +2942,8 @@ class ApplicationsController extends Controller
                     'is_literal' => $request->is_literal ?? false,
                     'is_multiline' => $request->is_multiline ?? false,
                     'is_shown_once' => $request->is_shown_once ?? false,
-                    'is_buildtime_only' => $request->is_buildtime_only ?? false,
+                    'is_runtime' => $request->is_runtime ?? true,
+                    'is_buildtime' => $request->is_buildtime ?? true,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
