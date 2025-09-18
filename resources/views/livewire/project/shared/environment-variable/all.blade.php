@@ -28,17 +28,19 @@
                         @endcan
                     </div>
                 @endif
-                <div class="w-64">
-                    @can('manageEnvironment', $resource)
-                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
-                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
-                            instantSave></x-forms.checkbox>
-                    @else
-                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
-                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
-                            disabled></x-forms.checkbox>
-                    @endcan
-                </div>
+                @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                    <div class="w-64">
+                        @can('manageEnvironment', $resource)
+                            <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
+                                helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                                instantSave></x-forms.checkbox>
+                        @else
+                            <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
+                                helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
+                                disabled></x-forms.checkbox>
+                        @endcan
+                    </div>
+                @endif
             </div>
         @endif
         @if ($resource->type() === 'service' || $resource?->build_pack === 'dockercompose')
