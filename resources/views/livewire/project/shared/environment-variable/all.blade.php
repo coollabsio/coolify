@@ -19,11 +19,11 @@
                     <div class="w-64">
                         @can('manageEnvironment', $resource)
                             <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                                helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
                                 instantSave></x-forms.checkbox>
                         @else
                             <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                                helper="Turn this off if one environment is dependent on an other. It will be sorted by creation order (like you pasted them or in the order you created them)."
+                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
                                 disabled></x-forms.checkbox>
                         @endcan
                     </div>
