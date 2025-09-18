@@ -169,6 +169,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $dockerBuildkitSupported = false;
 
+    private bool $skip_build = false;
+
     private Collection|string $build_secrets;
 
     public function tags()
@@ -571,7 +573,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
-            $this->save_environment_variables();
+            $this->generate_runtime_environment_variables();
 
             // For raw compose, we cannot automatically add secrets configuration
             // User must define it manually in their docker-compose file
@@ -580,7 +582,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
-            $this->save_environment_variables();
+            $this->generate_runtime_environment_variables();
             if (filled($this->env_filename)) {
                 $services = collect(data_get($composeFile, 'services', []));
                 $services = $services->map(function ($service, $name) {
@@ -764,6 +766,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->build_image();
+
+        // For Nixpacks, save runtime environment variables AFTER the build
+        // to prevent them from being accessible during the build process
+        $this->save_runtime_environment_variables();
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -963,18 +969,17 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
             if ($this->is_this_additional_server) {
+                $this->skip_build = true;
                 $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
                 $this->push_to_docker_registry();
                 $this->rolling_update();
-                if ($this->restart_only) {
-                    $this->post_deployment();
-                }
 
                 return true;
             }
             if (! $this->application->isConfigurationChanged()) {
                 $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
+                $this->skip_build = true;
                 $this->generate_compose_file();
                 $this->push_to_docker_registry();
                 $this->rolling_update();
@@ -1015,7 +1020,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function save_environment_variables()
+    private function generate_runtime_environment_variables()
     {
         $envs = collect([]);
         $sort = $this->application->settings->is_env_sorting_enabled;
@@ -1072,9 +1077,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            // Filter out buildtime-only variables from runtime environment
+            // Filter runtime variables (only include variables that are available at runtime)
             $runtime_environment_variables = $sorted_environment_variables->filter(function ($env) {
-                return ! $env->is_buildtime_only;
+                return $env->is_runtime;
             });
 
             // Sort runtime environment variables: those referencing SERVICE_ variables come after others
@@ -1128,9 +1133,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
 
-            // Filter out buildtime-only variables from runtime environment for preview
+            // Filter runtime variables for preview (only include variables that are available at runtime)
             $runtime_environment_variables_preview = $sorted_environment_variables_preview->filter(function ($env) {
-                return ! $env->is_buildtime_only;
+                return $env->is_runtime;
             });
 
             // Sort runtime environment variables: those referencing SERVICE_ variables come after others
@@ -1187,13 +1192,53 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
             $this->env_filename = null;
         } else {
-            $envs_base64 = base64_encode($envs->implode("\n"));
+            // For Nixpacks builds, we save the .env file AFTER the build to prevent
+            // runtime-only variables from being accessible during the build process
+            if ($this->application->build_pack !== 'nixpacks' || $this->skip_build) {
+                $envs_base64 = base64_encode($envs->implode("\n"));
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null"),
+                    ],
+
+                );
+                if ($this->use_build_server) {
+                    $this->server = $this->original_server;
+                    $this->execute_remote_command(
+                        [
+                            "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null",
+                        ]
+                    );
+                    $this->server = $this->build_server;
+                } else {
+                    $this->execute_remote_command(
+                        [
+                            "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null",
+                        ]
+                    );
+                }
+            }
+        }
+        $this->environment_variables = $envs;
+    }
+
+    private function save_runtime_environment_variables()
+    {
+        // This method saves the .env file with runtime variables
+        // It should be called AFTER the build for Nixpacks to prevent runtime-only variables
+        // from being accessible during the build process
+
+        if ($this->environment_variables && $this->environment_variables->isNotEmpty() && $this->env_filename) {
+            $envs_base64 = base64_encode($this->environment_variables->implode("\n"));
+
+            // Write .env file to workdir (for container runtime)
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null"),
                 ],
-
             );
+
+            // Write .env file to configuration directory
             if ($this->use_build_server) {
                 $this->server = $this->original_server;
                 $this->execute_remote_command(
@@ -1210,7 +1255,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 );
             }
         }
-        $this->environment_variables = $envs;
     }
 
     private function elixir_finetunes()
@@ -1429,6 +1473,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_image();
+        // For Nixpacks, save runtime environment variables AFTER the build
+        if ($this->application->build_pack === 'nixpacks') {
+            $this->save_runtime_environment_variables();
+        }
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -1692,6 +1740,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $nixpacks_command = $this->nixpacks_build_cmd();
         $this->application_deployment_queue->addLogEntry("Generating nixpacks configuration with: $nixpacks_command");
+
         $this->execute_remote_command(
             [executeInDocker($this->deployment_uuid, $nixpacks_command), 'save' => 'nixpacks_plan', 'hidden' => true],
             [executeInDocker($this->deployment_uuid, "nixpacks detect {$this->workdir}"), 'save' => 'nixpacks_type', 'hidden' => true],
@@ -1711,6 +1760,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $parsed = Toml::Parse($this->nixpacks_plan);
 
                 // Do any modifications here
+                // We need to generate envs here because nixpacks need to know to generate a proper Dockerfile
                 $this->generate_env_variables();
                 $merged_envs = collect(data_get($parsed, 'variables', []))->merge($this->env_args);
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
@@ -1881,13 +1931,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_args->put('SOURCE_COMMIT', $this->commit);
         $coolify_envs = $this->generate_coolify_env_variables();
 
-        // Include ALL environment variables (both build-time and runtime) for all build packs
-        // This deprecates the need for is_build_time flag
+        // For build process, include only environment variables where is_buildtime = true
         if ($this->pull_request_id === 0) {
-            // Get all environment variables except NIXPACKS_ prefixed ones for non-nixpacks builds
-            $envs = $this->application->build_pack === 'nixpacks'
-                ? $this->application->runtime_environment_variables
-                : $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get();
+            // Get environment variables that are marked as available during build
+            $envs = $this->application->environment_variables()
+                ->where('key', 'not like', 'NIXPACKS_%')
+                ->where('is_buildtime', true)
+                ->get();
 
             foreach ($envs as $env) {
                 if (! is_null($env->real_value)) {
@@ -1909,10 +1959,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
         } else {
-            // Get all preview environment variables except NIXPACKS_ prefixed ones for non-nixpacks builds
-            $envs = $this->application->build_pack === 'nixpacks'
-                ? $this->application->runtime_environment_variables_preview
-                : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
+            // Get preview environment variables that are marked as available during build
+            $envs = $this->application->environment_variables_preview()
+                ->where('key', 'not like', 'NIXPACKS_%')
+                ->where('is_buildtime', true)
+                ->get();
 
             foreach ($envs as $env) {
                 if (! is_null($env->real_value)) {
@@ -1944,8 +1995,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->application->fileStorages()->get();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-        // $environment_variables = $this->generate_environment_variables($ports);
-        $this->save_environment_variables();
+        $this->generate_runtime_environment_variables();
         if (data_get($this->application, 'custom_labels')) {
             $this->application->parseContainerLabels();
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
@@ -2662,6 +2712,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->application->build_pack === 'nixpacks') {
             $variables = collect($this->nixpacks_plan_json->get('variables'));
         } else {
+            // Generate environment variables for build process (filters by is_buildtime = true)
             $this->generate_env_variables();
             $variables = collect([])->merge($this->env_args);
         }
@@ -2688,8 +2739,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $variables = $this->pull_request_id === 0
-            ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get()
-            : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
+            ? $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->where('is_buildtime', true)->get()
+            : $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->where('is_buildtime', true)->get();
 
         if ($variables->isEmpty()) {
             return '';
@@ -2732,7 +2783,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
 
             if ($this->pull_request_id === 0) {
-                $envs = $this->application->environment_variables()->where('key', 'not like', 'NIXPACKS_%')->get();
+                // Only add environment variables that are available during build
+                $envs = $this->application->environment_variables()
+                    ->where('key', 'not like', 'NIXPACKS_%')
+                    ->where('is_buildtime', true)
+                    ->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
                         $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
@@ -2741,8 +2796,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                 }
             } else {
-                // Get all preview environment variables except NIXPACKS_ prefixed ones
-                $envs = $this->application->environment_variables_preview()->where('key', 'not like', 'NIXPACKS_%')->get();
+                // Only add preview environment variables that are available during build
+                $envs = $this->application->environment_variables_preview()
+                    ->where('key', 'not like', 'NIXPACKS_%')
+                    ->where('is_buildtime', true)
+                    ->get();
                 foreach ($envs as $env) {
                     if (data_get($env, 'is_multiline') === true) {
                         $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
