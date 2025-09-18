@@ -8360,7 +8360,10 @@
                     "is_preview": {
                         "type": "boolean"
                     },
-                    "is_buildtime_only": {
+                    "is_runtime": {
+                        "type": "boolean"
+                    },
+                    "is_buildtime": {
                         "type": "boolean"
                     },
                     "is_shared": {
