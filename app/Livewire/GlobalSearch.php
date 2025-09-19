@@ -69,6 +69,7 @@ class GlobalSearch extends Component
         $cacheKey = self::getCacheKey(auth()->user()->currentTeam()->id);
 
         $this->allSearchableItems = Cache::remember($cacheKey, 300, function () {
+            ray()->showQueries();
             $items = collect();
             $team = auth()->user()->currentTeam();
 
