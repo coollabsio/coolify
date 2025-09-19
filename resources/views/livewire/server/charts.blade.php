@@ -7,7 +7,7 @@
         <x-server.sidebar :server="$server" activeMenu="metrics" />
         <div class="w-full">
             <h2>Metrics</h2>
-            <div class="pb-4">Basic metrics for your container.</div>
+            <div class="pb-4">Basic metrics for your server.</div>
             @if ($server->isMetricsEnabled())
                 <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()">
                     <x-forms.select label="Interval" wire:change="setInterval" id="interval">
