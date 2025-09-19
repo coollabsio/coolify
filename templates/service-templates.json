@@ -2174,6 +2174,32 @@
         "minversion": "0.0.0",
         "port": "80"
     },
+    "linkding-plus": {
+        "documentation": "https://linkding.link/?utm_source=coolify.io",
+        "slogan": "A self-hosted bookmark manager designed to be minimal, fast, and easy to set up. (Includes feature for archiving websites as HTML snapshots)",
+        "compose": "c2VydmljZXM6CiAgbGlua2RpbmctcGx1czoKICAgIGltYWdlOiAnc2lzc2JydWVja2VyL2xpbmtkaW5nOmxhdGVzdC1wbHVzJwogICAgdm9sdW1lczoKICAgICAgLSAnbGlua2RpbmdfZGF0YTovZXRjL2xpbmtkaW5nL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTElOS0RJTkdfOTA5MAogICAgICAtICdMRF9TVVBFUlVTRVJfTkFNRT0ke1NVUEVSVVNFUl9OQU1FOj99JwogICAgICAtICdMRF9TVVBFUlVTRVJfUEFTU1dPUkQ9JHtTVVBFUlVTRVJfUEFTU1dPUkQ6P30nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gImJhc2ggLWMgJzo+IC9kZXYvdGNwLzEyNy4wLjAuMS85MDkwJyB8fCBleGl0IDEiCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwo=",
+        "tags": [
+            "rss",
+            "feed"
+        ],
+        "category": "RSS",
+        "logo": "svgs/linkding.svg",
+        "minversion": "0.0.0",
+        "port": "9090"
+    },
+    "linkding": {
+        "documentation": "https://linkding.link/?utm_source=coolify.io",
+        "slogan": "A self-hosted bookmark manager designed to be minimal, fast, and easy to set up.",
+        "compose": "c2VydmljZXM6CiAgbGlua2Rpbmc6CiAgICBpbWFnZTogJ3Npc3NicnVlY2tlci9saW5rZGluZzpsYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdsaW5rZGluZ19kYXRhOi9ldGMvbGlua2RpbmcvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9MSU5LRElOR185MDkwCiAgICAgIC0gJ0xEX1NVUEVSVVNFUl9OQU1FPSR7U1VQRVJVU0VSX05BTUU6P30nCiAgICAgIC0gJ0xEX1NVUEVSVVNFUl9QQVNTV09SRD0ke1NVUEVSVVNFUl9QQVNTV09SRDo/fScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAiYmFzaCAtYyAnOj4gL2Rldi90Y3AvMTI3LjAuMC4xLzkwOTAnIHx8IGV4aXQgMSIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCg==",
+        "tags": [
+            "rss",
+            "feed"
+        ],
+        "category": "RSS",
+        "logo": "svgs/linkding.svg",
+        "minversion": "0.0.0",
+        "port": "9090"
+    },
     "listmonk": {
         "documentation": "https://listmonk.app/?utm_source=coolify.io",
         "slogan": "Self-hosted newsletter and mailing list manager",

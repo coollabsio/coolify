@@ -151,6 +151,8 @@ class ServicesController extends Controller
                                 'homepage',
                                 'jellyfin',
                                 'kuzzle',
+                                'linkding',
+                                'linkding-plus',
                                 'listmonk',
                                 'logto',
                                 'mediawiki',

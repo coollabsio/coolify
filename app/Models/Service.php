@@ -752,6 +752,30 @@ class Service extends BaseModel
                     }
                     $fields->put('Meilisearch', $data->toArray());
                     break;
+                case $image->contains('linkding'):
+                    $data = collect([]);
+                    $SUPERUSER_NAME = $this->environment_variables()->where('key', 'SUPERUSER_NAME')->first();
+                    $SUPERUSER_PASSWORD = $this->environment_variables()->where('key', 'SUPERUSER_PASSWORD')->first();
+                    if ($SUPERUSER_NAME) {
+                        $data = $data->merge([
+                            'Superuser Name' => [
+                                'key' => data_get($SUPERUSER_NAME, 'key'),
+                                'value' => data_get($SUPERUSER_NAME, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($SUPERUSER_PASSWORD) {
+                        $data = $data->merge([
+                            'Superuser Password' => [
+                                'key' => data_get($SUPERUSER_PASSWORD, 'key'),
+                                'value' => data_get($SUPERUSER_PASSWORD, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Linkding', $data->toArray());
+                    break;
                 case $image->contains('ghost'):
                     $data = collect([]);
                     $MAIL_OPTIONS_AUTH_PASS = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
