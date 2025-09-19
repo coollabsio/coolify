@@ -138,7 +138,8 @@
                 }
             }
             let theme = localStorage.theme
-            let baseColor = '#FCD452'
+            let cpuColor = '#1e90ff'
+            let ramColor = '#00ced1'
             let textColor = '#ffffff'
             let editorBackground = '#181818'
             let editorTheme = 'blackboard'
@@ -149,12 +150,14 @@
                     theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
                 }
                 if (theme == 'dark') {
-                    baseColor = '#FCD452'
+                    cpuColor = '#1e90ff'
+                    ramColor = '#00ced1'
                     textColor = '#ffffff'
                     editorBackground = '#181818'
                     editorTheme = 'blackboard'
                 } else {
-                    baseColor = 'black'
+                    cpuColor = '#1e90ff'
+                    ramColor = '#00ced1'
                     textColor = '#000000'
                     editorBackground = '#ffffff'
                     editorTheme = null

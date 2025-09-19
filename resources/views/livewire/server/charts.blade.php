@@ -27,6 +27,7 @@
                         const optionsServerCpu = {
                             stroke: {
                                 curve: 'straight',
+                                width: 2,
                             },
                             chart: {
                                 height: '150px',
@@ -61,16 +62,16 @@
                                     enabled: false,
                                 }
                             },
-                            grid: {
-                                show: true,
-                                borderColor: '',
-                            },
-                            colors: [baseColor],
-                            xaxis: {
-                                type: 'datetime',
-                            },
-                            series: [{
-                                name: 'CPU %',
+                             grid: {
+                                 show: true,
+                                 borderColor: '',
+                             },
+                             colors: [cpuColor],
+                             xaxis: {
+                                 type: 'datetime',
+                             },
+                             series: [{
+                                 name: 'CPU %',
                                 data: []
                             }],
                             noData: {
@@ -95,11 +96,11 @@
                         document.addEventListener('livewire:init', () => {
                             Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
                                 checkTheme();
-                                serverCpuChart.updateOptions({
-                                    series: [{
-                                        data: chartData[0].seriesData,
-                                    }],
-                                    colors: [baseColor],
+                                 serverCpuChart.updateOptions({
+                                     series: [{
+                                         data: chartData[0].seriesData,
+                                     }],
+                                     colors: [cpuColor],
                                     xaxis: {
                                         type: 'datetime',
                                         labels: {
@@ -138,6 +139,7 @@
                             const optionsServerMemory = {
                                 stroke: {
                                     curve: 'straight',
+                                    width: 2,
                                 },
                                 chart: {
                                     height: '150px',
@@ -172,15 +174,15 @@
                                         enabled: false,
                                     }
                                 },
-                                grid: {
-                                    show: true,
-                                    borderColor: '',
-                                },
-                                colors: [baseColor],
-                                xaxis: {
-                                    type: 'datetime',
-                                    labels: {
-                                        show: true,
+                                 grid: {
+                                     show: true,
+                                     borderColor: '',
+                                 },
+                                 colors: [ramColor],
+                                 xaxis: {
+                                     type: 'datetime',
+                                     labels: {
+                                         show: true,
                                         style: {
                                             colors: textColor,
                                         }
@@ -212,11 +214,11 @@
                             document.addEventListener('livewire:init', () => {
                                 Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
                                     checkTheme();
-                                    serverMemoryChart.updateOptions({
-                                        series: [{
-                                            data: chartData[0].seriesData,
-                                        }],
-                                        colors: [baseColor],
+                                     serverMemoryChart.updateOptions({
+                                         series: [{
+                                             data: chartData[0].seriesData,
+                                         }],
+                                         colors: [ramColor],
                                         xaxis: {
                                             type: 'datetime',
                                             labels: {
