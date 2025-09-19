@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -110,7 +111,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use HasConfiguration, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -122,66 +123,6 @@ class Application extends BaseModel
         'custom_network_aliases' => 'array',
         'http_basic_auth_password' => 'encrypted',
     ];
-
-    public function customNetworkAliases(): Attribute
-    {
-        return Attribute::make(
-            set: function ($value) {
-                if (is_null($value) || $value === '') {
-                    return null;
-                }
-
-                // If it's already a JSON string, decode it
-                if (is_string($value) && $this->isJson($value)) {
-                    $value = json_decode($value, true);
-                }
-
-                // If it's a string but not JSON, treat it as a comma-separated list
-                if (is_string($value) && ! is_array($value)) {
-                    $value = explode(',', $value);
-                }
-
-                $value = collect($value)
-                    ->map(function ($alias) {
-                        if (is_string($alias)) {
-                            return str_replace(' ', '-', trim($alias));
-                        }
-
-                        return null;
-                    })
-                    ->filter()
-                    ->unique() // Remove duplicate values
-                    ->values()
-                    ->toArray();
-
-                return empty($value) ? null : json_encode($value);
-            },
-            get: function ($value) {
-                if (is_null($value)) {
-                    return null;
-                }
-
-                if (is_string($value) && $this->isJson($value)) {
-                    return json_decode($value, true);
-                }
-
-                return is_array($value) ? $value : [];
-            }
-        );
-    }
-
-    /**
-     * Check if a string is a valid JSON
-     */
-    private function isJson($string)
-    {
-        if (! is_string($string)) {
-            return false;
-        }
-        json_decode($string);
-
-        return json_last_error() === JSON_ERROR_NONE;
-    }
 
     protected static function booted()
     {
@@ -248,6 +189,66 @@ class Application extends BaseModel
                 $deployment->delete();
             }
         });
+    }
+
+    public function customNetworkAliases(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (is_null($value) || $value === '') {
+                    return null;
+                }
+
+                // If it's already a JSON string, decode it
+                if (is_string($value) && $this->isJson($value)) {
+                    $value = json_decode($value, true);
+                }
+
+                // If it's a string but not JSON, treat it as a comma-separated list
+                if (is_string($value) && ! is_array($value)) {
+                    $value = explode(',', $value);
+                }
+
+                $value = collect($value)
+                    ->map(function ($alias) {
+                        if (is_string($alias)) {
+                            return str_replace(' ', '-', trim($alias));
+                        }
+
+                        return null;
+                    })
+                    ->filter()
+                    ->unique() // Remove duplicate values
+                    ->values()
+                    ->toArray();
+
+                return empty($value) ? null : json_encode($value);
+            },
+            get: function ($value) {
+                if (is_null($value)) {
+                    return null;
+                }
+
+                if (is_string($value) && $this->isJson($value)) {
+                    return json_decode($value, true);
+                }
+
+                return is_array($value) ? $value : [];
+            }
+        );
+    }
+
+    /**
+     * Check if a string is a valid JSON
+     */
+    private function isJson($string)
+    {
+        if (! is_string($string)) {
+            return false;
+        }
+        json_decode($string);
+
+        return json_last_error() === JSON_ERROR_NONE;
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)

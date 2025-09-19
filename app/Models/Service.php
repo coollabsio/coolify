@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -41,7 +42,7 @@ use Visus\Cuid2\Cuid2;
 )]
 class Service extends BaseModel
 {
-    use HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
