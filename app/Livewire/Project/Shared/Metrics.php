@@ -33,16 +33,6 @@ class Metrics extends Component
         try {
             $cpuMetrics = $this->resource->getCpuMetrics($this->interval);
             $memoryMetrics = $this->resource->getMemoryMetrics($this->interval);
-
-            // Debug logging
-            \Log::info('Metrics loadData called', [
-                'chartId' => $this->chartId,
-                'cpuMetrics' => $cpuMetrics,
-                'memoryMetrics' => $memoryMetrics,
-                'cpuEvent' => "refreshChartData-{$this->chartId}-cpu",
-                'memoryEvent' => "refreshChartData-{$this->chartId}-memory"
-            ]);
-
             $this->dispatch("refreshChartData-{$this->chartId}-cpu", [
                 'seriesData' => $cpuMetrics,
             ]);
