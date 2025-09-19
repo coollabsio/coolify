@@ -6,6 +6,10 @@
     @apply hidden!;
 }
 
+@utility apexcharts-grid-borders {
+    @apply dark:hidden!;
+}
+
 @utility apexcharts-xaxistooltip {
     @apply hidden!;
 }
