@@ -80,12 +80,27 @@
                                     color: textColor,
                                 }
                             },
-                            tooltip: {
-                                enabled: true,
-                                marker: {
-                                    show: false,
-                                }
-                            },
+                             tooltip: {
+                                 enabled: true,
+                                 marker: {
+                                     show: false,
+                                 },
+                                 custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                                     const value = series[seriesIndex][dataPointIndex];
+                                     const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                     const date = new Date(timestamp);
+                                     const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
+                                         String(date.getUTCMinutes()).padStart(2, '0') + ':' +
+                                         String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
+                                         date.getUTCFullYear() + '-' +
+                                         String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                                         String(date.getUTCDate()).padStart(2, '0');
+                                     return '<div class="apexcharts-tooltip-custom">' +
+                                         '<div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
+                                         '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
+                                         '</div>';
+                                 }
+                             },
                             legend: {
                                 show: false
                             }
@@ -198,12 +213,27 @@
                                         color: textColor,
                                     }
                                 },
-                                tooltip: {
-                                    enabled: true,
-                                    marker: {
-                                        show: false,
-                                    }
-                                },
+                                 tooltip: {
+                                     enabled: true,
+                                     marker: {
+                                         show: false,
+                                     },
+                                     custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                                         const value = series[seriesIndex][dataPointIndex];
+                                         const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+                                         const date = new Date(timestamp);
+                                         const timeString = String(date.getUTCHours()).padStart(2, '0') + ':' +
+                                             String(date.getUTCMinutes()).padStart(2, '0') + ':' +
+                                             String(date.getUTCSeconds()).padStart(2, '0') + ', ' +
+                                             date.getUTCFullYear() + '-' +
+                                             String(date.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                                             String(date.getUTCDate()).padStart(2, '0');
+                                         return '<div class="apexcharts-tooltip-custom">' +
+                                             '<div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">' + value + '%</span></div>' +
+                                             '<div class="apexcharts-tooltip-custom-title">' + timeString + '</div>' +
+                                             '</div>';
+                                     }
+                                 },
                                 legend: {
                                     show: false
                                 }
