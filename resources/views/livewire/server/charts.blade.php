@@ -19,7 +19,7 @@
                         <option value="10080">1 week</option>
                         <option value="43200">30 days</option>
                     </x-forms.select>
-                    <h4 class="pt-4">CPU (%)</h4>
+                    <h4 class="pt-4">CPU Usage</h4>
                     <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
                     <script>
@@ -149,7 +149,7 @@
                     </script>
 
                     <div>
-                        <h4>Memory (%)</h4>
+                        <h4>Memory Usage</h4>
                         <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
                         <script>

@@ -2,7 +2,7 @@
     <div class="flex items-center gap-2">
         <h2>Metrics</h2>
     </div>
-    <div class="pb-4">Basic metrics for your container.</div>
+    <div class="pb-4">Basic metrics for your application container.</div>
     <div>
         @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
             <div class="alert alert-warning">Metrics are not available for Docker Compose applications yet!</div>
@@ -11,7 +11,7 @@
             <div>Go to <a class="underline dark:text-white" href="{{ route('server.show', $resource->destination->server->uuid) }}">Server settings</a> to enable it.</div>
         @else
             @if (!str($resource->status)->contains('running'))
-                <div class="alert alert-warning">Metrics are only available when this resource is running!</div>
+                <div class="alert alert-warning">Metrics are only available when the application container is running!</div>
             @else
                 <div>
                 <x-forms.select label="Interval" wire:change="setInterval" id="interval">
@@ -25,7 +25,7 @@
             </x-forms.select>
             <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()"
                 class="pt-5">
-                <h4>CPU (%)</h4>
+                <h4>CPU Usage</h4>
                 <div wire:ignore id="{!! $chartId !!}-cpu"></div>
 
                 <script>
@@ -151,7 +151,7 @@
                      });
                 </script>
 
-                <h4>Memory (MB)</h4>
+                <h4>Memory Usage</h4>
                 <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
                 <script>
