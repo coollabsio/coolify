@@ -46,7 +46,7 @@
                                     },
                                 },
                                 animations: {
-                                    enabled: false,
+                                    enabled: true,
                                 },
                             },
                             fill: {
@@ -173,7 +173,7 @@
                                         },
                                     },
                                     animations: {
-                                        enabled: false,
+                                        enabled: true,
                                     },
                                 },
                                 fill: {
