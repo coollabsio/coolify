@@ -17,6 +17,46 @@ trait ExecuteRemoteCommand
 
     public static int $batch_counter = 0;
 
+    private function redact_sensitive_info($text)
+    {
+        $text = remove_iip($text);
+
+        if (! isset($this->application)) {
+            return $text;
+        }
+
+        $lockedVars = collect([]);
+
+        if (isset($this->application->environment_variables)) {
+            $lockedVars = $lockedVars->merge(
+                $this->application->environment_variables
+                    ->where('is_shown_once', true)
+                    ->pluck('real_value', 'key')
+                    ->filter()
+            );
+        }
+
+        if (isset($this->pull_request_id) && $this->pull_request_id !== 0 && isset($this->application->environment_variables_preview)) {
+            $lockedVars = $lockedVars->merge(
+                $this->application->environment_variables_preview
+                    ->where('is_shown_once', true)
+                    ->pluck('real_value', 'key')
+                    ->filter()
+            );
+        }
+
+        foreach ($lockedVars as $key => $value) {
+            $escapedValue = preg_quote($value, '/');
+            $text = preg_replace(
+                '/'.$escapedValue.'/',
+                REDACTED,
+                $text
+            );
+        }
+
+        return $text;
+    }
+
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
@@ -74,7 +114,7 @@ trait ExecuteRemoteCommand
                         // Track SSH retry event in Sentry
                         $this->trackSshRetryEvent($attempt, $maxRetries, $delay, $errorMessage, [
                             'server' => $this->server->name ?? $this->server->ip ?? 'unknown',
-                            'command' => remove_iip($command),
+                            'command' => $this->redact_sensitive_info($command),
                             'trait' => 'ExecuteRemoteCommand',
                         ]);
 
@@ -125,8 +165,8 @@ trait ExecuteRemoteCommand
             $sanitized_output = sanitize_utf8_text($output);
 
             $new_log_entry = [
-                'command' => remove_iip($command),
-                'output' => remove_iip($sanitized_output),
+                'command' => $this->redact_sensitive_info($command),
+                'output' => $this->redact_sensitive_info($sanitized_output),
                 'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
@@ -194,7 +234,7 @@ trait ExecuteRemoteCommand
         $retryMessage = "SSH connection failed. Retrying... (Attempt {$attempt}/{$maxRetries}, waiting {$delay}s)\nError: {$errorMessage}";
 
         $new_log_entry = [
-            'output' => remove_iip($retryMessage),
+            'output' => $this->redact_sensitive_info($retryMessage),
             'type' => 'stdout',
             'timestamp' => Carbon::now('UTC'),
             'hidden' => false,
