@@ -32,7 +32,8 @@
                 wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
-                aria-placeholder="{{ $attributes->get('placeholder') }}">
+                aria-placeholder="{{ $attributes->get('placeholder') }}"
+                @if ($autofocus) x-ref="autofocusInput" @endif>
 
         </div>
     @else
@@ -45,7 +46,8 @@
             max="{{ $attributes->get('max') }}" minlength="{{ $attributes->get('minlength') }}"
             maxlength="{{ $attributes->get('maxlength') }}"
             @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
-            placeholder="{{ $attributes->get('placeholder') }}">
+            placeholder="{{ $attributes->get('placeholder') }}"
+            @if ($autofocus) x-ref="autofocusInput" @endif>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />

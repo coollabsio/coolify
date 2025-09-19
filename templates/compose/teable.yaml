@@ -1,5 +1,6 @@
 # documentation: https://help.teable.io/
 # slogan: Teable is a powerful visual interface built on relational databases (PostgreSQL).
+# category: productivity
 # tags: airtable, teable, database, visual, interface, relational, postgresql
 # logo: svgs/teable.png
 # port: 3000
@@ -10,8 +11,8 @@ services:
     volumes:
       - teable_data:/app/.assets:rw
     environment:
-      - SERVICE_FQDN_TEABLE_3000
-      - PUBLIC_ORIGIN=${SERVICE_FQDN_TEABLE}
+      - SERVICE_URL_TEABLE_3000
+      - PUBLIC_ORIGIN=${SERVICE_URL_TEABLE}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - SECRET_KEY=${SERVICE_PASSWORD_64_SECRET}
       - TZ=${TIMEZONE}

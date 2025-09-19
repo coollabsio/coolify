@@ -19,33 +19,37 @@
                     @endif
                 </div>
             </div>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
+            <x-forms.button canGate="update" :canResource="$storage" type="submit">Save</x-forms.button>
 
-            <x-modal-confirmation title="Confirm Storage Deletion?" isErrorButton buttonTitle="Delete"
-                submitAction="delete({{ $storage->id }})" :actions="[
-                    'The selected storage location will be permanently deleted from Coolify.',
-                    'If the storage location is in use by any backup jobs those backup jobs will only store the backup locally on the server.',
-                ]" confirmationText="{{ $storage->name }}"
-                confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
-                shortConfirmationLabel="Storage Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
+            @can('delete', $storage)
+                <x-modal-confirmation title="Confirm Storage Deletion?" isErrorButton buttonTitle="Delete"
+                    submitAction="delete({{ $storage->id }})" :actions="[
+                        'The selected storage location will be permanently deleted from Coolify.',
+                        'If the storage location is in use by any backup jobs those backup jobs will only store the backup locally on the server.',
+                    ]" confirmationText="{{ $storage->name }}"
+                    confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
+                    shortConfirmationLabel="Storage Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
+            @endcan
         </div>
         <div class="flex gap-2">
-            <x-forms.input label="Name" id="storage.name" />
-            <x-forms.input label="Description" id="storage.description" />
+            <x-forms.input canGate="update" :canResource="$storage" label="Name" id="storage.name" />
+            <x-forms.input canGate="update" :canResource="$storage" label="Description" id="storage.description" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input required label="Endpoint" id="storage.endpoint" />
-            <x-forms.input required label="Bucket" id="storage.bucket" />
-            <x-forms.input required label="Region" id="storage.region" />
+            <x-forms.input canGate="update" :canResource="$storage" required label="Endpoint" id="storage.endpoint" />
+            <x-forms.input canGate="update" :canResource="$storage" required label="Bucket" id="storage.bucket" />
+            <x-forms.input canGate="update" :canResource="$storage" required label="Region" id="storage.region" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input required type="password" label="Access Key" id="storage.key" />
-            <x-forms.input required type="password" label="Secret Key" id="storage.secret" />
+            <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Access Key"
+                id="storage.key" />
+            <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Secret Key"
+                id="storage.secret" />
         </div>
-        <x-forms.button class="mt-4" isHighlighted wire:click="testConnection">
-            Validate Connection
-        </x-forms.button>
+        @can('validateConnection', $storage)
+            <x-forms.button class="mt-4" isHighlighted wire:click="testConnection">
+                Validate Connection
+            </x-forms.button>
+        @endcan
     </form>
 </div>

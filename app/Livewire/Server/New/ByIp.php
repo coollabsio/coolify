@@ -5,56 +5,46 @@ namespace App\Livewire\Server\New;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Models\Team;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class ByIp extends Component
 {
+    use AuthorizesRequests;
+
     #[Locked]
     public $private_keys;
 
     #[Locked]
     public $limit_reached;
 
-    #[Validate('nullable|integer', as: 'Private Key')]
     public ?int $private_key_id = null;
 
-    #[Validate('nullable|string', as: 'Private Key Name')]
     public $new_private_key_name;
 
-    #[Validate('nullable|string', as: 'Private Key Description')]
     public $new_private_key_description;
 
-    #[Validate('nullable|string', as: 'Private Key Value')]
     public $new_private_key_value;
 
-    #[Validate('required|string', as: 'Name')]
     public string $name;
 
-    #[Validate('nullable|string', as: 'Description')]
     public ?string $description = null;
 
-    #[Validate('required|string', as: 'IP Address/Domain')]
     public string $ip;
 
-    #[Validate('required|string', as: 'User')]
     public string $user = 'root';
 
-    #[Validate('required|integer|between:1,65535', as: 'Port')]
     public int $port = 22;
 
-    #[Validate('required|boolean', as: 'Swarm Manager')]
     public bool $is_swarm_manager = false;
 
-    #[Validate('required|boolean', as: 'Swarm Worker')]
     public bool $is_swarm_worker = false;
 
-    #[Validate('nullable|integer', as: 'Swarm Cluster')]
     public $selected_swarm_cluster = null;
 
-    #[Validate('required|boolean', as: 'Build Server')]
     public bool $is_build_server = false;
 
     #[Locked]
@@ -68,6 +58,50 @@ class ByIp extends Component
         if ($this->swarm_managers->count() > 0) {
             $this->selected_swarm_cluster = $this->swarm_managers->first()->id;
         }
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'private_key_id' => 'nullable|integer',
+            'new_private_key_name' => 'nullable|string',
+            'new_private_key_description' => 'nullable|string',
+            'new_private_key_value' => 'nullable|string',
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'ip' => 'required|string',
+            'user' => 'required|string',
+            'port' => 'required|integer|between:1,65535',
+            'is_swarm_manager' => 'required|boolean',
+            'is_swarm_worker' => 'required|boolean',
+            'selected_swarm_cluster' => 'nullable|integer',
+            'is_build_server' => 'required|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(ValidationPatterns::combinedMessages(), [
+            'private_key_id.integer' => 'The Private Key field must be an integer.',
+            'private_key_id.nullable' => 'The Private Key field is optional.',
+            'new_private_key_name.string' => 'The Private Key Name must be a string.',
+            'new_private_key_description.string' => 'The Private Key Description must be a string.',
+            'new_private_key_value.string' => 'The Private Key Value must be a string.',
+            'ip.required' => 'The IP Address/Domain is required.',
+            'ip.string' => 'The IP Address/Domain must be a string.',
+            'user.required' => 'The User field is required.',
+            'user.string' => 'The User field must be a string.',
+            'port.required' => 'The Port field is required.',
+            'port.integer' => 'The Port field must be an integer.',
+            'port.between' => 'The Port field must be between 1 and 65535.',
+            'is_swarm_manager.required' => 'The Swarm Manager field is required.',
+            'is_swarm_manager.boolean' => 'The Swarm Manager field must be true or false.',
+            'is_swarm_worker.required' => 'The Swarm Worker field is required.',
+            'is_swarm_worker.boolean' => 'The Swarm Worker field must be true or false.',
+            'selected_swarm_cluster.integer' => 'The Swarm Cluster field must be an integer.',
+            'is_build_server.required' => 'The Build Server field is required.',
+            'is_build_server.boolean' => 'The Build Server field must be true or false.',
+        ]);
     }
 
     public function setPrivateKey(string $private_key_id)
@@ -84,6 +118,7 @@ class ByIp extends Component
     {
         $this->validate();
         try {
+            $this->authorize('create', Server::class);
             if (Server::where('team_id', currentTeam()->id)
                 ->where('ip', $this->ip)
                 ->exists()) {

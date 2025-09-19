@@ -256,12 +256,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
             if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
                 $MINIO_BROWSER_REDIRECT_URL->update([
-                    'value' => generateFqdn($server, 'console-'.$uuid, true),
+                    'value' => generateUrl(server: $server, random: 'console-'.$uuid, forceHttps: true),
                 ]);
             }
             if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
                 $MINIO_SERVER_URL->update([
-                    'value' => generateFqdn($server, 'minio-'.$uuid, true),
+                    'value' => generateUrl(server: $server, random: 'minio-'.$uuid, forceHttps: true),
                 ]);
             }
             $payload = collect([
@@ -279,12 +279,12 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 
             if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
                 $LOGTO_ENDPOINT->update([
-                    'value' => generateFqdn($server, 'logto-'.$uuid),
+                    'value' => generateUrl(server: $server, random: 'logto-'.$uuid),
                 ]);
             }
             if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
                 $LOGTO_ADMIN_ENDPOINT->update([
-                    'value' => generateFqdn($server, 'logto-admin-'.$uuid),
+                    'value' => generateUrl(server: $server, random: 'logto-admin-'.$uuid),
                 ]);
             }
             $payload = collect([
@@ -1093,19 +1093,18 @@ function getContainerLogs(Server $server, string $container_id, int $lines = 100
 {
     if ($server->isSwarm()) {
         $output = instant_remote_process([
-            "docker service logs -n {$lines} {$container_id}",
+            "docker service logs -n {$lines} {$container_id} 2>&1",
         ], $server);
     } else {
         $output = instant_remote_process([
-            "docker logs -n {$lines} {$container_id}",
+            "docker logs -n {$lines} {$container_id} 2>&1",
         ], $server);
     }
 
-    $output .= removeAnsiColors($output);
+    $output = removeAnsiColors($output);
 
     return $output;
 }
-
 function escapeEnvVariables($value)
 {
     $search = ['\\', "\r", "\t", "\x0", '"', "'"];

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -14,13 +15,38 @@ class StackForm extends Component
 
     protected $listeners = ['saveCompose'];
 
-    public $rules = [
-        'service.docker_compose_raw' => 'required',
-        'service.docker_compose' => 'required',
-        'service.name' => 'required',
-        'service.description' => 'nullable',
-        'service.connect_to_docker_network' => 'nullable',
-    ];
+    protected function rules(): array
+    {
+        $baseRules = [
+            'service.docker_compose_raw' => 'required',
+            'service.docker_compose' => 'required',
+            'service.name' => ValidationPatterns::nameRules(),
+            'service.description' => ValidationPatterns::descriptionRules(),
+            'service.connect_to_docker_network' => 'nullable',
+        ];
+
+        // Add dynamic field rules
+        foreach ($this->fields ?? collect() as $key => $field) {
+            $rules = data_get($field, 'rules', 'nullable');
+            $baseRules["fields.$key.value"] = $rules;
+        }
+
+        return $baseRules;
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'service.name.required' => 'The Name field is required.',
+                'service.name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+                'service.description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+                'service.docker_compose_raw.required' => 'The Docker Compose Raw field is required.',
+                'service.docker_compose.required' => 'The Docker Compose field is required.',
+            ]
+        );
+    }
 
     public $validationAttributes = [];
 
@@ -45,7 +71,6 @@ class StackForm extends Component
                     'customHelper' => $customHelper,
                 ]);
 
-                $this->rules["fields.$key.value"] = $rules;
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;
             }
         }

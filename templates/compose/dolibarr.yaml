@@ -1,5 +1,6 @@
 # documentation: https://www.dolibarr.org/documentation-home.php
 # slogan: Dolibarr is a modern software package to manage your organization's activity (contacts, quotes, invoices, orders, stocks, agenda, hr, expense reports, accountancy, ecm, manufacturing, ...).
+# category: cms
 # tags: crm,ERP
 # logo: svgs/dolibarr.png
 # port: 80
@@ -8,7 +9,7 @@ services:
   dolibarr:
     image: dolibarr/dolibarr:latest
     environment:
-      - SERVICE_FQDN_DOLIBARR_80
+      - SERVICE_URL_DOLIBARR_80
       - WWW_USER_ID=${WWW_USER_ID:-1000}
       - WWW_GROUP_ID=${WWW_GROUP_ID:-1000}
       - DOLI_DB_HOST=mariadb

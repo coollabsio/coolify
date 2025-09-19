@@ -63,7 +63,6 @@ class DockerCompose extends Component
                 EnvironmentVariable::create([
                     'key' => $key,
                     'value' => $variable,
-                    'is_build_time' => false,
                     'is_preview' => false,
                     'resourceable_id' => $service->id,
                     'resourceable_type' => $service->getMorphClass(),

@@ -76,6 +76,7 @@ class Advanced extends Component
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
+            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->concurrent_builds = $this->concurrentBuilds;
             $this->server->settings->dynamic_timeout = $this->dynamicTimeout;

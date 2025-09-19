@@ -1,5 +1,6 @@
 # documentation: https://doc.evolution-api.com/v1/pt/get-started/introduction
 # slogan: Evolution API Installation with Postgres and Redis
+# category: backend
 # tags: evolution-api,evo-api,evolution,whatsapp,api,postgres,redis
 # logo: svgs/evolution-api.svg
 # port: 8080
@@ -13,8 +14,8 @@ services:
       - redis
       - postgres
     environment:
-      - SERVICE_FQDN_EVO_8080
-      - SERVER_URL=$SERVICE_FQDN_EVO
+      - SERVICE_URL_EVO_8080
+      - SERVER_URL=$SERVICE_URL_EVO
       - DB_TYPE=${DB_TYPE:-postgresdb}
       - 'DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-postgres}'
       - DB_POSTGRESDB_HOST=${DB_POSTGRESDB_HOST:-postgres}

@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Project\Shared;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 // Refactored ✅
 class Webhooks extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     public ?string $deploywebhook;

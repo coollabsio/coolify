@@ -4,7 +4,7 @@ namespace App\Livewire\Project;
 
 use App\Models\Environment;
 use App\Models\Project;
-use Livewire\Attributes\Validate;
+use App\Support\ValidationPatterns;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -12,11 +12,22 @@ class Show extends Component
 {
     public Project $project;
 
-    #[Validate(['required', 'string', 'min:3'])]
     public string $name;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $description = null;
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return ValidationPatterns::combinedMessages();
+    }
 
     public function mount(string $project_uuid)
     {

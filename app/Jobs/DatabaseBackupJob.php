@@ -54,6 +54,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public ?string $backup_output = null;
 
+    public ?string $error_output = null;
+
+    public bool $s3_uploaded = false;
+
     public ?string $postgres_password = null;
 
     public ?string $mongo_root_username = null;
@@ -351,6 +355,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $size = $this->calculate_size();
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
+
+                        // If local backup is disabled, delete the local file immediately after S3 upload
+                        if ($this->backup->disable_local_backup) {
+                            deleteBackupsLocally($this->backup_location, $this->server);
+                        }
                     }
 
                     $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
@@ -361,15 +370,34 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         'size' => $size,
                     ]);
                 } catch (\Throwable $e) {
-                    if ($this->backup_log) {
-                        $this->backup_log->update([
-                            'status' => 'failed',
-                            'message' => $this->backup_output,
-                            'size' => $size,
-                            'filename' => null,
-                        ]);
+                    // Check if backup actually failed or if it's just a post-backup issue
+                    $actualBackupFailed = ! $this->s3_uploaded && $this->backup->save_s3;
+
+                    if ($actualBackupFailed || $size === 0) {
+                        // Real backup failure
+                        if ($this->backup_log) {
+                            $this->backup_log->update([
+                                'status' => 'failed',
+                                'message' => $this->error_output ?? $this->backup_output ?? $e->getMessage(),
+                                'size' => $size,
+                                'filename' => null,
+                            ]);
+                        }
+                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->error_output ?? $this->backup_output ?? $e->getMessage(), $database));
+                    } else {
+                        // Backup succeeded but post-processing failed (cleanup, notification, etc.)
+                        if ($this->backup_log) {
+                            $this->backup_log->update([
+                                'status' => 'success',
+                                'message' => $this->backup_output ? $this->backup_output."\nWarning: Post-backup cleanup encountered an issue: ".$e->getMessage() : 'Warning: '.$e->getMessage(),
+                                'size' => $size,
+                            ]);
+                        }
+                        // Send success notification since the backup itself succeeded
+                        $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
+                        // Log the post-backup issue
+                        ray('Post-backup operation failed but backup was successful: '.$e->getMessage());
                     }
-                    $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output, $database));
                 }
             }
             if ($this->backup_log && $this->backup_log->status === 'success') {
@@ -440,7 +468,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_output = null;
             }
         } catch (\Throwable $e) {
-            $this->add_to_backup_output($e->getMessage());
+            $this->add_to_error_output($e->getMessage());
             throw $e;
         }
     }
@@ -466,7 +494,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_output = null;
             }
         } catch (\Throwable $e) {
-            $this->add_to_backup_output($e->getMessage());
+            $this->add_to_error_output($e->getMessage());
             throw $e;
         }
     }
@@ -486,7 +514,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_output = null;
             }
         } catch (\Throwable $e) {
-            $this->add_to_backup_output($e->getMessage());
+            $this->add_to_error_output($e->getMessage());
             throw $e;
         }
     }
@@ -506,7 +534,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->backup_output = null;
             }
         } catch (\Throwable $e) {
-            $this->add_to_backup_output($e->getMessage());
+            $this->add_to_error_output($e->getMessage());
             throw $e;
         }
     }
@@ -517,6 +545,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->backup_output = $this->backup_output."\n".$output;
         } else {
             $this->backup_output = $output;
+        }
+    }
+
+    private function add_to_error_output($output): void
+    {
+        if ($this->error_output) {
+            $this->error_output = $this->error_output."\n".$output;
+        } else {
+            $this->error_output = $output;
         }
     }
 
@@ -561,13 +598,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             }
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key \"$secret\"";
+            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
 
-            $this->add_to_backup_output('Uploaded to S3.');
+            $this->s3_uploaded = true;
         } catch (\Throwable $e) {
-            $this->add_to_backup_output($e->getMessage());
+            $this->s3_uploaded = false;
+            $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {
             $command = "docker rm -f backup-of-{$this->backup->uuid}";

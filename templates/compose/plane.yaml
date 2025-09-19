@@ -1,12 +1,13 @@
 # documentation: https://docs.plane.so/self-hosting/methods/docker-compose
 # slogan: The open source project management tool
+# category: productivity
 # tags: plane,project-management,tool,open,source,api,nextjs,redis,postgresql,django,pm
 # logo: svgs/plane.svg
 
 x-app-env: &app-env
   environment:
     - APP_RELEASE=${APP_RELEASE:-v0.25.2}
-    - WEB_URL=${SERVICE_FQDN_PLANE}
+    - WEB_URL=${SERVICE_URL_PLANE}
     - DEBUG=${DEBUG:-0}
     - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGIN:-http://localhost}
     # Gunicorn Workers
@@ -52,7 +53,7 @@ x-app-env: &app-env
 services:
   proxy:
     environment:
-      - SERVICE_FQDN_PLANE
+      - SERVICE_URL_PLANE
       - FILE_SIZE_LIMIT=${FILE_SIZE_LIMIT:-5242880}
       - BUCKET_NAME=${BUCKET_NAME:-uploads}
     image: makeplane/plane-proxy:${APP_RELEASE:-v0.25.1}

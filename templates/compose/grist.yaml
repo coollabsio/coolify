@@ -1,5 +1,6 @@
 # documentation: https://support.getgrist.com/
 # slogan: Grist is a modern relational spreadsheet. It combines the flexibility of a spreadsheet with the robustness of a database.
+# category: productivity
 # tags: lowcode, nocode, spreadsheet, database, relational
 # logo: svgs/grist.svg
 # port: 443
@@ -8,9 +9,9 @@ services:
   grist:
     image: gristlabs/grist:latest
     environment:
-      - SERVICE_FQDN_GRIST_443
-      - APP_HOME_URL=${SERVICE_FQDN_GRIST}
-      - APP_DOC_URL=${SERVICE_FQDN_GRIST}
+      - SERVICE_URL_GRIST_443
+      - APP_HOME_URL=${SERVICE_URL_GRIST}
+      - APP_DOC_URL=${SERVICE_URL_GRIST}
       - GRIST_DOMAIN=${SERVICE_URL_GRIST}
       - TZ=${TZ:-UTC}
       - GRIST_SUPPORT_ANON=${SUPPORT_ANON:-false}
@@ -21,7 +22,7 @@ services:
       - GRIST_UI_FEATURES=${UI_FEATURES:-helpCenter,billing,templates,createSite,multiSite,sendToDrive,tutorials,supportGrist}
       - GRIST_DEFAULT_EMAIL=${DEFAULT_EMAIL:-test@example.com}
       - GRIST_ORG_IN_PATH=${ORG_IN_PATH:-true}
-      - GRIST_OIDC_SP_HOST=${SERVICE_FQDN_GRIST}
+      - GRIST_OIDC_SP_HOST=${SERVICE_URL_GRIST}
       - GRIST_OIDC_IDP_SCOPES=${OIDC_IDP_SCOPES:-openid profile email}
       - GRIST_OIDC_IDP_SKIP_END_SESSION_ENDPOINT=${OIDC_IDP_SKIP_END_SESSION_ENDPOINT:-false}
       - GRIST_OIDC_IDP_ISSUER=${OIDC_IDP_ISSUER:?}
@@ -40,8 +41,8 @@ services:
       - TYPEORM_PORT=${TYPEORM_PORT:-5432}
       - TYPEORM_LOGGING=${TYPEORM_LOGGING:-false}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - GRIST_HELP_CENTER=${SERVICE_FQDN_GRIST}/help
-      - GRIST_TERMS_OF_SERVICE_URL=${SERVICE_FQDN_GRIST}/terms
+      - GRIST_HELP_CENTER=${SERVICE_URL_GRIST}/help
+      - GRIST_TERMS_OF_SERVICE_URL=${SERVICE_URL_GRIST}/terms
       - FREE_COACHING_CALL_URL=${FREE_COACHING_CALL_URL}
       - GRIST_CONTACT_SUPPORT_URL=${CONTACT_SUPPORT_URL}
     volumes:

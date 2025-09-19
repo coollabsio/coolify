@@ -18,10 +18,12 @@
                 href="{{ route('project.database.logs', $parameters) }}">
                 Logs
             </a>
-            <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.database.command', $parameters) }}">
-                Terminal
-            </a>
+            @can('canAccessTerminal')
+                <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
+                    href="{{ route('project.database.command', $parameters) }}">
+                    Terminal
+                </a>
+            @endcan
             @if (
                 $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
                     $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||

@@ -29,7 +29,7 @@
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description>
-                                    <span x-html="application.description"></span>
+                                    <span x-html="window.sanitizeHTML(application.description)"></span>
                                 </x-slot>
                                 <x-slot:logo>
                                     <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"

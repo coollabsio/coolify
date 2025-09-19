@@ -77,18 +77,22 @@
                 ]) }}">
                 Resources
             </a>
-            <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
-                href="{{ route('server.command', [
-                    'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
-                Terminal
-            </a>
-            <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
-                href="{{ route('server.security.patches', [
-                    'server_uuid' => data_get($server, 'uuid'),
-                ]) }}">
-                Security
-            </a>
+            @can('canAccessTerminal')
+                <a class="{{ request()->routeIs('server.command') ? 'dark:text-white' : '' }}"
+                    href="{{ route('server.command', [
+                        'server_uuid' => data_get($server, 'uuid'),
+                    ]) }}">
+                    Terminal
+                </a>
+            @endcan
+            @can('update', $server)
+                <a class="{{ request()->routeIs('server.security.patches') ? 'dark:text-white' : '' }}"
+                    href="{{ route('server.security.patches', [
+                        'server_uuid' => data_get($server, 'uuid'),
+                    ]) }}">
+                    Security
+                </a>
+            @endcan
         </nav>
         <div class="order-first sm:order-last">
             <div>

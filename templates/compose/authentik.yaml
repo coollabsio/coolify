@@ -1,5 +1,6 @@
 # documentation: https://docs.goauthentik.io/docs/installation/docker-compose
 # slogan: An open-source Identity Provider, focused on flexibility and versatility.
+# category: auth
 # tags: identity,login,user,oauth,openid,oidc,authentication,saml,auth0,okta
 # logo: svgs/authentik.png
 # port: 9000
@@ -10,7 +11,7 @@ services:
     restart: unless-stopped
     command: server
     environment:
-      - SERVICE_FQDN_AUTHENTIKSERVER_9000
+      - SERVICE_URL_AUTHENTIKSERVER_9000
       - AUTHENTIK_REDIS__HOST=${REDIS_HOST:-redis}
       - AUTHENTIK_POSTGRESQL__HOST=${POSTGRES_HOST:-postgresql}
       - AUTHENTIK_POSTGRESQL__USER=${SERVICE_USER_POSTGRESQL}

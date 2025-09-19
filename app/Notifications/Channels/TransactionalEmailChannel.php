@@ -16,7 +16,12 @@ class TransactionalEmailChannel
         if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
             return;
         }
-        $email = $notifiable->email;
+
+        // Check if notification has a custom recipient (for email changes)
+        $email = property_exists($notification, 'newEmail') && $notification->newEmail
+            ? $notification->newEmail
+            : $notifiable->email;
+
         if (! $email) {
             return;
         }

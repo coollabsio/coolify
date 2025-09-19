@@ -58,7 +58,7 @@ class StripeProcessJob implements ShouldQueue
                 case 'checkout.session.completed':
                     $clientReferenceId = data_get($data, 'client_reference_id');
                     if (is_null($clientReferenceId)) {
-                        send_internal_notification('Checkout session completed without client reference id.');
+                        // send_internal_notification('Checkout session completed without client reference id.');
                         break;
                     }
                     $userId = Str::before($clientReferenceId, ':');
@@ -68,7 +68,7 @@ class StripeProcessJob implements ShouldQueue
                     $team = Team::find($teamId);
                     $found = $team->members->where('id', $userId)->first();
                     if (! $found->isAdmin()) {
-                        send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
+                        // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                     }
                     $subscription = Subscription::where('team_id', $teamId)->first();
@@ -95,7 +95,7 @@ class StripeProcessJob implements ShouldQueue
                     $customerId = data_get($data, 'customer');
                     $planId = data_get($data, 'lines.data.0.plan.id');
                     if (Str::contains($excludedPlans, $planId)) {
-                        send_internal_notification('Subscription excluded.');
+                        // send_internal_notification('Subscription excluded.');
                         break;
                     }
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
@@ -110,16 +110,38 @@ class StripeProcessJob implements ShouldQueue
                     break;
                 case 'invoice.payment_failed':
                     $customerId = data_get($data, 'customer');
+                    $invoiceId = data_get($data, 'id');
+                    $paymentIntentId = data_get($data, 'payment_intent');
+
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
-                        send_internal_notification('invoice.payment_failed failed but no subscription found in Coolify for customer: '.$customerId);
+                        // send_internal_notification('invoice.payment_failed failed but no subscription found in Coolify for customer: '.$customerId);
                         throw new \RuntimeException("No subscription found for customer: {$customerId}");
                     }
                     $team = data_get($subscription, 'team');
                     if (! $team) {
-                        send_internal_notification('invoice.payment_failed failed but no team found in Coolify for customer: '.$customerId);
+                        // send_internal_notification('invoice.payment_failed failed but no team found in Coolify for customer: '.$customerId);
                         throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
                     }
+
+                    // Verify payment status with Stripe API before sending failure notification
+                    if ($paymentIntentId) {
+                        try {
+                            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                            $paymentIntent = $stripe->paymentIntents->retrieve($paymentIntentId);
+
+                            if (in_array($paymentIntent->status, ['processing', 'succeeded', 'requires_action', 'requires_confirmation'])) {
+                                break;
+                            }
+
+                            if (! $subscription->stripe_invoice_paid && $subscription->created_at->diffInMinutes(now()) < 5) {
+                                SubscriptionInvoiceFailedJob::dispatch($team)->delay(now()->addSeconds(60));
+                                break;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
                     if (! $subscription->stripe_invoice_paid) {
                         SubscriptionInvoiceFailedJob::dispatch($team);
                         // send_internal_notification('Invoice payment failed: '.$customerId);
@@ -129,11 +151,11 @@ class StripeProcessJob implements ShouldQueue
                     $customerId = data_get($data, 'customer');
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
-                        send_internal_notification('payment_intent.payment_failed, no subscription found in Coolify for customer: '.$customerId);
+                        // send_internal_notification('payment_intent.payment_failed, no subscription found in Coolify for customer: '.$customerId);
                         throw new \RuntimeException("No subscription found in Coolify for customer: {$customerId}");
                     }
                     if ($subscription->stripe_invoice_paid) {
-                        send_internal_notification('payment_intent.payment_failed but invoice is active for customer: '.$customerId);
+                        // send_internal_notification('payment_intent.payment_failed but invoice is active for customer: '.$customerId);
 
                         return;
                     }
@@ -154,7 +176,7 @@ class StripeProcessJob implements ShouldQueue
                     $team = Team::find($teamId);
                     $found = $team->members->where('id', $userId)->first();
                     if (! $found->isAdmin()) {
-                        send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
+                        // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                         throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
                     }
                     $subscription = Subscription::where('team_id', $teamId)->first();
@@ -177,7 +199,7 @@ class StripeProcessJob implements ShouldQueue
                     $subscriptionId = data_get($data, 'items.data.0.subscription') ?? data_get($data, 'id');
                     $planId = data_get($data, 'items.data.0.plan.id') ?? data_get($data, 'plan.id');
                     if (Str::contains($excludedPlans, $planId)) {
-                        send_internal_notification('Subscription excluded.');
+                        // send_internal_notification('Subscription excluded.');
                         break;
                     }
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
@@ -194,7 +216,7 @@ class StripeProcessJob implements ShouldQueue
                                 'stripe_invoice_paid' => false,
                             ]);
                         } else {
-                            send_internal_notification('No subscription and team id found');
+                            // send_internal_notification('No subscription and team id found');
                             throw new \RuntimeException('No subscription and team id found');
                         }
                     }
@@ -230,7 +252,7 @@ class StripeProcessJob implements ShouldQueue
                             $subscription->update([
                                 'stripe_past_due' => true,
                             ]);
-                            send_internal_notification('Past Due: '.$customerId.'Subscription ID: '.$subscriptionId);
+                            // send_internal_notification('Past Due: '.$customerId.'Subscription ID: '.$subscriptionId);
                         }
                     }
                     if ($status === 'unpaid') {
@@ -238,13 +260,13 @@ class StripeProcessJob implements ShouldQueue
                             $subscription->update([
                                 'stripe_invoice_paid' => false,
                             ]);
-                            send_internal_notification('Unpaid: '.$customerId.'Subscription ID: '.$subscriptionId);
+                            // send_internal_notification('Unpaid: '.$customerId.'Subscription ID: '.$subscriptionId);
                         }
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->subscriptionEnded();
                         } else {
-                            send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
+                            // send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
                         }
                     }
@@ -273,11 +295,11 @@ class StripeProcessJob implements ShouldQueue
                         if ($team) {
                             $team->subscriptionEnded();
                         } else {
-                            send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
+                            // send_internal_notification('Subscription deleted but no team found in Coolify for customer: '.$customerId);
                             throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
                         }
                     } else {
-                        send_internal_notification('Subscription deleted but no subscription found in Coolify for customer: '.$customerId);
+                        // send_internal_notification('Subscription deleted but no subscription found in Coolify for customer: '.$customerId);
                         throw new \RuntimeException("No subscription found in Coolify for customer: {$customerId}");
                     }
                     break;

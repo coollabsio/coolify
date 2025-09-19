@@ -3,20 +3,41 @@
 namespace App\Livewire\Security\PrivateKey;
 
 use App\Models\PrivateKey;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public PrivateKey $private_key;
 
     public $public_key = 'Loading...';
 
-    protected $rules = [
-        'private_key.name' => 'required|string',
-        'private_key.description' => 'nullable|string',
-        'private_key.private_key' => 'required|string',
-        'private_key.is_git_related' => 'nullable|boolean',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'private_key.name' => ValidationPatterns::nameRules(),
+            'private_key.description' => ValidationPatterns::descriptionRules(),
+            'private_key.private_key' => 'required|string',
+            'private_key.is_git_related' => 'nullable|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'private_key.name.required' => 'The Name field is required.',
+                'private_key.name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+                'private_key.description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+                'private_key.private_key.required' => 'The Private Key field is required.',
+                'private_key.private_key.string' => 'The Private Key must be a valid string.',
+            ]
+        );
+    }
 
     protected $validationAttributes = [
         'private_key.name' => 'name',
@@ -44,6 +65,7 @@ class Show extends Component
     public function delete()
     {
         try {
+            $this->authorize('delete', $this->private_key);
             $this->private_key->safeDelete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
@@ -58,6 +80,7 @@ class Show extends Component
     public function changePrivateKey()
     {
         try {
+            $this->authorize('update', $this->private_key);
             $this->private_key->updatePrivateKey([
                 'private_key' => formatPrivateKey($this->private_key->private_key),
             ]);

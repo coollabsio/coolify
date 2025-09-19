@@ -1,5 +1,6 @@
 # documentation: https://docs.nodebb.org/
 # slogan: A next-generation discussion platform.
+# category: messaging
 # tags: communication, forums, discussion
 # logo: svgs/nodebb.svg
 # port: 4567
@@ -8,7 +9,7 @@ services:
   nodebb:
     image: ghcr.io/nodebb/nodebb:latest
     environment:
-      - SERVICE_FQDN_NODEBB_4567
+      - SERVICE_URL_NODEBB_4567
     volumes:
       - nodebb_build:/usr/src/app/build
       - nodebb_uploads:/usr/src/app/public/uploads
