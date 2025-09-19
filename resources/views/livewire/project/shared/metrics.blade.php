@@ -129,15 +129,18 @@
                                      }
                                  }
                              },
-                             yaxis: {
-                                 show: true,
-                                 labels: {
-                                     show: true,
-                                     style: {
-                                         colors: textColor,
-                                     }
-                                 }
-                             },
+                              yaxis: {
+                                  show: true,
+                                  labels: {
+                                      show: true,
+                                      style: {
+                                          colors: textColor,
+                                      },
+                                      formatter: function(value) {
+                                          return Math.round(value) + ' %';
+                                      }
+                                  }
+                              },
                              noData: {
                                  text: 'Loading...',
                                  style: {
@@ -259,16 +262,19 @@
                                      }
                                  }
                              },
-                             yaxis: {
-                                 min: 0,
-                                 show: true,
-                                 labels: {
-                                     show: true,
-                                     style: {
-                                         colors: textColor,
-                                     }
-                                 }
-                             },
+                              yaxis: {
+                                  min: 0,
+                                  show: true,
+                                  labels: {
+                                      show: true,
+                                      style: {
+                                          colors: textColor,
+                                      },
+                                      formatter: function(value) {
+                                          return Math.round(value) + ' MB';
+                                      }
+                                  }
+                              },
                              noData: {
                                  text: 'Loading...',
                                  style: {
