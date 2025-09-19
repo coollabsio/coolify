@@ -12,7 +12,7 @@ services:
       - SERVICE_URL_LOBECHAT_3210
       - OPENAI_API_KEY=${SERVICE_OPENAI_API_KEY}
       - OPENAI_PROXY_URL=${SERVICE_URL_OPENAI_PROXY:-https://api.openai.com/v1}
-      - ACCESS_CODE=${SERVICE_PASSWORD_ACCESSCODE?}
+      - ACCESS_CODE=${SERVICE_PASSWORD_ACCESSCODE}
     healthcheck:
       test:
         - CMD-SHELL
