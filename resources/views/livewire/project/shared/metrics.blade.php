@@ -148,7 +148,7 @@
                      });
                 </script>
 
-                <h3>Memory (MB)</h3>
+                <h4>Memory (MB)</h4>
                 <div wire:ignore id="{!! $chartId !!}-memory"></div>
 
                 <script>
