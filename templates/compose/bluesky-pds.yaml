@@ -1,3 +1,10 @@
+# documentation: https://github.com/bluesky-social/pds
+# slogan: Bluesky PDS (Personal Data Server)
+# category: backend
+# tags: bluesky, pds, platform
+# logo: svgs/bluesky.svg
+# port: 3000
+
 services:
   pds:
     image: 'ghcr.io/bluesky-social/pds:latest'
