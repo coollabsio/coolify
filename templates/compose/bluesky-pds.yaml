@@ -48,7 +48,7 @@ services:
         - wget
         - '--spider'
         - 'http://127.0.0.1:3000/xrpc/_health'
-      interval: 2s
+      interval: 5s
       timeout: 10s
       retries: 10
 volumes:
