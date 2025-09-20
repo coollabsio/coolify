@@ -11,7 +11,7 @@ services:
     volumes:
       - 'pds-data:/pds'
     environment:
-      - SERVICE_FQDN_PDS_3000
+      - SERVICE_URL_PDS_3000
       - 'PDS_HOSTNAME=${SERVICE_FQDN_PDS_3000}'
       - 'PDS_JWT_SECRET=${SERVICE_HEX_32_JWTSECRET}'
       - 'PDS_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}'
