@@ -56,7 +56,7 @@
                             <div class="flex flex-col gap-2 pt-4">
                                 <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
                                     monacoEditorLanguage="yaml"
-                                    label="Configuration file ({{ $this->configurationFilePath }})" name="proxySettings"
+                                    label="Configuration file ( {{ $this->configurationFilePath }} )" name="proxySettings"
                                     id="proxySettings" rows="30" />
                                 @can('update', $server)
                                     <x-modal-confirmation title="Reset Proxy Configuration?"
