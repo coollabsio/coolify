@@ -22,7 +22,7 @@
                      </div>
                      <div class="subtitle">Configure your proxy settings and advanced options.</div>
                      <h3>Advanced</h3>
-                    <div class="pb-4 w-96">
+                    <div class="pb-6 w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
                             id="server.settings.generate_exact_labels"
@@ -52,7 +52,7 @@
                     </div>
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
                         @if ($proxySettings)
-                            <div class="flex flex-col gap-2 pt-4">
+                            <div class="flex flex-col gap-2 pt-2">
                                 <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
                                     monacoEditorLanguage="yaml"
                                     label="Configuration file ( {{ $this->configurationFilePath }} )" name="proxySettings"
