@@ -20,7 +20,8 @@
                          @endif
                          <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
                      </div>
-                    <h3>Advanced</h3>
+                     <div class="subtitle">Configure your proxy settings and advanced options.</div>
+                     <h3>Advanced</h3>
                     <div class="pb-4 w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
