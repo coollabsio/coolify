@@ -36,9 +36,9 @@
                         @endif
                     </div>
                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
-                        <h3>Traefik</h3>
+                        <h3>Traefik (Coolify Proxy)</h3>
                     @elseif ($server->proxyType() === 'CADDY')
-                        <h3>Caddy</h3>
+                        <h3>Caddy (Coolify Proxy)</h3>
                     @endif
                     @if (
                         $server->proxy->last_applied_settings &&
