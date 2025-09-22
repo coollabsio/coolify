@@ -4,25 +4,25 @@
         <div x-init="$wire.loadProxyConfiguration">
             @if ($selectedProxy !== 'NONE')
                 <form wire:submit='submit'>
-                     <div class="flex items-center gap-2">
-                         <h2>Configuration</h2>
-                         @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
-                             @can('update', $server)
-                                 <x-modal-confirmation title="Confirm Proxy Switching?" 
-                                     buttonTitle="Switch Proxy"
-                                     submitAction="changeProxy" :actions="[
-                                         'Custom proxy configurations may be reset to their default settings.'
-                                     ]" warningMessage="This operation may cause issues. Please refer to the guide <a href='https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies' target='_blank' class='underline text-white'>switching between proxies</a> before proceeding!" step2ButtonText="Switch Proxy" :confirmWithText="false" :confirmWithPassword="false">
-                                 </x-modal-confirmation>
-                             @endcan
-                         @else
-                             <x-forms.button canGate="update" :canResource="$server"
-                                 wire:click="$dispatch('error', 'Currently running proxy must be stopped before switching proxy')">Switch Proxy</x-forms.button>
-                         @endif
-                         <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
-                     </div>
-                     <div class="subtitle">Configure your proxy settings and advanced options.</div>
-                     <h3>Advanced</h3>
+                    <div class="flex items-center gap-2">
+                        <h2>Configuration</h2>
+                        @if ($server->proxy->status === 'exited' || $server->proxy->status === 'removing')
+                            @can('update', $server)
+                                <x-modal-confirmation title="Confirm Proxy Switching?" buttonTitle="Switch Proxy"
+                                    submitAction="changeProxy" :actions="['Custom proxy configurations may be reset to their default settings.']"
+                                    warningMessage="This operation may cause issues. Please refer to the guide <a href='https://coolify.io/docs/knowledge-base/server/proxies#switch-between-proxies' target='_blank' class='underline text-white'>switching between proxies</a> before proceeding!"
+                                    step2ButtonText="Switch Proxy" :confirmWithText="false" :confirmWithPassword="false">
+                                </x-modal-confirmation>
+                            @endcan
+                        @else
+                            <x-forms.button canGate="update" :canResource="$server"
+                                wire:click="$dispatch('error', 'Currently running proxy must be stopped before switching proxy')">Switch
+                                Proxy</x-forms.button>
+                        @endif
+                        <x-forms.button canGate="update" :canResource="$server" type="submit">Save</x-forms.button>
+                    </div>
+                    <div class="subtitle">Configure your proxy settings and advanced options.</div>
+                    <h3>Advanced</h3>
                     <div class="pb-6 w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
@@ -36,30 +36,32 @@
                                 id="redirectUrl" label="Redirect to (optional)" />
                         @endif
                     </div>
-                     @php
-                         $proxyTitle = $server->proxyType() === ProxyTypes::TRAEFIK->value ? 'Traefik (Coolify Proxy)' : 'Caddy (Coolify Proxy)';
-                     @endphp
-                     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
-                         <div class="flex items-center gap-2">
-                             <h3>{{ $proxyTitle }}</h3>
-                             @if($proxySettings)
-                                 @can('update', $server)
-                                     <x-modal-confirmation title="Reset Proxy Configuration?"
-                                         buttonTitle="Reset Configuration"
-                                         submitAction="resetProxyConfiguration" :actions="[
-                                             'Reset proxy configuration to default settings',
-                                             'All custom configurations will be lost',
-                                             'Custom ports and entrypoints will be removed',
-                                         ]"
-                                         confirmationText="{{ $server->name }}"
-                                         confirmationLabel="Please confirm by entering the server name below"
-                                         shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
-                                         :confirmWithPassword="false" :confirmWithText="true">
-                                     </x-modal-confirmation>
-                                 @endcan
-                             @endif
-                         </div>
-                     @endif
+                    @php
+                        $proxyTitle =
+                            $server->proxyType() === ProxyTypes::TRAEFIK->value
+                                ? 'Traefik (Coolify Proxy)'
+                                : 'Caddy (Coolify Proxy)';
+                    @endphp
+                    @if ($server->proxyType() === ProxyTypes::TRAEFIK->value || $server->proxyType() === 'CADDY')
+                        <div class="flex items-center gap-2">
+                            <h3>{{ $proxyTitle }}</h3>
+                            @if ($proxySettings)
+                                @can('update', $server)
+                                    <x-modal-confirmation title="Reset Proxy Configuration?"
+                                        buttonTitle="Reset Configuration" submitAction="resetProxyConfiguration"
+                                        :actions="[
+                                            'Reset proxy configuration to default settings',
+                                            'All custom configurations will be lost',
+                                            'Custom ports and entrypoints will be removed',
+                                        ]" confirmationText="{{ $server->name }}"
+                                        confirmationLabel="Please confirm by entering the server name below"
+                                        shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
+                                        :confirmWithPassword="false" :confirmWithText="true">
+                                    </x-modal-confirmation>
+                                @endcan
+                            @endif
+                        </div>
+                    @endif
                     @if (
                         $server->proxy->last_applied_settings &&
                             $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
@@ -72,32 +74,12 @@
                     </div>
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
                         @if ($proxySettings)
-                            <div class="flex flex-col gap-2 pt-4">
+                            <div class="flex flex-col gap-2 pt-2">
                                 <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
                                     monacoEditorLanguage="yaml"
-                                    label="Configuration file ( {{ $this->configurationFilePath }} )" name="proxySettings"
-                                    id="proxySettings" rows="30" />
-                                @can('update', $server)
-                                    <x-modal-confirmation title="Reset Proxy Configuration?"
-                                        buttonTitle="Reset configuration to default" isErrorButton
-                                        submitAction="resetProxyConfiguration" :actions="[
-                                            'Reset proxy configuration to default settings',
-                                            'All custom configurations will be lost',
-                                            'Custom ports and entrypoints will be removed',
-                                        ]"
-                                        confirmationText="{{ $server->name }}"
-                                        confirmationLabel="Please confirm by entering the server name below"
-                                        shortConfirmationLabel="Server Name" step2ButtonText="Reset Configuration"
-                                        :confirmWithPassword="false" :confirmWithText="true">
-                                    </x-modal-confirmation>
-                                @endcan
+                                    label="Configuration file ( {{ $this->configurationFilePath }} )"
+                                    name="proxySettings" id="proxySettings" rows="30" />
                             </div>
-                             <div class="flex flex-col gap-2 pt-2">
-                                  <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
-                                      monacoEditorLanguage="yaml"
-                                      label="Configuration file ({{ $this->configurationFilePath }})" name="proxySettings"
-                                      id="proxySettings" rows="30" />
-                             </div>
                         @endif
                     </div>
                 </form>
