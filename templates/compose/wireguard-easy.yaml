@@ -1,5 +1,6 @@
 # documentation: https://github.com/wg-easy/wg-easy
 # slogan: The easiest way to run WireGuard VPN + Web-based Admin UI.
+# category: vps
 # tags: wireguard,vpn,web,admin
 # logo: svgs/wireguard.svg
 # port: 8000
@@ -8,11 +9,11 @@ services:
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy:latest
     environment:
-      - SERVICE_FQDN_WIREGUARDEASY_8000
-      - WG_HOST=${SERVICE_FQDN_WIREGUARDEASY}
+      - SERVICE_URL_WIREGUARDEASY_51821
+      - WG_HOST=${SERVICE_URL_WIREGUARDEASY}
       - LANG=${LANG:-en}
-      - PORT=8000
       - WG_PORT=51820
+      - _PASSWORD=${SERVICE_PASSWORD_ADMIN}
     volumes:
       - wg-easy:/etc/wireguard
     ports:
@@ -23,3 +24,9 @@ services:
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv4.ip_forward=1
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        eval "wgpw '${SERVICE_PASSWORD_ADMIN}' > /pass-hash"
+        eval "$(cat /pass-hash) dumb-init node server.js"

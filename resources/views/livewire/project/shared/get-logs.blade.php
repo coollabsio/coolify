@@ -1,4 +1,4 @@
-<div class="p-4 my-4 border dark:border-coolgray-200">
+<div class="p-4 my-4 border dark:border-coolgray-200 border-neutral-200">
     <div x-init="$wire.getLogs" id="screen" x-data="{
         fullscreen: false,
         alwaysScroll: false,
@@ -56,7 +56,7 @@
             <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
-            <div class="flex overflow-y-auto flex-col-reverse px-4 py-2 w-full bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"
+            <div class="flex overflow-y-auto flex-col-reverse px-4 py-2 w-full bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300 border-neutral-200"
                 :class="fullscreen ? '' : 'max-h-96 border border-solid rounded-sm'">
                 <div :class="fullscreen ? 'fixed top-4 right-4' : 'absolute top-6 right-0'">
                     <div class="flex justify-end gap-4" :class="fullscreen ? 'fixed' : ''"

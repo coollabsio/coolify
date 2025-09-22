@@ -2,10 +2,13 @@
 
 namespace App\Livewire\Project\Shared;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class HealthChecks extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
 
     protected $rules = [
@@ -27,6 +30,7 @@ class HealthChecks extends Component
 
     public function instantSave()
     {
+        $this->authorize('update', $this->resource);
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
     }
@@ -34,6 +38,7 @@ class HealthChecks extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->validate();
             $this->resource->save();
             $this->dispatch('success', 'Health check updated.');

@@ -27,7 +27,9 @@
                 @endforeach
             </x-forms.select>
             <div class="">
-                <x-forms.checkbox instantSave type="checkbox" id="is_build_server" label="Use it as a build server?" />
+                <x-forms.checkbox instantSave type="checkbox" id="is_build_server"
+                    helper="Build servers are used to build your applications, so you cannot deploy applications to it."
+                    label="Use it as a build server?" />
             </div>
             <div class="">
                 <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>

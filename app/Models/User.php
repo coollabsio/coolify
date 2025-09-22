@@ -53,7 +53,24 @@ class User extends Authenticatable implements SendsEmail
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
         'show_boarding' => 'boolean',
+        'email_change_code_expires_at' => 'datetime',
     ];
+
+    /**
+     * Set the email attribute to lowercase.
+     */
+    public function setEmailAttribute($value)
+    {
+        $this->attributes['email'] = strtolower($value);
+    }
+
+    /**
+     * Set the pending_email attribute to lowercase.
+     */
+    public function setPendingEmailAttribute($value)
+    {
+        $this->attributes['pending_email'] = $value ? strtolower($value) : null;
+    }
 
     protected static function boot()
     {
@@ -72,6 +89,93 @@ class User extends Authenticatable implements SendsEmail
             $new_team = Team::create($team);
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
+
+        static::deleting(function (User $user) {
+            \DB::transaction(function () use ($user) {
+                $teams = $user->teams;
+                foreach ($teams as $team) {
+                    $user_alone_in_team = $team->members->count() === 1;
+
+                    // Prevent deletion if user is alone in root team
+                    if ($team->id === 0 && $user_alone_in_team) {
+                        throw new \Exception('User is alone in the root team, cannot delete');
+                    }
+
+                    if ($user_alone_in_team) {
+                        static::finalizeTeamDeletion($user, $team);
+                        // Delete any pending team invitations for this user
+                        TeamInvitation::whereEmail($user->email)->delete();
+
+                        continue;
+                    }
+
+                    // Load the user's role for this team
+                    $userRole = $team->members->where('id', $user->id)->first()?->pivot?->role;
+
+                    if ($userRole === 'owner') {
+                        $found_other_owner_or_admin = $team->members->filter(function ($member) use ($user) {
+                            return ($member->pivot->role === 'owner' || $member->pivot->role === 'admin') && $member->id !== $user->id;
+                        })->first();
+
+                        if ($found_other_owner_or_admin) {
+                            $team->members()->detach($user->id);
+
+                            continue;
+                        } else {
+                            $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
+                                return $member->pivot->role === 'member';
+                            })->first();
+
+                            if ($found_other_member_who_is_not_owner) {
+                                $found_other_member_who_is_not_owner->pivot->role = 'owner';
+                                $found_other_member_who_is_not_owner->pivot->save();
+                                $team->members()->detach($user->id);
+                            } else {
+                                static::finalizeTeamDeletion($user, $team);
+                            }
+
+                            continue;
+                        }
+                    } else {
+                        $team->members()->detach($user->id);
+                    }
+                }
+            });
+        });
+    }
+
+    /**
+     * Finalize team deletion by cleaning up all associated resources
+     */
+    private static function finalizeTeamDeletion(User $user, Team $team)
+    {
+        $servers = $team->servers;
+        foreach ($servers as $server) {
+            $resources = $server->definedResources();
+            foreach ($resources as $resource) {
+                $resource->forceDelete();
+            }
+            $server->forceDelete();
+        }
+
+        $projects = $team->projects;
+        foreach ($projects as $project) {
+            $project->forceDelete();
+        }
+
+        $team->members()->detach($user->id);
+        $team->delete();
+    }
+
+    /**
+     * Delete the user if they are not verified and have a force password reset.
+     * This is used to clean up users that have been invited, did not accept the invitation (and did not verify their email and have a force password reset).
+     */
+    public function deleteIfNotVerifiedAndForcePasswordReset()
+    {
+        if ($this->hasVerifiedEmail() === false && $this->force_password_reset === true) {
+            $this->delete();
+        }
     }
 
     public function recreate_personal_team()
@@ -114,6 +218,16 @@ class User extends Authenticatable implements SendsEmail
     public function teams()
     {
         return $this->belongsToMany(Team::class)->withPivot('role');
+    }
+
+    public function changelogReads()
+    {
+        return $this->hasMany(UserChangelogRead::class);
+    }
+
+    public function getUnreadChangelogCount(): int
+    {
+        return app(\App\Services\ChangelogService::class)->getUnreadCountForUser($this);
     }
 
     public function getRecipients(): array
@@ -222,5 +336,78 @@ class User extends Authenticatable implements SendsEmail
         $user = Auth::user()->teams->where('id', currentTeam()->id)->first();
 
         return data_get($user, 'pivot.role');
+    }
+
+    public function requestEmailChange(string $newEmail): void
+    {
+        // Generate 6-digit code
+        $code = sprintf('%06d', mt_rand(0, 999999));
+
+        // Set expiration using config value
+        $expiryMinutes = config('constants.email_change.verification_code_expiry_minutes', 10);
+        $expiresAt = Carbon::now()->addMinutes($expiryMinutes);
+
+        $this->update([
+            'pending_email' => $newEmail,
+            'email_change_code' => $code,
+            'email_change_code_expires_at' => $expiresAt,
+        ]);
+
+        // Send verification email to new address
+        $this->notify(new \App\Notifications\TransactionalEmails\EmailChangeVerification($this, $code, $newEmail, $expiresAt));
+    }
+
+    public function isEmailChangeCodeValid(string $code): bool
+    {
+        return $this->email_change_code === $code
+            && $this->email_change_code_expires_at
+            && Carbon::now()->lessThan($this->email_change_code_expires_at);
+    }
+
+    public function confirmEmailChange(string $code): bool
+    {
+        if (! $this->isEmailChangeCodeValid($code)) {
+            return false;
+        }
+
+        $oldEmail = $this->email;
+        $newEmail = $this->pending_email;
+
+        // Update email and clear change request fields
+        $this->update([
+            'email' => $newEmail,
+            'pending_email' => null,
+            'email_change_code' => null,
+            'email_change_code_expires_at' => null,
+        ]);
+
+        // For cloud users, dispatch job to update Stripe customer email asynchronously
+        if (isCloud() && $this->currentTeam()->subscription) {
+            dispatch(new \App\Jobs\UpdateStripeCustomerEmailJob(
+                $this->currentTeam(),
+                $this->id,
+                $newEmail,
+                $oldEmail
+            ));
+        }
+
+        return true;
+    }
+
+    public function clearEmailChangeRequest(): void
+    {
+        $this->update([
+            'pending_email' => null,
+            'email_change_code' => null,
+            'email_change_code_expires_at' => null,
+        ]);
+    }
+
+    public function hasEmailChangeRequest(): bool
+    {
+        return ! is_null($this->pending_email)
+            && ! is_null($this->email_change_code)
+            && $this->email_change_code_expires_at
+            && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
 }

@@ -185,6 +185,8 @@ class StartPostgresql
             }
         }
 
+        $command = ['postgres'];
+
         if (filled($this->database->postgres_conf)) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
@@ -195,28 +197,24 @@ class StartPostgresql
                     'read_only' => true,
                 ]]
             );
-            $docker_compose['services'][$container_name]['command'] = [
-                'postgres',
-                '-c',
-                'config_file=/etc/postgresql/postgresql.conf',
-            ];
+            $command = array_merge($command, ['-c', 'config_file=/etc/postgresql/postgresql.conf']);
         }
 
         if ($this->database->enable_ssl) {
-            $docker_compose['services'][$container_name]['command'] = [
-                'postgres',
-                '-c',
-                'ssl=on',
-                '-c',
-                'ssl_cert_file=/var/lib/postgresql/certs/server.crt',
-                '-c',
-                'ssl_key_file=/var/lib/postgresql/certs/server.key',
-            ];
+            $command = array_merge($command, [
+                '-c', 'ssl=on',
+                '-c', 'ssl_cert_file=/var/lib/postgresql/certs/server.crt',
+                '-c', 'ssl_key_file=/var/lib/postgresql/certs/server.key',
+            ]);
         }
 
         // Add custom docker run options
         $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
         $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
+        if (count($command) > 1) {
+            $docker_compose['services'][$container_name]['command'] = $command;
+        }
 
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -230,6 +228,8 @@ class StartPostgresql
             $this->commands[] = executeInDocker($this->database->uuid, "chown {$this->database->postgres_user}:{$this->database->postgres_user} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
         }
         $this->commands[] = "echo 'Database started.'";
+
+        ray($this->commands);
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }

@@ -8,28 +8,30 @@
         <div class="flex flex-col gap-4">
             <div class="flex items-center gap-2">
                 <h2>CA Certificate</h2>
-                <div class="flex gap-2">
-                    <x-modal-confirmation title="Confirm changing of CA Certificate?" buttonTitle="Save"
-                        submitAction="saveCaCertificate" :actions="[
-                            'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.',
-                            'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
-                            'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
-                            'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
-                        ]"
-                        confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
-                        step3ButtonText="Save Certificate">
-                    </x-modal-confirmation>
-                    <x-modal-confirmation title="Confirm Regenerate Certificate?" buttonTitle="Regenerate "
-                        submitAction="regenerateCaCertificate" :actions="[
-                            'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.',
-                            'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
-                            'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with the new CA certificate.',
-                            'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
-                        ]"
-                        confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
-                        step3ButtonText="Regenerate Certificate">
-                    </x-modal-confirmation>
-                </div>
+                @can('update', $server)
+                    <div class="flex gap-2">
+                        <x-modal-confirmation title="Confirm changing of CA Certificate?" buttonTitle="Save"
+                            submitAction="saveCaCertificate" :actions="[
+                                'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.',
+                                'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
+                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with your new CA certificate.',
+                                'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
+                            ]"
+                            confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
+                            step3ButtonText="Save Certificate">
+                        </x-modal-confirmation>
+                        <x-modal-confirmation title="Confirm Regenerate Certificate?" buttonTitle="Regenerate "
+                            submitAction="regenerateCaCertificate" :actions="[
+                                'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.',
+                                'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
+                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates singned with the new CA certificate.',
+                                'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
+                            ]"
+                            confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
+                            step3ButtonText="Regenerate Certificate">
+                        </x-modal-confirmation>
+                    </div>
+                @endcan
             </div>
             <div class="space-y-4">
                 <div class="text-sm">
@@ -63,9 +65,11 @@
                             </span>
                         @endif
                     </div>
-                    <x-forms.button wire:click="toggleCertificate" type="button" class="py-1! px-2! text-sm">
-                        {{ $showCertificate ? 'Hide' : 'Show' }}
-                    </x-forms.button>
+                    @can('view', $server)
+                        <x-forms.button wire:click="toggleCertificate" type="button" class="py-1! px-2! text-sm">
+                            {{ $showCertificate ? 'Hide' : 'Show' }}
+                        </x-forms.button>
+                    @endcan
                 </div>
                 @if ($showCertificate)
                     <textarea class="w-full h-[370px] input" wire:model="certificateContent"

@@ -36,6 +36,18 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
     }
 
+    public function executionsPaginated(int $skip = 0, int $take = 10)
+    {
+        $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->orderBy('created_at', 'desc');
+        $count = $executions->count();
+        $executions = $executions->skip($skip)->take($take)->get();
+
+        return [
+            'count' => $count,
+            'executions' => $executions,
+        ];
+    }
+
     public function server()
     {
         if ($this->database) {

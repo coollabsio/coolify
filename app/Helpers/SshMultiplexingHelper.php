@@ -4,7 +4,9 @@ namespace App\Helpers;
 
 use App\Models\PrivateKey;
 use App\Models\Server;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
 class SshMultiplexingHelper
@@ -30,6 +32,7 @@ class SshMultiplexingHelper
         $sshConfig = self::serverSshConfiguration($server);
         $muxSocket = $sshConfig['muxFilename'];
 
+        // Check if connection exists
         $checkCommand = "ssh -O check -o ControlPath=$muxSocket ";
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
             $checkCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
@@ -39,6 +42,24 @@ class SshMultiplexingHelper
 
         if ($process->exitCode() !== 0) {
             return self::establishNewMultiplexedConnection($server);
+        }
+
+        // Connection exists, ensure we have metadata for age tracking
+        if (self::getConnectionAge($server) === null) {
+            // Existing connection but no metadata, store current time as fallback
+            self::storeConnectionMetadata($server);
+        }
+
+        // Connection exists, check if it needs refresh due to age
+        if (self::isConnectionExpired($server)) {
+            return self::refreshMultiplexedConnection($server);
+        }
+
+        // Perform health check if enabled
+        if (config('constants.ssh.mux_health_check_enabled')) {
+            if (! self::isConnectionHealthy($server)) {
+                return self::refreshMultiplexedConnection($server);
+            }
         }
 
         return true;
@@ -65,6 +86,9 @@ class SshMultiplexingHelper
             return false;
         }
 
+        // Store connection metadata for tracking
+        self::storeConnectionMetadata($server);
+
         return true;
     }
 
@@ -79,6 +103,9 @@ class SshMultiplexingHelper
         }
         $closeCommand .= "{$server->user}@{$server->ip}";
         Process::run($closeCommand);
+
+        // Clear connection metadata from cache
+        self::clearConnectionMetadata($server);
     }
 
     public static function generateScpCommand(Server $server, string $source, string $dest)
@@ -94,8 +121,18 @@ class SshMultiplexingHelper
         if ($server->isIpv6()) {
             $scp_command .= '-6 ';
         }
-        if (self::isMultiplexingEnabled() && self::ensureMultiplexedConnection($server)) {
-            $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        if (self::isMultiplexingEnabled()) {
+            try {
+                if (self::ensureMultiplexedConnection($server)) {
+                    $scp_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+                }
+            } catch (\Exception $e) {
+                Log::warning('SSH multiplexing failed for SCP, falling back to non-multiplexed connection', [
+                    'server' => $server->name ?? $server->ip,
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue without multiplexing
+            }
         }
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -103,7 +140,11 @@ class SshMultiplexingHelper
         }
 
         $scp_command .= self::getCommonSshOptions($server, $sshKeyLocation, config('constants.ssh.connection_timeout'), config('constants.ssh.server_interval'), isScp: true);
-        $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
+        if ($server->isIpv6()) {
+            $scp_command .= "{$source} {$server->user}@[{$server->ip}]:{$dest}";
+        } else {
+            $scp_command .= "{$source} {$server->user}@{$server->ip}:{$dest}";
+        }
 
         return $scp_command;
     }
@@ -126,8 +167,16 @@ class SshMultiplexingHelper
 
         $ssh_command = "timeout $timeout ssh ";
 
-        if (self::isMultiplexingEnabled() && self::ensureMultiplexedConnection($server)) {
-            $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+        $multiplexingSuccessful = false;
+        if (self::isMultiplexingEnabled()) {
+            try {
+                $multiplexingSuccessful = self::ensureMultiplexedConnection($server);
+                if ($multiplexingSuccessful) {
+                    $ssh_command .= "-o ControlMaster=auto -o ControlPath=$muxSocket -o ControlPersist={$muxPersistTime} ";
+                }
+            } catch (\Exception $e) {
+                // Continue without multiplexing
+            }
         }
 
         if (data_get($server, 'settings.is_cloudflare_tunnel')) {
@@ -181,5 +230,82 @@ class SshMultiplexingHelper
         }
 
         return $options;
+    }
+
+    /**
+     * Check if the multiplexed connection is healthy by running a test command
+     */
+    public static function isConnectionHealthy(Server $server): bool
+    {
+        $sshConfig = self::serverSshConfiguration($server);
+        $muxSocket = $sshConfig['muxFilename'];
+        $healthCheckTimeout = config('constants.ssh.mux_health_check_timeout');
+
+        $healthCommand = "timeout $healthCheckTimeout ssh -o ControlMaster=auto -o ControlPath=$muxSocket ";
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $healthCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
+        }
+        $healthCommand .= "{$server->user}@{$server->ip} 'echo \"health_check_ok\"'";
+
+        $process = Process::run($healthCommand);
+        $isHealthy = $process->exitCode() === 0 && str_contains($process->output(), 'health_check_ok');
+
+        return $isHealthy;
+    }
+
+    /**
+     * Check if the connection has exceeded its maximum age
+     */
+    public static function isConnectionExpired(Server $server): bool
+    {
+        $connectionAge = self::getConnectionAge($server);
+        $maxAge = config('constants.ssh.mux_max_age');
+
+        return $connectionAge !== null && $connectionAge > $maxAge;
+    }
+
+    /**
+     * Get the age of the current connection in seconds
+     */
+    public static function getConnectionAge(Server $server): ?int
+    {
+        $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
+        $connectionTime = Cache::get($cacheKey);
+
+        if ($connectionTime === null) {
+            return null;
+        }
+
+        return time() - $connectionTime;
+    }
+
+    /**
+     * Refresh a multiplexed connection by closing and re-establishing it
+     */
+    public static function refreshMultiplexedConnection(Server $server): bool
+    {
+        // Close existing connection
+        self::removeMuxFile($server);
+
+        // Establish new connection
+        return self::establishNewMultiplexedConnection($server);
+    }
+
+    /**
+     * Store connection metadata when a new connection is established
+     */
+    private static function storeConnectionMetadata(Server $server): void
+    {
+        $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
+        Cache::put($cacheKey, time(), config('constants.ssh.mux_persist_time') + 300); // Cache slightly longer than persist time
+    }
+
+    /**
+     * Clear connection metadata from cache
+     */
+    private static function clearConnectionMetadata(Server $server): void
+    {
+        $cacheKey = "ssh_mux_connection_time_{$server->uuid}";
+        Cache::forget($cacheKey);
     }
 }

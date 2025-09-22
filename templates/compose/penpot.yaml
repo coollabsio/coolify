@@ -1,5 +1,6 @@
 # documentation: https://help.penpot.app/technical-guide/getting-started/#install-with-docker
 # slogan: Penpot is the first Open Source design and prototyping platform for product teams.
+# category: productivity
 # tags: penpot,design,prototyping,figma,open,source
 # logo: svgs/penpot.svg
 # port: 8080
@@ -15,7 +16,7 @@ services:
       penpot-exporter:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_FRONTEND_8080
+      - SERVICE_URL_FRONTEND_8080
       - PENPOT_FLAGS=${PENPOT_FRONTEND_FLAGS:-enable-login-with-password}
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://127.0.0.1:8080']
@@ -36,7 +37,7 @@ services:
       - PENPOT_FLAGS=${PENPOT_BACKEND_FLAGS:-enable-login-with-password enable-smtp enable-prepl-server}
       - PENPOT_HTTP_SERVER_PORT=6060
       - PENPOT_SECRET_KEY=$SERVICE_REALBASE64_64_PENPOT
-      - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND_8080
+      - PENPOT_PUBLIC_URI=$SERVICE_URL_FRONTEND_8080
       - PENPOT_BACKEND_URI=http://penpot-backend
       - PENPOT_EXPORTER_URI=http://penpot-exporter
       - PENPOT_DATABASE_URI=postgresql://postgres/${POSTGRES_DB:-penpot}
@@ -55,7 +56,7 @@ services:
       - PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS:-false}
       - PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL:-false}
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:6060/readyz']
+      test: ['CMD', 'node', '-e', "require('http').get({host:'127.0.0.1', port:6060, path:'/readyz'}, res => process.exit(res.statusCode===200 ? 0 : 1)).on('error', () => process.exit(1));"]
       interval: 10s
       timeout: 30s
       retries: 15
@@ -63,7 +64,7 @@ services:
   penpot-exporter:
     image: penpotapp/exporter:latest
     environment:
-      - PENPOT_PUBLIC_URI=$SERVICE_FQDN_FRONTEND_8080
+      - PENPOT_PUBLIC_URI=$SERVICE_URL_FRONTEND_8080
       - PENPOT_REDIS_URI=redis://redis/0
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://127.0.0.1:6061/readyz']
@@ -74,7 +75,7 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     environment:
-      - SERVICE_FQDN_MAILPIT_8025
+      - SERVICE_URL_MAILPIT_8025
     healthcheck:
       test: ['CMD', '/mailpit', 'readyz']
       interval: 5s

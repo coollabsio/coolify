@@ -3,15 +3,18 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
 class Previews extends Component
 {
+    use AuthorizesRequests;
+
     public Application $application;
 
     public string $deployment_uuid;
@@ -21,6 +24,14 @@ class Previews extends Component
     public Collection $pull_requests;
 
     public int $rate_limit_remaining;
+
+    public $domainConflicts = [];
+
+    public $showDomainConflictModal = false;
+
+    public $forceSaveDomains = false;
+
+    public $pendingPreviewId = null;
 
     protected $rules = [
         'application.previews.*.fqdn' => 'string|nullable',
@@ -35,6 +46,7 @@ class Previews extends Component
     public function load_prs()
     {
         try {
+            $this->authorize('update', $this->application);
             ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
@@ -45,20 +57,44 @@ class Previews extends Component
         }
     }
 
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        if ($this->pendingPreviewId) {
+            $this->save_preview($this->pendingPreviewId);
+            $this->pendingPreviewId = null;
+        }
+    }
+
     public function save_preview($preview_id)
     {
         try {
+            $this->authorize('update', $this->application);
             $success = true;
             $preview = $this->application->previews->find($preview_id);
             if (data_get_str($preview, 'fqdn')->isNotEmpty()) {
                 $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->trim()->lower();
-                if (! validate_dns_entry($preview->fqdn, $this->application->destination->server)) {
+                if (! validateDNSEntry($preview->fqdn, $this->application->destination->server)) {
                     $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $success = false;
                 }
-                check_domain_usage(resource: $this->application, domain: $preview->fqdn);
+                // Check for domain conflicts if not forcing save
+                if (! $this->forceSaveDomains) {
+                    $result = checkDomainUsage(resource: $this->application, domain: $preview->fqdn);
+                    if ($result['hasConflicts']) {
+                        $this->domainConflicts = $result['conflicts'];
+                        $this->showDomainConflictModal = true;
+                        $this->pendingPreviewId = $preview_id;
+
+                        return;
+                    }
+                } else {
+                    // Reset the force flag after using it
+                    $this->forceSaveDomains = false;
+                }
             }
 
             if (! $preview) {
@@ -73,38 +109,36 @@ class Previews extends Component
 
     public function generate_preview($preview_id)
     {
-        $preview = $this->application->previews->find($preview_id);
-        if (! $preview) {
-            $this->dispatch('error', 'Preview not found.');
+        try {
+            $this->authorize('update', $this->application);
 
-            return;
-        }
-        if ($this->application->build_pack === 'dockercompose') {
-            $preview->generate_preview_fqdn_compose();
+            $preview = $this->application->previews->find($preview_id);
+            if (! $preview) {
+                $this->dispatch('error', 'Preview not found.');
+
+                return;
+            }
+            if ($this->application->build_pack === 'dockercompose') {
+                $preview->generate_preview_fqdn_compose();
+                $this->application->refresh();
+                $this->dispatch('success', 'Domain generated.');
+
+                return;
+            }
+
+            $preview->generate_preview_fqdn();
             $this->application->refresh();
+            $this->dispatch('update_links');
             $this->dispatch('success', 'Domain generated.');
-
-            return;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-
-        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
-        $url = Url::fromString($fqdn);
-        $template = $this->application->preview_url_template;
-        $host = $url->getHost();
-        $schema = $url->getScheme();
-        $random = new Cuid2;
-        $preview_fqdn = str_replace('{{random}}', $random, $template);
-        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-        $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
-        $preview_fqdn = "$schema://$preview_fqdn";
-        $preview->fqdn = $preview_fqdn;
-        $preview->save();
-        $this->dispatch('success', 'Domain generated.');
     }
 
     public function add(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         try {
+            $this->authorize('update', $this->application);
             if ($this->application->build_pack === 'dockercompose') {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -128,7 +162,7 @@ class Previews extends Component
                         'pull_request_html_url' => $pull_request_html_url,
                     ]);
                 }
-                $this->application->generate_preview_fqdn($pull_request_id);
+                $found->generate_preview_fqdn();
                 $this->application->refresh();
                 $this->dispatch('update_links');
                 $this->dispatch('success', 'Preview added.');
@@ -140,17 +174,23 @@ class Previews extends Component
 
     public function force_deploy_without_cache(int $pull_request_id, ?string $pull_request_html_url = null)
     {
+        $this->authorize('deploy', $this->application);
+
         $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true);
     }
 
     public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null)
     {
+        $this->authorize('deploy', $this->application);
+
         $this->add($pull_request_id, $pull_request_html_url);
         $this->deploy($pull_request_id, $pull_request_html_url);
     }
 
     public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false)
     {
+        $this->authorize('deploy', $this->application);
+
         try {
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -191,8 +231,22 @@ class Previews extends Component
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
 
+    private function stopContainers(array $containers, $server)
+    {
+        $containersToStop = collect($containers)->pluck('Names')->toArray();
+
+        foreach ($containersToStop as $containerName) {
+            instant_remote_process(command: [
+                "docker stop --time=30 $containerName",
+                "docker rm -f $containerName",
+            ], server: $server, throwError: false);
+        }
+    }
+
     public function stop(int $pull_request_id)
     {
+        $this->authorize('deploy', $this->application);
+
         try {
             $server = $this->application->destination->server;
 
@@ -215,48 +269,29 @@ class Previews extends Component
     public function delete(int $pull_request_id)
     {
         try {
-            $server = $this->application->destination->server;
+            $this->authorize('delete', $this->application);
+            $preview = ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->first();
 
-            if ($this->application->destination->server->isSwarm()) {
-                instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
-            } else {
-                $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
-                $this->stopContainers($containers, $server);
+            if (! $preview) {
+                $this->dispatch('error', 'Preview not found.');
+
+                return;
             }
 
-            ApplicationPreview::where('application_id', $this->application->id)
-                ->where('pull_request_id', $pull_request_id)
-                ->first()
-                ->delete();
+            // Soft delete immediately for instant UI feedback
+            $preview->delete();
 
-            $this->application->refresh();
+            // Dispatch the job for async cleanup (container stopping + force delete)
+            DeleteResourceJob::dispatch($preview);
+
+            // Refresh the application and its previews relationship to reflect the soft delete
+            $this->application->load('previews');
             $this->dispatch('update_links');
-            $this->dispatch('success', 'Preview deleted.');
+            $this->dispatch('success', 'Preview deletion started. It may take a few moments to complete.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    private function stopContainers(array $containers, $server, int $timeout = 30)
-    {
-        if (empty($containers)) {
-            return;
-        }
-        $containerNames = [];
-        foreach ($containers as $container) {
-            $containerNames[] = str_replace('/', '', $container['Names']);
-        }
-
-        $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
-        $commands = [
-            "docker stop --time=$timeout $containerList",
-            "docker rm -f $containerList",
-        ];
-
-        instant_remote_process(
-            command: $commands,
-            server: $server,
-            throwError: false
-        );
     }
 }

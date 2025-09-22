@@ -8,9 +8,11 @@
     <div>
         <div class="flex gap-2">
             <h2 class="pb-4">Scheduled Backups</h2>
-            <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
-                <livewire:project.database.create-scheduled-backup :database="$database" />
-            </x-modal-input>
+            @can('update', $database)
+                <x-modal-input buttonTitle="+ Add" title="New Scheduled Backup">
+                    <livewire:project.database.create-scheduled-backup :database="$database" />
+                </x-modal-input>
+            @endcan
         </div>
         <livewire:project.database.scheduled-backups :database="$database" />
     </div>

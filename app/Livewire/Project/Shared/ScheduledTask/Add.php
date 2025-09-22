@@ -3,12 +3,15 @@
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
 use App\Models\ScheduledTask;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Add extends Component
 {
+    use AuthorizesRequests;
+
     public $parameters;
 
     #[Locked]
@@ -19,6 +22,9 @@ class Add extends Component
 
     #[Locked]
     public Collection $containerNames;
+
+    #[Locked]
+    public $resource;
 
     public string $name;
 
@@ -45,6 +51,22 @@ class Add extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+
+        // Get the resource based on type and id
+        switch ($this->type) {
+            case 'application':
+                $this->resource = \App\Models\Application::findOrFail($this->id);
+                break;
+            case 'service':
+                $this->resource = \App\Models\Service::findOrFail($this->id);
+                break;
+            case 'standalone-postgresql':
+                $this->resource = \App\Models\StandalonePostgresql::findOrFail($this->id);
+                break;
+            default:
+                throw new \Exception('Invalid resource type');
+        }
+
         if ($this->containerNames->count() > 0) {
             $this->container = $this->containerNames->first();
         }
@@ -53,6 +75,7 @@ class Add extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->validate();
             $isValid = validate_cron_expression($this->frequency);
             if (! $isValid) {

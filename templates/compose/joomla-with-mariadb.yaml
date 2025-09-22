@@ -1,5 +1,6 @@
 # documentation: https://joomla.org
-# slogan: Joomla! is the mobile-ready and user-friendly way to build your website. Choose from thousands of features and designs. Joomla! is free and open source. 
+# slogan: Joomla! is the mobile-ready and user-friendly way to build your website. Choose from thousands of features and designs. Joomla! is free and open source.
+# category: cms
 # tags: cms, blog, content, management, mariadb
 # logo: svgs/joomla.svg
 # port: 80
@@ -10,7 +11,7 @@ services:
     volumes:
       - joomla_data:/var/www/html
     environment:
-      - SERVICE_FQDN_JOOMLA
+      - SERVICE_URL_JOOMLA
       - JOOMLA_DB_HOST=mariadb
       - JOOMLA_DB_USER=${SERVICE_USER_JOOMLA}
       - JOOMLA_DB_PASSWORD=${SERVICE_PASSWORD_JOOMLA}

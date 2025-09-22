@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Traits\HasSafeStringAttribute;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
@@ -27,7 +29,7 @@ use phpseclib3\Crypt\PublicKeyLoader;
 )]
 class PrivateKey extends BaseModel
 {
-    use WithRateLimiting;
+    use HasSafeStringAttribute, WithRateLimiting;
 
     protected $fillable = [
         'name',
@@ -98,11 +100,18 @@ class PrivateKey extends BaseModel
 
     public static function createAndStore(array $data)
     {
-        $privateKey = new self($data);
-        $privateKey->save();
-        $privateKey->storeInFileSystem();
+        return DB::transaction(function () use ($data) {
+            $privateKey = new self($data);
+            $privateKey->save();
 
-        return $privateKey;
+            try {
+                $privateKey->storeInFileSystem();
+            } catch (\Exception $e) {
+                throw new \Exception('Failed to store SSH key: '.$e->getMessage());
+            }
+
+            return $privateKey;
+        });
     }
 
     public static function generateNewKeyPair($type = 'rsa')
@@ -150,15 +159,64 @@ class PrivateKey extends BaseModel
     public function storeInFileSystem()
     {
         $filename = "ssh_key@{$this->uuid}";
-        Storage::disk('ssh-keys')->put($filename, $this->private_key);
+        $disk = Storage::disk('ssh-keys');
 
-        return "/var/www/html/storage/app/ssh/keys/{$filename}";
+        // Ensure the storage directory exists and is writable
+        $this->ensureStorageDirectoryExists();
+
+        // Attempt to store the private key
+        $success = $disk->put($filename, $this->private_key);
+
+        if (! $success) {
+            throw new \Exception("Failed to write SSH key to filesystem. Check disk space and permissions for: {$this->getKeyLocation()}");
+        }
+
+        // Verify the file was actually created and has content
+        if (! $disk->exists($filename)) {
+            throw new \Exception("SSH key file was not created: {$this->getKeyLocation()}");
+        }
+
+        $storedContent = $disk->get($filename);
+        if (empty($storedContent) || $storedContent !== $this->private_key) {
+            $disk->delete($filename); // Clean up the bad file
+            throw new \Exception("SSH key file content verification failed: {$this->getKeyLocation()}");
+        }
+
+        return $this->getKeyLocation();
     }
 
     public static function deleteFromStorage(self $privateKey)
     {
         $filename = "ssh_key@{$privateKey->uuid}";
-        Storage::disk('ssh-keys')->delete($filename);
+        $disk = Storage::disk('ssh-keys');
+
+        if ($disk->exists($filename)) {
+            $disk->delete($filename);
+        }
+    }
+
+    protected function ensureStorageDirectoryExists()
+    {
+        $disk = Storage::disk('ssh-keys');
+        $directoryPath = '';
+
+        if (! $disk->exists($directoryPath)) {
+            $success = $disk->makeDirectory($directoryPath);
+            if (! $success) {
+                throw new \Exception('Failed to create SSH keys storage directory');
+            }
+        }
+
+        // Check if directory is writable by attempting a test file
+        $testFilename = '.test_write_'.uniqid();
+        $testSuccess = $disk->put($testFilename, 'test');
+
+        if (! $testSuccess) {
+            throw new \Exception('SSH keys storage directory is not writable');
+        }
+
+        // Clean up test file
+        $disk->delete($testFilename);
     }
 
     public function getKeyLocation()
@@ -168,10 +226,17 @@ class PrivateKey extends BaseModel
 
     public function updatePrivateKey(array $data)
     {
-        $this->update($data);
-        $this->storeInFileSystem();
+        return DB::transaction(function () use ($data) {
+            $this->update($data);
 
-        return $this;
+            try {
+                $this->storeInFileSystem();
+            } catch (\Exception $e) {
+                throw new \Exception('Failed to update SSH key: '.$e->getMessage());
+            }
+
+            return $this;
+        });
     }
 
     public function servers()

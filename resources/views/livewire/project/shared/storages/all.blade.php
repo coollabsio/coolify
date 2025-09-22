@@ -3,11 +3,10 @@
         @foreach ($resource->persistentStorages as $storage)
             @if ($resource->type() === 'service')
                 <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage"
-                    :isFirst="$loop->first" isReadOnly='true' isService='true' />
+                    :resource="$resource" :isFirst="$storage->id === $this->firstStorageId" isService='true' />
             @else
                 <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage"
-                    isReadOnly="{{ data_get($storage, 'is_readonly') }}"
-                    startedAt="{{ data_get($resource, 'started_at') }}" />
+                    :resource="$resource" :isFirst="$storage->id === $this->firstStorageId" startedAt="{{ data_get($resource, 'started_at') }}" />
             @endif
         @endforeach
     </div>

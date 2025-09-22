@@ -48,6 +48,18 @@ export function initializeTerminalComponent() {
                     this.sendCommandWhenReady({ command: command });
                 });
 
+                this.$wire.on('terminal-should-focus', () => {
+                    // Wait for terminal to be ready, then focus
+                    const focusWhenReady = () => {
+                        if (this.terminalActive && this.term) {
+                            this.term.focus();
+                        } else {
+                            setTimeout(focusWhenReady, 100);
+                        }
+                    };
+                    focusWhenReady();
+                });
+
                 this.keepAliveInterval = setInterval(this.keepAlive.bind(this), 30000);
 
                 this.$watch('terminalActive', (active) => {
@@ -352,6 +364,15 @@ export function initializeTerminalComponent() {
                     setTimeout(() => {
                         this.resizeTerminal();
                     }, 200);
+
+                    // Ensure terminal gets focus after connection with multiple attempts
+                    setTimeout(() => {
+                        this.term.focus();
+                    }, 100);
+                    
+                    setTimeout(() => {
+                        this.term.focus();
+                    }, 500);
 
                     // Notify parent component that terminal is connected
                     this.$wire.dispatch('terminalConnected');

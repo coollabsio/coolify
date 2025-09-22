@@ -12,7 +12,7 @@
                 </svg>
                 In progress
             </button>
-            <button class="menu-item" @click="modalOpen=true" x-show="!showProgress">
+            <button class="menu-item cursor-pointer" @click="modalOpen=true" x-show="!showProgress">
                 <svg xmlns="http://www.w3.org/2000/svg"
                     class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -27,8 +27,7 @@
             </button>
             <template x-teleport="body">
                 <div x-show="modalOpen"
-                    class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen"
-                    x-cloak>
+                    class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
                     <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
                         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
                         x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
@@ -55,8 +54,11 @@
                             <p>Are you sure you would like to upgrade your instance to {{ $latestVersion }}?</p>
                             <br />
 
-                            <div class="p-4 mb-4 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
-                                <p class="font-medium">Warning: Any deployments running during the update process will fail. Please ensure no deployments are in progress on any server before continuing.</p>
+                            <div
+                                class="p-4 mb-4 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800">
+                                <p class="font-medium">Warning: Any deployments running during the update process will
+                                    fail. Please ensure no deployments are in progress on any server before continuing.
+                                </p>
                             </div>
                             <p>You can review the changelogs <a class="font-bold underline dark:text-white"
                                     href="https://github.com/coollabsio/coolify/releases" target="_blank">here</a>.</p>

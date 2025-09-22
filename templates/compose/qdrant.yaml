@@ -1,5 +1,6 @@
 # documentation: https://qdrant.tech/documentation/
 # slogan: Qdrant is a vector similarity search engine that provides a production-ready service with a convenient API to store, search, and manage points (i.e. vectors) with an additional payload.
+# category: database
 # tags: ai, vector-database, semantic-search, machine-learning, bm25, embeddings, llm
 # logo: svgs/qdrant.png
 # port: 6333
@@ -8,7 +9,7 @@ services:
   qdrant:
     image: "qdrant/qdrant:latest"
     environment:
-      - SERVICE_FQDN_QDRANT_6333
+      - SERVICE_URL_QDRANT_6333
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}
     volumes:
       - "qdrant-storage:/qdrant/storage"

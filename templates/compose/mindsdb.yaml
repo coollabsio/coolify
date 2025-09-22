@@ -1,5 +1,6 @@
 # documentation: https://docs.mindsdb.com/what-is-mindsdb
 # slogan: MindsDB is the platform for building AI from enterprise data, enabling smarter organizations.
+# category: ai
 # tags: mysql, postgresdb, machine-learning, ai
 # logo: svgs/mindsdb.svg
 # port: 47334
@@ -8,8 +9,8 @@ services:
   mindsdb:
     image: mindsdb/mindsdb:latest
     environment:
-      - SERVICE_FQDN_MINDSDB_47334
-      - SERVICE_FQDN_API_47335=/api
+      - SERVICE_URL_MINDSDB_47334
+      - SERVICE_URL_API_47335=/api
       - MINDSDB_DOCKER_ENV=true
       - MINDSDB_STORAGE_DIR=/mindsdb/var
       - FLASK_DEBUG=${FLASK_DEBUG:-1}  # This will make sure http requests are logged regardless of log level

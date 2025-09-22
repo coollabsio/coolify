@@ -1,5 +1,6 @@
 # documentation: https://docs.docker.com/registry/
 # slogan: The Docker Registry lets you distribute Docker images.
+# category: devtools
 # tags: registry,images,docker
 # logo: svgs/docker-registry.png
 # port: 5000
@@ -8,7 +9,7 @@ services:
   registry:
     image: registry:2
     environment:
-      - SERVICE_FQDN_REGISTRY_5000
+      - SERVICE_URL_REGISTRY_5000
       - REGISTRY_AUTH=htpasswd
       - REGISTRY_AUTH_HTPASSWD_REALM=Registry
       - REGISTRY_AUTH_HTPASSWD_PATH=/auth/registry.password

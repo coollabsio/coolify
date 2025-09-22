@@ -6,8 +6,29 @@
     @apply hidden!;
 }
 
+@utility apexcharts-grid-borders {
+    @apply dark:hidden!;
+}
+
 @utility apexcharts-xaxistooltip {
     @apply hidden!;
+}
+
+@utility apexcharts-tooltip-custom {
+    @apply bg-white dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300 rounded-lg shadow-lg p-3 text-sm;
+    min-width: 160px;
+}
+
+@utility apexcharts-tooltip-custom-value {
+    @apply text-neutral-700 dark:text-neutral-300 mb-1;
+}
+
+@utility apexcharts-tooltip-value-bold {
+    @apply font-bold text-black dark:text-white;
+}
+
+@utility apexcharts-tooltip-custom-title {
+    @apply text-xs text-neutral-500 dark:text-neutral-400 font-medium;
 }
 
 @utility input-sticky {
@@ -42,7 +63,7 @@
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 py-1 text-sm text-black normal-case rounded-sm border outline-0 cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-none disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
+    @apply flex gap-2 justify-center items-center px-2 py-1 text-sm text-black normal-case rounded-sm border outline-0 cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
 }
 
 @utility alert-success {
@@ -122,7 +143,7 @@
 }
 
 @utility navbar-main {
-    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 md:items-center;
+    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 border-neutral-200 md:items-center;
 }
 
 @utility loading {

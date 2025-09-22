@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\ProcessStatus;
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Visus\Cuid2\Cuid2;
 
@@ -38,9 +42,9 @@ use Visus\Cuid2\Cuid2;
 )]
 class Service extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
 
-    private static $parserVersion = '4';
+    private static $parserVersion = '5';
 
     protected $guarded = [];
 
@@ -116,6 +120,18 @@ class Service extends BaseModel
         return (bool) str($this->status)->contains('exited');
     }
 
+    public function isStarting(): bool
+    {
+        try {
+            $activity = Activity::where('properties->type_uuid', $this->uuid)->latest()->first();
+            $status = data_get($activity, 'properties.status');
+
+            return $status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function type()
     {
         return 'service';
@@ -159,6 +175,10 @@ class Service extends BaseModel
 
     public function getStatusAttribute()
     {
+        if ($this->isStarting()) {
+            return 'starting:unhealthy';
+        }
+
         $applications = $this->applications;
         $databases = $this->databases;
 
@@ -237,6 +257,19 @@ class Service extends BaseModel
                 continue;
             }
             switch ($image) {
+                case $image->contains('drizzle-team/gateway'):
+                    $data = collect([]);
+                    $masterpass = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_DRIZZLE')->first();
+                    $data = $data->merge([
+                        'Master Password' => [
+                            'key' => data_get($masterpass, 'key'),
+                            'value' => data_get($masterpass, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Drizzle', $data->toArray());
+                    break;
                 case $image->contains('castopod'):
                     $data = collect([]);
                     $disable_https = $this->environment_variables()->where('key', 'CP_DISABLE_HTTPS')->first();
@@ -1081,7 +1114,6 @@ class Service extends BaseModel
                 $this->environment_variables()->create([
                     'key' => $key,
                     'value' => $value,
-                    'is_build_time' => false,
                     'resourceable_id' => $this->id,
                     'resourceable_type' => $this->getMorphClass(),
                     'is_preview' => false,
@@ -1198,14 +1230,14 @@ class Service extends BaseModel
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderBy('key', 'asc');
-    }
-
-    public function environment_variables_preview()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', true)
-            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+            ->orderByRaw("
+                CASE 
+                    WHEN LOWER(key) LIKE 'service_%' THEN 1
+                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            ");
     }
 
     public function workdir()
@@ -1242,33 +1274,24 @@ class Service extends BaseModel
 
             return 3;
         });
+        $envs = collect([]);
         foreach ($sorted as $env) {
-            if (version_compare($env->version, '4.0.0-beta.347', '<=')) {
-                $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
-            } else {
-                $real_value = $env->real_value;
-                if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->real_value;
-                } else {
-                    if ($env->is_literal || $env->is_multiline) {
-                        $real_value = '\''.$real_value.'\'';
-                    } else {
-                        $real_value = escapeEnvVariables($env->real_value);
-                    }
-                }
-                $commands[] = "echo \"{$env->key}={$real_value}\" >> .env";
-            }
+            $envs->push("{$env->key}={$env->real_value}");
         }
-        if ($sorted->count() === 0) {
+        if ($envs->count() === 0) {
             $commands[] = 'touch .env';
+        } else {
+            $envs_base64 = base64_encode($envs->implode("\n"));
+            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
         }
+
         instant_remote_process($commands, $this->server);
     }
 
     public function parse(bool $isNew = false): Collection
     {
         if ((int) $this->compose_parsing_version >= 3) {
-            return newParser($this);
+            return serviceParser($this);
         } elseif ($this->docker_compose_raw) {
             return parseDockerComposeFile($this, $isNew);
         } else {
