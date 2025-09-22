@@ -718,7 +718,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $backupConfig = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
         if (! $backupConfig) {
@@ -1951,7 +1951,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -2072,7 +2072,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -2180,7 +2180,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
