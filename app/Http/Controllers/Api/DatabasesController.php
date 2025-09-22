@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
@@ -717,7 +718,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $backupConfig = ScheduledDatabaseBackup::where('database_id', $database->id)
+        $backupConfig = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
         if (! $backupConfig) {
@@ -741,7 +742,7 @@ class DatabasesController extends Controller
 
         // Convert s3_storage_uuid to s3_storage_id
         if (isset($backupData['s3_storage_uuid'])) {
-            $s3Storage = \App\Models\S3Storage::where('uuid', $backupData['s3_storage_uuid'])->first();
+            $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
             if ($s3Storage) {
                 $backupData['s3_storage_id'] = $s3Storage->id;
             }
@@ -1950,7 +1951,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -2071,7 +2072,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -2179,7 +2180,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::where('team_id', $teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 

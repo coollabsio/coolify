@@ -10,6 +10,11 @@ class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+
     public function database(): MorphTo
     {
         return $this->morphTo();
