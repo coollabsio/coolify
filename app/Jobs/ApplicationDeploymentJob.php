@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
+use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -146,6 +147,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private bool $disableBuildCache = false;
 
     private Collection $saved_outputs;
+
+    private ?string $secrets_hash_key = null;
 
     private ?string $full_healthcheck_url = null;
 
@@ -2722,22 +2725,28 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->application->build_pack === 'nixpacks') {
             $variables = collect($this->nixpacks_plan_json->get('variables'));
         } else {
-            // Generate environment variables for build process (filters by is_buildtime = true)
             $this->generate_env_variables();
             $variables = collect([])->merge($this->env_args);
         }
 
-        // Check if build secrets are enabled and BuildKit is supported
         if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
             $this->generate_build_secrets($variables);
             $this->build_args = '';
         } else {
-            // Fall back to traditional build args
+            $secrets_hash = '';
+            if ($variables->isNotEmpty()) {
+                $secrets_hash = $this->generate_secrets_hash($variables);
+            }
+
             $this->build_args = $variables->map(function ($value, $key) {
                 $value = escapeshellarg($value);
 
                 return "--build-arg {$key}={$value}";
             });
+
+            if ($secrets_hash) {
+                $this->build_args->push("--build-arg COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
+            }
         }
     }
 
@@ -2756,13 +2765,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return '';
         }
 
-        return $variables
+        $secrets_hash = $this->generate_secrets_hash($variables);
+        $env_flags = $variables
             ->map(function ($env) {
                 $escaped_value = escapeshellarg($env->real_value);
 
                 return "-e {$env->key}={$escaped_value}";
             })
             ->implode(' ');
+
+        $env_flags .= " -e COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}";
+
+        return $env_flags;
     }
 
     private function generate_build_secrets(Collection $variables)
@@ -2778,6 +2792,36 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return "--secret id={$key},env={$key}";
             })
             ->implode(' ');
+
+        $this->build_secrets .= ' --secret id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
+    }
+
+    private function generate_secrets_hash($variables)
+    {
+        if (! $this->secrets_hash_key) {
+            $this->secrets_hash_key = bin2hex(random_bytes(32));
+        }
+
+        if ($variables instanceof Collection) {
+            $secrets_string = $variables
+                ->mapWithKeys(function ($value, $key) {
+                    return [$key => $value];
+                })
+                ->sortKeys()
+                ->map(function ($value, $key) {
+                    return "{$key}={$value}";
+                })
+                ->implode('|');
+        } else {
+            $secrets_string = $variables
+                ->map(function ($env) {
+                    return "{$env->key}={$env->real_value}";
+                })
+                ->sort()
+                ->implode('|');
+        }
+
+        return hash_hmac('sha256', $secrets_string, $this->secrets_hash_key);
     }
 
     private function add_build_env_variables_to_dockerfile()
@@ -2819,6 +2863,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     }
                 }
             }
+
+            if ($envs->isNotEmpty()) {
+                $secrets_hash = $this->generate_secrets_hash($envs);
+                $dockerfile->splice(1, 0, ["ARG COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}"]);
+            }
+
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
@@ -2859,6 +2909,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         // Generate mount strings for all secrets
         $mountStrings = $variables->map(fn ($env) => "--mount=type=secret,id={$env->key},env={$env->key}")->implode(' ');
+
+        // Add mount for the secrets hash to ensure cache invalidation
+        $mountStrings .= ' --mount=type=secret,id=COOLIFY_BUILD_SECRETS_HASH,env=COOLIFY_BUILD_SECRETS_HASH';
 
         $modified = false;
         $dockerfile = $dockerfile->map(function ($line) use ($mountStrings, &$modified) {
@@ -3196,6 +3249,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         queue_next_deployment($this->application);
 
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
+            ray($this->application->team()->id);
+            event(new ApplicationConfigurationChanged($this->application->team()->id));
+
             if (! $this->only_this_server) {
                 $this->deploy_to_additional_destinations();
             }
