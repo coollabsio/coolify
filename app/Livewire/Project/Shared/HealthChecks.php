@@ -33,6 +33,7 @@ class HealthChecks extends Component
         $this->authorize('update', $this->resource);
         $this->resource->save();
         $this->dispatch('success', 'Health check updated.');
+        $this->dispatch('configurationChanged');
     }
 
     public function submit()
@@ -42,6 +43,7 @@ class HealthChecks extends Component
             $this->validate();
             $this->resource->save();
             $this->dispatch('success', 'Health check updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
