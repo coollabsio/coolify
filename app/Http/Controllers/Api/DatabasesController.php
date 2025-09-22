@@ -85,7 +85,7 @@ class DatabasesController extends Controller
 
         $databaseIds = $databases->pluck('id')->toArray();
 
-        $backupConfigs = ScheduledDatabaseBackup::with('latest_log')
+        $backupConfigs = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('latest_log')
             ->whereIn('database_id', $databaseIds)
             ->get()
             ->groupBy('database_id');
@@ -159,7 +159,7 @@ class DatabasesController extends Controller
 
         $this->authorize('view', $database);
 
-        $backupConfig = ScheduledDatabaseBackup::with('executions')->where('database_id', $database->id)->get();
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('executions')->where('database_id', $database->id)->get();
 
         return response()->json($backupConfig);
     }
@@ -718,7 +718,7 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
-        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
+        $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
         if (! $backupConfig) {
@@ -1951,7 +1951,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -2072,7 +2072,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
@@ -2180,7 +2180,7 @@ class DatabasesController extends Controller
         }
 
         // Find the backup configuration by its UUID
-        $backup = ScheduledDatabaseBackup::ownedByCurrentTeam()->where('database_id', $database->id)
+        $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
 
