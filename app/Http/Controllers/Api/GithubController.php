@@ -42,7 +42,6 @@ class GithubController extends Controller
                             'client_secret' => ['type' => 'string', 'description' => 'GitHub OAuth App Client Secret.'],
                             'webhook_secret' => ['type' => 'string', 'description' => 'Webhook secret for GitHub webhooks.'],
                             'private_key_uuid' => ['type' => 'string', 'description' => 'UUID of an existing private key for GitHub App authentication.'],
-                            'is_public' => ['type' => 'boolean', 'description' => 'Whether this is a public GitHub app (default: false).'],
                             'is_system_wide' => ['type' => 'boolean', 'description' => 'Is this app system-wide (cloud only).'],
                         ],
                         required: ['name', 'api_url', 'html_url', 'app_id', 'installation_id', 'client_id', 'client_secret', 'private_key_uuid'],
@@ -72,7 +71,6 @@ class GithubController extends Controller
                                 'installation_id' => ['type' => 'integer'],
                                 'client_id' => ['type' => 'string'],
                                 'private_key_id' => ['type' => 'integer'],
-                                'is_public' => ['type' => 'boolean'],
                                 'is_system_wide' => ['type' => 'boolean'],
                                 'team_id' => ['type' => 'integer'],
                             ]
@@ -118,7 +116,6 @@ class GithubController extends Controller
             'client_secret',
             'webhook_secret',
             'private_key_uuid',
-            'is_public',
             'is_system_wide',
         ];
 
@@ -135,7 +132,6 @@ class GithubController extends Controller
             'client_secret' => 'required|string',
             'webhook_secret' => 'required|string',
             'private_key_uuid' => 'required|string',
-            'is_public' => 'boolean',
             'is_system_wide' => 'boolean',
         ]);
 
@@ -180,7 +176,7 @@ class GithubController extends Controller
                 'client_secret' => $request->input('client_secret'),
                 'webhook_secret' => $request->input('webhook_secret'),
                 'private_key_id' => $privateKey->id,
-                'is_public' => $request->input('is_public', false),
+                'is_public' => false,
                 'team_id' => $teamId,
             ];
 
@@ -390,6 +386,270 @@ class GithubController extends Controller
             return response()->json(['message' => 'GitHub app not found'], 404);
         } catch (\Throwable $e) {
             return handleError($e);
+        }
+    }
+
+    /**
+     * Update a GitHub app.
+     */
+    #[OA\Patch(
+        path: '/github-apps/{github_app_id}',
+        operationId: 'updateGithubApp',
+        security: [
+            ['api_token' => []],
+        ],
+        tags: ['GitHub Apps'],
+        summary: 'Update GitHub App',
+        description: 'Update an existing GitHub app.',
+        parameters: [
+            new OA\Parameter(
+                name: 'github_app_id',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'integer'),
+                description: 'GitHub App ID'
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    type: 'object',
+                    properties: [
+                        'name' => ['type' => 'string', 'description' => 'GitHub App name'],
+                        'organization' => ['type' => 'string', 'nullable' => true, 'description' => 'GitHub organization'],
+                        'api_url' => ['type' => 'string', 'description' => 'GitHub API URL'],
+                        'html_url' => ['type' => 'string', 'description' => 'GitHub HTML URL'],
+                        'custom_user' => ['type' => 'string', 'description' => 'Custom user for SSH'],
+                        'custom_port' => ['type' => 'integer', 'description' => 'Custom port for SSH'],
+                        'app_id' => ['type' => 'integer', 'description' => 'GitHub App ID'],
+                        'installation_id' => ['type' => 'integer', 'description' => 'GitHub Installation ID'],
+                        'client_id' => ['type' => 'string', 'description' => 'GitHub Client ID'],
+                        'client_secret' => ['type' => 'string', 'description' => 'GitHub Client Secret'],
+                        'webhook_secret' => ['type' => 'string', 'description' => 'GitHub Webhook Secret'],
+                        'private_key_uuid' => ['type' => 'string', 'description' => 'Private key UUID'],
+                        'is_system_wide' => ['type' => 'boolean', 'description' => 'Is system wide (non-cloud instances only)'],
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'GitHub app updated successfully',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'message' => ['type' => 'string', 'example' => 'GitHub app updated successfully'],
+                            'data' => ['type' => 'object', 'description' => 'Updated GitHub app data'],
+                        ]
+                    )
+                )
+            ),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 404, description: 'GitHub app not found'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
+    public function update_github_app(Request $request, $github_app_id)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        try {
+            $githubApp = GithubApp::where('id', $github_app_id)
+                ->where('team_id', $teamId)
+                ->firstOrFail();
+
+            // Define allowed fields for update
+            $allowedFields = [
+                'name',
+                'organization',
+                'api_url',
+                'html_url',
+                'custom_user',
+                'custom_port',
+                'app_id',
+                'installation_id',
+                'client_id',
+                'client_secret',
+                'webhook_secret',
+                'private_key_uuid',
+            ];
+
+            if (! isCloud()) {
+                $allowedFields[] = 'is_system_wide';
+            }
+
+            $payload = $request->only($allowedFields);
+
+            // Validate the request
+            $rules = [];
+            if (isset($payload['name'])) {
+                $rules['name'] = 'string';
+            }
+            if (isset($payload['organization'])) {
+                $rules['organization'] = 'nullable|string';
+            }
+            if (isset($payload['api_url'])) {
+                $rules['api_url'] = 'url';
+            }
+            if (isset($payload['html_url'])) {
+                $rules['html_url'] = 'url';
+            }
+            if (isset($payload['custom_user'])) {
+                $rules['custom_user'] = 'string';
+            }
+            if (isset($payload['custom_port'])) {
+                $rules['custom_port'] = 'integer|min:1|max:65535';
+            }
+            if (isset($payload['app_id'])) {
+                $rules['app_id'] = 'integer';
+            }
+            if (isset($payload['installation_id'])) {
+                $rules['installation_id'] = 'integer';
+            }
+            if (isset($payload['client_id'])) {
+                $rules['client_id'] = 'string';
+            }
+            if (isset($payload['client_secret'])) {
+                $rules['client_secret'] = 'string';
+            }
+            if (isset($payload['webhook_secret'])) {
+                $rules['webhook_secret'] = 'string';
+            }
+            if (isset($payload['private_key_uuid'])) {
+                $rules['private_key_uuid'] = 'string|uuid';
+            }
+            if (! isCloud() && isset($payload['is_system_wide'])) {
+                $rules['is_system_wide'] = 'boolean';
+            }
+
+            $validator = customApiValidator($payload, $rules);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            // Handle private_key_uuid -> private_key_id conversion
+            if (isset($payload['private_key_uuid'])) {
+                $privateKey = PrivateKey::where('team_id', $teamId)
+                    ->where('uuid', $payload['private_key_uuid'])
+                    ->first();
+
+                if (! $privateKey) {
+                    return response()->json([
+                        'message' => 'Private key not found or does not belong to your team',
+                    ], 404);
+                }
+
+                unset($payload['private_key_uuid']);
+                $payload['private_key_id'] = $privateKey->id;
+            }
+
+            // Update the GitHub app
+            $githubApp->update($payload);
+
+            return response()->json([
+                'message' => 'GitHub app updated successfully',
+                'data' => $githubApp,
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'GitHub app not found',
+            ], 404);
+        }
+    }
+
+    /**
+     * Delete a GitHub app.
+     */
+    #[OA\Delete(
+        path: '/github-apps/{github_app_id}',
+        operationId: 'deleteGithubApp',
+        security: [
+            ['api_token' => []],
+        ],
+        tags: ['GitHub Apps'],
+        summary: 'Delete GitHub App',
+        description: 'Delete a GitHub app if it\'s not being used by any applications.',
+        parameters: [
+            new OA\Parameter(
+                name: 'github_app_id',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'integer'),
+                description: 'GitHub App ID'
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'GitHub app deleted successfully',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'message' => ['type' => 'string', 'example' => 'GitHub app deleted successfully'],
+                        ]
+                    )
+                )
+            ),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 404, description: 'GitHub app not found'),
+            new OA\Response(
+                response: 409,
+                description: 'Conflict - GitHub app is in use',
+                content: new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        type: 'object',
+                        properties: [
+                            'message' => ['type' => 'string', 'example' => 'This GitHub app is being used by 5 application(s). Please delete all applications first.'],
+                        ]
+                    )
+                )
+            ),
+        ]
+    )]
+    public function delete_github_app($github_app_id)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        try {
+            $githubApp = GithubApp::where('id', $github_app_id)
+                ->where('team_id', $teamId)
+                ->firstOrFail();
+
+            // Check if the GitHub app is being used by any applications
+            if ($githubApp->applications->isNotEmpty()) {
+                $count = $githubApp->applications->count();
+
+                return response()->json([
+                    'message' => "This GitHub app is being used by {$count} application(s). Please delete all applications first.",
+                ], 409);
+            }
+
+            $githubApp->delete();
+
+            return response()->json([
+                'message' => 'GitHub app deleted successfully',
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'GitHub app not found',
+            ], 404);
         }
     }
 }
