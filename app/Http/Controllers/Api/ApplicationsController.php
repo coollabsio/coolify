@@ -3380,11 +3380,12 @@ class ApplicationsController extends Controller
             $fqdn = str($fqdn)->replaceStart(',', '')->trim();
             $errors = [];
             $fqdn = str($fqdn)->trim()->explode(',')->map(function ($domain) use (&$errors) {
+                $domain = trim($domain);
                 if (filter_var($domain, FILTER_VALIDATE_URL) === false) {
                     $errors[] = 'Invalid domain: '.$domain;
                 }
 
-                return str($domain)->trim()->lower();
+                return str($domain)->lower();
             });
             if (count($errors) > 0) {
                 return response()->json([
