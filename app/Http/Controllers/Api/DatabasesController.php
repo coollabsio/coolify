@@ -17,6 +17,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class DatabasesController extends Controller
@@ -718,6 +719,24 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
+        $this->authorize('update', $database);
+
+        if ($request->boolean('save_s3') && ! $request->filled('s3_storage_uuid')) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['s3_storage_uuid' => ['The s3_storage_uuid field is required when save_s3 is true.']],
+            ], 422);
+        }
+        if ($request->filled('s3_storage_uuid')) {
+            $existsInTeam = S3Storage::ownedByCurrentTeam()->where('uuid', $request->s3_storage_uuid)->exists();
+            if (! $existsInTeam) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                ], 422);
+            }
+        }
+
         $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
             ->first();
@@ -745,6 +764,11 @@ class DatabasesController extends Controller
             $s3Storage = S3Storage::ownedByCurrentTeam()->where('uuid', $backupData['s3_storage_uuid'])->first();
             if ($s3Storage) {
                 $backupData['s3_storage_id'] = $s3Storage->id;
+            } elseif ($request->boolean('save_s3')) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['s3_storage_uuid' => ['The selected S3 storage is invalid for this team.']],
+                ], 422);
             }
             unset($backupData['s3_storage_uuid']);
         }
@@ -752,7 +776,7 @@ class DatabasesController extends Controller
         $backupConfig->update($backupData);
 
         if ($request->backup_now) {
-            DatabaseBackupJob::dispatch($backupConfig);
+            dispatch(new DatabaseBackupJob($backupConfig));
         }
 
         return response()->json([
@@ -1950,6 +1974,8 @@ class DatabasesController extends Controller
             return response()->json(['message' => 'Database not found.'], 404);
         }
 
+        $this->authorize('update', $database);
+
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
             ->where('uuid', $request->scheduled_backup_uuid)
@@ -1962,6 +1988,7 @@ class DatabasesController extends Controller
         $deleteS3 = filter_var($request->query->get('delete_s3', false), FILTER_VALIDATE_BOOLEAN);
 
         try {
+            DB::beginTransaction();
             // Get all executions for this backup configuration
             $executions = $backup->executions()->get();
 
@@ -1980,11 +2007,14 @@ class DatabasesController extends Controller
 
             // Delete the backup configuration itself
             $backup->delete();
+            DB::commit();
 
             return response()->json([
                 'message' => 'Backup configuration and all executions deleted.',
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
+
             return response()->json(['message' => 'Failed to delete backup: '.$e->getMessage()], 500);
         }
     }
@@ -2070,6 +2100,8 @@ class DatabasesController extends Controller
         if (! $database) {
             return response()->json(['message' => 'Database not found.'], 404);
         }
+
+        $this->authorize('update', $database);
 
         // Find the backup configuration by its UUID
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->where('database_id', $database->id)
