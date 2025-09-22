@@ -124,8 +124,8 @@ class GithubController extends Controller
             'organization' => 'nullable|string|max:255',
             'api_url' => 'required|string|url',
             'html_url' => 'required|string|url',
-            'custom_user' => 'string|max:255',
-            'custom_port' => 'integer|min:1|max:65535',
+            'custom_user' => 'nullable|string|max:255',
+            'custom_port' => 'nullable|integer|min:1|max:65535',
             'app_id' => 'required|integer',
             'installation_id' => 'required|integer',
             'client_id' => 'required|string|max:255',
@@ -259,10 +259,13 @@ class GithubController extends Controller
             $maxPages = 100; // Safety limit: max 10,000 repositories
 
             while ($page <= $maxPages) {
-                $response = Http::withToken($token)->get("{$githubApp->api_url}/installation/repositories", [
-                    'per_page' => 100,
-                    'page' => $page,
-                ]);
+                $response = Http::GitHub($githubApp->api_url, $token)
+                    ->timeout(20)
+                    ->retry(3, 200, throw: false)
+                    ->get('/installation/repositories', [
+                        'per_page' => 100,
+                        'page' => $page,
+                    ]);
 
                 if ($response->status() !== 200) {
                     return response()->json([
@@ -368,7 +371,10 @@ class GithubController extends Controller
 
             $token = generateGithubInstallationToken($githubApp);
 
-            $response = Http::withToken($token)->get("{$githubApp->api_url}/repos/{$owner}/{$repo}/branches");
+            $response = Http::GitHub($githubApp->api_url, $token)
+                ->timeout(20)
+                ->retry(3, 200, throw: false)
+                ->get("/repos/{$owner}/{$repo}/branches");
 
             if ($response->status() !== 200) {
                 return response()->json([
