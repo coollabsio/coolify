@@ -8,13 +8,17 @@ use App\Helpers\SslHelper;
 use App\Models\Server;
 use App\Models\SslCertificate;
 use App\Models\StandaloneMariadb;
+use App\Support\ValidationPatterns;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class General extends Component
 {
+    use AuthorizesRequests;
+
     protected $listeners = ['refresh'];
 
     public Server $server;
@@ -37,22 +41,43 @@ class General extends Component
         ];
     }
 
-    protected $rules = [
-        'database.name' => 'required',
-        'database.description' => 'nullable',
-        'database.mariadb_root_password' => 'required',
-        'database.mariadb_user' => 'required',
-        'database.mariadb_password' => 'required',
-        'database.mariadb_database' => 'required',
-        'database.mariadb_conf' => 'nullable',
-        'database.image' => 'required',
-        'database.ports_mappings' => 'nullable',
-        'database.is_public' => 'nullable|boolean',
-        'database.public_port' => 'nullable|integer',
-        'database.is_log_drain_enabled' => 'nullable|boolean',
-        'database.custom_docker_run_options' => 'nullable',
-        'database.enable_ssl' => 'boolean',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'database.name' => ValidationPatterns::nameRules(),
+            'database.description' => ValidationPatterns::descriptionRules(),
+            'database.mariadb_root_password' => 'required',
+            'database.mariadb_user' => 'required',
+            'database.mariadb_password' => 'required',
+            'database.mariadb_database' => 'required',
+            'database.mariadb_conf' => 'nullable',
+            'database.image' => 'required',
+            'database.ports_mappings' => 'nullable',
+            'database.is_public' => 'nullable|boolean',
+            'database.public_port' => 'nullable|integer',
+            'database.is_log_drain_enabled' => 'nullable|boolean',
+            'database.custom_docker_run_options' => 'nullable',
+            'database.enable_ssl' => 'boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'database.name.required' => 'The Name field is required.',
+                'database.name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+                'database.description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+                'database.mariadb_root_password.required' => 'The Root Password field is required.',
+                'database.mariadb_user.required' => 'The MariaDB User field is required.',
+                'database.mariadb_password.required' => 'The MariaDB Password field is required.',
+                'database.mariadb_database.required' => 'The MariaDB Database field is required.',
+                'database.image.required' => 'The Docker Image field is required.',
+                'database.public_port.integer' => 'The Public Port must be an integer.',
+            ]
+        );
+    }
 
     protected $validationAttributes = [
         'database.name' => 'Name',
@@ -86,6 +111,8 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
                 $this->database->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
@@ -103,6 +130,8 @@ class General extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (str($this->database->public_port)->isEmpty()) {
                 $this->database->public_port = null;
             }
@@ -123,6 +152,8 @@ class General extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if ($this->database->is_public && ! $this->database->public_port) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->database->is_public = false;
@@ -154,6 +185,8 @@ class General extends Component
     public function instantSaveSSL()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $this->database->save();
             $this->dispatch('success', 'SSL configuration updated.');
         } catch (Exception $e) {
@@ -164,6 +197,8 @@ class General extends Component
     public function regenerateSslCertificate()
     {
         try {
+            $this->authorize('update', $this->database);
+
             $existingCert = $this->database->sslCertificates()->first();
 
             if (! $existingCert) {

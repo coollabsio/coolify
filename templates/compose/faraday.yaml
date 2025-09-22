@@ -1,5 +1,6 @@
 # documentation: https://faradaysec.com/
 # slogan: Faraday is a powerful, open-source, web-based vulnerability management tool.
+# category: security
 # tags: vulnerability, management, tool
 # logo: svgs/faraday.png
 # port: 5985
@@ -37,7 +38,7 @@ services:
     image: faradaysec/faraday:latest
     entrypoint: /entrypoint.sh
     environment:
-      - SERVICE_FQDN_FARADAY_5985
+      - SERVICE_URL_FARADAY_5985
       - AUTHENTIK_POSTGRESQL__PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - PGSQL_USER=${SERVICE_USER_POSTGRESQL}
       - PGSQL_PASSWD=${SERVICE_PASSWORD_POSTGRESQL}

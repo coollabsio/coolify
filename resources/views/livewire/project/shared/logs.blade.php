@@ -9,7 +9,7 @@
         <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-2">The resource is not running.</div>
+                <div class="pt-4">The resource is not running.</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
                     Loading containers...
@@ -44,7 +44,7 @@
         <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-2">The resource is not running.</div>
+                <div class="pt-4">The resource is not running.</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
                     Loading containers...
@@ -68,7 +68,7 @@
         <div>
             <h2>Logs</h2>
             @if (str($status)->contains('exited'))
-                <div class="pt-2">The resource is not running.</div>
+                <div class="pt-4">The resource is not running.</div>
             @else
                 <div class="pt-2" wire:loading wire:target="loadAllContainers">
                     Loading containers...

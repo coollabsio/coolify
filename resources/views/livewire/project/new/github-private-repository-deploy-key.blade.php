@@ -1,13 +1,13 @@
 <div>
     <h1>Create a new Application</h1>
     <div class="pb-4">Deploy any public or private Git repositories through a Deploy Key.</div>
-    <div class="flex flex-col pt-4">
+    <div class="flex flex-col ">
         @if ($current_step === 'private_keys')
             <h2 class="pb-4">Select a private key</h2>
             <div class="flex flex-col justify-center gap-2 text-left ">
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 box"
+                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 box"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -20,7 +20,7 @@
                             </div>
                         </div>
                     @else
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 box"
+                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 box"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -46,9 +46,8 @@
             </div>
         @endif
         @if ($current_step === 'repository')
-            <h2 class="pb-4">Select a repository</h2>
-            <form class="flex flex-col gap-2 pt-2" wire:submit='submit'>
-                <x-forms.input id="repository_url" required label="Repository Url (https:// or git@)" />
+            <form class="flex flex-col gap-2" wire:submit='submit'>
+                <x-forms.input id="repository_url" required label="Repository URL (https:// or git@)" />
                 <div class="flex gap-2">
                     <x-forms.input id="branch" required label="Branch" />
                     <x-forms.select wire:model.live="build_pack" label="Build Pack" required>

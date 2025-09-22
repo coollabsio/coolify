@@ -5,6 +5,7 @@ namespace App\Livewire\Destination\New;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -12,6 +13,8 @@ use Visus\Cuid2\Cuid2;
 
 class Docker extends Component
 {
+    use AuthorizesRequests;
+
     #[Locked]
     public $servers;
 
@@ -67,6 +70,7 @@ class Docker extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', StandaloneDocker::class);
             $this->validate();
             if ($this->isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();

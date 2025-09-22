@@ -1,5 +1,6 @@
 # documentation: https://listmonk.app/
 # slogan: Self-hosted newsletter and mailing list manager
+# category: email
 # tags: newsletter, mailing list, self-hosted, open source
 # logo: svgs/listmonk.svg
 # port: 9000
@@ -8,7 +9,7 @@ services:
   listmonk:
     image: listmonk/listmonk:latest
     environment:
-      - SERVICE_FQDN_LISTMONK_9000
+      - SERVICE_URL_LISTMONK_9000
       - LISTMONK_app__address=0.0.0.0:9000
       - LISTMONK_db__host=postgres
       - LISTMONK_db__name=listmonk

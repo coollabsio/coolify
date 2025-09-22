@@ -21,11 +21,11 @@ class StartProxy
         }
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
-        $configuration = CheckConfiguration::run($server);
+        $configuration = GetProxyConfiguration::run($server);
         if (! $configuration) {
             throw new \Exception('Configuration is not synced');
         }
-        SaveConfiguration::run($server, $configuration);
+        SaveProxyConfiguration::run($server, $configuration);
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value();
         $server->save();

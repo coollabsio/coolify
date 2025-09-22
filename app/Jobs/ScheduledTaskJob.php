@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Events\ScheduledTaskDone;
+use App\Exceptions\NonReportableException;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
@@ -120,7 +121,7 @@ class ScheduledTaskJob implements ShouldQueue
             }
 
             // No valid container was found.
-            throw new \Exception('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
+            throw new NonReportableException('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
         } catch (\Throwable $e) {
             if ($this->task_log) {
                 $this->task_log->update([

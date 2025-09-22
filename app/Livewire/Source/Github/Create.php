@@ -3,10 +3,13 @@
 namespace App\Livewire\Source\Github;
 
 use App\Models\GithubApp;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Create extends Component
 {
+    use AuthorizesRequests;
+
     public string $name;
 
     public ?string $organization = null;
@@ -29,6 +32,8 @@ class Create extends Component
     public function createGitHubApp()
     {
         try {
+            $this->authorize('createAnyResource');
+
             $this->validate([
                 'name' => 'required|string',
                 'organization' => 'nullable|string',

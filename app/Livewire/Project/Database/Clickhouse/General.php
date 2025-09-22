@@ -6,51 +6,42 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
+use App\Support\ValidationPatterns;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class General extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public StandaloneClickhouse $database;
 
-    #[Validate(['required', 'string'])]
     public string $name;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $description = null;
 
-    #[Validate(['required', 'string'])]
     public string $clickhouseAdminUser;
 
-    #[Validate(['required', 'string'])]
     public string $clickhouseAdminPassword;
 
-    #[Validate(['required', 'string'])]
     public string $image;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $portsMappings = null;
 
-    #[Validate(['nullable', 'boolean'])]
     public ?bool $isPublic = null;
 
-    #[Validate(['nullable', 'integer'])]
     public ?int $publicPort = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $customDockerRunOptions = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $dbUrl = null;
 
-    #[Validate(['nullable', 'string'])]
     public ?string $dbUrlPublic = null;
 
-    #[Validate(['nullable', 'boolean'])]
     public bool $isLogDrainEnabled = false;
 
     public function getListeners()
@@ -70,6 +61,40 @@ class General extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'clickhouseAdminUser' => 'required|string',
+            'clickhouseAdminPassword' => 'required|string',
+            'image' => 'required|string',
+            'portsMappings' => 'nullable|string',
+            'isPublic' => 'nullable|boolean',
+            'publicPort' => 'nullable|integer',
+            'customDockerRunOptions' => 'nullable|string',
+            'dbUrl' => 'nullable|string',
+            'dbUrlPublic' => 'nullable|string',
+            'isLogDrainEnabled' => 'nullable|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'clickhouseAdminUser.required' => 'The Admin User field is required.',
+                'clickhouseAdminUser.string' => 'The Admin User must be a string.',
+                'clickhouseAdminPassword.required' => 'The Admin Password field is required.',
+                'clickhouseAdminPassword.string' => 'The Admin Password must be a string.',
+                'image.required' => 'The Docker Image field is required.',
+                'image.string' => 'The Docker Image must be a string.',
+                'publicPort.integer' => 'The Public Port must be an integer.',
+            ]
+        );
     }
 
     public function syncData(bool $toModel = false)
@@ -109,6 +134,8 @@ class General extends Component
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
                 $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
@@ -127,6 +154,8 @@ class General extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
                 $this->isPublic = false;
@@ -164,6 +193,8 @@ class General extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (str($this->publicPort)->isEmpty()) {
                 $this->publicPort = null;
             }

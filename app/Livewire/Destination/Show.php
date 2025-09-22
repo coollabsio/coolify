@@ -5,12 +5,15 @@ namespace App\Livewire\Destination;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     #[Locked]
     public $destination;
 
@@ -63,6 +66,8 @@ class Show extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->destination);
+
             $this->syncData(true);
             $this->dispatch('success', 'Destination saved.');
         } catch (\Throwable $e) {
@@ -73,6 +78,8 @@ class Show extends Component
     public function delete()
     {
         try {
+            $this->authorize('delete', $this->destination);
+
             if ($this->destination->getMorphClass() === \App\Models\StandaloneDocker::class) {
                 if ($this->destination->attachedTo()) {
                     return $this->dispatch('error', 'You must delete all resources before deleting this destination.');

@@ -4,10 +4,13 @@ namespace App\Livewire\Server\PrivateKey;
 
 use App\Models\PrivateKey;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public $privateKeys = [];
@@ -35,6 +38,7 @@ class Show extends Component
 
         $originalPrivateKeyId = $this->server->getOriginal('private_key_id');
         try {
+            $this->authorize('update', $this->server);
             $this->server->update(['private_key_id' => $privateKeyId]);
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection(justCheckingNewKey: true);
             if ($uptime) {

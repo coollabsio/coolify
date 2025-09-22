@@ -9,6 +9,8 @@ use App\Models\Project;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use Carbon\Carbon;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -62,7 +64,7 @@ class PublicGitRepository extends Component
     public bool $new_compose_services = false;
 
     protected $rules = [
-        'repository_url' => 'required|url',
+        'repository_url' => ['required', 'string'],
         'port' => 'required|numeric',
         'isStatic' => 'required|boolean',
         'publish_directory' => 'nullable|string',
@@ -70,6 +72,20 @@ class PublicGitRepository extends Component
         'base_directory' => 'nullable|string',
         'docker_compose_location' => 'nullable|string',
     ];
+
+    protected function rules()
+    {
+        return [
+            'repository_url' => ['required', 'string', new ValidGitRepositoryUrl],
+            'port' => 'required|numeric',
+            'isStatic' => 'required|boolean',
+            'publish_directory' => 'nullable|string',
+            'build_pack' => 'required|string',
+            'base_directory' => 'nullable|string',
+            'docker_compose_location' => 'nullable|string',
+            'git_branch' => ['required', 'string', new ValidGitBranch],
+        ];
+    }
 
     protected $validationAttributes = [
         'repository_url' => 'repository',
@@ -141,6 +157,15 @@ class PublicGitRepository extends Component
     public function loadBranch()
     {
         try {
+            // Validate repository URL
+            $validator = validator(['repository_url' => $this->repository_url], [
+                'repository_url' => ['required', 'string', new ValidGitRepositoryUrl],
+            ]);
+
+            if ($validator->fails()) {
+                throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
+            }
+
             if (str($this->repository_url)->startsWith('git@')) {
                 $github_instance = str($this->repository_url)->after('git@')->before(':');
                 $repository = str($this->repository_url)->after(':')->before('.git');
@@ -191,6 +216,15 @@ class PublicGitRepository extends Component
         $this->git_branch = 'main';
         $this->base_directory = '/';
 
+        // Validate repository URL before parsing
+        $validator = validator(['repository_url' => $this->repository_url], [
+            'repository_url' => ['required', 'string', new ValidGitRepositoryUrl],
+        ]);
+
+        if ($validator->fails()) {
+            throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
+        }
+
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
@@ -234,6 +268,27 @@ class PublicGitRepository extends Component
     {
         try {
             $this->validate();
+
+            // Additional validation for git repository and branch
+            if ($this->git_source === 'other') {
+                // For 'other' sources, git_repository contains the full URL
+                $validator = validator(['git_repository' => $this->git_repository], [
+                    'git_repository' => ['required', 'string', new ValidGitRepositoryUrl],
+                ]);
+
+                if ($validator->fails()) {
+                    throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('git_repository'));
+                }
+            }
+
+            $branchValidator = validator(['git_branch' => $this->git_branch], [
+                'git_branch' => ['required', 'string', new ValidGitBranch],
+            ]);
+
+            if ($branchValidator->fails()) {
+                throw new \RuntimeException('Invalid branch: '.$branchValidator->errors()->first('git_branch'));
+            }
+
             $destination_uuid = $this->query['destination'];
             $project_uuid = $this->parameters['project_uuid'];
             $environment_uuid = $this->parameters['environment_uuid'];
@@ -318,7 +373,7 @@ class PublicGitRepository extends Component
 
             $application->settings->is_static = $this->isStatic;
             $application->settings->save();
-            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
             $application->save();
             if ($this->checkCoolifyConfig) {

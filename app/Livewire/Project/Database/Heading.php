@@ -7,10 +7,13 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Heading extends Component
 {
+    use AuthorizesRequests;
+
     public $database;
 
     public array $parameters;
@@ -33,7 +36,10 @@ class Heading extends Component
     public function activityFinished()
     {
         try {
-            $this->database->started_at ??= now();
+            // Only set started_at if database is actually running
+            if ($this->database->isRunning()) {
+                $this->database->started_at ??= now();
+            }
             $this->database->save();
 
             if (is_null($this->database->config_hash) || $this->database->isConfigurationChanged()) {
@@ -64,6 +70,8 @@ class Heading extends Component
     public function stop()
     {
         try {
+            $this->authorize('manage', $this->database);
+
             $this->dispatch('info', 'Gracefully stopping database.');
             StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
         } catch (\Exception $e) {
@@ -73,12 +81,16 @@ class Heading extends Component
 
     public function restart()
     {
+        $this->authorize('manage', $this->database);
+
         $activity = RestartDatabase::run($this->database);
         $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }
 
     public function start()
     {
+        $this->authorize('manage', $this->database);
+
         $activity = StartDatabase::run($this->database);
         $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
     }

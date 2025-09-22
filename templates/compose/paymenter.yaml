@@ -1,5 +1,6 @@
 # documentation: https://paymenter.org/docs/guides/docker
 # slogan: Open-Source Billing, Built for Hosting
+# category: cms
 # tags: automation, billing, open source
 # logo: svgs/paymenter.svg
 # port: 80
@@ -11,7 +12,7 @@ services:
       - app_logs:/app/storage/logs
       - app_public:/app/storage/public
     environment:
-      SERVICE_FQDN_PAYMENTER: ${SERVICE_FQDN_PAYMENTER_80}
+      SERVICE_URL_PAYMENTER: ${SERVICE_URL_PAYMENTER_80}
       DB_DATABASE: ${MYSQL_DATABASE:-paymenter-db}
       DB_PASSWORD: ${SERVICE_PASSWORD_MYSQL}
       DB_USERNAME: ${SERVICE_USER_MYSQL}

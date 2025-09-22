@@ -11,7 +11,7 @@ class CleanupDocker
 
     public string $jobQueue = 'high';
 
-    public function handle(Server $server)
+    public function handle(Server $server, bool $deleteUnusedVolumes = false, bool $deleteUnusedNetworks = false)
     {
         $settings = instanceSettings();
         $realtimeImage = config('constants.coolify.realtime_image');
@@ -36,11 +36,11 @@ class CleanupDocker
             "docker images --filter before=$realtimeImageWithoutPrefixVersion --filter reference=$realtimeImageWithoutPrefix | grep $realtimeImageWithoutPrefix | awk '{print $3}' | xargs -r docker rmi -f",
         ];
 
-        if ($server->settings->delete_unused_volumes) {
+        if ($deleteUnusedVolumes) {
             $commands[] = 'docker volume prune -af';
         }
 
-        if ($server->settings->delete_unused_networks) {
+        if ($deleteUnusedNetworks) {
             $commands[] = 'docker network prune -f';
         }
 

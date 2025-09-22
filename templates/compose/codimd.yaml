@@ -1,5 +1,6 @@
 # documentation: https://hackmd.io/c/codimd-documentation
 # slogan: Realtime collaborative markdown notes on all platforms
+# category: productivity
 # tags: markdown, md, editor, opensource, collaborative, realtime-collaboration, notes
 # logo: svgs/codimd.png
 # port: 3000
@@ -8,7 +9,7 @@ services:
   codimd:
     image: nabo.codimd.dev/hackmdio/hackmd:latest
     environment:
-      - SERVICE_FQDN_CODIMD_3000
+      - SERVICE_URL_CODIMD_3000
       - CMD_DOMAIN=${SERVICE_URL_CODIMD}
       - CMD_PROTOCOL_USESSL=${CMD_PROTOCOL_USESSL:-false}
       - CMD_SESSION_SECRET=${SERVICE_PASSWORD_SESSIONSECRET}

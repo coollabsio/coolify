@@ -1,5 +1,6 @@
 # documentation: https://docmost.com/docs/
 # slogan: Open-source collaborative wiki and documentation software
+# category: productivity
 # tags: documentation, opensource, wiki, confluence, knowledge-base, notion, realtime-collaboration, notion-alternative
 # logo: svgs/docmost.png
 # port: 3000
@@ -13,9 +14,9 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_DOCMOST_3000
+      - SERVICE_URL_DOCMOST_3000
       - APP_SECRET=$SERVICE_BASE64_APPKEY
-      - APP_URL=$SERVICE_FQDN_DOCMOST_3000
+      - APP_URL=$SERVICE_URL_DOCMOST_3000
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql/docmost?schema=public
       - REDIS_URL=redis://redis:6379
     volumes:

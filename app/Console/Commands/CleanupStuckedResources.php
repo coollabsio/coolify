@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\CleanupHelperContainersJob;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -20,6 +21,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\Team;
 use Illuminate\Console\Command;
 
 class CleanupStuckedResources extends Command
@@ -36,6 +38,12 @@ class CleanupStuckedResources extends Command
     private function cleanup_stucked_resources()
     {
         try {
+            $teams = Team::all()->filter(function ($team) {
+                return $team->members()->count() === 0 && $team->servers()->count() === 0;
+            });
+            foreach ($teams as $team) {
+                $team->delete();
+            }
             $servers = Server::all()->filter(function ($server) {
                 return $server->isFunctional();
             });
@@ -65,7 +73,7 @@ class CleanupStuckedResources extends Command
             $applications = Application::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($applications as $application) {
                 echo "Deleting stuck application: {$application->name}\n";
-                $application->forceDelete();
+                DeleteResourceJob::dispatch($application);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
@@ -75,8 +83,17 @@ class CleanupStuckedResources extends Command
             foreach ($applicationsPreviews as $applicationPreview) {
                 if (! data_get($applicationPreview, 'application')) {
                     echo "Deleting stuck application preview: {$applicationPreview->uuid}\n";
-                    $applicationPreview->delete();
+                    DeleteResourceJob::dispatch($applicationPreview);
                 }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsPreviews = ApplicationPreview::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($applicationsPreviews as $applicationPreview) {
+                echo "Deleting stuck application preview: {$applicationPreview->fqdn}\n";
+                DeleteResourceJob::dispatch($applicationPreview);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
@@ -85,16 +102,16 @@ class CleanupStuckedResources extends Command
             $postgresqls = StandalonePostgresql::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($postgresqls as $postgresql) {
                 echo "Deleting stuck postgresql: {$postgresql->name}\n";
-                $postgresql->forceDelete();
+                DeleteResourceJob::dispatch($postgresql);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck postgresql: {$e->getMessage()}\n";
         }
         try {
-            $redis = StandaloneRedis::withTrashed()->whereNotNull('deleted_at')->get();
-            foreach ($redis as $redis) {
+            $rediss = StandaloneRedis::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($rediss as $redis) {
                 echo "Deleting stuck redis: {$redis->name}\n";
-                $redis->forceDelete();
+                DeleteResourceJob::dispatch($redis);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck redis: {$e->getMessage()}\n";
@@ -103,7 +120,7 @@ class CleanupStuckedResources extends Command
             $keydbs = StandaloneKeydb::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($keydbs as $keydb) {
                 echo "Deleting stuck keydb: {$keydb->name}\n";
-                $keydb->forceDelete();
+                DeleteResourceJob::dispatch($keydb);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck keydb: {$e->getMessage()}\n";
@@ -112,7 +129,7 @@ class CleanupStuckedResources extends Command
             $dragonflies = StandaloneDragonfly::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($dragonflies as $dragonfly) {
                 echo "Deleting stuck dragonfly: {$dragonfly->name}\n";
-                $dragonfly->forceDelete();
+                DeleteResourceJob::dispatch($dragonfly);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck dragonfly: {$e->getMessage()}\n";
@@ -121,7 +138,7 @@ class CleanupStuckedResources extends Command
             $clickhouses = StandaloneClickhouse::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($clickhouses as $clickhouse) {
                 echo "Deleting stuck clickhouse: {$clickhouse->name}\n";
-                $clickhouse->forceDelete();
+                DeleteResourceJob::dispatch($clickhouse);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
@@ -130,7 +147,7 @@ class CleanupStuckedResources extends Command
             $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($mongodbs as $mongodb) {
                 echo "Deleting stuck mongodb: {$mongodb->name}\n";
-                $mongodb->forceDelete();
+                DeleteResourceJob::dispatch($mongodb);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mongodb: {$e->getMessage()}\n";
@@ -139,7 +156,7 @@ class CleanupStuckedResources extends Command
             $mysqls = StandaloneMysql::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($mysqls as $mysql) {
                 echo "Deleting stuck mysql: {$mysql->name}\n";
-                $mysql->forceDelete();
+                DeleteResourceJob::dispatch($mysql);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mysql: {$e->getMessage()}\n";
@@ -148,7 +165,7 @@ class CleanupStuckedResources extends Command
             $mariadbs = StandaloneMariadb::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($mariadbs as $mariadb) {
                 echo "Deleting stuck mariadb: {$mariadb->name}\n";
-                $mariadb->forceDelete();
+                DeleteResourceJob::dispatch($mariadb);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mariadb: {$e->getMessage()}\n";
@@ -157,7 +174,7 @@ class CleanupStuckedResources extends Command
             $services = Service::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($services as $service) {
                 echo "Deleting stuck service: {$service->name}\n";
-                $service->forceDelete();
+                DeleteResourceJob::dispatch($service);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck service: {$e->getMessage()}\n";
@@ -210,19 +227,19 @@ class CleanupStuckedResources extends Command
             foreach ($applications as $application) {
                 if (! data_get($application, 'environment')) {
                     echo 'Application without environment: '.$application->name.'\n';
-                    $application->forceDelete();
+                    DeleteResourceJob::dispatch($application);
 
                     continue;
                 }
                 if (! $application->destination()) {
                     echo 'Application without destination: '.$application->name.'\n';
-                    $application->forceDelete();
+                    DeleteResourceJob::dispatch($application);
 
                     continue;
                 }
                 if (! data_get($application, 'destination.server')) {
                     echo 'Application without server: '.$application->name.'\n';
-                    $application->forceDelete();
+                    DeleteResourceJob::dispatch($application);
 
                     continue;
                 }
@@ -235,19 +252,19 @@ class CleanupStuckedResources extends Command
             foreach ($postgresqls as $postgresql) {
                 if (! data_get($postgresql, 'environment')) {
                     echo 'Postgresql without environment: '.$postgresql->name.'\n';
-                    $postgresql->forceDelete();
+                    DeleteResourceJob::dispatch($postgresql);
 
                     continue;
                 }
                 if (! $postgresql->destination()) {
                     echo 'Postgresql without destination: '.$postgresql->name.'\n';
-                    $postgresql->forceDelete();
+                    DeleteResourceJob::dispatch($postgresql);
 
                     continue;
                 }
                 if (! data_get($postgresql, 'destination.server')) {
                     echo 'Postgresql without server: '.$postgresql->name.'\n';
-                    $postgresql->forceDelete();
+                    DeleteResourceJob::dispatch($postgresql);
 
                     continue;
                 }
@@ -260,19 +277,19 @@ class CleanupStuckedResources extends Command
             foreach ($redis as $redis) {
                 if (! data_get($redis, 'environment')) {
                     echo 'Redis without environment: '.$redis->name.'\n';
-                    $redis->forceDelete();
+                    DeleteResourceJob::dispatch($redis);
 
                     continue;
                 }
                 if (! $redis->destination()) {
                     echo 'Redis without destination: '.$redis->name.'\n';
-                    $redis->forceDelete();
+                    DeleteResourceJob::dispatch($redis);
 
                     continue;
                 }
                 if (! data_get($redis, 'destination.server')) {
                     echo 'Redis without server: '.$redis->name.'\n';
-                    $redis->forceDelete();
+                    DeleteResourceJob::dispatch($redis);
 
                     continue;
                 }
@@ -286,19 +303,19 @@ class CleanupStuckedResources extends Command
             foreach ($mongodbs as $mongodb) {
                 if (! data_get($mongodb, 'environment')) {
                     echo 'Mongodb without environment: '.$mongodb->name.'\n';
-                    $mongodb->forceDelete();
+                    DeleteResourceJob::dispatch($mongodb);
 
                     continue;
                 }
                 if (! $mongodb->destination()) {
                     echo 'Mongodb without destination: '.$mongodb->name.'\n';
-                    $mongodb->forceDelete();
+                    DeleteResourceJob::dispatch($mongodb);
 
                     continue;
                 }
                 if (! data_get($mongodb, 'destination.server')) {
                     echo 'Mongodb without server:  '.$mongodb->name.'\n';
-                    $mongodb->forceDelete();
+                    DeleteResourceJob::dispatch($mongodb);
 
                     continue;
                 }
@@ -312,19 +329,19 @@ class CleanupStuckedResources extends Command
             foreach ($mysqls as $mysql) {
                 if (! data_get($mysql, 'environment')) {
                     echo 'Mysql without environment: '.$mysql->name.'\n';
-                    $mysql->forceDelete();
+                    DeleteResourceJob::dispatch($mysql);
 
                     continue;
                 }
                 if (! $mysql->destination()) {
                     echo 'Mysql without destination: '.$mysql->name.'\n';
-                    $mysql->forceDelete();
+                    DeleteResourceJob::dispatch($mysql);
 
                     continue;
                 }
                 if (! data_get($mysql, 'destination.server')) {
                     echo 'Mysql without server: '.$mysql->name.'\n';
-                    $mysql->forceDelete();
+                    DeleteResourceJob::dispatch($mysql);
 
                     continue;
                 }
@@ -338,19 +355,19 @@ class CleanupStuckedResources extends Command
             foreach ($mariadbs as $mariadb) {
                 if (! data_get($mariadb, 'environment')) {
                     echo 'Mariadb without environment: '.$mariadb->name.'\n';
-                    $mariadb->forceDelete();
+                    DeleteResourceJob::dispatch($mariadb);
 
                     continue;
                 }
                 if (! $mariadb->destination()) {
                     echo 'Mariadb without destination: '.$mariadb->name.'\n';
-                    $mariadb->forceDelete();
+                    DeleteResourceJob::dispatch($mariadb);
 
                     continue;
                 }
                 if (! data_get($mariadb, 'destination.server')) {
                     echo 'Mariadb without server: '.$mariadb->name.'\n';
-                    $mariadb->forceDelete();
+                    DeleteResourceJob::dispatch($mariadb);
 
                     continue;
                 }
@@ -364,19 +381,19 @@ class CleanupStuckedResources extends Command
             foreach ($services as $service) {
                 if (! data_get($service, 'environment')) {
                     echo 'Service without environment: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
                 if (! $service->destination()) {
                     echo 'Service without destination: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
                 if (! data_get($service, 'server')) {
                     echo 'Service without server: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
@@ -389,7 +406,7 @@ class CleanupStuckedResources extends Command
             foreach ($serviceApplications as $service) {
                 if (! data_get($service, 'service')) {
                     echo 'ServiceApplication without service: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
@@ -402,7 +419,7 @@ class CleanupStuckedResources extends Command
             foreach ($serviceDatabases as $service) {
                 if (! data_get($service, 'service')) {
                     echo 'ServiceDatabase without service: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }

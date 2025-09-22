@@ -246,6 +246,8 @@ class ServicesController extends Controller
             return invalidTokenResponse();
         }
 
+        $this->authorize('create', Service::class);
+
         $return = validateIncomingRequest($request);
         if ($return instanceof \Illuminate\Http\JsonResponse) {
             return $return;
@@ -351,7 +353,6 @@ class ServicesController extends Controller
                             'value' => $generatedValue,
                             'resourceable_id' => $service->id,
                             'resourceable_type' => $service->getMorphClass(),
-                            'is_build_time' => false,
                             'is_preview' => false,
                         ]);
                     });
@@ -377,14 +378,118 @@ class ServicesController extends Controller
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
+            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
 
-            $service = new Service;
-            $result = $this->upsert_service($request, $service, $teamId);
-            if ($result instanceof \Illuminate\Http\JsonResponse) {
-                return $result;
+            $validator = customApiValidator($request->all(), [
+                'project_uuid' => 'string|required',
+                'environment_name' => 'string|nullable',
+                'environment_uuid' => 'string|nullable',
+                'server_uuid' => 'string|required',
+                'destination_uuid' => 'string',
+                'name' => 'string|max:255',
+                'description' => 'string|nullable',
+                'instant_deploy' => 'boolean',
+                'connect_to_docker_network' => 'boolean',
+                'docker_compose_raw' => 'string|required',
+            ]);
+
+            $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+            if ($validator->fails() || ! empty($extraFields)) {
+                $errors = $validator->errors();
+                if (! empty($extraFields)) {
+                    foreach ($extraFields as $field) {
+                        $errors->add($field, 'This field is not allowed.');
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $errors,
+                ], 422);
             }
 
-            return response()->json(serializeApiResponse($result))->setStatusCode(201);
+            $environmentUuid = $request->environment_uuid;
+            $environmentName = $request->environment_name;
+            if (blank($environmentUuid) && blank($environmentName)) {
+                return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
+            }
+            $serverUuid = $request->server_uuid;
+            $projectUuid = $request->project_uuid;
+            $project = Project::whereTeamId($teamId)->whereUuid($projectUuid)->first();
+            if (! $project) {
+                return response()->json(['message' => 'Project not found.'], 404);
+            }
+            $environment = $project->environments()->where('name', $environmentName)->first();
+            if (! $environment) {
+                $environment = $project->environments()->where('uuid', $environmentUuid)->first();
+            }
+            if (! $environment) {
+                return response()->json(['message' => 'Environment not found.'], 404);
+            }
+            $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
+            if (! $server) {
+                return response()->json(['message' => 'Server not found.'], 404);
+            }
+            $destinations = $server->destinations();
+            if ($destinations->count() == 0) {
+                return response()->json(['message' => 'Server has no destinations.'], 400);
+            }
+            if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
+                return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
+            }
+            $destination = $destinations->first();
+            if (! isBase64Encoded($request->docker_compose_raw)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerCompose = base64_decode($request->docker_compose_raw);
+            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+
+            $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
+            $instantDeploy = $request->instant_deploy ?? false;
+
+            $service = new Service;
+            $service->name = $request->name ?? 'service-'.str()->random(10);
+            $service->description = $request->description;
+            $service->docker_compose_raw = $dockerComposeRaw;
+            $service->environment_id = $environment->id;
+            $service->server_id = $server->id;
+            $service->destination_id = $destination->id;
+            $service->destination_type = $destination->getMorphClass();
+            $service->connect_to_docker_network = $connectToDockerNetwork;
+            $service->save();
+
+            $service->parse(isNew: true);
+            if ($instantDeploy) {
+                StartService::dispatch($service);
+            }
+
+            $domains = $service->applications()->get()->pluck('fqdn')->sort();
+            $domains = $domains->map(function ($domain) {
+                if (count(explode(':', $domain)) > 2) {
+                    return str($domain)->beforeLast(':')->value();
+                }
+
+                return $domain;
+            })->values();
+
+            return response()->json([
+                'uuid' => $service->uuid,
+                'domains' => $domains,
+            ])->setStatusCode(201);
         } else {
             return response()->json(['message' => 'No service type or docker_compose_raw provided.'], 400);
         }
@@ -442,6 +547,8 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('view', $service);
 
         $service = $service->load(['applications', 'databases']);
 
@@ -508,12 +615,14 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('delete', $service);
+
         DeleteResourceJob::dispatch(
             resource: $service,
-            deleteConfigurations: $request->query->get('delete_configurations', true),
             deleteVolumes: $request->query->get('delete_volumes', true),
-            dockerCleanup: $request->query->get('docker_cleanup', true),
-            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true)
+            deleteConnectedNetworks: $request->query->get('delete_connected_networks', true),
+            deleteConfigurations: $request->query->get('delete_configurations', true),
+            dockerCleanup: $request->query->get('docker_cleanup', true)
         );
 
         return response()->json([
@@ -550,7 +659,6 @@ class ServicesController extends Controller
                     mediaType: 'application/json',
                     schema: new OA\Schema(
                         type: 'object',
-                        required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid', 'docker_compose_raw'],
                         properties: [
                             'name' => ['type' => 'string', 'description' => 'The service name.'],
                             'description' => ['type' => 'string', 'description' => 'The service description.'],
@@ -615,28 +723,16 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
-        $result = $this->upsert_service($request, $service, $teamId);
-        if ($result instanceof \Illuminate\Http\JsonResponse) {
-            return $result;
-        }
+        $this->authorize('update', $service);
 
-        return response()->json(serializeApiResponse($result))->setStatusCode(200);
-    }
+        $allowedFields = ['name', 'description', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
 
-    private function upsert_service(Request $request, Service $service, string $teamId)
-    {
-        $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network'];
         $validator = customApiValidator($request->all(), [
-            'project_uuid' => 'string|required',
-            'environment_name' => 'string|nullable',
-            'environment_uuid' => 'string|nullable',
-            'server_uuid' => 'string|required',
-            'destination_uuid' => 'string',
             'name' => 'string|max:255',
             'description' => 'string|nullable',
             'instant_deploy' => 'boolean',
             'connect_to_docker_network' => 'boolean',
-            'docker_compose_raw' => 'string|required',
+            'docker_compose_raw' => 'string|nullable',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -653,70 +749,42 @@ class ServicesController extends Controller
                 'errors' => $errors,
             ], 422);
         }
+        if ($request->has('docker_compose_raw')) {
+            if (! isBase64Encoded($request->docker_compose_raw)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerComposeRaw = base64_decode($request->docker_compose_raw);
+            if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
+                    ],
+                ], 422);
+            }
+            $dockerCompose = base64_decode($request->docker_compose_raw);
+            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            $service->docker_compose_raw = $dockerComposeRaw;
+        }
 
-        $environmentUuid = $request->environment_uuid;
-        $environmentName = $request->environment_name;
-        if (blank($environmentUuid) && blank($environmentName)) {
-            return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
+        if ($request->has('name')) {
+            $service->name = $request->name;
         }
-        $serverUuid = $request->server_uuid;
-        $instantDeploy = $request->instant_deploy ?? false;
-        $project = Project::whereTeamId($teamId)->whereUuid($request->project_uuid)->first();
-        if (! $project) {
-            return response()->json(['message' => 'Project not found.'], 404);
+        if ($request->has('description')) {
+            $service->description = $request->description;
         }
-        $environment = $project->environments()->where('name', $environmentName)->first();
-        if (! $environment) {
-            $environment = $project->environments()->where('uuid', $environmentUuid)->first();
+        if ($request->has('connect_to_docker_network')) {
+            $service->connect_to_docker_network = $request->connect_to_docker_network;
         }
-        if (! $environment) {
-            return response()->json(['message' => 'Environment not found.'], 404);
-        }
-        $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
-        if (! $server) {
-            return response()->json(['message' => 'Server not found.'], 404);
-        }
-        $destinations = $server->destinations();
-        if ($destinations->count() == 0) {
-            return response()->json(['message' => 'Server has no destinations.'], 400);
-        }
-        if ($destinations->count() > 1 && ! $request->has('destination_uuid')) {
-            return response()->json(['message' => 'Server has multiple destinations and you do not set destination_uuid.'], 400);
-        }
-        $destination = $destinations->first();
-        if (! isBase64Encoded($request->docker_compose_raw)) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                ],
-            ], 422);
-        }
-        $dockerComposeRaw = base64_decode($request->docker_compose_raw);
-        if (mb_detect_encoding($dockerComposeRaw, 'ASCII', true) === false) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => [
-                    'docker_compose_raw' => 'The docker_compose_raw should be base64 encoded.',
-                ],
-            ], 422);
-        }
-        $dockerCompose = base64_decode($request->docker_compose_raw);
-        $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-        $connectToDockerNetwork = $request->connect_to_docker_network ?? false;
-
-        $service->name = $request->name ?? null;
-        $service->description = $request->description ?? null;
-        $service->docker_compose_raw = $dockerComposeRaw;
-        $service->environment_id = $environment->id;
-        $service->server_id = $server->id;
-        $service->destination_id = $destination->id;
-        $service->destination_type = $destination->getMorphClass();
-        $service->connect_to_docker_network = $connectToDockerNetwork;
         $service->save();
 
         $service->parse();
-        if ($instantDeploy) {
+        if ($request->instant_deploy) {
             StartService::dispatch($service);
         }
 
@@ -729,10 +797,10 @@ class ServicesController extends Controller
             return $domain;
         })->values();
 
-        return [
+        return response()->json([
             'uuid' => $service->uuid,
             'domains' => $domains,
-        ];
+        ])->setStatusCode(200);
     }
 
     #[OA\Get(
@@ -795,6 +863,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $envs = $service->environment_variables->map(function ($env) {
             $env->makeHidden([
                 'application_id',
@@ -848,7 +918,6 @@ class ServicesController extends Controller
                             'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                            'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -899,10 +968,11 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -966,7 +1036,6 @@ class ServicesController extends Controller
                                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -1020,6 +1089,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
             return response()->json(['message' => 'Bulk data is required.'], 400);
@@ -1030,7 +1101,6 @@ class ServicesController extends Controller
             $validator = customApiValidator($item, [
                 'key' => 'string|required',
                 'value' => 'string|nullable',
-                'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
@@ -1086,7 +1156,6 @@ class ServicesController extends Controller
                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -1136,10 +1205,11 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -1238,6 +1308,8 @@ class ServicesController extends Controller
             return response()->json(['message' => 'Service not found.'], 404);
         }
 
+        $this->authorize('manageEnvironment', $service);
+
         $env = EnvironmentVariable::where('uuid', $request->env_uuid)
             ->where('resourceable_type', Service::class)
             ->where('resourceable_id', $service->id)
@@ -1317,6 +1389,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('deploy', $service);
+
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
@@ -1395,6 +1470,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('stop', $service);
+
         if (str($service->status)->contains('stopped') || str($service->status)->contains('exited')) {
             return response()->json(['message' => 'Service is already stopped.'], 400);
         }
@@ -1482,6 +1560,9 @@ class ServicesController extends Controller
         if (! $service) {
             return response()->json(['message' => 'Service not found.'], 404);
         }
+
+        $this->authorize('deploy', $service);
+
         $pullLatest = $request->boolean('latest');
         RestartService::dispatch($service, $pullLatest);
 

@@ -1,5 +1,6 @@
 # documentation: https://github.com/henrygd/beszel?tab=readme-ov-file#getting-started
 # slogan: A lightweight server resource monitoring hub with historical data, docker stats, and alerts.
+# category: monitoring
 # tags: beszel,monitoring,server,stats,alerts
 # logo: svgs/beszel.svg
 # port: 8090
@@ -10,7 +11,7 @@ services:
   beszel:
     image: henrygd/beszel:latest
     environment:
-      - SERVICE_FQDN_BESZEL_8090
+      - SERVICE_URL_BESZEL_8090
     volumes:
       - beszel_data:/beszel_data
 

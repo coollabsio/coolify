@@ -9,6 +9,8 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ValidGitBranch;
+use App\Rules\ValidGitRepositoryUrl;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -53,16 +55,28 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private ?string $git_host = null;
 
-    private string $git_repository;
+    private ?string $git_repository = null;
 
     protected $rules = [
-        'repository_url' => 'required',
-        'branch' => 'required|string',
+        'repository_url' => ['required', 'string'],
+        'branch' => ['required', 'string'],
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
         'publish_directory' => 'nullable|string',
         'build_pack' => 'required|string',
     ];
+
+    protected function rules()
+    {
+        return [
+            'repository_url' => ['required', 'string', new ValidGitRepositoryUrl],
+            'branch' => ['required', 'string', new ValidGitBranch],
+            'port' => 'required|numeric',
+            'is_static' => 'required|boolean',
+            'publish_directory' => 'nullable|string',
+            'build_pack' => 'required|string',
+        ];
+    }
 
     protected $validationAttributes = [
         'repository_url' => 'Repository',
@@ -135,6 +149,9 @@ class GithubPrivateRepositoryDeployKey extends Component
 
             $this->get_git_source();
 
+            // Note: git_repository has already been validated and transformed in get_git_source()
+            // It may now be in SSH format (git@host:repo.git) which is valid for deploy keys
+
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
             if ($this->git_source === 'other') {
@@ -177,7 +194,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
             $application->name = generate_random_name($application->uuid);
             $application->save();
@@ -194,6 +211,15 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private function get_git_source()
     {
+        // Validate repository URL before parsing
+        $validator = validator(['repository_url' => $this->repository_url], [
+            'repository_url' => ['required', 'string', new ValidGitRepositoryUrl],
+        ]);
+
+        if ($validator->fails()) {
+            throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
+        }
+
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
@@ -206,8 +232,10 @@ class GithubPrivateRepositoryDeployKey extends Component
         if (str($this->repository_url)->startsWith('http')) {
             $this->git_host = $this->repository_url_parsed->getHost();
             $this->git_repository = $this->repository_url_parsed->getSegment(1).'/'.$this->repository_url_parsed->getSegment(2);
+            // Convert to SSH format for deploy key usage
             $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');
         } else {
+            // If it's already in SSH format, just use it as-is
             $this->git_repository = $this->repository_url;
         }
         $this->git_source = 'other';

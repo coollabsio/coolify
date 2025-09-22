@@ -12,7 +12,7 @@
     <div class="pb-4">Deploy resources, like Applications, Databases, Services...</div>
     <div x-data="searchResources()">
         @if ($current_step === 'type')
-            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky top-0 z-50 py-2">
+            <div x-init="window.addEventListener('scroll', () => isSticky = window.pageYOffset > 100)" class="sticky z-10 top-10 py-2">
                 <input autocomplete="off" x-ref="searchInput" class="input-sticky"
                     :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
                     @keydown.window.slash.prevent="$refs.searchInput.focus()">
@@ -29,7 +29,7 @@
                             <x-resource-view>
                                 <x-slot:title><span x-text="application.name"></span></x-slot>
                                 <x-slot:description>
-                                    <span x-html="application.description"></span>
+                                    <span x-html="window.sanitizeHTML(application.description)"></span>
                                 </x-slot>
                                 <x-slot:logo>
                                     <img class="w-[4.5rem] aspect-square h-[4.5rem] p-2 transition-all duration-200 dark:opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100 dark:bg-white/10 bg-black/10"
@@ -78,7 +78,7 @@
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
                     </div>
-                    <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
+                    <div class="py-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by
                         the
                         respective
                         companies, and use of them does not imply any affiliation or endorsement.<br>Find more services
@@ -253,7 +253,8 @@
     @endif
     @if ($current_step === 'destinations')
         <h2>Select a destination</h2>
-        <div>Destinations are used to segregate resources by network. If you are unsure, select the default
+        <div class="pb-4">Destinations are used to segregate resources by network. If you are unsure, select the
+            default
             Standalone Docker (coolify).</div>
         <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
             @if ($server->isSwarm())
