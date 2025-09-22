@@ -74,7 +74,7 @@
                     </div>
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
                         @if ($proxySettings)
-                            <div class="flex flex-col gap-2 pt-4">
+                            <div class="flex flex-col gap-2 pt-2">
                                 <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
                                     monacoEditorLanguage="yaml"
                                     label="Configuration file ( {{ $this->configurationFilePath }} )"
