@@ -74,13 +74,21 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->onQueue('high');
         $this->timeout = $backup->timeout;
-
-        $this->backup_log_uuid = (string) new Cuid2;
     }
 
     public function handle(): void
     {
         try {
+            $attempts = 0;
+            do {
+                $this->backup_log_uuid = (string) new Cuid2;
+                $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
+                $attempts++;
+                if ($attempts >= 3 && $exists) {
+                    throw new \Exception('Unable to generate unique UUID for backup execution after 3 attempts');
+                }
+            } while ($exists);
+
             $databasesToBackup = null;
 
             $this->team = Team::find($this->backup->team_id);
