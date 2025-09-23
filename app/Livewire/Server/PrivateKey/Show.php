@@ -5,6 +5,7 @@ namespace App\Livewire\Server\PrivateKey;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Show extends Component
@@ -35,19 +36,19 @@ class Show extends Component
 
             return;
         }
-
-        $originalPrivateKeyId = $this->server->getOriginal('private_key_id');
         try {
             $this->authorize('update', $this->server);
-            $this->server->update(['private_key_id' => $privateKeyId]);
-            ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection(justCheckingNewKey: true);
-            if ($uptime) {
-                $this->dispatch('success', 'Private key updated successfully.');
-            } else {
-                throw new \Exception($error);
-            }
+            DB::transaction(function () use ($ownedPrivateKey) {
+                $this->server->privateKey()->associate($ownedPrivateKey);
+                $this->server->save();
+                ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection(justCheckingNewKey: true);
+                if (! $uptime) {
+                    throw new \Exception($error);
+                }
+            });
+            $this->dispatch('success', 'Private key updated successfully.');
         } catch (\Exception $e) {
-            $this->server->update(['private_key_id' => $originalPrivateKeyId]);
+            $this->server->refresh();
             $this->server->validateConnection();
             $this->dispatch('error', $e->getMessage());
         }
