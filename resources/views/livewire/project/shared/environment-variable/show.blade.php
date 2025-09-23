@@ -188,6 +188,7 @@
                             @endif
                         @endif
                     </div>
+                    <x-environment-variable-warning :problematic-variables="$problematicVariables" />
                     <div class="flex w-full justify-end gap-2">
                         @if ($isDisabled)
                             <x-forms.button disabled type="submit">Update</x-forms.button>

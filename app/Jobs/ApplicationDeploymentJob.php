@@ -18,6 +18,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
 use Carbon\Carbon;
 use Exception;
@@ -39,7 +40,7 @@ use Yosymfony\Toml\Toml;
 
 class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, EnvironmentVariableAnalyzer, ExecuteRemoteCommand, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
 
@@ -2720,6 +2721,30 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('New container started.');
     }
 
+    private function analyzeBuildTimeVariables($variables)
+    {
+        $variablesArray = $variables->toArray();
+        $warnings = self::analyzeBuildVariables($variablesArray);
+
+        if (empty($warnings)) {
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+        foreach ($warnings as $warning) {
+            $messages = self::formatBuildWarning($warning);
+            foreach ($messages as $message) {
+                $this->application_deployment_queue->addLogEntry($message, type: 'warning');
+            }
+            $this->application_deployment_queue->addLogEntry('');
+        }
+
+        // Add general advice
+        $this->application_deployment_queue->addLogEntry('💡 Tips to resolve build issues:', type: 'info');
+        $this->application_deployment_queue->addLogEntry('   1. Set these variables as "Runtime only" in the environment variables settings', type: 'info');
+        $this->application_deployment_queue->addLogEntry('   2. Use different values for build-time (e.g., NODE_ENV=development for build)', type: 'info');
+        $this->application_deployment_queue->addLogEntry('   3. Consider using multi-stage Docker builds to separate build and runtime environments', type: 'info');
+    }
+
     private function generate_build_env_variables()
     {
         if ($this->application->build_pack === 'nixpacks') {
@@ -2727,6 +2752,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         } else {
             $this->generate_env_variables();
             $variables = collect([])->merge($this->env_args);
+        }
+
+        // Analyze build variables for potential issues
+        if ($variables->isNotEmpty()) {
+            $this->analyzeBuildTimeVariables($variables);
         }
 
         if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {

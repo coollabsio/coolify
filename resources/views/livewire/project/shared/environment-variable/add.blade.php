@@ -3,11 +3,15 @@
     <x-forms.textarea x-show="$wire.is_multiline === true" x-cloak id="value" label="Value" required />
     <x-forms.input x-show="$wire.is_multiline === false" x-cloak placeholder="production" id="value"
         x-bind:label="$wire.is_multiline === false && 'Value'" required />
+
     @if (!$shared || $isNixpacks)
         <x-forms.checkbox id="is_buildtime"
             helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
             label="Available at Buildtime" />
-        <x-forms.checkbox id="is_runtime" 
+
+        <x-environment-variable-warning :problematic-variables="$problematicVariables" />
+
+        <x-forms.checkbox id="is_runtime"
             helper="Make this variable available in the running container at runtime."
             label="Available at Runtime" />
         <x-forms.checkbox id="is_literal"
