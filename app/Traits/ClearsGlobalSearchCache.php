@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Livewire\GlobalSearch;
+use Illuminate\Database\Eloquent\Model;
 
 trait ClearsGlobalSearchCache
 {
