@@ -27,9 +27,6 @@ class Advanced extends Component
     #[Validate(['integer', 'min:1'])]
     public int $dynamicTimeout = 1;
 
-    #[Validate(['boolean'])]
-    public bool $isTerminalEnabled = false;
-
     public function mount(string $server_uuid)
     {
         try {
@@ -42,36 +39,7 @@ class Advanced extends Component
         }
     }
 
-    public function toggleTerminal($password)
-    {
-        try {
-            // Check if user is admin or owner
-            if (! auth()->user()->isAdmin()) {
-                throw new \Exception('Only team administrators and owners can modify terminal access.');
-            }
 
-            // Verify password unless two-step confirmation is disabled
-            if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-                if (! Hash::check($password, Auth::user()->password)) {
-                    $this->addError('password', 'The provided password is incorrect.');
-
-                    return;
-                }
-            }
-
-            // Toggle the terminal setting
-            $this->server->settings->is_terminal_enabled = ! $this->server->settings->is_terminal_enabled;
-            $this->server->settings->save();
-
-            // Update the local property
-            $this->isTerminalEnabled = $this->server->settings->is_terminal_enabled;
-
-            $status = $this->isTerminalEnabled ? 'enabled' : 'disabled';
-            $this->dispatch('success', "Terminal access has been {$status}.");
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
 
     public function syncData(bool $toModel = false)
     {
@@ -88,7 +56,6 @@ class Advanced extends Component
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
             $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
-            $this->isTerminalEnabled = $this->server->settings->is_terminal_enabled;
         }
     }
 
