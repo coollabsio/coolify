@@ -402,7 +402,7 @@ class GithubController extends Controller
         path: '/github-apps/{github_app_id}',
         operationId: 'updateGithubApp',
         security: [
-            ['api_token' => []],
+            ['bearerAuth' => []],
         ],
         tags: ['GitHub Apps'],
         summary: 'Update GitHub App',
@@ -581,7 +581,7 @@ class GithubController extends Controller
         path: '/github-apps/{github_app_id}',
         operationId: 'deleteGithubApp',
         security: [
-            ['api_token' => []],
+            ['bearerAuth' => []],
         ],
         tags: ['GitHub Apps'],
         summary: 'Delete GitHub App',
