@@ -109,7 +109,7 @@ trait EnvironmentVariableAnalyzer
             if (isset($config['check_function'])) {
                 $method = $config['check_function'];
                 if (method_exists(self::class, $method)) {
-                    return self::$method($key, $value, $config);
+                    return self::{$method}($key, $value, $config);
                 }
             }
 
