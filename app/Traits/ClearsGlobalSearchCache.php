@@ -65,7 +65,7 @@ trait ClearsGlobalSearchCache
     {
         // For database models, team is accessed through environment.project.team
         if (method_exists($this, 'team')) {
-            $team = $this->team();
+            $team = $this->team;
             if (filled($team)) {
                 return is_object($team) ? $team->id : null;
             }
