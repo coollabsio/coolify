@@ -93,19 +93,65 @@ class StripeProcessJob implements ShouldQueue
                     break;
                 case 'invoice.paid':
                     $customerId = data_get($data, 'customer');
+                    $invoiceAmount = data_get($data, 'amount_paid', 0);
+                    $subscriptionId = data_get($data, 'subscription');
                     $planId = data_get($data, 'lines.data.0.plan.id');
                     if (Str::contains($excludedPlans, $planId)) {
                         // send_internal_notification('Subscription excluded.');
                         break;
                     }
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                    if ($subscription) {
-                        $subscription->update([
-                            'stripe_invoice_paid' => true,
-                            'stripe_past_due' => false,
-                        ]);
-                    } else {
+                    if (! $subscription) {
                         throw new \RuntimeException("No subscription found for customer: {$customerId}");
+                    }
+
+                    if ($subscription->stripe_subscription_id) {
+                        try {
+                            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                            $stripeSubscription = $stripe->subscriptions->retrieve(
+                                $subscription->stripe_subscription_id
+                            );
+
+                            switch ($stripeSubscription->status) {
+                                case 'active':
+                                    $subscription->update([
+                                        'stripe_invoice_paid' => true,
+                                        'stripe_past_due' => false,
+                                    ]);
+                                    break;
+
+                                case 'past_due':
+                                    $subscription->update([
+                                        'stripe_invoice_paid' => true,
+                                        'stripe_past_due' => true,
+                                    ]);
+                                    break;
+
+                                case 'canceled':
+                                case 'incomplete_expired':
+                                case 'unpaid':
+                                    send_internal_notification(
+                                        "Invoice paid for {$stripeSubscription->status} subscription. ".
+                                        "Customer: {$customerId}, Amount: \${$invoiceAmount}"
+                                    );
+                                    break;
+
+                                default:
+                                    VerifyStripeSubscriptionStatusJob::dispatch($subscription)
+                                        ->delay(now()->addSeconds(20));
+                                    break;
+                            }
+                        } catch (\Exception $e) {
+                            VerifyStripeSubscriptionStatusJob::dispatch($subscription)
+                                ->delay(now()->addSeconds(20));
+
+                            send_internal_notification(
+                                'Failed to verify subscription status in invoice.paid: '.$e->getMessage()
+                            );
+                        }
+                    } else {
+                        VerifyStripeSubscriptionStatusJob::dispatch($subscription)
+                            ->delay(now()->addSeconds(20));
                     }
                     break;
                 case 'invoice.payment_failed':
