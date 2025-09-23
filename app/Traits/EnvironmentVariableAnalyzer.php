@@ -13,19 +13,19 @@ trait EnvironmentVariableAnalyzer
         return [
             'NODE_ENV' => [
                 'problematic_values' => ['production', 'prod'],
-                'affects' => 'Node.js/npm/yarn',
+                'affects' => 'Node.js/npm/yarn/bun/pnpm',
                 'issue' => 'Skips devDependencies installation which are often required for building (webpack, typescript, etc.)',
                 'recommendation' => 'Uncheck "Available at Buildtime" or use "development" during build',
             ],
             'NPM_CONFIG_PRODUCTION' => [
                 'problematic_values' => ['true', '1', 'yes'],
-                'affects' => 'npm',
+                'affects' => 'npm/pnpm',
                 'issue' => 'Forces npm to skip devDependencies',
                 'recommendation' => 'Remove from build-time variables or set to false',
             ],
             'YARN_PRODUCTION' => [
                 'problematic_values' => ['true', '1', 'yes'],
-                'affects' => 'Yarn',
+                'affects' => 'Yarn/pnpm',
                 'issue' => 'Forces yarn to skip devDependencies',
                 'recommendation' => 'Remove from build-time variables or set to false',
             ],
