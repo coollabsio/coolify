@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Cloud;
 
 use App\Actions\Stripe\CancelSubscription;
 use App\Actions\User\DeleteUserResources;
