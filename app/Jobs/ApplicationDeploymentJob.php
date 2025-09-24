@@ -2725,7 +2725,27 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function analyzeBuildTimeVariables($variables)
     {
-        $variablesArray = $variables->toArray();
+        $userDefinedVariables = collect([]);
+
+        $dbVariables = $this->pull_request_id === 0
+            ? $this->application->environment_variables()
+                ->where('is_buildtime', true)
+                ->pluck('key')
+            : $this->application->environment_variables_preview()
+                ->where('is_buildtime', true)
+                ->pluck('key');
+
+        foreach ($variables as $key => $value) {
+            if ($dbVariables->contains($key)) {
+                $userDefinedVariables->put($key, $value);
+            }
+        }
+
+        if ($userDefinedVariables->isEmpty()) {
+            return;
+        }
+
+        $variablesArray = $userDefinedVariables->toArray();
         $warnings = self::analyzeBuildVariables($variablesArray);
 
         if (empty($warnings)) {
