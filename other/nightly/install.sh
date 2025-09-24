@@ -825,7 +825,7 @@ else
 fi
 echo " - Coolify installed successfully."
 
-echo " - Waiting for 20 seconds for Coolify database migrations to be ready."
+echo " - Waiting 20 seconds for Coolify database migrations to complete."
 getAJoke
 
 sleep 20
