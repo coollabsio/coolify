@@ -647,6 +647,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof \Illuminate\Support\Collection && $this->build_args->isNotEmpty()) {
                 $build_args_string = $this->build_args->implode(' ');
+                // Escape single quotes for bash -c context used by executeInDocker
+                $build_args_string = str_replace("'", "'\\''", $build_args_string);
                 $command .= " {$build_args_string}";
                 $this->application_deployment_queue->addLogEntry('Adding build arguments to Docker Compose build command.');
             }
