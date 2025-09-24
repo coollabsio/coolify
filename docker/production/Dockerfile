@@ -72,9 +72,12 @@ RUN apk add --no-cache gnupg && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
 # Install system dependencies
-RUN apk add --no-cache \
+# Install openssh-client from v3.21 to avoid bug in r8, then remove v3.21 repos
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.21/main" >> /etc/apk/repositories && \
+    apk add --no-cache 'openssh-client<10.0_p1-r8' && \
+    sed -i '/v3.21/d' /etc/apk/repositories && \
+    apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
-    openssh-client \
     git \
     git-lfs \
     jq \
