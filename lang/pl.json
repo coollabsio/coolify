@@ -10,6 +10,7 @@
     "auth.login.google": "Zaloguj się przez Google",
     "auth.login.infomaniak": "Zaloguj się przez Infomaniak",
     "auth.login.zitadel": "Zaloguj się przez Zitadel",
+    "auth.login.oidc": "Zaloguj się przez SSO",
     "auth.already_registered": "Już zarejestrowany?",
     "auth.confirm_password": "Potwierdź hasło",
     "auth.forgot_password_link": "Zapomniałeś hasło?",
