@@ -715,7 +715,7 @@ echo -e "6. Setting up environment variable file"
 if [ -f $ENV_FILE ]; then
     # If .env exists, create backup
     echo " - Creating backup of existing .env file to .env-$DATE"
-    cp $ENV_FILE $ENV_FILE-$DATE
+    cp "$ENV_FILE" "$ENV_FILE-$DATE"
     # Merge .env.production values into .env
     echo " - Merging .env.production values into .env"
     awk -F '=' '!seen[$1]++' $ENV_FILE /data/coolify/source/.env.production > $ENV_FILE.tmp && mv $ENV_FILE.tmp $ENV_FILE
