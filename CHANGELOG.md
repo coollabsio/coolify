@@ -7,9 +7,11 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - *(PreviewCompose)* Adds port to preview urls
+- *(deployment-job)* Enhance build time variable analysis
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 
 ## [4.0.0-beta.429] - 2025-09-23
