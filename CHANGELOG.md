@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- *(docker)* Adjust openssh-client installation in Dockerfile to avoid version bug
+- *(docker)* Streamline openssh-client installation in Dockerfile
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Increment coolify version numbers to 4.0.0-beta.431 and 4.0.0-beta.432 in configuration files
+
+## [4.0.0-beta.430] - 2025-09-24
+
+### 🐛 Bug Fixes
+
 - *(PreviewCompose)* Adds port to preview urls
 - *(deployment-job)* Enhance build time variable analysis
 
