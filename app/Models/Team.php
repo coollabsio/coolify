@@ -193,6 +193,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function subscriptionEnded()
     {
         $this->subscription->update([
+            'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,
             'stripe_trial_already_ended' => false,

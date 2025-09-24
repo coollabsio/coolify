@@ -85,6 +85,47 @@ class ApplicationDeploymentQueue extends Model
         return str($this->commit_message)->value();
     }
 
+    private function redactSensitiveInfo($text)
+    {
+        $text = remove_iip($text);
+
+        $app = $this->application;
+        if (! $app) {
+            return $text;
+        }
+
+        $lockedVars = collect([]);
+
+        if ($app->environment_variables) {
+            $lockedVars = $lockedVars->merge(
+                $app->environment_variables
+                    ->where('is_shown_once', true)
+                    ->pluck('real_value', 'key')
+                    ->filter()
+            );
+        }
+
+        if ($this->pull_request_id !== 0 && $app->environment_variables_preview) {
+            $lockedVars = $lockedVars->merge(
+                $app->environment_variables_preview
+                    ->where('is_shown_once', true)
+                    ->pluck('real_value', 'key')
+                    ->filter()
+            );
+        }
+
+        foreach ($lockedVars as $key => $value) {
+            $escapedValue = preg_quote($value, '/');
+            $text = preg_replace(
+                '/'.$escapedValue.'/',
+                REDACTED,
+                $text
+            );
+        }
+
+        return $text;
+    }
+
     public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false)
     {
         if ($type === 'error') {
@@ -96,7 +137,7 @@ class ApplicationDeploymentQueue extends Model
         }
         $newLogEntry = [
             'command' => null,
-            'output' => remove_iip($message),
+            'output' => $this->redactSensitiveInfo($message),
             'type' => $type,
             'timestamp' => Carbon::now('UTC'),
             'hidden' => $hidden,

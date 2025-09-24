@@ -96,7 +96,11 @@ class GetContainersStatus
             }
             $containerStatus = data_get($container, 'State.Status');
             $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
-            $containerStatus = "$containerStatus ($containerHealth)";
+            if ($containerStatus === 'restarting') {
+                $containerStatus = "restarting ($containerHealth)";
+            } else {
+                $containerStatus = "$containerStatus ($containerHealth)";
+            }
             $labels = Arr::undot(format_docker_labels_to_json($labels));
             $applicationId = data_get($labels, 'coolify.applicationId');
             if ($applicationId) {
@@ -386,17 +390,31 @@ class GetContainersStatus
             return null;
         }
 
-        // Aggregate status: if any container is running, app is running
         $hasRunning = false;
+        $hasRestarting = false;
         $hasUnhealthy = false;
+        $hasExited = false;
 
         foreach ($relevantStatuses as $status) {
-            if (str($status)->contains('running')) {
+            if (str($status)->contains('restarting')) {
+                $hasRestarting = true;
+            } elseif (str($status)->contains('running')) {
                 $hasRunning = true;
                 if (str($status)->contains('unhealthy')) {
                     $hasUnhealthy = true;
                 }
+            } elseif (str($status)->contains('exited')) {
+                $hasExited = true;
+                $hasUnhealthy = true;
             }
+        }
+
+        if ($hasRestarting) {
+            return 'degraded (unhealthy)';
+        }
+
+        if ($hasRunning && $hasExited) {
+            return 'degraded (unhealthy)';
         }
 
         if ($hasRunning) {

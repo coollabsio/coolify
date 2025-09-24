@@ -547,9 +547,10 @@ class General extends Component
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                $domain = trim($domain);
                 Url::fromString($domain, ['http', 'https']);
 
-                return str($domain)->trim()->lower();
+                return str($domain)->lower();
             });
 
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');

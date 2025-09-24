@@ -239,7 +239,6 @@
                         @endif
                     </div>
                     <div class="flex flex-col gap-2">
-
                         <div class="w-96">
                             <x-forms.checkbox canGate="update" :canResource="$server" wire:model.live="isSentinelEnabled"
                                 label="Enable Sentinel" />
@@ -267,9 +266,7 @@
                                     $wire.set('sentinelCustomDockerImage', this.customImage);
                                 }
                             }" x-init="$wire.set('sentinelCustomDockerImage', customImage)">
-                                <x-forms.input 
-                                    x-model="customImage"
-                                    @input.debounce.500ms="saveCustomImage()"
+                                <x-forms.input x-model="customImage" @input.debounce.500ms="saveCustomImage()"
                                     placeholder="e.g., sentinel:latest or myregistry/sentinel:dev"
                                     label="Custom Sentinel Docker Image (Dev Only)"
                                     helper="Override the default Sentinel Docker image for testing. Leave empty to use the default." />

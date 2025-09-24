@@ -1093,11 +1093,11 @@ function getContainerLogs(Server $server, string $container_id, int $lines = 100
 {
     if ($server->isSwarm()) {
         $output = instant_remote_process([
-            "docker service logs -n {$lines} {$container_id}",
+            "docker service logs -n {$lines} {$container_id} 2>&1",
         ], $server);
     } else {
         $output = instant_remote_process([
-            "docker logs -n {$lines} {$container_id}",
+            "docker logs -n {$lines} {$container_id} 2>&1",
         ], $server);
     }
 
@@ -1105,7 +1105,6 @@ function getContainerLogs(Server $server, string $container_id, int $lines = 100
 
     return $output;
 }
-
 function escapeEnvVariables($value)
 {
     $search = ['\\', "\r", "\t", "\x0", '"', "'"];

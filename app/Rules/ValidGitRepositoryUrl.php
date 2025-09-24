@@ -31,7 +31,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
             '[', ']', '<', '>', '\n', '\r', '\0', '"', "'",
-            '\\', '!', '?', '*', '~', '^', '%', '=', '+',
+            '\\', '!', '?', '*', '^', '%', '=', '+',
             '#', // Comment character that could hide commands
         ];
 
@@ -85,7 +85,7 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
 
             // Validate SSH URL format (git@host:user/repo.git)
-            if (! preg_match('/^git@[a-zA-Z0-9\.\-]+:[a-zA-Z0-9\-_\/\.]+$/', $value)) {
+            if (! preg_match('/^git@[a-zA-Z0-9\.\-]+:[a-zA-Z0-9\-_\/\.~]+$/', $value)) {
                 $fail('The :attribute is not a valid SSH repository URL.');
 
                 return;

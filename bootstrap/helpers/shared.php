@@ -634,10 +634,14 @@ function getTopLevelNetworks(Service|Application $resource)
             $definedNetwork = collect([$resource->uuid]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
 
-                // Only add 'networks' key if 'network_mode' is not 'host'
-                if (! $hasHostNetworkMode) {
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
+                // Only add 'networks' key if 'network_mode' is not 'host' or does not start with 'service:' or 'container:'
+                if (! $hasValidNetworkMode) {
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -1272,7 +1276,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
+
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
@@ -1383,7 +1392,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
 
-                if (! $hasHostNetworkMode) {
+                if (! $hasValidNetworkMode) {
                     // Add Coolify specific networks
                     $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                         return $value == $definedNetwork;

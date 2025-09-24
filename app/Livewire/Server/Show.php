@@ -271,7 +271,7 @@ class Show extends Component
             $this->authorize('manageSentinel', $this->server);
             $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
             $this->server->restartSentinel($customImage);
-            $this->dispatch('success', 'Restarting Sentinel.');
+            $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -355,7 +355,7 @@ class Show extends Component
     public function instantSave()
     {
         try {
-            $this->submit();
+            $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -365,7 +365,7 @@ class Show extends Component
     {
         try {
             $this->syncData(true);
-            $this->dispatch('success', 'Server updated.');
+            $this->dispatch('success', 'Server settings updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

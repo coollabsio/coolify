@@ -11,6 +11,7 @@
     'content' => null,
     'checkboxes' => [],
     'actions' => [],
+    'warningMessage' => null,
     'confirmWithText' => true,
     'confirmationText' => 'Confirm Deletion',
     'confirmationLabel' => 'Please confirm the execution of the actions by entering the Name below',
@@ -228,7 +229,7 @@
                     <div x-show="step === 2">
                         <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
                             <p class="font-bold">Warning</p>
-                            <p>This operation is permanent and cannot be undone. Please think again before proceeding!
+                            <p>{!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
                             </p>
                         </div>
                         <div class="mb-4">The following actions will be performed:</div>

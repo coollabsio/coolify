@@ -20,7 +20,15 @@ class ConfigurationChecker extends Component
 
     public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
 
-    protected $listeners = ['configurationChanged'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+
+        return [
+            "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'configurationChanged',
+            'configurationChanged' => 'configurationChanged',
+        ];
+    }
 
     public function mount()
     {

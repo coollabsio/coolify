@@ -6,8 +6,29 @@
     @apply hidden!;
 }
 
+@utility apexcharts-grid-borders {
+    @apply dark:hidden!;
+}
+
 @utility apexcharts-xaxistooltip {
     @apply hidden!;
+}
+
+@utility apexcharts-tooltip-custom {
+    @apply bg-white dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300 rounded-lg shadow-lg p-3 text-sm;
+    min-width: 160px;
+}
+
+@utility apexcharts-tooltip-custom-value {
+    @apply text-neutral-700 dark:text-neutral-300 mb-1;
+}
+
+@utility apexcharts-tooltip-value-bold {
+    @apply font-bold text-black dark:text-white;
+}
+
+@utility apexcharts-tooltip-custom-title {
+    @apply text-xs text-neutral-500 dark:text-neutral-400 font-medium;
 }
 
 @utility input-sticky {
