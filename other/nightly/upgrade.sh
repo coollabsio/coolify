@@ -18,16 +18,16 @@ curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 # Backup existing .env file before making any changes
 if [ "$SKIP_BACKUP" != "true" ]; then
     if [ -f "$ENV_FILE" ]; then
-        echo "Creating backup of existing .env file to .env-$DATE" >>$LOGFILE
-        cp $ENV_FILE $ENV_FILE-$DATE
+        echo "Creating backup of existing .env file to .env-$DATE" >>"$LOGFILE"
+        cp "$ENV_FILE" "$ENV_FILE-$DATE"
     else
-        echo "No existing .env file found to backup" >>$LOGFILE
+        echo "No existing .env file found to backup" >>"$LOGFILE"
     fi
 fi
 
-echo "Merging .env.production values into .env" >>$LOGFILE
-awk -F '=' '!seen[$1]++' $ENV_FILE /data/coolify/source/.env.production > $ENV_FILE.tmp && mv $ENV_FILE.tmp $ENV_FILE
-echo ".env file merged successfully" >>$LOGFILE
+echo "Merging .env.production values into .env" >>"$LOGFILE"
+awk -F '=' '!seen[$1]++' "$ENV_FILE" /data/coolify/source/.env.production > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+echo ".env file merged successfully" >>"$LOGFILE"
 
 update_env_var() {
     local key="$1"
@@ -36,15 +36,15 @@ update_env_var() {
     # If variable "key=" exists but has no value, update the value of the existing line
     if grep -q "^${key}=$" "$ENV_FILE"; then
         sed -i "s|^${key}=$|${key}=${value}|" "$ENV_FILE"
-        echo " - Updated value of ${key} as the current value was empty" >>$LOGFILE
+        echo " - Updated value of ${key} as the current value was empty" >>"$LOGFILE"
     # If variable "key=" doesn't exist, append it to the file with value
     elif ! grep -q "^${key}=" "$ENV_FILE"; then
         printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
-        echo " - Added ${key} with default value as the variable was missing" >>$LOGFILE
+        echo " - Added ${key} with default value as the variable was missing" >>"$LOGFILE"
     fi
 }
 
-echo "Checking and updating environment variables if necessary..." >>$LOGFILE
+echo "Checking and updating environment variables if necessary..." >>"$LOGFILE"
 update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
@@ -65,8 +65,8 @@ if [ -f /root/.docker/config.json ]; then
 fi
 
 if [ -f /data/coolify/source/docker-compose.custom.yml ]; then
-    echo "docker-compose.custom.yml detected." >>$LOGFILE
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >>$LOGFILE 2>&1
+    echo "docker-compose.custom.yml detected." >>"$LOGFILE"
+    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml -f /data/coolify/source/docker-compose.custom.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
 else
-    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >>$LOGFILE 2>&1
+    docker run -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_CONFIG_MOUNT} --rm ${REGISTRY_URL:-ghcr.io}/coollabsio/coolify-helper:${LATEST_HELPER_VERSION} bash -c "LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --remove-orphans --force-recreate --wait --wait-timeout 60" >>"$LOGFILE" 2>&1
 fi
