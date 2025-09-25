@@ -76,10 +76,9 @@
                             label="Delete Unused Networks"
                             helper="This option will remove all unused Docker networks during cleanup.<br><br><strong>Warning: Functionality may be lost and containers may not be able to communicate with each other!</strong><br><br>Consequences include:<br>
                             <ul class='list-disc pl-4 mt-2'>
-                                <li>Networks not attached to running containers will be permanently deleted (stopped containers are affected).</li>
-                                <li>Custom networks for stopped containers will be permanently deleted.</li>
-                                <li>Functionality may be lost and containers may not be able to communicate with each other.</li>
-                            </ul>" 
+                                <li>Networks not attached to running containers will be permanently deleted (networks used by stopped containers are affected).</li>
+                                <li>Containers may lose connectivity if required networks are removed.</li>
+                            </ul>"
                         />
                     </div>
                 </div>
