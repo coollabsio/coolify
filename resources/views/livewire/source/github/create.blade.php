@@ -52,8 +52,7 @@
         </x-forms.button>
     </form>
 @else
-    <div class="text-gray-500 p-4 text-center">
-        <p>You don't have permission to create new GitHub Apps.</p>
-        <p class="text-sm">Please contact your team administrator for access.</p>
-    </div>
+    <x-callout type="warning" title="Permission Required">
+        You don't have permission to create new GitHub Apps. Please contact your team administrator for access.
+    </x-callout>
 @endcan
