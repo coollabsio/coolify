@@ -63,6 +63,8 @@ class Show extends Component
 
     public bool $isSentinelDebugEnabled;
 
+    public ?string $sentinelCustomDockerImage = null;
+
     public string $serverTimezone;
 
     public function getListeners()
@@ -267,8 +269,9 @@ class Show extends Component
     {
         try {
             $this->authorize('manageSentinel', $this->server);
-            $this->server->restartSentinel();
-            $this->dispatch('success', 'Restarting Sentinel.');
+            $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
+            $this->server->restartSentinel($customImage);
+            $this->dispatch('info', 'Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -295,12 +298,38 @@ class Show extends Component
         }
     }
 
+    public function updatedIsBuildServer($value)
+    {
+        try {
+            $this->authorize('update', $this->server);
+            if ($value === true && $this->isSentinelEnabled) {
+                $this->isSentinelEnabled = false;
+                $this->isMetricsEnabled = false;
+                $this->isSentinelDebugEnabled = false;
+                StopSentinel::dispatch($this->server);
+                $this->dispatch('info', 'Sentinel has been disabled as build servers cannot run Sentinel.');
+            }
+            $this->submit();
+            // Dispatch event to refresh the navbar
+            $this->dispatch('refreshServerShow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function updatedIsSentinelEnabled($value)
     {
         try {
             $this->authorize('manageSentinel', $this->server);
             if ($value === true) {
-                StartSentinel::run($this->server, true);
+                if ($this->isBuildServer) {
+                    $this->isSentinelEnabled = false;
+                    $this->dispatch('error', 'Sentinel cannot be enabled on build servers.');
+
+                    return;
+                }
+                $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
+                StartSentinel::run($this->server, true, null, $customImage);
             } else {
                 $this->isMetricsEnabled = false;
                 $this->isSentinelDebugEnabled = false;
@@ -326,7 +355,7 @@ class Show extends Component
     public function instantSave()
     {
         try {
-            $this->submit();
+            $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -336,7 +365,7 @@ class Show extends Component
     {
         try {
             $this->syncData(true);
-            $this->dispatch('success', 'Server updated.');
+            $this->dispatch('success', 'Server settings updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

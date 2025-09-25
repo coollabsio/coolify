@@ -11,6 +11,7 @@
     'content' => null,
     'checkboxes' => [],
     'actions' => [],
+    'warningMessage' => null,
     'confirmWithText' => true,
     'confirmationText' => 'Confirm Deletion',
     'confirmationLabel' => 'Please confirm the execution of the actions by entering the Name below',
@@ -200,9 +201,6 @@
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
-                            <div class="flex justify-between items-center">
-                                <h4>Actions</h4>
-                            </div>
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
@@ -226,11 +224,9 @@
 
                     <!-- Step 2: Confirm deletion -->
                     <div x-show="step === 2">
-                        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
-                            <p class="font-bold">Warning</p>
-                            <p>This operation is permanent and cannot be undone. Please think again before proceeding!
-                            </p>
-                        </div>
+                        <x-callout type="danger" title="Warning" class="mb-4">
+                            {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
+                        </x-callout>
                         <div class="mb-4">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
@@ -324,10 +320,9 @@
                     <!-- Step 3: Password confirmation -->
                     @if (!$disableTwoStepConfirmation)
                         <div x-show="step === 3 && confirmWithPassword">
-                            <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-error" role="alert">
-                                <p class="font-bold">Final Confirmation</p>
-                                <p>Please enter your password to confirm this destructive action.</p>
-                            </div>
+                            <x-callout type="danger" title="Final Confirmation" class="mb-4">
+                                Please enter your password to confirm this destructive action.
+                            </x-callout>
                             <div class="flex flex-col gap-2 mb-4">
                                 @php
                                     $passwordConfirm = Str::uuid();

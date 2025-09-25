@@ -11,8 +11,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
-class PullChangelogFromGitHub implements ShouldBeEncrypted, ShouldQueue
+class PullChangelog implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -26,21 +27,36 @@ class PullChangelogFromGitHub implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
+            // Fetch from CDN instead of GitHub API to avoid rate limits
+            $cdnUrl = config('constants.coolify.releases_url');
+
             $response = Http::retry(3, 1000)
                 ->timeout(30)
-                ->get('https://api.github.com/repos/coollabsio/coolify/releases?per_page=10');
+                ->get($cdnUrl);
 
             if ($response->successful()) {
                 $releases = $response->json();
+
+                // Limit to 10 releases for processing (same as before)
+                $releases = array_slice($releases, 0, 10);
+
                 $changelog = $this->transformReleasesToChangelog($releases);
 
                 // Group entries by month and save them
                 $this->saveChangelogEntries($changelog);
             } else {
-                send_internal_notification('PullChangelogFromGitHub failed with: '.$response->status().' '.$response->body());
+                // Log error instead of sending notification
+                Log::error('PullChangelogFromGitHub: Failed to fetch from CDN', [
+                    'status' => $response->status(),
+                    'url' => $cdnUrl,
+                ]);
             }
         } catch (\Throwable $e) {
-            send_internal_notification('PullChangelogFromGitHub failed with: '.$e->getMessage());
+            // Log error instead of sending notification
+            Log::error('PullChangelogFromGitHub: Exception occurred', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 

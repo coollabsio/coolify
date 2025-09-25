@@ -29,6 +29,7 @@ class Handler extends ExceptionHandler
      */
     protected $dontReport = [
         ProcessException::class,
+        NonReportableException::class,
     ];
 
     /**
@@ -110,9 +111,14 @@ class Handler extends ExceptionHandler
                     );
                 }
             );
+            // Check for errors that should not be reported to Sentry
             if (str($e->getMessage())->contains('No space left on device')) {
+                // Log locally but don't send to Sentry
+                logger()->warning('Disk space error: '.$e->getMessage());
+
                 return;
             }
+
             Integration::captureUnhandledException($e);
         });
     }

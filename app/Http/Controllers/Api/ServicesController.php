@@ -353,7 +353,6 @@ class ServicesController extends Controller
                             'value' => $generatedValue,
                             'resourceable_id' => $service->id,
                             'resourceable_type' => $service->getMorphClass(),
-                            'is_build_time' => false,
                             'is_preview' => false,
                         ]);
                     });
@@ -920,7 +919,6 @@ class ServicesController extends Controller
                             'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                             'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                             'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                            'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -976,7 +974,6 @@ class ServicesController extends Controller
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
@@ -1040,7 +1037,6 @@ class ServicesController extends Controller
                                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -1106,7 +1102,6 @@ class ServicesController extends Controller
             $validator = customApiValidator($item, [
                 'key' => 'string|required',
                 'value' => 'string|nullable',
-                'is_build_time' => 'boolean',
                 'is_literal' => 'boolean',
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
@@ -1162,7 +1157,6 @@ class ServicesController extends Controller
                         'key' => ['type' => 'string', 'description' => 'The key of the environment variable.'],
                         'value' => ['type' => 'string', 'description' => 'The value of the environment variable.'],
                         'is_preview' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in preview deployments.'],
-                        'is_build_time' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is used in build time.'],
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable\'s value is shown on the UI.'],
@@ -1217,7 +1211,6 @@ class ServicesController extends Controller
         $validator = customApiValidator($request->all(), [
             'key' => 'string|required',
             'value' => 'string|nullable',
-            'is_build_time' => 'boolean',
             'is_literal' => 'boolean',
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',

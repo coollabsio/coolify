@@ -72,6 +72,7 @@ RUN apk add --no-cache gnupg && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
 # Install system dependencies
+RUN apk upgrade
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     openssh-client \

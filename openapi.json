@@ -2773,10 +2773,6 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
                                     },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -2869,10 +2865,6 @@
                                     "is_preview": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                    },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
                                     },
                                     "is_literal": {
                                         "type": "boolean",
@@ -2971,10 +2963,6 @@
                                                 "is_preview": {
                                                     "type": "boolean",
                                                     "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                                },
-                                                "is_build_time": {
-                                                    "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable is used in build time."
                                                 },
                                                 "is_literal": {
                                                     "type": "boolean",
@@ -7179,10 +7167,6 @@
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
                                     },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
-                                    },
                                     "is_literal": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is a literal, nothing espaced."
@@ -7275,10 +7259,6 @@
                                     "is_preview": {
                                         "type": "boolean",
                                         "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                    },
-                                    "is_build_time": {
-                                        "type": "boolean",
-                                        "description": "The flag to indicate if the environment variable is used in build time."
                                     },
                                     "is_literal": {
                                         "type": "boolean",
@@ -7377,10 +7357,6 @@
                                                 "is_preview": {
                                                     "type": "boolean",
                                                     "description": "The flag to indicate if the environment variable is used in preview deployments."
-                                                },
-                                                "is_build_time": {
-                                                    "type": "boolean",
-                                                    "description": "The flag to indicate if the environment variable is used in build time."
                                                 },
                                                 "is_literal": {
                                                     "type": "boolean",
@@ -8375,9 +8351,6 @@
                     "resourceable_id": {
                         "type": "integer"
                     },
-                    "is_build_time": {
-                        "type": "boolean"
-                    },
                     "is_literal": {
                         "type": "boolean"
                     },
@@ -8385,6 +8358,12 @@
                         "type": "boolean"
                     },
                     "is_preview": {
+                        "type": "boolean"
+                    },
+                    "is_runtime": {
+                        "type": "boolean"
+                    },
+                    "is_buildtime": {
                         "type": "boolean"
                     },
                     "is_shared": {

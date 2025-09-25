@@ -210,10 +210,10 @@ class General extends Component
             }
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
-        // Convert service names with dots to use underscores for HTML form binding
+        // Convert service names with dots and dashes to use underscores for HTML form binding
         $sanitizedDomains = [];
         foreach ($this->parsedServiceDomains as $serviceName => $domain) {
-            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
             $sanitizedDomains[$sanitizedKey] = $domain;
         }
         $this->parsedServiceDomains = $sanitizedDomains;
@@ -305,10 +305,10 @@ class General extends Component
             // Refresh parsedServiceDomains to reflect any changes in docker_compose_domains
             $this->application->refresh();
             $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
-            // Convert service names with dots to use underscores for HTML form binding
+            // Convert service names with dots and dashes to use underscores for HTML form binding
             $sanitizedDomains = [];
             foreach ($this->parsedServiceDomains as $serviceName => $domain) {
-                $sanitizedKey = str($serviceName)->slug('_')->toString();
+                $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
                 $sanitizedDomains[$sanitizedKey] = $domain;
             }
             $this->parsedServiceDomains = $sanitizedDomains;
@@ -334,7 +334,7 @@ class General extends Component
 
             $uuid = new Cuid2;
             $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
-            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
             $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
 
             // Convert back to original service names for storage
@@ -344,7 +344,7 @@ class General extends Component
                 $originalServiceName = $key;
                 if (isset($this->parsedServices['services'])) {
                     foreach ($this->parsedServices['services'] as $originalName => $service) {
-                        if (str($originalName)->slug('_')->toString() === $key) {
+                        if (str($originalName)->replace('-', '_')->replace('.', '_')->toString() === $key) {
                             $originalServiceName = $originalName;
                             break;
                         }
@@ -487,7 +487,7 @@ class General extends Component
             $domains = str($this->application->fqdn)->trim()->explode(',');
             if ($this->application->additional_servers->count() === 0) {
                 foreach ($domains as $domain) {
-                    if (! validate_dns_entry($domain, $this->application->destination->server)) {
+                    if (! validateDNSEntry($domain, $this->application->destination->server)) {
                         $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     }
                 }
@@ -547,9 +547,10 @@ class General extends Component
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                $domain = trim($domain);
                 Url::fromString($domain, ['http', 'https']);
 
-                return str($domain)->trim()->lower();
+                return str($domain)->lower();
             });
 
             $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
@@ -615,7 +616,7 @@ class General extends Component
                     foreach ($this->parsedServiceDomains as $service) {
                         $domain = data_get($service, 'domain');
                         if ($domain) {
-                            if (! validate_dns_entry($domain, $this->application->destination->server)) {
+                            if (! validateDNSEntry($domain, $this->application->destination->server)) {
                                 $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                             }
                         }
@@ -671,7 +672,7 @@ class General extends Component
         $domains = collect(json_decode($this->application->docker_compose_domains, true)) ?? collect([]);
 
         foreach ($domains as $serviceName => $service) {
-            $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_');
+            $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
             $domain = data_get($service, 'domain');
             // Delete SERVICE_FQDN_ and SERVICE_URL_ variables if domain is removed
             $this->application->environment_variables()->where('resourceable_type', Application::class)
@@ -703,7 +704,6 @@ class General extends Component
                     'key' => "SERVICE_FQDN_{$serviceNameFormatted}",
                 ], [
                     'value' => $fqdnValue,
-                    'is_build_time' => false,
                     'is_preview' => false,
                 ]);
 
@@ -712,7 +712,6 @@ class General extends Component
                     'key' => "SERVICE_URL_{$serviceNameFormatted}",
                 ], [
                     'value' => $urlValue,
-                    'is_build_time' => false,
                     'is_preview' => false,
                 ]);
                 // Create/update port-specific variables if port exists
@@ -721,7 +720,6 @@ class General extends Component
                         'key' => "SERVICE_FQDN_{$serviceNameFormatted}_{$port}",
                     ], [
                         'value' => $fqdnValue,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
 
@@ -729,7 +727,6 @@ class General extends Component
                         'key' => "SERVICE_URL_{$serviceNameFormatted}_{$port}",
                     ], [
                         'value' => $urlValue,
-                        'is_build_time' => false,
                         'is_preview' => false,
                     ]);
                 }
