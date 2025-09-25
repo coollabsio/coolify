@@ -712,18 +712,18 @@ curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 echo -e "6. Setting up environment variable file"
 
-if [ -f $ENV_FILE ]; then
+if [ -f "$ENV_FILE" ]; then
     # If .env exists, create backup
     echo " - Creating backup of existing .env file to .env-$DATE"
     cp "$ENV_FILE" "$ENV_FILE-$DATE"
     # Merge .env.production values into .env
     echo " - Merging .env.production values into .env"
-    awk -F '=' '!seen[$1]++' $ENV_FILE /data/coolify/source/.env.production > $ENV_FILE.tmp && mv $ENV_FILE.tmp $ENV_FILE
+    awk -F '=' '!seen[$1]++' "$ENV_FILE" "/data/coolify/source/.env.production" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
     echo " - .env file merged successfully"
 else
     # If no .env exists, copy .env.production to .env
     echo " - No .env file found, copying .env.production to .env"
-    cp /data/coolify/source/.env.production $ENV_FILE
+    cp "/data/coolify/source/.env.production" "$ENV_FILE"
 fi
 
 echo -e "7. Checking and updating environment variables if necessary..."
