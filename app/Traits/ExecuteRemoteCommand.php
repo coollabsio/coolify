@@ -202,13 +202,13 @@ trait ExecuteRemoteCommand
 
             if ($this->save) {
                 if (data_get($this->saved_outputs, $this->save, null) === null) {
-                    data_set($this->saved_outputs, $this->save, str());
+                    $this->saved_outputs->put($this->save, str());
                 }
                 if ($append) {
-                    $this->saved_outputs[$this->save] .= str($sanitized_output)->trim();
-                    $this->saved_outputs[$this->save] = str($this->saved_outputs[$this->save]);
+                    $current_value = $this->saved_outputs->get($this->save);
+                    $this->saved_outputs->put($this->save, str($current_value.str($sanitized_output)->trim()));
                 } else {
-                    $this->saved_outputs[$this->save] = str($sanitized_output)->trim();
+                    $this->saved_outputs->put($this->save, str($sanitized_output)->trim());
                 }
             }
         });
