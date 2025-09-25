@@ -68,9 +68,8 @@
                             label="Delete Unused Volumes"
                             helper="This option will remove all unused Docker volumes during cleanup.<br><br><strong>Warning: Data from stopped containers will be lost!</strong><br><br>Consequences include:<br>
                             <ul class='list-disc pl-4 mt-2'>
-                                <li>Volumes not attached to running containers will be deleted and data will be permanently lost (stopped containers are affected).</li>
-                                <li>Data from stopped containers volumes will be permanently lost.</li>
-                                <li>No way to recover deleted volume data.</li>
+                                <li>Volumes not attached to running containers will be permanently deleted (volumes from stopped containers are affected).</li>
+                                <li>Data stored in deleted volumes cannot be recovered.</li>
                             </ul>" 
                         />
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave id="deleteUnusedNetworks"
