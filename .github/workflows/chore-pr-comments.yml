@@ -1,6 +1,6 @@
 name: Add comment based on label
 on:
-  pull_request:
+  pull_request_target:
     types:
       - labeled
 jobs:
@@ -8,6 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: read
+      actions: none
+      checks: none
+      deployments: none
+      issues: none
+      packages: none
+      repository-projects: none
+      security-events: none
+      statuses: none
     strategy:
       matrix:
         include:
