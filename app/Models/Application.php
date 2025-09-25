@@ -1479,14 +1479,14 @@ class Application extends BaseModel
             if ($this->docker_compose_domains) {
                 $json = collect(json_decode($this->docker_compose_domains));
                 foreach ($json as $key => $value) {
-                    if (str($key)->contains('-')) {
+                    if (str($key)->contains('-') || str($key)->contains('.')) {
                         $key = str($key)->replace('-', '_')->replace('.', '_');
                     }
                     $json->put((string) $key, $value);
                 }
                 $services = collect(data_get($parsedServices, 'services', []));
                 foreach ($services as $name => $service) {
-                    if (str($name)->contains('-')) {
+                    if (str($name)->contains('-') || str($name)->contains('.')) {
                         $replacedName = str($name)->replace('-', '_')->replace('.', '_');
                         $services->put((string) $replacedName, $service);
                         $services->forget((string) $name);
@@ -1503,6 +1503,7 @@ class Application extends BaseModel
                 } else {
                     $this->docker_compose_domains = null;
                 }
+                ray($this->docker_compose_domains);
                 $this->save();
             }
 
