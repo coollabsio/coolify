@@ -18,7 +18,7 @@ class TeamInvitation extends Model
     /**
      * Set the email attribute to lowercase.
      */
-    public function setEmailAttribute($value)
+    public function setEmailAttribute(string $value): void
     {
         $this->attributes['email'] = strtolower($value);
     }
