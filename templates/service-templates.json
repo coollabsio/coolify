@@ -187,7 +187,7 @@
         "minversion": "0.0.0"
     },
     "beszel": {
-        "documentation": "https://github.com/henrygd/beszel?tab=readme-ov-file#getting-started&utm_source=coolify.io",
+        "documentation": "https://github.com/henrygd/beszel?tab=readme-ov-file#getting-started?utm_source=coolify.io",
         "slogan": "A lightweight server resource monitoring hub with historical data, docker stats, and alerts.",
         "compose": "c2VydmljZXM6CiAgYmVzemVsOgogICAgaW1hZ2U6ICdoZW5yeWdkL2Jlc3plbDowLjEyLjEwJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0JFU1pFTF84MDkwCiAgICB2b2x1bWVzOgogICAgICAtICdiZXN6ZWxfZGF0YTovYmVzemVsX2RhdGEnCiAgICAgIC0gJ2Jlc3plbF9zb2NrZXQ6L2Jlc3plbF9zb2NrZXQnCiAgYmVzemVsLWFnZW50OgogICAgaW1hZ2U6ICdoZW5yeWdkL2Jlc3plbC1hZ2VudDowLjEyLjEwJwogICAgdm9sdW1lczoKICAgICAgLSAnYmVzemVsX2FnZW50X2RhdGE6L3Zhci9saWIvYmVzemVsLWFnZW50JwogICAgICAtICdiZXN6ZWxfc29ja2V0Oi9iZXN6ZWxfc29ja2V0JwogICAgICAtICcvdmFyL3J1bi9kb2NrZXIuc29jazovdmFyL3J1bi9kb2NrZXIuc29jazpybycKICAgIGVudmlyb25tZW50OgogICAgICAtIExJU1RFTj0vYmVzemVsX3NvY2tldC9iZXN6ZWwuc29jawogICAgICAtICdIVUJfVVJMPWh0dHA6Ly9iZXN6ZWw6ODA5MCcKICAgICAgLSAnVE9LRU49JHtUT0tFTn0nCiAgICAgIC0gJ0tFWT0ke0tFWX0nCg==",
         "tags": [
