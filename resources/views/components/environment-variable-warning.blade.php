@@ -31,7 +31,7 @@
     }
 }" x-if="showWarning">
     <x-callout type="warning" title="Caution">
-        <div class="text-sm text-yellow-700 dark:text-yellow-300" x-text="warningMessage"></div>
-        <div class="text-sm text-yellow-700 dark:text-yellow-300" x-text="recommendation"></div>
+        <div class="text-sm" x-text="warningMessage"></div>
+        <div class="text-sm" x-text="recommendation"></div>
     </x-callout>
 </template>

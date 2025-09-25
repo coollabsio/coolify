@@ -41,11 +41,11 @@
                                 helper="The Docker cleanup tasks will run when the disk usage exceeds this threshold." />
                         @endif
                     </div>
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="Enabling Force Docker Cleanup or manually triggering a cleanup will perform the following actions:
                             <ul class='list-disc pl-4 mt-2'>
-                                <li>Removes stopped containers managed by Coolify (as containers are none persistent, no data will be lost).</li>
+                                <li>Removes stopped containers managed by Coolify (as containers are non-persistent, no data will be lost).</li>
                                 <li>Deletes unused images.</li>
                                 <li>Clears build cache.</li>
                                 <li>Removes old versions of the Coolify helper image.</li>
@@ -63,7 +63,7 @@
                     <x-callout type="warning" title="Caution">
                         <p>These options can cause permanent data loss and functional issues. Only enable if you fully understand the consequences</p>
                     </x-callout>
-                    <div class="w-96">
+                    <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave id="deleteUnusedVolumes"
                             label="Delete Unused Volumes"
                             helper="This option will remove all unused Docker volumes during cleanup.<br><br><strong>Warning: Data from stopped containers will be lost!</strong><br><br>Consequences include:<br>
