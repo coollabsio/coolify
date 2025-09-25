@@ -24,11 +24,9 @@ class LocalPersistentVolume extends Model
         return $this->morphTo('resource');
     }
 
-    protected function name(): Attribute
+    protected function customizeName($value)
     {
-        return Attribute::make(
-            set: fn (string $value) => str($value)->trim()->value,
-        );
+        return str($value)->trim()->value;
     }
 
     protected function mountPath(): Attribute

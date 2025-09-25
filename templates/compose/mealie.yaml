@@ -1,5 +1,6 @@
 # documentation: https://docs.mealie.io/
 # slogan: A recipe manager and meal planner.
+# category: productivity
 # tags: recipe manager, meal planner, cooking, food
 # logo: svgs/mealie.png
 # port: 9000
@@ -8,7 +9,7 @@ services:
   mealie:
     image: 'ghcr.io/mealie-recipes/mealie:latest'
     environment:
-      - SERVICE_FQDN_MEALIE_9000
+      - SERVICE_URL_MEALIE_9000
       - ALLOW_SIGNUP=${ALLOW_SIGNUP:-true}
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}

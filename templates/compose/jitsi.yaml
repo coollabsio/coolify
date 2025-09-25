@@ -1,5 +1,6 @@
 # ignore: true
 # documentation: https://jitsi.github.io/handbook/docs/intro
+# category: productivity
 # slogan: World's easiest way to add meetings to your apps
 # logo: svgs/jitsi.svg
 # tags: video, conferencing, meetings, communication, open-source
@@ -17,8 +18,8 @@ services:
       - ~/.jitsi-meet-cfg/web/crontabs:/var/spool/cron/crontabs:Z
       - ~/.jitsi-meet-cfg/transcripts:/usr/share/jitsi-meet/transcripts:Z
     environment:
-      - SERVICE_FQDN_JITSI
-      - PUBLIC_URL=$SERVICE_FQDN_JITSI
+      - SERVICE_URL_JITSI
+      - PUBLIC_URL=$SERVICE_URL_JITSI
       - JITSI_IMAGE_VERSION=unstable
       - JIBRI_RECORDER_PASSWORD=$SERVICE_PASSWORD_JITSI
       - JIBRI_XMPP_PASSWORD=$SERVICE_PASSWORD_JITSI
@@ -52,7 +53,7 @@ services:
     environment:
       - JICOFO_AUTH_PASSWORD
       - JVB_AUTH_PASSWORD
-      - PUBLIC_URL=$SERVICE_FQDN_JITSI
+      - PUBLIC_URL=$SERVICE_URL_JITSI
       - TZ
     networks:
       meet.jitsi:
@@ -98,7 +99,7 @@ services:
     environment:
       - JVB_ADVERTISE_IPS
       - JVB_AUTH_PASSWORD
-      - PUBLIC_URL=$SERVICE_FQDN_JITSI
+      - PUBLIC_URL=$SERVICE_URL_JITSI
       - TZ
       - XMPP_SERVER=prosody
     depends_on:

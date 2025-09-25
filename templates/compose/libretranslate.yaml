@@ -1,5 +1,6 @@
 # documentation: https://libretranslate.com/docs/
 # slogan: Free and open-source machine translation API, entirely self-hosted.
+# category: ai
 # tags: translate, api
 # logo: svgs/libretranslate.svg
 # port: 5000
@@ -8,7 +9,7 @@ services:
   libretranslate:
     image: "libretranslate/libretranslate:latest"
     environment:
-      - SERVICE_FQDN_LIBRETRANSLATE_5000
+      - SERVICE_URL_LIBRETRANSLATE_5000
       - LT_SSL=${LT_SSL:-true}
       - LT_UPDATE_MODELS=${LT_UPDATE_MODELS:-true}
       - LT_LOAD_ONLY=${LT_LOAD_ONLY:-en,es,fr,de,ja}

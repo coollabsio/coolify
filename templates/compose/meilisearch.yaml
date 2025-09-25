@@ -1,5 +1,6 @@
 # documentation: https://www.meilisearch.com
 # slogan: MeiliSearch is a powerful, fast, easy to use and deploy search engine.
+# category: search
 # tags: search,engine,fulltext,full,text,meilisearch
 # logo: svgs/meilisearch.svg
 # port: 7700
@@ -8,7 +9,7 @@ services:
   meilisearch:
     image: getmeili/meilisearch:latest
     environment:
-      - SERVICE_FQDN_MEILISEARCH_7700
+      - SERVICE_URL_MEILISEARCH_7700
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
       - MEILI_ENV=${MEILI_ENV:-production}
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}

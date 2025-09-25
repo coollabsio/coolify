@@ -4,12 +4,15 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\PrivateKey;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Source extends Component
 {
+    use AuthorizesRequests;
+
     public Application $application;
 
     #[Locked]
@@ -81,6 +84,7 @@ class Source extends Component
     public function setPrivateKey(int $privateKeyId)
     {
         try {
+            $this->authorize('update', $this->application);
             $this->privateKeyId = $privateKeyId;
             $this->syncData(true);
             $this->getPrivateKeys();
@@ -94,7 +98,9 @@ class Source extends Component
 
     public function submit()
     {
+
         try {
+            $this->authorize('update', $this->application);
             if (str($this->gitCommitSha)->isEmpty()) {
                 $this->gitCommitSha = 'HEAD';
             }
@@ -107,7 +113,9 @@ class Source extends Component
 
     public function changeSource($sourceId, $sourceType)
     {
+
         try {
+            $this->authorize('update', $this->application);
             $this->application->update([
                 'source_id' => $sourceId,
                 'source_type' => $sourceType,

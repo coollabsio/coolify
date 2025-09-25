@@ -1,0 +1,31 @@
+# documentation: https://pi-hole.net/
+# slogan: Network-wide Ad Blocking
+# category: proxy
+# tags: ad-block,dns,sinkhole,ntp,dhcp
+# logo: svgs/pihole.svg
+# port: 80
+
+services:
+  pihole:
+    image: pihole/pihole:latest
+    ports:
+      # DNS Ports
+      - "53:53/tcp"
+      - "53:53/udp"
+      # Uncomment the below if using Pi-hole as your DHCP Server
+      - "67:67/udp"
+      # Uncomment the line below if you are using Pi-hole as your NTP server
+      - "123:123/udp"
+    environment:
+      - SERVICE_URL_PIHOLE_80
+      - TZ=${TZ:-Europe/London}
+      - FTLCONF_webserver_api_password=${SERVICE_PASSWORD_PIHOLE}
+      - FTLCONF_dns_listeningMode=${FTLCONF_dns_listeningMode:-all}
+    volumes:
+      - pihole-data:/etc/pihole
+    cap_add:
+      # See https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
+      # Required if you are using Pi-hole as your DHCP server, else not needed
+      - NET_ADMIN
+      # Required if you are using Pi-hole as your NTP client to be able to set the host's system time
+      - SYS_TIME

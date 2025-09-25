@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Application;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class ApplicationPolicy
 {
@@ -12,6 +13,10 @@ class ApplicationPolicy
      */
     public function viewAny(User $user): bool
     {
+        // Authorization temporarily disabled
+        /*
+        return true;
+        */
         return true;
     }
 
@@ -20,6 +25,10 @@ class ApplicationPolicy
      */
     public function view(User $user, Application $application): bool
     {
+        // Authorization temporarily disabled
+        /*
+        return true;
+        */
         return true;
     }
 
@@ -28,15 +37,31 @@ class ApplicationPolicy
      */
     public function create(User $user): bool
     {
+        // Authorization temporarily disabled
+        /*
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return false;
+        */
         return true;
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Application $application): bool
+    public function update(User $user, Application $application): Response
     {
-        return true;
+        // Authorization temporarily disabled
+        /*
+        if ($user->isAdmin()) {
+            return Response::allow();
+        }
+
+        return Response::deny('As a member, you cannot update this application.<br/><br/>You need at least admin or owner permissions.');
+        */
+        return Response::allow();
     }
 
     /**
@@ -44,11 +69,15 @@ class ApplicationPolicy
      */
     public function delete(User $user, Application $application): bool
     {
+        // Authorization temporarily disabled
+        /*
         if ($user->isAdmin()) {
             return true;
         }
 
         return false;
+        */
+        return true;
     }
 
     /**
@@ -56,6 +85,10 @@ class ApplicationPolicy
      */
     public function restore(User $user, Application $application): bool
     {
+        // Authorization temporarily disabled
+        /*
+        return true;
+        */
         return true;
     }
 
@@ -64,6 +97,58 @@ class ApplicationPolicy
      */
     public function forceDelete(User $user, Application $application): bool
     {
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
+    }
+
+    /**
+     * Determine whether the user can deploy the application.
+     */
+    public function deploy(User $user, Application $application): bool
+    {
+        // Authorization temporarily disabled
+        /*
+        return $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
+    }
+
+    /**
+     * Determine whether the user can manage deployments.
+     */
+    public function manageDeployments(User $user, Application $application): bool
+    {
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
+    }
+
+    /**
+     * Determine whether the user can manage environment variables.
+     */
+    public function manageEnvironment(User $user, Application $application): bool
+    {
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin() && $user->teams->contains('id', $application->team()->first()->id);
+        */
+        return true;
+    }
+
+    /**
+     * Determine whether the user can cleanup deployment queue.
+     */
+    public function cleanupDeploymentQueue(User $user): bool
+    {
+        // Authorization temporarily disabled
+        /*
+        return $user->isAdmin();
+        */
         return true;
     }
 }

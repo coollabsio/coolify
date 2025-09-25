@@ -21,8 +21,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Laravel\Horizon\Contracts\Silenced;
 
-class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
+class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -64,6 +65,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
     public Collection $foundApplicationPreviewsIds;
 
+    public Collection $applicationContainerStatuses;
+
     public bool $foundProxy = false;
 
     public bool $foundLogDrainContainer = false;
@@ -86,6 +89,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
         $this->foundServiceApplicationIds = collect();
         $this->foundApplicationPreviewsIds = collect();
         $this->foundServiceDatabaseIds = collect();
+        $this->applicationContainerStatuses = collect();
         $this->allApplicationIds = collect();
         $this->allDatabaseUuids = collect();
         $this->allTcpProxyUuids = collect();
@@ -154,7 +158,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
                             if ($this->allApplicationIds->contains($applicationId) && $this->isRunning($containerStatus)) {
                                 $this->foundApplicationIds->push($applicationId);
                             }
-                            $this->updateApplicationStatus($applicationId, $containerStatus);
+                            // Store container status for aggregation
+                            if (! $this->applicationContainerStatuses->has($applicationId)) {
+                                $this->applicationContainerStatuses->put($applicationId, collect());
+                            }
+                            $containerName = $labels->get('com.docker.compose.service');
+                            if ($containerName) {
+                                $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                            }
                         } else {
                             $previewKey = $applicationId.':'.$pullRequestId;
                             if ($this->allApplicationPreviewsIds->contains($previewKey) && $this->isRunning($containerStatus)) {
@@ -204,7 +215,84 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->updateAdditionalServersStatus();
 
+        // Aggregate multi-container application statuses
+        $this->aggregateMultiContainerStatuses();
+
         $this->checkLogDrainContainer();
+    }
+
+    private function aggregateMultiContainerStatuses()
+    {
+        if ($this->applicationContainerStatuses->isEmpty()) {
+            return;
+        }
+
+        foreach ($this->applicationContainerStatuses as $applicationId => $containerStatuses) {
+            $application = $this->applications->where('id', $applicationId)->first();
+            if (! $application) {
+                continue;
+            }
+
+            // Parse docker compose to check for excluded containers
+            $dockerComposeRaw = data_get($application, 'docker_compose_raw');
+            $excludedContainers = collect();
+
+            if ($dockerComposeRaw) {
+                try {
+                    $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+                    $services = data_get($dockerCompose, 'services', []);
+
+                    foreach ($services as $serviceName => $serviceConfig) {
+                        // Check if container should be excluded
+                        $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
+                        $restartPolicy = data_get($serviceConfig, 'restart', 'always');
+
+                        if ($excludeFromHc || $restartPolicy === 'no') {
+                            $excludedContainers->push($serviceName);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // If we can't parse, treat all containers as included
+                }
+            }
+
+            // Filter out excluded containers
+            $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
+                return ! $excludedContainers->contains($containerName);
+            });
+
+            // If all containers are excluded, don't update status
+            if ($relevantStatuses->isEmpty()) {
+                continue;
+            }
+
+            // Aggregate status: if any container is running, app is running
+            $hasRunning = false;
+            $hasUnhealthy = false;
+
+            foreach ($relevantStatuses as $status) {
+                if (str($status)->contains('running')) {
+                    $hasRunning = true;
+                    if (str($status)->contains('unhealthy')) {
+                        $hasUnhealthy = true;
+                    }
+                }
+            }
+
+            $aggregatedStatus = null;
+            if ($hasRunning) {
+                $aggregatedStatus = $hasUnhealthy ? 'running (unhealthy)' : 'running (healthy)';
+            } else {
+                // All containers are exited
+                $aggregatedStatus = 'exited (unhealthy)';
+            }
+
+            // Update application status with aggregated result
+            if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
+                $application->status = $aggregatedStatus;
+                $application->save();
+            }
+        }
     }
 
     private function updateApplicationStatus(string $applicationId, string $containerStatus)

@@ -6,13 +6,17 @@
         @if ($exception->getMessage())
             <p class="text-base leading-7 text-red-500">{{ $exception->getMessage() }}</p>
         @else
-            <p class="text-base leading-7 text-neutral-300">The request could not be understood by the server due to
+            <p class="text-base leading-7 dark:text-neutral-400 text-black">The request could not be understood by the
+                server due to
                 malformed syntax.
             </p>
         @endif
-        <div class="flex items-center mt-10 gap-x-6">
-            <a href="/">
-                <x-forms.button>Go back home</x-forms.button>
+        <div class="flex items-center mt-10 gap-x-2">
+            <a href="{{ url()->previous() }}">
+                <x-forms.button>Go back</x-forms.button>
+            </a>
+            <a href="{{ route('dashboard') }}">
+                <x-forms.button>Dashboard</x-forms.button>
             </a>
             <a target="_blank" class="text-xs" href="{{ config('constants.urls.contact') }}">Contact
                 support

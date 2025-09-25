@@ -1,5 +1,6 @@
 # documentation: https://weblate.org
 # slogan: Weblate is a libre software web-based continuous localization system.
+# category: productivity
 # tags: localization, translation, web, web-based, continuous, libre, software
 # logo: svgs/weblate.webp
 # port: 8080
@@ -8,7 +9,7 @@ services:
   weblate:
     image: weblate/weblate:latest
     environment:
-      - SERVICE_FQDN_WEBLATE_8080
+      - SERVICE_URL_WEBLATE_8080
       - WEBLATE_SITE_DOMAIN=$SERVICE_URL_WEBLATE
       - WEBLATE_ADMIN_NAME=${WEBLATE_ADMIN_NAME:-Admin}
       - WEBLATE_ADMIN_EMAIL=${WEBLATE_ADMIN_EMAIL:-admin@example.com}

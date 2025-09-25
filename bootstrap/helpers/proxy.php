@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
@@ -130,10 +130,16 @@ function generate_default_proxy_configuration(Server $server)
     }
 
     $array_of_networks = collect([]);
-    $networks->map(function ($network) use ($array_of_networks) {
+    $filtered_networks = collect([]);
+    $networks->map(function ($network) use ($array_of_networks, $filtered_networks) {
+        if ($network === 'host') {
+            return; // network-scoped alias is supported only for containers in user defined networks
+        }
+
         $array_of_networks[$network] = [
             'external' => true,
         ];
+        $filtered_networks->push($network);
     });
     if ($proxy_type === ProxyTypes::TRAEFIK->value) {
         $labels = [
@@ -155,7 +161,7 @@ function generate_default_proxy_configuration(Server $server)
                     'extra_hosts' => [
                         'host.docker.internal:host-gateway',
                     ],
-                    'networks' => $networks->toArray(),
+                    'networks' => $filtered_networks->toArray(),
                     'ports' => [
                         '80:80',
                         '443:443',
@@ -237,7 +243,7 @@ function generate_default_proxy_configuration(Server $server)
                         'CADDY_DOCKER_POLLING_INTERVAL=5s',
                         'CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile',
                     ],
-                    'networks' => $networks->toArray(),
+                    'networks' => $filtered_networks->toArray(),
                     'ports' => [
                         '80:80',
                         '443:443',
@@ -261,7 +267,7 @@ function generate_default_proxy_configuration(Server $server)
     }
 
     $config = Yaml::dump($config, 12, 2);
-    SaveConfiguration::run($server, $config);
+    SaveProxyConfiguration::run($server, $config);
 
     return $config;
 }

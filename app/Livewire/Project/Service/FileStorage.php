@@ -15,12 +15,15 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class FileStorage extends Component
 {
+    use AuthorizesRequests;
+
     public LocalFileVolume $fileStorage;
 
     public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase|Application $resource;
@@ -54,6 +57,8 @@ class FileStorage extends Component
     public function convertToDirectory()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = true;
             $this->fileStorage->content = null;
@@ -70,6 +75,8 @@ class FileStorage extends Component
     public function loadStorageOnServer()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->fileStorage->loadStorageOnServer();
             $this->dispatch('success', 'File storage loaded from server.');
         } catch (\Throwable $e) {
@@ -82,6 +89,8 @@ class FileStorage extends Component
     public function convertToFile()
     {
         try {
+            $this->authorize('update', $this->resource);
+
             $this->fileStorage->deleteStorageOnServer();
             $this->fileStorage->is_directory = false;
             $this->fileStorage->content = null;
@@ -99,6 +108,8 @@ class FileStorage extends Component
 
     public function delete($password)
     {
+        $this->authorize('update', $this->resource);
+
         if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
             if (! Hash::check($password, Auth::user()->password)) {
                 $this->addError('password', 'The provided password is incorrect.');
@@ -127,6 +138,8 @@ class FileStorage extends Component
 
     public function submit()
     {
+        $this->authorize('update', $this->resource);
+
         $original = $this->fileStorage->getOriginal();
         try {
             $this->validate();

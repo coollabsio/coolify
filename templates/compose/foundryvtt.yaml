@@ -1,5 +1,6 @@
 # documentation: https://foundryvtt.com/kb/
 # slogan: Foundry Virtual Tabletop is a self-hosted & modern roleplaying platform
+# category: media
 # tags: foundryvtt,foundry,vtt,ttrpg,roleplaying
 # logo: svgs/foundryvtt.png
 # port: 30000
@@ -10,7 +11,7 @@ services:
     expose:
     - 30000
     environment:
-    - SERVICE_FQDN_FOUNDRY_30000
+    - SERVICE_URL_FOUNDRY_30000
     # Account username or email address for foundryvtt.com. Required for downloading an application distribution.
     - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
     # Account password for foundryvtt.com. Required for downloading an application distribution.
@@ -19,7 +20,7 @@ services:
     - FOUNDRY_RELEASE_URL=${FOUNDRY_RELEASE_URL}
     # The license key to install. e.g.; AAAA-BBBB-CCCC-DDDD-EEEE-FFFF If left unset, a license key will be fetched when using account authentication.
     - FOUNDRY_LICENSE_KEY=${FOUNDRY_LICENSE_KEY}
-    # Admin password to be applied at startup. If omitted the admin password will be cleared. 
+    # Admin password to be applied at startup. If omitted the admin password will be cleared.
     - FOUNDRY_ADMIN_KEY=${FOUNDRY_ADMIN:-atropos}
     # A custom hostname to use in place of the host machine's public IP address when displaying the address of the game session. This allows for reverse proxies or DNS servers to modify the public address. Example: foundry.example.com
     - FOUNDRY_HOSTNAME=${FOUNDRY_HOSTNAME}

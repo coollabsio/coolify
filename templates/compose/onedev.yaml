@@ -1,5 +1,6 @@
 # documentation: https://docs.onedev.io/
 # slogan: Git server with CI/CD, kanban, and packages. Seamless integration. Unparalleled experience.
+# category: git
 # tags: git, scm, ci, cd, kanban, packages, devops, collaboration, code, repository, management
 # logo: svgs/onedev.svg
 # port: 6610
@@ -11,7 +12,7 @@ services:
       - onedev-docker-sock:/var/run/docker.sock
       - onedev-data:/opt/onedev
     environment:
-      - SERVICE_FQDN_ONEDEV_6610
+      - SERVICE_URL_ONEDEV_6610
       - hibernate_dialect=io.onedev.server.persistence.PostgreSQLDialect
       - hibernate_connection_driver_class=org.postgresql.Driver
       - hibernate_connection_url=jdbc:postgresql://postgres:5432/${POSTGRESQL_DATABASE:-onedev}
@@ -20,7 +21,7 @@ services:
       - initial_user=${SERVICE_USER_ONEDEV}
       - initial_password=${SERVICE_PASSWORD_ONEDEV}
       - initial_email=${ONEDEV_EMAIL:-mail@example.com}
-      - initial_server_url=${SERVICE_FQDN_ONEDEV}
+      - initial_server_url=${SERVICE_URL_ONEDEV}
       - initial_ssh_root_url=${SSH_ROOT_URL:-ssh://changeme:22}
     depends_on:
       postgres:

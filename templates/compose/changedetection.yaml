@@ -1,5 +1,6 @@
 # documentation: https://github.com/dgtlmoon/changedetection.io/
 # slogan: Website change detection monitor and notifications.
+# category: monitoring
 # tags: web, alert, monitor
 # logo: svgs/changedetection.png
 # port: 5000
@@ -10,8 +11,8 @@ services:
     volumes:
       - changedetection-data:/datastore
     environment:
-      - SERVICE_FQDN_CHANGEDETECTION_5000
-      - BASE_URL=${SERVICE_FQDN_CHANGEDETECTION}
+      - SERVICE_URL_CHANGEDETECTION_5000
+      - BASE_URL=${SERVICE_URL_CHANGEDETECTION}
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - PLAYWRIGHT_DRIVER_URL=${PLAYWRIGHT_DRIVER_URL:-ws://browser-sockpuppet-chrome:3000}

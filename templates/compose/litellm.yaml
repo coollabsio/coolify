@@ -1,5 +1,6 @@
 # documentation: https://docs.litellm.ai
 # slogan: Call all LLM APIs using the OpenAI format. Use Bedrock, Azure, OpenAI, Cohere, Anthropic, Ollama, Sagemaker, HuggingFace, Replicate, Groq (100+ LLMs)
+# category: ai
 # tags: ai, qdrant, weaviate, langchain, openai, gpt, llm, lmops, anthropic, cohere, ollama, sagemaker, huggingface, replicate, groq
 # logo: svgs/litellm.svg
 # port: 4000
@@ -13,7 +14,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_LITELLM_4000
+      - SERVICE_URL_LITELLM_4000
       - LITELLM_LOG=${LITELLM_LOG:-ERROR}
       - LITELLM_MODE=${LITELLM_MODE:-PRODUCTION}
       - LITELLM_MASTER_KEY=${SERVICE_PASSWORD_MASTERKEY}

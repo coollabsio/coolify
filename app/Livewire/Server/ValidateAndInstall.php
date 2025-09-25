@@ -5,10 +5,13 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class ValidateAndInstall extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public int $number_of_tries = 0;
@@ -62,6 +65,7 @@ class ValidateAndInstall extends Component
 
     public function validateConnection()
     {
+        $this->authorize('update', $this->server);
         ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
         if (! $this->uptime) {
             $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$error.'</div>';
