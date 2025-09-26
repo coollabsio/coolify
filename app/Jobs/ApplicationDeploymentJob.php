@@ -1343,8 +1343,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $variables = data_get($parsed, 'variables', []);
 
             $envCommands = [];
-            foreach ($variables as $key => $value) {
-                $envCommands[] = "echo \"$key=\${$key}\" >> /app/.env";
+            foreach (array_keys($variables) as $key) {
+                $envCommands[] = "printf '%s=%s\\n' ".escapeshellarg($key)." \"\${$key}\" >> /app/.env";
             }
 
             if (! empty($envCommands)) {
