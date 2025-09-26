@@ -1728,16 +1728,29 @@ class Application extends BaseModel
         return '#^'.$regex.'$#';
     }
 
+    public function normalizeWatchPaths(): void
+    {
+        if (is_null($this->watch_paths)) {
+            return;
+        }
+
+        $normalized = $this->parseWatchPaths($this->watch_paths);
+        if ($normalized !== $this->watch_paths) {
+            $this->watch_paths = $normalized;
+            $this->save();
+        }
+    }
+
     public function isWatchPathsTriggered(Collection $modified_files): bool
     {
         if (is_null($this->watch_paths)) {
             return false;
         }
-        $this->watch_paths = $this->parseWatchPaths($this->watch_paths);
-        $this->save();
+
+        $this->normalizeWatchPaths();
+
         $watch_paths = collect(explode("\n", $this->watch_paths));
 
-        // If no valid patterns after filtering, don't trigger
         if ($watch_paths->isEmpty()) {
             return false;
         }
