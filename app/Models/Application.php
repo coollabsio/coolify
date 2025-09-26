@@ -1560,8 +1560,16 @@ class Application extends BaseModel
         if ($value) {
             $watch_paths = collect(explode("\n", $value))
                 ->map(function (string $path): string {
-                    // Trim whitespace and remove leading slashes to normalize paths
+                    // Trim whitespace
                     $path = trim($path);
+
+                    if (str_starts_with($path, '!')) {
+                        $negation = '!';
+                        $pathWithoutNegation = substr($path, 1);
+                        $pathWithoutNegation = ltrim(trim($pathWithoutNegation), '/');
+
+                        return $negation.$pathWithoutNegation;
+                    }
 
                     return ltrim($path, '/');
                 })
