@@ -35,7 +35,7 @@ services:
       - 'KIBANA_PASSWORD=${SERVICE_PASSWORD_KIBANA}'
       - 'ELASTICSEARCH_SERVICEACCOUNTTOKEN=${ELASTICSEARCH_SERVICEACCOUNTTOKEN}' # Kibana authenticates to Elasticsearch using this service token
       - 'SERVER_NAME=${SERVICE_FQDN_KIBANA}' # For generating links and setting cookie domains
-      - 'SERVER_PUBLICBASEURL=${SERVICE_URL_KIBANA}' # Public URL used in generated links (reporting, alerting, etc.)
+      - 'SERVER_PUBLICBASEURL=${SERVICE_FQDN_KIBANA}' # Public URL used in generated links (reporting, alerting, etc.)
       - 'ELASTICSEARCH_HOSTS=http://elasticsearch:9200' # Connect Kibana to Elasticsearch Service
       - XPACK.SECURITY.ENABLED=true # Enable authentication and authorization (required for service tokens, roles, etc.)
       - 'XPACK_SECURITY_ENCRYPTIONKEY=${SERVICE_PASSWORD_XPACKSECURITY}' # Required for encrypted session & auth tokens
