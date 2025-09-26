@@ -1503,7 +1503,6 @@ class Application extends BaseModel
                 } else {
                     $this->docker_compose_domains = null;
                 }
-                ray($this->docker_compose_domains);
                 $this->save();
             }
 
