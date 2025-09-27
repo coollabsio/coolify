@@ -19,6 +19,15 @@ services:
       - APP_URL=$SERVICE_URL_DOCMOST_3000
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql/docmost?schema=public
       - REDIS_URL=redis://redis:6379
+      - MAIL_DRIVER=${MAIL_DRIVER}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - POSTMARK_TOKEN=${POSTMARK_TOKEN}
     volumes:
       - "docmost:/app/data/storage"
     healthcheck:
