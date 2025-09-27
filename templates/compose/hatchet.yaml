@@ -99,9 +99,3 @@ services:
       - hatchet_certs:/hatchet/certs
       - hatchet_config:/hatchet/config
 
-volumes:
-  hatchet_postgres_data:
-  hatchet_rabbitmq_data:
-  hatchet_rabbitmq.conf:
-  hatchet_config:
-  hatchet_certs:
