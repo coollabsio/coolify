@@ -2,6 +2,8 @@
     dropdownOpen: false,
     search: '',
     allEntries: [],
+    darkColorContent: getComputedStyle($el).getPropertyValue('--color-base'),
+    whiteColorContent: getComputedStyle($el).getPropertyValue('--color-white'),
     init() {
         this.mounted();
         // Load all entries when component initializes
@@ -45,11 +47,16 @@
         const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const userSettings = localStorage.getItem('theme') || 'dark';
         localStorage.setItem('theme', userSettings);
+
+        const themeMetaTag = document.querySelector('meta[name=theme-color]');
+
         if (userSettings === 'dark') {
             document.documentElement.classList.add('dark');
+            themeMetaTag.setAttribute('content', this.darkColorContent);
             this.theme = 'dark';
         } else if (userSettings === 'light') {
             document.documentElement.classList.remove('dark');
+            themeMetaTag.setAttribute('content', this.whiteColorContent);
             this.theme = 'light';
         } else if (darkModePreference) {
             this.theme = 'system';
@@ -302,7 +309,7 @@
                                                         <span x-text="entry.title"></span>
                                                         <x-external-link />
                                                     </a></span>
-                                                <span x-show="entry.tag_name === '{{ $currentVersion }}'" 
+                                                <span x-show="entry.tag_name === '{{ $currentVersion }}'"
                                                     class="px-2 py-1 text-xs font-semibold bg-success text-white rounded-sm">
                                                     CURRENT VERSION
                                                 </span>
