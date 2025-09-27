@@ -37,6 +37,7 @@ services:
     image: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:latest
     command: /hatchet/hatchet-migrate
     restart: no
+    exclude_from_hc: true
     environment:
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB
     depends_on:
