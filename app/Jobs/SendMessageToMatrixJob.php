@@ -18,6 +18,11 @@ class SendMessageToMatrixJob implements ShouldQueue
     public int $tries = 5;
     public int $maxExceptions = 3;
 
+    /**
+     * Exponential backoff delays for Matrix API rate limiting.
+     * Matrix homeservers typically implement rate limiting,
+     * so we use increasing delays to avoid hitting limits.
+     */
     public function backoff(): array
     {
         return [15, 60, 180];
@@ -44,12 +49,33 @@ class SendMessageToMatrixJob implements ShouldQueue
             'formatted_body' => "<h3 style=\"color: {$this->message->color}\">{$this->message->title}</h3><p>{$this->message->description}</p>",
         ];
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->accessToken,
-            'Content-Type' => 'application/json',
-        ])->timeout(15)->put($url, $body);
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->accessToken,
+                'Content-Type' => 'application/json',
+            ])->timeout(15)->put($url, $body);
 
-        $response->throw();
+            $response->throw();
+
+            // Log successful delivery for monitoring
+            logger()->info('Matrix notification sent successfully', [
+                'room_id' => $this->roomId,
+                'homeserver' => $this->homeserverUrl,
+                'transaction_id' => $transactionId,
+            ]);
+        } catch (\Throwable $e) {
+            // Enhanced error logging for Matrix API failures
+            logger()->error('Matrix notification failed', [
+                'room_id' => $this->roomId,
+                'homeserver' => $this->homeserverUrl,
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'status_code' => $e->getCode(),
+                'attempt' => $this->attempts(),
+            ]);
+
+            throw $e;
+        }
     }
 
     public function failed(Throwable $exception): void

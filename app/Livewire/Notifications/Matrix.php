@@ -25,10 +25,10 @@ class Matrix extends Component
     #[Validate(['boolean'])]
     public bool $matrixEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['url', 'nullable', 'regex:/^https?:\/\/.+/'])]
     public ?string $matrixHomeserverUrl = null;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'regex:/^![a-zA-Z0-9]+:.+/'])]
     public ?string $matrixRoomId = null;
 
     #[Validate(['string', 'nullable'])]
@@ -143,12 +143,15 @@ class Matrix extends Component
     {
         try {
             $this->validate([
-                'matrixHomeserverUrl' => 'required',
-                'matrixRoomId' => 'required',
-                'matrixAccessToken' => 'required',
+                'matrixHomeserverUrl' => 'required|url|regex:/^https?:\/\/.+/',
+                'matrixRoomId' => 'required|string|regex:/^![a-zA-Z0-9]+:.+/',
+                'matrixAccessToken' => 'required|string',
             ], [
                 'matrixHomeserverUrl.required' => 'Matrix Homeserver URL is required.',
+                'matrixHomeserverUrl.url' => 'Matrix Homeserver URL must be a valid URL.',
+                'matrixHomeserverUrl.regex' => 'Matrix Homeserver URL must start with http:// or https://.',
                 'matrixRoomId.required' => 'Matrix Room ID is required.',
+                'matrixRoomId.regex' => 'Matrix Room ID must be in the format !roomname:homeserver.domain (e.g., !example:matrix.org).',
                 'matrixAccessToken.required' => 'Matrix Access Token is required.',
             ]);
             $this->saveModel();
