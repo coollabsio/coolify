@@ -9,10 +9,19 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class SendMessageToMatrixJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 5;
+    public int $maxExceptions = 3;
+
+    public function backoff(): array
+    {
+        return [15, 60, 180];
+    }
 
     public function __construct(
         private MatrixMessage $message,
@@ -35,9 +44,16 @@ class SendMessageToMatrixJob implements ShouldQueue
             'formatted_body' => "<h3 style=\"color: {$this->message->color}\">{$this->message->title}</h3><p>{$this->message->description}</p>",
         ];
 
-        Http::withHeaders([
+        $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->accessToken,
             'Content-Type' => 'application/json',
-        ])->put($url, $body);
+        ])->timeout(15)->put($url, $body);
+
+        $response->throw();
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        report($exception);
     }
 }

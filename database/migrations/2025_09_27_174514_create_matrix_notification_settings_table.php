@@ -40,17 +40,22 @@ return new class extends Migration
             $table->unique(['team_id']);
         });
 
-        $teams = DB::table('teams')->get();
-
-        foreach ($teams as $team) {
-            try {
-                DB::table('matrix_notification_settings')->insert([
-                    'team_id' => $team->id,
-                ]);
-            } catch (\Throwable $e) {
-                Log::error('Error creating matrix notification settings for existing teams: '.$e->getMessage());
-            }
-        }
+        DB::table('teams')
+            ->orderBy('id')
+            ->chunkById(500, function ($teams): void {
+                foreach ($teams as $team) {
+                    try {
+                        DB::table('matrix_notification_settings')->insert([
+                            'team_id' => $team->id,
+                        ]);
+                    } catch (\Throwable $e) {
+                        Log::error(
+                            'Error creating matrix notification settings for existing teams: '.$e->getMessage(),
+                            ['team_id' => $team->id]
+                        );
+                    }
+                }
+            });
     }
 
     /**

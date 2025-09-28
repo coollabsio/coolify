@@ -317,6 +317,6 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsMatrix, Sends
 
     public function routeNotificationForMatrix()
     {
-        return null;
+        return $this->matrixNotificationSettings;
     }
 }

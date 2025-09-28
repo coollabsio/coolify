@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Notifications\Notifiable;
 
 class MatrixNotificationSettings extends Model
 {
-    use Notifiable;
+    use HasFactory, Notifiable;
 
     public $timestamps = false;
 
@@ -35,33 +37,35 @@ class MatrixNotificationSettings extends Model
         'server_patch_matrix_notifications',
     ];
 
-    protected $casts = [
-        'matrix_enabled' => 'boolean',
-        'matrix_homeserver_url' => 'encrypted',
-        'matrix_room_id' => 'encrypted',
-        'matrix_access_token' => 'encrypted',
+    protected function casts(): array
+    {
+        return [
+            'matrix_enabled' => 'boolean',
+            'matrix_homeserver_url' => 'encrypted',
+            'matrix_room_id' => 'encrypted',
+            'matrix_access_token' => 'encrypted',
+            'deployment_success_matrix_notifications' => 'boolean',
+            'deployment_failure_matrix_notifications' => 'boolean',
+            'status_change_matrix_notifications' => 'boolean',
+            'backup_success_matrix_notifications' => 'boolean',
+            'backup_failure_matrix_notifications' => 'boolean',
+            'scheduled_task_success_matrix_notifications' => 'boolean',
+            'scheduled_task_failure_matrix_notifications' => 'boolean',
+            'docker_cleanup_success_matrix_notifications' => 'boolean',
+            'docker_cleanup_failure_matrix_notifications' => 'boolean',
+            'server_disk_usage_matrix_notifications' => 'boolean',
+            'server_reachable_matrix_notifications' => 'boolean',
+            'server_unreachable_matrix_notifications' => 'boolean',
+            'server_patch_matrix_notifications' => 'boolean',
+        ];
+    }
 
-        'deployment_success_matrix_notifications' => 'boolean',
-        'deployment_failure_matrix_notifications' => 'boolean',
-        'status_change_matrix_notifications' => 'boolean',
-        'backup_success_matrix_notifications' => 'boolean',
-        'backup_failure_matrix_notifications' => 'boolean',
-        'scheduled_task_success_matrix_notifications' => 'boolean',
-        'scheduled_task_failure_matrix_notifications' => 'boolean',
-        'docker_cleanup_success_matrix_notifications' => 'boolean',
-        'docker_cleanup_failure_matrix_notifications' => 'boolean',
-        'server_disk_usage_matrix_notifications' => 'boolean',
-        'server_reachable_matrix_notifications' => 'boolean',
-        'server_unreachable_matrix_notifications' => 'boolean',
-        'server_patch_matrix_notifications' => 'boolean',
-    ];
-
-    public function team()
+    public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
     }
 
-    public function isEnabled()
+    public function isEnabled(): bool
     {
         return $this->matrix_enabled;
     }

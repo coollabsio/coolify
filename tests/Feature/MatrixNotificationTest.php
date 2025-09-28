@@ -47,13 +47,16 @@ it('belongs to a team', function () {
 });
 
 it('can check if matrix notifications are enabled', function () {
+    $disabledTeam = Team::factory()->create();
+    $enabledTeam = Team::factory()->create();
+
     $disabledSettings = MatrixNotificationSettings::factory()->create([
-        'team_id' => $this->team->id,
+        'team_id' => $disabledTeam->id,
         'matrix_enabled' => false,
     ]);
 
     $enabledSettings = MatrixNotificationSettings::factory()->create([
-        'team_id' => $this->team->id,
+        'team_id' => $enabledTeam->id,
         'matrix_enabled' => true,
     ]);
 

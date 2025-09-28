@@ -80,7 +80,8 @@ class Matrix extends Component
     {
         try {
             $this->team = auth()->user()->currentTeam();
-            $this->settings = $this->team->matrixNotificationSettings;
+            $this->settings = $this->team->matrixNotificationSettings()
+                ->firstOrCreate(['team_id' => $this->team->id]);
             $this->authorize('view', $this->settings);
             $this->syncData();
         } catch (\Throwable $e) {

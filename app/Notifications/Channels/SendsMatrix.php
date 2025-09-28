@@ -4,5 +4,5 @@ namespace App\Notifications\Channels;
 
 interface SendsMatrix
 {
-    public function routeNotificationForMatrix();
+    public function routeNotificationForMatrix(): mixed;
 }
