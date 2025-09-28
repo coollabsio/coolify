@@ -1316,6 +1316,44 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return [$nixpacks_php_fallback_path, $nixpacks_php_root_dir];
     }
 
+    private function php_finetunes(&$parsed)
+    {
+        $installCmds = data_get($parsed, 'phases.install.cmds', []);
+
+        $hasComposerInstall = false;
+        foreach ($installCmds as $cmd) {
+            if (str_contains($cmd, 'composer install') || str_contains($cmd, 'composer update')) {
+                $hasComposerInstall = true;
+                break;
+            }
+        }
+
+        if ($hasComposerInstall) {
+            $variables = data_get($parsed, 'variables', []);
+
+            $envCommands = [];
+            foreach (array_keys($variables) as $key) {
+                $envCommands[] = "printf '%s=%s\\n' ".escapeshellarg($key)." \"\${$key}\" >> /app/.env";
+            }
+
+            if (! empty($envCommands)) {
+                $checkSymfonyCmd = 'if [ -f /app/composer.json ] && (grep -q "symfony/dotenv\\|symfony/framework-bundle\\|symfony/flex" /app/composer.json 2>/dev/null); then touch /app/.env; fi';
+
+                $conditionalEnvCommands = [];
+                foreach ($envCommands as $envCmd) {
+                    $conditionalEnvCommands[] = 'if [ -f /app/.env ]; then '.$envCmd.'; fi';
+                }
+
+                array_unshift($installCmds, $checkSymfonyCmd);
+                array_splice($installCmds, 1, 0, $conditionalEnvCommands);
+
+                data_set($parsed, 'phases.install.cmds', $installCmds);
+
+                $this->application_deployment_queue->addLogEntry('Symfony app detected: Added conditional .env file creation for Symfony apps');
+            }
+        }
+    }
+
     private function rolling_update()
     {
         $this->checkForCancellation();
@@ -1790,6 +1828,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
                 if ($this->nixpacks_type === 'elixir') {
                     $this->elixir_finetunes();
+                }
+                if ($this->nixpacks_type === 'php') {
+                    $this->php_finetunes($parsed);
                 }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->nixpacks_plan_json = collect($parsed);

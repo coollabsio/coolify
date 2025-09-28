@@ -66,12 +66,10 @@
                             confirmationLabel="Please type the confirmation text to disable two step confirmation."
                             shortConfirmationLabel="Confirmation text" />
                     </div>
-                    <div class="w-full px-4 py-2 mb-4 text-white rounded-xs border-l-4 border-red-500 bg-error">
-                        <p class="font-bold">Warning!</p>
-                        <p>Disabling two step confirmation reduces security (as anyone can easily delete anything) and
-                            increases
-                            the risk of accidental actions. This is not recommended for production servers.</p>
-                    </div>
+                    <x-callout type="danger" title="Warning!" class="mb-4">
+                        Disabling two step confirmation reduces security (as anyone can easily delete anything) and
+                        increases the risk of accidental actions. This is not recommended for production servers.
+                    </x-callout>
                 @endif
             </div>
         </form>

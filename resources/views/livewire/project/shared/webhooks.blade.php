@@ -73,7 +73,9 @@
                     @endcan
                 </form>
             @else
-                You are using an official Git App. You do not need manual webhooks.
+                <x-callout type="info" title="Information">
+                    You are using an official Git App. You do not need manual webhooks.
+                </x-callout>
             @endif
         </div>
     @endif

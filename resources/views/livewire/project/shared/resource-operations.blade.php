@@ -28,13 +28,9 @@
                     @endforeach
                 @endforeach
             @else
-                <div
-                    class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                    <div class="text-yellow-800 dark:text-yellow-200">
-                        <strong>Access Restricted:</strong> You don't have permission to clone resources. Contact your team
-                        administrator to request access.
-                    </div>
-                </div>
+                <x-callout type="warning" title="Access Restricted">
+                    You don't have permission to clone resources. Contact your team administrator to request access.
+                </x-callout>
             @endcan
         </div>
     </div>
@@ -71,13 +67,9 @@
                     <div>No projects found to move to</div>
                 @endforelse
             @else
-                <div
-                    class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                    <div class="text-yellow-800 dark:text-yellow-200">
-                        <strong>Access Restricted:</strong> You don't have permission to move resources between projects or
-                        environments. Contact your team administrator to request access.
-                    </div>
-                </div>
+                <x-callout type="warning" title="Access Restricted">
+                    You don't have permission to move resources between projects or environments. Contact your team administrator to request access.
+                </x-callout>
             @endcan
         </div>
     </div>

@@ -4,13 +4,18 @@
     problematicVars: @js($problematicVariables),
     get showWarning() {
         const currentKey = $wire.key;
+        const currentValue = $wire.value;
         const isBuildtime = $wire.is_buildtime;
 
         if (!isBuildtime || !currentKey) return false;
         if (!this.problematicVars.hasOwnProperty(currentKey)) return false;
 
-        // Always show warning for known problematic variables when set as buildtime
-        return true;
+        const config = this.problematicVars[currentKey];
+        if (!config || !config.problematic_values) return false;
+
+        // Check if current value matches any problematic values
+        const lowerValue = String(currentValue).toLowerCase();
+        return config.problematic_values.some(pv => pv.toLowerCase() === lowerValue);
     },
     get warningMessage() {
         if (!this.showWarning) return null;
@@ -25,8 +30,8 @@
         return `Recommendation: ${config.recommendation}`;
     }
 }" x-if="showWarning">
-    <div class="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-        <div class="text-sm text-yellow-700 dark:text-yellow-300" x-text="warningMessage"></div>
-        <div class="text-sm text-yellow-700 dark:text-yellow-300" x-text="recommendation"></div>
-    </div>
+    <x-callout type="warning" title="Caution">
+        <div class="text-sm" x-text="warningMessage"></div>
+        <div class="text-sm" x-text="recommendation"></div>
+    </x-callout>
 </template>

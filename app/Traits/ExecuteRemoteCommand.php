@@ -155,7 +155,7 @@ trait ExecuteRemoteCommand
     private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors)
     {
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-        $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
             $output = str($output)->trim();
             if ($output->startsWith('╔')) {
                 $output = "\n".$output;
@@ -202,13 +202,13 @@ trait ExecuteRemoteCommand
 
             if ($this->save) {
                 if (data_get($this->saved_outputs, $this->save, null) === null) {
-                    data_set($this->saved_outputs, $this->save, str());
+                    $this->saved_outputs->put($this->save, str());
                 }
                 if ($append) {
-                    $this->saved_outputs[$this->save] .= str($sanitized_output)->trim();
-                    $this->saved_outputs[$this->save] = str($this->saved_outputs[$this->save]);
+                    $current_value = $this->saved_outputs->get($this->save);
+                    $this->saved_outputs->put($this->save, str($current_value.str($sanitized_output)->trim()));
                 } else {
-                    $this->saved_outputs[$this->save] = str($sanitized_output)->trim();
+                    $this->saved_outputs->put($this->save, str($sanitized_output)->trim());
                 }
             }
         });
