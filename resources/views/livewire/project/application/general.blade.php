@@ -189,7 +189,7 @@
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input id="application.docker_registry_image_name"
-                                helper="Empty means it won't push the image to a docker registry."
+                                helper="Empty means it won't push the image to a docker registry. Pre-tag the image with your registry url if you want to push it to a private registry (default: Dockerhub). <br><br>Example: ghcr.io/myimage"
                                 placeholder="Empty means it won't push the image to a docker registry."
                                 label="Docker Image" x-bind:disabled="!canUpdate" />
                             <x-forms.input id="application.docker_registry_image_tag"
