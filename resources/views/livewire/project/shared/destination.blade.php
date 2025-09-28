@@ -80,21 +80,11 @@
         <div class="flex flex-col gap-2">
             @if ($resource->persistentStorages()->count() > 0)
                 <h3>Add another server</h3>
-                <div
-                    class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-900/20 dark:border-yellow-800">
-                    <div class="flex items-center">
-
-                        <div>
-                            <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cannot add additional
-                                servers</h4>
-                            <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                                This application has persistent storage volumes configured. Applications with persistent
-                                storage cannot be deployed to multiple servers as the storage would not be accessible
-                                across different servers.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <x-callout type="warning" title="Cannot add additional servers">
+                    This application has persistent storage volumes configured. Applications with persistent
+                    storage cannot be deployed to multiple servers as the storage would not be accessible
+                    across different servers.
+                </x-callout>
             @elseif (count($networks) > 0)
                 <h3>Add another server</h3>
                 <div class="grid grid-cols-1 gap-4">

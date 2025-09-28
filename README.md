@@ -76,7 +76,7 @@ Thank you so much!
 * [QuantCDN](https://www.quantcdn.io?ref=coolify.io) - Enterprise-grade content delivery network
 * [PFGLabs](https://pfglabs.com?ref=coolify.io) - Build Real Projects with Golang
 * [JobsCollider](https://jobscollider.com/remote-jobs?ref=coolify.io) - 30,000+ remote jobs for developers
-* [Juxtdigital](https://juxtdigital.com?ref=coolify.io) - Digital transformation and web solutions
+* [Juxtdigital](https://juxtdigital.com?ref=coolify.io) - Digital PR & AI Authority Building Agency
 * [Cloudify.ro](https://cloudify.ro?ref=coolify.io) - Cloud hosting solutions
 * [CodeRabbit](https://coderabbit.ai?ref=coolify.io) - Cut Code Review Time & Bugs in Half
 * [American Cloud](https://americancloud.com?ref=coolify.io) - US-based cloud infrastructure services

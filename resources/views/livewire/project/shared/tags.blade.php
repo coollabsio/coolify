@@ -10,12 +10,9 @@
             <x-forms.button type="submit">Add</x-forms.button>
         </form>
     @else
-        <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg mt-4">
-            <div class="text-yellow-800 dark:text-yellow-200">
-                <strong>Access Restricted:</strong> You don't have permission to manage tags. Contact your team
-                administrator to request access.
-            </div>
-        </div>
+        <x-callout type="warning" title="Access Restricted" class="mt-4">
+            You don't have permission to manage tags. Contact your team administrator to request access.
+        </x-callout>
     @endcan
     @if (data_get($this->resource, 'tags') && count(data_get($this->resource, 'tags')) > 0)
         <h3 class="pt-4">Assigned Tags</h3>

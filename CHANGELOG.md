@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- *(docker)* Adjust openssh-client installation in Dockerfile to avoid version bug
+- *(docker)* Streamline openssh-client installation in Dockerfile
+
+### 📚 Documentation
+
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Increment coolify version numbers to 4.0.0-beta.431 and 4.0.0-beta.432 in configuration files
+
+## [4.0.0-beta.430] - 2025-09-24
+
+### 🐛 Bug Fixes
+
+- *(PreviewCompose)* Adds port to preview urls
+- *(deployment-job)* Enhance build time variable analysis
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+## [4.0.0-beta.429] - 2025-09-23
+
 ### 🚀 Features
 
 - *(environment)* Replace is_buildtime_only with is_runtime and is_buildtime flags for environment variables, updating related logic and views
@@ -23,6 +50,8 @@ All notable changes to this project will be documented in this file.
 - *(cloud-check)* Enhance CloudCheckSubscription command with fix options
 - *(stripe)* Enhance subscription handling and verification process
 - *(private-key-refresh)* Add refresh dispatch on private key update and connection check
+- *(comments)* Add automated comments for labeled pull requests to guide documentation updates
+- *(comments)* Ping PR author
 
 ### 🐛 Bug Fixes
 
@@ -42,6 +71,8 @@ All notable changes to this project will be documented in this file.
 - *(environment-variables)* Correct method call syntax in analyzeBuildVariable function
 - *(clears-global-search-cache)* Refine team retrieval logic in getTeamIdForCache method
 - *(subscription-job)* Enhance retry logic for VerifyStripeSubscriptionStatusJob
+- *(environment-variable)* Update checkbox visibility and helper text for build and runtime options
+- *(deployment-job)* Escape single quotes in build arguments for Docker Compose command
 
 ### 🚜 Refactor
 
@@ -75,6 +106,8 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Change order of runtime and buildtime
+- *(docker-compose)* Update soketi image version to 1.0.10 in production and Windows configurations
+- *(versions)* Update coolify version numbers to 4.0.0-beta.430 and 4.0.0-beta.431 in configuration files
 
 ## [4.0.0-beta.428] - 2025-09-15
 

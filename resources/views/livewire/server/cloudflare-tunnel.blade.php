@@ -23,15 +23,11 @@
             <div class="flex flex-col gap-2 pt-6">
                 @if ($isCloudflareTunnelsEnabled)
                     <div class="flex flex-col gap-4">
-                        <div
-                            class="w-full px-4 py-2 text-yellow-800 rounded-xs border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-600">
-                            <p class="font-bold">Warning!</p>
-                            <p>If you disable Cloudflare Tunnel, you will need to update the server's IP address back
-                                to
-                                its real IP address in the server "General" settings. The server may become inaccessible
-                                if the IP
-                                address is not updated correctly.</p>
-                        </div>
+                        <x-callout type="warning" title="Warning!">
+                            If you disable Cloudflare Tunnel, you will need to update the server's IP address back
+                            to its real IP address in the server "General" settings. The server may become inaccessible
+                            if the IP address is not updated correctly.
+                        </x-callout>
                         <div class="w-64">
                             @if ($server->ip_previous)
                                 <x-modal-confirmation title="Disable Cloudflare Tunnel?"
@@ -60,10 +56,9 @@
                         </div>
                     </div>
                 @elseif (!$server->isFunctional())
-                    <div
-                        class="p-4 mb-4 w-full text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
+                    <x-callout type="info" title="Configuration Options" class="mb-4">
                         To <span class="font-semibold">automatically</span> configure Cloudflare Tunnel, please
-                        validate your server first.</span> Then you will need a Cloudflare token and an SSH
+                        validate your server first. Then you will need a Cloudflare token and an SSH
                         domain configured.
                         <br />
                         To <span class="font-semibold">manually</span> configure Cloudflare Tunnel, please
@@ -72,8 +67,8 @@
                         <br /><br />
                         For more information, please read our <a
                             href="https://coolify.io/docs/knowledge-base/cloudflare/tunnels/server-ssh" target="_blank"
-                            class="underline ">documentation</a>.
-                    </div>
+                            class="underline">documentation</a>.
+                    </x-callout>
                 @endif
                 @if (!$isCloudflareTunnelsEnabled && $server->isFunctional())
                     <div class="flex  flex-col pb-2">
@@ -97,10 +92,9 @@
                                 <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
                             </form>
                         @else
-                            <div
-                                class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
+                            <x-callout type="warning" title="Permission Required" class="mb-4">
                                 You don't have permission to configure Cloudflare Tunnel for this server.
-                            </div>
+                            </x-callout>
                         @endcan
                     </div>
                     @script
@@ -128,10 +122,9 @@
                         confirmationLabel="Please type the confirmation text to confirm that you manually configured Cloudflare Tunnel."
                         shortConfirmationLabel="Confirmation text" />
                 @else
-                    <div
-                        class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
+                    <x-callout type="warning" title="Permission Required" class="mb-4">
                         You don't have permission to configure Cloudflare Tunnel for this server.
-                    </div>
+                    </x-callout>
                 @endcan
             </div>
             @endif

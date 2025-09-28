@@ -30,14 +30,12 @@
                         </button>
                     </div>
                     <div class="relative w-auto">
-                        <div class="p-4 mb-4 text-white border-l-4 border-red-500 bg-red-600" role="alert">
-                            <p class="font-bold">Warning: Domain Conflict Detected</p>
-                            <p>{{ $slot ?? 'The following domain(s) are already in use by other resources. Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }}
-                            </p>
-                        </div>
+                        <x-callout type="danger" title="Domain Conflict Detected" class="mb-4">
+                            The following domain(s) are already in use by other resources. Using the same domain for
+                            multiple resources can cause routing conflicts and unpredictable behavior.
+                        </x-callout>
 
                         <div class="mb-4">
-                            <h4 class="mb-2 font-semibold">Conflicting Resources:</h4>
                             <ul class="space-y-2">
                                 @foreach ($conflicts as $conflict)
                                     <li class="flex items-start text-red-500">
@@ -58,9 +56,7 @@
                             </ul>
                         </div>
 
-                        <div class="p-4 mb-4 text-yellow-800 dark:text-yellow-200 border-l-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg"
-                            role="alert">
-                            <p class="font-bold">What will happen if you continue?</p>
+                        <x-callout type="warning" title="What will happen if you continue?" class="mb-4">
                             @if (isset($consequences))
                                 {{ $consequences }}
                             @else
@@ -71,7 +67,7 @@
                                     <li>SSL certificates might not work correctly</li>
                                 </ul>
                             @endif
-                        </div>
+                        </x-callout>
 
                         <div class="flex flex-wrap gap-2 justify-between mt-4">
                             <x-forms.button @click="modalOpen = false; $wire.set('showDomainConflictModal', false)"
