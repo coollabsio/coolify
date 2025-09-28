@@ -11,15 +11,19 @@ keithah/coolify:matrix-notifications
 
 ## Quick Start Testing
 
-### 1. Pull and Run the Test Image
+### 1. Prepare Testing Environment
 
 ```bash
-# Pull the image
-docker pull keithah/coolify:matrix-notifications
+# Create testing directory
+mkdir coolify-matrix-test
+cd coolify-matrix-test
 
-# Run with docker-compose (recommended)
-# Download the test docker-compose.yml file first, then:
-docker-compose up -d
+# Create database directory and file for SQLite
+mkdir -p database
+touch database/database.sqlite
+
+# Pull the test image
+docker pull keithah/coolify:matrix-notifications
 ```
 
 ### 2. Setup Environment
@@ -44,7 +48,30 @@ APP_KEY=base64:YOUR_APP_KEY_HERE
 LOG_LEVEL=debug
 ```
 
-### 3. Access Coolify
+**Important:** Create the SQLite database file before starting the container:
+
+```bash
+# Create database directory and file
+mkdir -p database
+touch database/database.sqlite
+```
+
+### 3. Run with Docker
+
+```bash
+# Simple docker run command
+docker run -d \
+  --name coolify-matrix-test \
+  -p 8000:80 \
+  -v $(pwd)/database:/var/www/html/database \
+  -v $(pwd)/.env:/var/www/html/.env \
+  keithah/coolify:matrix-notifications
+
+# Or use docker-compose (create docker-compose.yml first)
+docker-compose up -d
+```
+
+### 4. Access Coolify
 
 1. Open your browser to `http://localhost:8000`
 2. Complete the initial setup
@@ -63,14 +90,21 @@ You'll need:
 
 ```bash
 # Replace with your homeserver URL and credentials
-curl -XPOST -d '{
+# Note: Use the full Matrix user ID (@username:homeserver.com)
+curl -XPOST -H "Content-Type: application/json" -d '{
   "type": "m.login.password",
-  "identifier": {"user": "your_bot_username", "type": "m.id.user"},
+  "identifier": {"user": "@your_bot_username:your-homeserver.com", "type": "m.id.user"},
   "password": "your_bot_password"
-}' "https://your-homeserver.com/_matrix/client/r0/login"
+}' "https://your-homeserver.com/_matrix/client/v3/login"
 ```
 
-This returns JSON with an `access_token` field.
+This returns JSON with an `access_token` field. Example response:
+```json
+{
+  "access_token": "syt_...",
+  "user_id": "@your_bot_username:your-homeserver.com"
+}
+```
 
 ### Getting Room ID
 
