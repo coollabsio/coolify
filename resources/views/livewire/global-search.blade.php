@@ -9,6 +9,8 @@
     closeModal() {
         this.modalOpen = false;
         this.selectedIndex = -1;
+        // Ensure scroll is restored
+        document.body.style.overflow = '';
         @this.closeSearchModal();
     },
     navigateResults(direction) {
@@ -89,7 +91,9 @@
             class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen">
             <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
             </div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
+            <div x-show="modalOpen" x-trap.inert="modalOpen" 
+                 x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })" 
+                 x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave="ease-in duration-100"
