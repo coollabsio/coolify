@@ -4,6 +4,8 @@
     @if (isSubscribed() || !isCloud())
         <livewire:layout-popups />
     @endif
+    <!-- Global search component - included once to prevent keyboard shortcut duplication -->
+    <livewire:global-search />
     @auth
         <div x-data="{
             open: false,
