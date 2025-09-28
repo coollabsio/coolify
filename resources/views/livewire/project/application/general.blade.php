@@ -8,6 +8,9 @@
     <form wire:submit='submit' class="flex flex-col pb-32">
         <div class="flex items-center gap-2">
             <h2>General</h2>
+            @if (isDev())
+                <div>{{ $application->compose_parsing_version }}</div>
+            @endif
             <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
         </div>
         <div>General configuration for your application.</div>
@@ -462,12 +465,9 @@
             </div>
         </div>
     </form>
-    
-    <x-domain-conflict-modal 
-        :conflicts="$domainConflicts" 
-        :showModal="$showDomainConflictModal" 
-        confirmAction="confirmDomainUsage" />
-    
+
+    <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal" confirmAction="confirmDomainUsage" />
+
     @script
         <script>
             $wire.$on('loadCompose', (isInit = true) => {

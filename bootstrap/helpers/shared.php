@@ -204,7 +204,6 @@ function get_latest_version_of_coolify(): string
 
         return data_get($versions, 'coolify.v4.version');
     } catch (\Throwable $e) {
-        ray($e->getMessage());
 
         return '0.0.0';
     }
@@ -635,10 +634,14 @@ function getTopLevelNetworks(Service|Application $resource)
             $definedNetwork = collect([$resource->uuid]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
 
-                // Only add 'networks' key if 'network_mode' is not 'host'
-                if (! $hasHostNetworkMode) {
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
+                // Only add 'networks' key if 'network_mode' is not 'host' or does not start with 'service:' or 'container:'
+                if (! $hasValidNetworkMode) {
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -962,7 +965,7 @@ function getRealtime()
     }
 }
 
-function validate_dns_entry(string $fqdn, Server $server)
+function validateDNSEntry(string $fqdn, Server $server)
 {
     // https://www.cloudflare.com/ips-v4/#
     $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
@@ -995,7 +998,7 @@ function validate_dns_entry(string $fqdn, Server $server)
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                        if (ipMatch($result->getData(), $cloudflare_ips->toArray(), $match)) {
                             $found_matching_ip = true;
                             break;
                         }
@@ -1013,7 +1016,7 @@ function validate_dns_entry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
-function ip_match($ip, $cidrs, &$match = null)
+function ipMatch($ip, $cidrs, &$match = null)
 {
     foreach ((array) $cidrs as $cidr) {
         [$subnet, $mask] = explode('/', $cidr);
@@ -1027,7 +1030,7 @@ function ip_match($ip, $cidrs, &$match = null)
     return false;
 }
 
-function check_ip_against_allowlist($ip, $allowlist)
+function checkIPAgainstAllowlist($ip, $allowlist)
 {
     if (empty($allowlist)) {
         return false;
@@ -1085,78 +1088,6 @@ function check_ip_against_allowlist($ip, $allowlist)
     return false;
 }
 
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array
-{
-    $commands = $commands->map(function ($line) {
-        if (
-            ! str(trim($line))->startsWith([
-                'cd',
-                'command',
-                'echo',
-                'true',
-                'if',
-                'fi',
-            ])
-        ) {
-            return "sudo $line";
-        }
-
-        if (str(trim($line))->startsWith('if')) {
-            return str_replace('if', 'if sudo', $line);
-        }
-
-        return $line;
-    });
-
-    $commands = $commands->map(function ($line) use ($server) {
-        if (Str::startsWith($line, 'sudo mkdir -p')) {
-            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
-        }
-
-        return $line;
-    });
-
-    $commands = $commands->map(function ($line) {
-        $line = str($line);
-        if (str($line)->contains('$(')) {
-            $line = $line->replace('$(', '$(sudo ');
-        }
-        if (str($line)->contains('||')) {
-            $line = $line->replace('||', '|| sudo');
-        }
-        if (str($line)->contains('&&')) {
-            $line = $line->replace('&&', '&& sudo');
-        }
-        if (str($line)->contains(' | ')) {
-            $line = $line->replace(' | ', ' | sudo ');
-        }
-
-        return $line->value();
-    });
-
-    return $commands->toArray();
-}
-function parseLineForSudo(string $command, Server $server): string
-{
-    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
-        $command = "sudo $command";
-    }
-    if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
-    }
-    if (str($command)->contains('$(') || str($command)->contains('`')) {
-        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-    }
-    if (str($command)->contains('||')) {
-        $command = str($command)->replace('||', '|| sudo ')->value();
-    }
-    if (str($command)->contains('&&')) {
-        $command = str($command)->replace('&&', '&& sudo ')->value();
-    }
-
-    return $command;
-}
-
 function get_public_ips()
 {
     try {
@@ -1198,30 +1129,77 @@ function get_public_ips()
 function isAnyDeploymentInprogress()
 {
     $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
-    $basicDetails = $runningJobs->map(function ($job) {
-        return [
-            'id' => $job->id,
-            'created_at' => $job->created_at,
-            'application_id' => $job->application_id,
-            'server_id' => $job->server_id,
-            'horizon_job_id' => $job->horizon_job_id,
-            'status' => $job->status,
-        ];
-    });
-    echo 'Running jobs: '.json_encode($basicDetails)."\n";
+
+    if ($runningJobs->isEmpty()) {
+        echo "No deployments in progress.\n";
+        exit(0);
+    }
+
     $horizonJobIds = [];
+    $deploymentDetails = [];
+
     foreach ($runningJobs as $runningJob) {
         $horizonJobStatus = getJobStatus($runningJob->horizon_job_id);
         if ($horizonJobStatus === 'unknown' || $horizonJobStatus === 'reserved') {
             $horizonJobIds[] = $runningJob->horizon_job_id;
+
+            // Get application and team information
+            $application = Application::find($runningJob->application_id);
+            $teamMembers = [];
+            $deploymentUrl = '';
+
+            if ($application) {
+                // Get team members through the application's project
+                $team = $application->team();
+                if ($team) {
+                    $teamMembers = $team->members()->pluck('email')->toArray();
+                }
+
+                // Construct the full deployment URL
+                if ($runningJob->deployment_url) {
+                    $baseUrl = base_url();
+                    $deploymentUrl = $baseUrl.$runningJob->deployment_url;
+                }
+            }
+
+            $deploymentDetails[] = [
+                'id' => $runningJob->id,
+                'application_name' => $runningJob->application_name ?? 'Unknown',
+                'server_name' => $runningJob->server_name ?? 'Unknown',
+                'deployment_url' => $deploymentUrl,
+                'team_members' => $teamMembers,
+                'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
+                'horizon_job_id' => $runningJob->horizon_job_id,
+            ];
         }
     }
+
     if (count($horizonJobIds) === 0) {
-        echo "No deployments in progress.\n";
+        echo "No active deployments in progress (all jobs completed or failed).\n";
         exit(0);
     }
-    $horizonJobIds = collect($horizonJobIds)->unique()->toArray();
-    echo 'There are '.count($horizonJobIds)." deployments in progress.\n";
+
+    // Display enhanced deployment information
+    echo "\n=== Running Deployments ===\n";
+    echo 'Total active deployments: '.count($horizonJobIds)."\n\n";
+
+    foreach ($deploymentDetails as $index => $deployment) {
+        echo 'Deployment #'.($index + 1).":\n";
+        echo '  Application: '.$deployment['application_name']."\n";
+        echo '  Server: '.$deployment['server_name']."\n";
+        echo '  Started: '.$deployment['created_at']."\n";
+        if ($deployment['deployment_url']) {
+            echo '  URL: '.$deployment['deployment_url']."\n";
+        }
+        if (! empty($deployment['team_members'])) {
+            echo '  Team members: '.implode(', ', $deployment['team_members'])."\n";
+        } else {
+            echo "  Team members: No team members found\n";
+        }
+        echo '  Horizon Job ID: '.$deployment['horizon_job_id']."\n";
+        echo "\n";
+    }
+
     exit(1);
 }
 
@@ -1298,7 +1276,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
+
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
@@ -1409,7 +1392,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
 
-                if (! $hasHostNetworkMode) {
+                if (! $hasValidNetworkMode) {
                     // Add Coolify specific networks
                     $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                         return $value == $definedNetwork;
@@ -1637,7 +1620,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             EnvironmentVariable::create([
                                 'key' => $key,
                                 'value' => $fqdn,
-                                'is_build_time' => false,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
@@ -1717,7 +1699,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $fqdn,
-                                            'is_build_time' => false,
                                             'resourceable_type' => get_class($resource),
                                             'resourceable_id' => $resource->id,
                                             'is_preview' => false,
@@ -1756,7 +1737,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $generatedValue,
-                                            'is_build_time' => false,
                                             'resourceable_type' => get_class($resource),
                                             'resourceable_id' => $resource->id,
                                             'is_preview' => false,
@@ -1795,7 +1775,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'resourceable_id' => $resource->id,
                             ], [
                                 'value' => $defaultValue,
-                                'is_build_time' => false,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
@@ -2059,12 +2038,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = $name->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
@@ -2103,7 +2082,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $name = $volume->before(':');
                                     $mount = $volume->after(':');
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 }
@@ -2122,7 +2101,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $source = str($source)->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $source = $source."-pr-$pull_request_id";
+                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2131,7 +2110,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                 } else {
                                     if ($pull_request_id !== 0) {
-                                        $source = $source."-pr-$pull_request_id";
+                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2183,13 +2162,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = $name->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
-                                        $name = $uuid."-$name-pr-$pull_request_id";
+                                        $name = $uuid.'-'.addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
@@ -2231,7 +2210,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $name = $volume->before(':');
                                     $mount = $volume->after(':');
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 }
@@ -2259,7 +2238,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
                                     } else {
-                                        $source = $uuid."-$source-pr-$pull_request_id";
+                                        $source = $uuid.'-'.addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -2299,7 +2278,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             if ($pull_request_id !== 0 && count($serviceDependencies) > 0) {
                 $serviceDependencies = $serviceDependencies->map(function ($dependency) use ($pull_request_id) {
-                    return $dependency."-pr-$pull_request_id";
+                    return addPreviewDeploymentSuffix($dependency, $pull_request_id);
                 });
                 data_set($service, 'depends_on', $serviceDependencies->toArray());
             }
@@ -2486,7 +2465,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $fqdn,
-                                        'is_build_time' => false,
                                         'resourceable_type' => get_class($resource),
                                         'resourceable_id' => $resource->id,
                                         'is_preview' => false,
@@ -2498,7 +2476,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $generatedValue,
-                                        'is_build_time' => false,
                                         'resourceable_type' => get_class($resource),
                                         'resourceable_id' => $resource->id,
                                         'is_preview' => false,
@@ -2532,20 +2509,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($foundEnv) {
                             $defaultValue = data_get($foundEnv, 'value');
                         }
-                        $isBuildTime = data_get($foundEnv, 'is_build_time', false);
                         if ($foundEnv) {
                             $foundEnv->update([
                                 'key' => $key,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
-                                'is_build_time' => $isBuildTime,
                                 'value' => $defaultValue,
                             ]);
                         } else {
                             EnvironmentVariable::create([
                                 'key' => $key,
                                 'value' => $defaultValue,
-                                'is_build_time' => $isBuildTime,
                                 'resourceable_type' => get_class($resource),
                                 'resourceable_id' => $resource->id,
                                 'is_preview' => false,
@@ -2693,7 +2667,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         });
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
-                $services[$serviceName."-pr-$pull_request_id"] = $service;
+                $services[addPreviewDeploymentSuffix($serviceName, $pull_request_id)] = $service;
                 data_forget($services, $serviceName);
             });
         }
@@ -3072,4 +3046,19 @@ function parseDockerfileInterval(string $something)
     }
 
     return $seconds;
+}
+
+function addPreviewDeploymentSuffix(string $name, int $pull_request_id = 0): string
+{
+    return ($pull_request_id === 0) ? $name : $name.'-pr-'.$pull_request_id;
+}
+
+function generateDockerComposeServiceName(mixed $services, int $pullRequestId = 0): Collection
+{
+    $collection = collect([]);
+    foreach ($services as $serviceName => $_) {
+        $collection->put('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper(), addPreviewDeploymentSuffix($serviceName, $pullRequestId));
+    }
+
+    return $collection;
 }

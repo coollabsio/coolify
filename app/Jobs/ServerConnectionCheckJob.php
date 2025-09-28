@@ -78,11 +78,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             // Server is reachable, check if Docker is available
-            // $isUsable = $this->checkDockerAvailability();
+            $isUsable = $this->checkDockerAvailability();
 
             $this->server->settings->update([
                 'is_reachable' => true,
-                'is_usable' => true,
+                'is_usable' => $isUsable,
             ]);
 
         } catch (\Throwable $e) {

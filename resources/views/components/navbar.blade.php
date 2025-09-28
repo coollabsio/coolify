@@ -59,20 +59,20 @@
                 if (this.zoom === '90') {
                     const style = document.createElement('style');
                     style.textContent = `
-                                    html {
-                                        font-size: 93.75%;
-                                    }
-                
-                                    :root {
-                                        --vh: 1vh;
-                                    }
-                
-                                    @media (min-width: 1024px) {
                                         html {
-                                            font-size: 87.5%;
+                                            font-size: 93.75%;
                                         }
-                                    }
-                                `;
+                    
+                                        :root {
+                                            --vh: 1vh;
+                                        }
+                    
+                                        @media (min-width: 1024px) {
+                                            html {
+                                                font-size: 87.5%;
+                                            }
+                                        }
+                                    `;
                     document.head.appendChild(style);
                 }
             }
@@ -81,6 +81,9 @@
         <div class="flex flex-col w-full">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
             <x-version />
+        </div>
+        <div>
+            <livewire:global-search />
         </div>
         <livewire:settings-dropdown />
     </div>
@@ -278,7 +281,7 @@
                             Teams
                         </a>
                     </li>
-                    @if (isCloud())
+                    @if (isCloud() && auth()->user()->isAdmin())
                         <li>
                             <a title="Subscription"
                                 class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"

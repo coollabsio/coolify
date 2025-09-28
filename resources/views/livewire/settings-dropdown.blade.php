@@ -242,6 +242,9 @@
                         <p class="mt-1 text-sm dark:text-neutral-400">
                             Stay up to date with the latest features and improvements.
                         </p>
+                        <p class="mt-1 text-xs dark:text-neutral-500">
+                            Current version: <span class="font-semibold dark:text-neutral-300">{{ $currentVersion }}</span>
+                        </p>
                     </div>
                     <div class="flex items-center gap-2">
                         @if (isDev())
@@ -299,6 +302,10 @@
                                                         <span x-text="entry.title"></span>
                                                         <x-external-link />
                                                     </a></span>
+                                                <span x-show="entry.tag_name === '{{ $currentVersion }}'" 
+                                                    class="px-2 py-1 text-xs font-semibold bg-success text-white rounded-sm">
+                                                    CURRENT VERSION
+                                                </span>
                                                 <span class="text-xs dark:text-neutral-400"
                                                     x-text="new Date(entry.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })"></span>
                                             </div>

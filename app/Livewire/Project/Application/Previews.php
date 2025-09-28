@@ -77,7 +77,7 @@ class Previews extends Component
                 $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
                 $preview->fqdn = str($preview->fqdn)->trim()->lower();
-                if (! validate_dns_entry($preview->fqdn, $this->application->destination->server)) {
+                if (! validateDNSEntry($preview->fqdn, $this->application->destination->server)) {
                     $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $success = false;
                 }
@@ -229,6 +229,18 @@ class Previews extends Component
     {
         $this->deployment_uuid = new Cuid2;
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+    }
+
+    private function stopContainers(array $containers, $server)
+    {
+        $containersToStop = collect($containers)->pluck('Names')->toArray();
+
+        foreach ($containersToStop as $containerName) {
+            instant_remote_process(command: [
+                "docker stop --time=30 $containerName",
+                "docker rm -f $containerName",
+            ], server: $server, throwError: false);
+        }
     }
 
     public function stop(int $pull_request_id)
