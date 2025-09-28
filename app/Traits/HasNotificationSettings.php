@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\MatrixChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -30,6 +31,7 @@ trait HasNotificationSettings
             'telegram' => $this->telegramNotificationSettings,
             'slack' => $this->slackNotificationSettings,
             'pushover' => $this->pushoverNotificationSettings,
+            'matrix' => $this->matrixNotificationSettings,
             default => null,
         };
     }
@@ -77,6 +79,7 @@ trait HasNotificationSettings
             'telegram' => TelegramChannel::class,
             'slack' => SlackChannel::class,
             'pushover' => PushoverChannel::class,
+            'matrix' => MatrixChannel::class,
         ];
 
         if ($event === 'general') {

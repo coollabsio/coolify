@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsMatrix;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
@@ -35,7 +36,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsMatrix, SendsPushover, SendsSlack
 {
     use HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
@@ -53,6 +54,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->slackNotificationSettings()->create();
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
+            $team->matrixNotificationSettings()->create();
         });
 
         static::saving(function ($team) {
@@ -187,7 +189,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('discord')?->isEnabled() ||
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
-            $this->getNotificationSettings('pushover')?->isEnabled();
+            $this->getNotificationSettings('pushover')?->isEnabled() ||
+            $this->getNotificationSettings('matrix')?->isEnabled();
     }
 
     public function subscriptionEnded()
@@ -305,5 +308,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function pushoverNotificationSettings()
     {
         return $this->hasOne(PushoverNotificationSettings::class);
+    }
+
+    public function matrixNotificationSettings()
+    {
+        return $this->hasOne(MatrixNotificationSettings::class);
+    }
+
+    public function routeNotificationForMatrix()
+    {
+        return null;
     }
 }

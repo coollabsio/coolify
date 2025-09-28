@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\MatrixMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -203,6 +204,33 @@ class DeploymentSuccess extends CustomEmailNotification
             title: $title,
             description: $description,
             color: SlackMessage::successColor()
+        );
+    }
+
+    public function toMatrix(): MatrixMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} successfully deployed";
+            $description = "New version successfully deployed for {$this->application_name}";
+            if ($this->preview->fqdn) {
+                $description .= "\nPreview URL: {$this->preview->fqdn}";
+            }
+        } else {
+            $title = 'New version successfully deployed';
+            $description = "New version successfully deployed for {$this->application_name}";
+            if ($this->fqdn) {
+                $description .= "\nApplication URL: {$this->fqdn}";
+            }
+        }
+
+        $description .= "\n\nProject: ".data_get($this->application, 'environment.project.name');
+        $description .= "\nEnvironment: {$this->environment_name}";
+        $description .= "\nDeployment Logs: {$this->deployment_url}";
+
+        return new MatrixMessage(
+            title: $title,
+            description: $description,
+            color: MatrixMessage::successColor()
         );
     }
 }
