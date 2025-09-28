@@ -136,7 +136,7 @@ class ValidGitRepositoryUrl implements ValidationRule
 
             // Validate path contains only safe characters
             $path = $parsed['path'] ?? '';
-            if (! empty($path) && ! preg_match('/^[a-zA-Z0-9\-_\/\.]+$/', $path)) {
+            if (! empty($path) && ! preg_match('/^[a-zA-Z0-9\-_\/\.@~]+$/', $path)) {
                 $fail('The :attribute path contains invalid characters.');
 
                 return;
