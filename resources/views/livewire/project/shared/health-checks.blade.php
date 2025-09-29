@@ -2,6 +2,16 @@
     <div class="flex items-center gap-2">
         <h2>Healthchecks</h2>
         <x-forms.button canGate="update" :canResource="$resource" type="submit">Save</x-forms.button>
+        @if (!$resource->health_check_enabled)
+            <x-modal-confirmation title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"
+                submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this resource.']"
+                warningMessage="If the health check fails, your application will become inaccessible. Please review the <a href='https://coolify.io/docs/knowledge-base/health-checks' target='_blank' class='underline text-white'>Health Checks</a> guide before proceeding!"
+                step2ButtonText="Enable Healthcheck" :confirmWithText="false" :confirmWithPassword="false"
+                isHighlightedButton>
+            </x-modal-confirmation>
+        @else
+            <x-forms.button canGate="update" :canResource="$resource" wire:click="toggleHealthcheck">Disable Healthcheck</x-forms.button>
+        @endif
     </div>
     <div class="pb-4">Define how your resource's health should be checked.</div>
     <div class="flex flex-col gap-4">
@@ -9,9 +19,6 @@
             <div class="dark:text-warning">A custom health check has been found and will be used until you enable this.
             </div>
         @endif
-        <div class="w-32">
-            <x-forms.checkbox canGate="update" :canResource="$resource" instantSave id="resource.health_check_enabled" label="Enabled" />
-        </div>
         <div class="flex gap-2">
             <x-forms.select canGate="update" :canResource="$resource" id="resource.health_check_method" label="Method" required>
                 <option value="GET">GET</option>

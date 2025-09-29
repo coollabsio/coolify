@@ -47,6 +47,18 @@ class HealthChecks extends Component
         }
     }
 
+    public function toggleHealthcheck()
+    {
+        try {
+            $this->authorize('update', $this->resource);
+            $this->resource->health_check_enabled = !$this->resource->health_check_enabled;
+            $this->resource->save();
+            $this->dispatch('success', 'Health check ' . ($this->resource->health_check_enabled ? 'enabled' : 'disabled') . '.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function render()
     {
         return view('livewire.project.shared.health-checks');
