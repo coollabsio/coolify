@@ -57,6 +57,8 @@ services:
       - SERVER_GRPC_BROADCAST_ADDRESS=${SERVER_GRPC_BROADCAST_ADDRESS:-hatchet-engine:7077}
       - SERVER_DEFAULT_ENGINE_VERSION=V1
       - SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS=${SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS:-hatchet-engine:7070}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=$SERVICE_PASSWORD_HATCHET_DASHBOARD_ADMIN
     volumes:
       - hatchet_certs:/hatchet/certs
       - hatchet_config:/hatchet/config
@@ -94,7 +96,6 @@ services:
     environment:
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB
       - SERVICE_URL_HATCHET_80
-      # Default credentials are "admin@example.com" and "Admin123!!"
     volumes:
       - hatchet_certs:/hatchet/certs
       - hatchet_config:/hatchet/config
