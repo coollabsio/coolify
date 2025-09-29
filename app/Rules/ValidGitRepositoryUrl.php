@@ -142,8 +142,8 @@ class ValidGitRepositoryUrl implements ValidationRule
                 return;
             }
         } elseif (str_starts_with($value, 'git://')) {
-            // Validate git:// protocol URL
-            if (! preg_match('/^git:\/\/[a-zA-Z0-9\.\-]+\/[a-zA-Z0-9\-_\/\.]+$/', $value)) {
+            // Validate git:// protocol URL (supports both git://host/path and git://host:port/path with tilde)
+            if (! preg_match('/^git:\/\/[a-zA-Z0-9\.\-]+(:[0-9]+)?[:\/][a-zA-Z0-9\-_\/\.~]+$/', $value)) {
                 $fail('The :attribute is not a valid git:// URL.');
 
                 return;

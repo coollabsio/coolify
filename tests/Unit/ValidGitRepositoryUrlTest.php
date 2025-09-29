@@ -136,6 +136,7 @@ it('validates git:// protocol URLs', function () {
     $validUrls = [
         'git://github.com/user/repo.git',
         'git://gitlab.com/user/repo.git',
+        'git://git.sr.ht:~user/repo.git',
     ];
 
     foreach ($validUrls as $url) {
