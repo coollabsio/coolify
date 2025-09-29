@@ -1477,13 +1477,14 @@ class Application extends BaseModel
             $this->save();
             $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
-                $json = collect(json_decode($this->docker_compose_domains));
+                $decoded = json_decode($this->docker_compose_domains, true);
+                $json = collect(is_array($decoded) ? $decoded : []);
+                $normalized = collect();
                 foreach ($json as $key => $value) {
-                    if (str($key)->contains('-') || str($key)->contains('.')) {
-                        $key = str($key)->replace('-', '_')->replace('.', '_');
-                    }
-                    $json->put((string) $key, $value);
+                    $normalizedKey = (string) str($key)->replace('-', '_')->replace('.', '_');
+                    $normalized->put($normalizedKey, $value);
                 }
+                $json = $normalized;
                 $services = collect(data_get($parsedServices, 'services', []));
                 foreach ($services as $name => $service) {
                     if (str($name)->contains('-') || str($name)->contains('.')) {
