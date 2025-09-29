@@ -72,6 +72,7 @@ RUN apk add --no-cache gnupg && \
     curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
 
 # Install system dependencies
+RUN apk upgrade
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
     openssh-client \
@@ -120,6 +121,7 @@ COPY --chown=www-data:www-data templates ./templates
 COPY --chown=www-data:www-data resources/views ./resources/views
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
+COPY --chown=www-data:www-data changelogs/ ./changelogs/
 
 RUN composer dump-autoload
 

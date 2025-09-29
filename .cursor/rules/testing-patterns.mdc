@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Testing strategies with Pest PHP, Laravel Dusk, and quality assurance patterns
+globs: tests/**/*.php, database/factories/*.php
 alwaysApply: false
 ---
 # Coolify Testing Architecture & Patterns
@@ -8,6 +8,8 @@ alwaysApply: false
 ## Testing Philosophy
 
 Coolify employs **comprehensive testing strategies** using modern PHP testing frameworks to ensure reliability of deployment operations, infrastructure management, and user interactions.
+
+!Important: Always run tests inside `coolify` container.
 
 ## Testing Framework Stack
 

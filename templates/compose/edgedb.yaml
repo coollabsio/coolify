@@ -1,7 +1,8 @@
 # ignore: true
 # documentation: https://www.edgedb.com
 # slogan: An open-source database designed as a spiritual successor to SQL and the relational paradigm. Powered by the Postgres query engine under the hood.
-# tags: db database sql
+# category: database
+# tags: db, database, sql
 # logo: svgs/edgedb.svg
 # port: 5656
 
@@ -9,7 +10,7 @@ services:
   edgedb:
     image: edgedb/edgedb
     environment:
-      - SERVICE_FQDN_EDGEDB_5656
+      - SERVICE_URL_EDGEDB_5656
       - EDGEDB_SERVER_ADMIN_UI=${EDGEDB_SERVER_ADMIN_UI:-enabled}
       - EDGEDB_SERVER_BACKEND_DSN=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-edgedb}
       - EDGEDB_SERVER_SECURITY=${EDGEDB_SERVER_SECURITY:-strict}

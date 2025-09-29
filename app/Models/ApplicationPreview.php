@@ -74,7 +74,7 @@ class ApplicationPreview extends BaseModel
 
     public function generate_preview_fqdn()
     {
-        if (is_null($this->fqdn) && $this->application->fqdn) {
+        if ($this->application->fqdn) {
             if (str($this->application->fqdn)->contains(',')) {
                 $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
                 $preview_fqdn = getFqdnWithoutPort(str($this->application->fqdn)->explode(',')[0]);

@@ -26,6 +26,8 @@ class GetContainersStatus
 
     public $server;
 
+    protected ?Collection $applicationContainerStatuses;
+
     public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
     {
         $this->containers = $containers;
@@ -94,7 +96,11 @@ class GetContainersStatus
             }
             $containerStatus = data_get($container, 'State.Status');
             $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
-            $containerStatus = "$containerStatus ($containerHealth)";
+            if ($containerStatus === 'restarting') {
+                $containerStatus = "restarting ($containerHealth)";
+            } else {
+                $containerStatus = "$containerStatus ($containerHealth)";
+            }
             $labels = Arr::undot(format_docker_labels_to_json($labels));
             $applicationId = data_get($labels, 'coolify.applicationId');
             if ($applicationId) {
@@ -119,11 +125,16 @@ class GetContainersStatus
                     $application = $this->applications->where('id', $applicationId)->first();
                     if ($application) {
                         $foundApplications[] = $application->id;
-                        $statusFromDb = $application->status;
-                        if ($statusFromDb !== $containerStatus) {
-                            $application->update(['status' => $containerStatus]);
-                        } else {
-                            $application->update(['last_online_at' => now()]);
+                        // Store container status for aggregation
+                        if (! isset($this->applicationContainerStatuses)) {
+                            $this->applicationContainerStatuses = collect();
+                        }
+                        if (! $this->applicationContainerStatuses->has($applicationId)) {
+                            $this->applicationContainerStatuses->put($applicationId, collect());
+                        }
+                        $containerName = data_get($labels, 'com.docker.compose.service');
+                        if ($containerName) {
+                            $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
                         }
                     } else {
                         // Notify user that this container should not be there.
@@ -320,6 +331,97 @@ class GetContainersStatus
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
+
+        // Aggregate multi-container application statuses
+        if (isset($this->applicationContainerStatuses) && $this->applicationContainerStatuses->isNotEmpty()) {
+            foreach ($this->applicationContainerStatuses as $applicationId => $containerStatuses) {
+                $application = $this->applications->where('id', $applicationId)->first();
+                if (! $application) {
+                    continue;
+                }
+
+                $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses);
+                if ($aggregatedStatus) {
+                    $statusFromDb = $application->status;
+                    if ($statusFromDb !== $aggregatedStatus) {
+                        $application->update(['status' => $aggregatedStatus]);
+                    } else {
+                        $application->update(['last_online_at' => now()]);
+                    }
+                }
+            }
+        }
+
         ServiceChecked::dispatch($this->server->team->id);
+    }
+
+    private function aggregateApplicationStatus($application, Collection $containerStatuses): ?string
+    {
+        // Parse docker compose to check for excluded containers
+        $dockerComposeRaw = data_get($application, 'docker_compose_raw');
+        $excludedContainers = collect();
+
+        if ($dockerComposeRaw) {
+            try {
+                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($dockerComposeRaw);
+                $services = data_get($dockerCompose, 'services', []);
+
+                foreach ($services as $serviceName => $serviceConfig) {
+                    // Check if container should be excluded
+                    $excludeFromHc = data_get($serviceConfig, 'exclude_from_hc', false);
+                    $restartPolicy = data_get($serviceConfig, 'restart', 'always');
+
+                    if ($excludeFromHc || $restartPolicy === 'no') {
+                        $excludedContainers->push($serviceName);
+                    }
+                }
+            } catch (\Exception $e) {
+                // If we can't parse, treat all containers as included
+            }
+        }
+
+        // Filter out excluded containers
+        $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
+            return ! $excludedContainers->contains($containerName);
+        });
+
+        // If all containers are excluded, don't update status
+        if ($relevantStatuses->isEmpty()) {
+            return null;
+        }
+
+        $hasRunning = false;
+        $hasRestarting = false;
+        $hasUnhealthy = false;
+        $hasExited = false;
+
+        foreach ($relevantStatuses as $status) {
+            if (str($status)->contains('restarting')) {
+                $hasRestarting = true;
+            } elseif (str($status)->contains('running')) {
+                $hasRunning = true;
+                if (str($status)->contains('unhealthy')) {
+                    $hasUnhealthy = true;
+                }
+            } elseif (str($status)->contains('exited')) {
+                $hasExited = true;
+                $hasUnhealthy = true;
+            }
+        }
+
+        if ($hasRestarting) {
+            return 'degraded (unhealthy)';
+        }
+
+        if ($hasRunning && $hasExited) {
+            return 'degraded (unhealthy)';
+        }
+
+        if ($hasRunning) {
+            return $hasUnhealthy ? 'running (unhealthy)' : 'running (healthy)';
+        }
+
+        // All containers are exited
+        return 'exited (unhealthy)';
     }
 }

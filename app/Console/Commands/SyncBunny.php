@@ -16,7 +16,7 @@ class SyncBunny extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:bunny {--templates} {--release} {--nightly}';
+    protected $signature = 'sync:bunny {--templates} {--release} {--github-releases} {--nightly}';
 
     /**
      * The console command description.
@@ -26,6 +26,50 @@ class SyncBunny extends Command
     protected $description = 'Sync files to BunnyCDN';
 
     /**
+     * Fetch GitHub releases and sync to CDN
+     */
+    private function syncGitHubReleases($parent_dir, $bunny_cdn_storage_name, $bunny_cdn_path, $bunny_cdn)
+    {
+        $this->info('Fetching releases from GitHub...');
+        try {
+            $response = Http::timeout(30)
+                ->get('https://api.github.com/repos/coollabsio/coolify/releases', [
+                    'per_page' => 30,  // Fetch more releases for better changelog
+                ]);
+
+            if ($response->successful()) {
+                $releases = $response->json();
+
+                // Save releases to a temporary file
+                $releases_file = "$parent_dir/releases.json";
+                file_put_contents($releases_file, json_encode($releases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+                // Upload to CDN
+                Http::pool(fn (Pool $pool) => [
+                    $pool->storage(fileName: $releases_file)->put("/$bunny_cdn_storage_name/$bunny_cdn_path/releases.json"),
+                    $pool->purge("$bunny_cdn/coolify/releases.json"),
+                ]);
+
+                // Clean up temporary file
+                unlink($releases_file);
+
+                $this->info('releases.json uploaded & purged...');
+                $this->info('Total releases synced: '.count($releases));
+
+                return true;
+            } else {
+                $this->error('Failed to fetch releases from GitHub: '.$response->status());
+
+                return false;
+            }
+        } catch (\Throwable $e) {
+            $this->error('Error fetching releases: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle()
@@ -33,6 +77,7 @@ class SyncBunny extends Command
         $that = $this;
         $only_template = $this->option('templates');
         $only_version = $this->option('release');
+        $only_github_releases = $this->option('github-releases');
         $nightly = $this->option('nightly');
         $bunny_cdn = 'https://cdn.coollabs.io';
         $bunny_cdn_path = 'coolify';
@@ -45,7 +90,7 @@ class SyncBunny extends Command
         $install_script = 'install.sh';
         $upgrade_script = 'upgrade.sh';
         $production_env = '.env.production';
-        $service_template = 'service-templates.json';
+        $service_template = config('constants.services.file_name');
         $versions = 'versions.json';
 
         $compose_file_location = "$parent_dir/$compose_file";
@@ -90,7 +135,7 @@ class SyncBunny extends Command
                 $install_script_location = "$parent_dir/other/nightly/$install_script";
                 $versions_location = "$parent_dir/other/nightly/$versions";
             }
-            if (! $only_template && ! $only_version) {
+            if (! $only_template && ! $only_version && ! $only_github_releases) {
                 if ($nightly) {
                     $this->info('About to sync files NIGHTLY (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN.');
                 } else {
@@ -102,7 +147,7 @@ class SyncBunny extends Command
                 }
             }
             if ($only_template) {
-                $this->info('About to sync service-templates.json to BunnyCDN.');
+                $this->info('About to sync '.config('constants.services.file_name').' to BunnyCDN.');
                 $confirmed = confirm('Are you sure you want to sync?');
                 if (! $confirmed) {
                     return;
@@ -128,11 +173,28 @@ class SyncBunny extends Command
                 if (! $confirmed) {
                     return;
                 }
+
+                // First sync GitHub releases
+                $this->info('Syncing GitHub releases first...');
+                $this->syncGitHubReleases($parent_dir, $bunny_cdn_storage_name, $bunny_cdn_path, $bunny_cdn);
+
+                // Then sync versions.json
                 Http::pool(fn (Pool $pool) => [
                     $pool->storage(fileName: $versions_location)->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
                 ]);
                 $this->info('versions.json uploaded & purged...');
+
+                return;
+            } elseif ($only_github_releases) {
+                $this->info('About to sync GitHub releases to BunnyCDN.');
+                $confirmed = confirm('Are you sure you want to sync GitHub releases?');
+                if (! $confirmed) {
+                    return;
+                }
+
+                // Use the reusable function
+                $this->syncGitHubReleases($parent_dir, $bunny_cdn_storage_name, $bunny_cdn_path, $bunny_cdn);
 
                 return;
             }

@@ -5,11 +5,14 @@ namespace App\Livewire\Server;
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StopLogDrain;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class LogDrains extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     #[Validate(['boolean'])]
@@ -160,6 +163,7 @@ class LogDrains extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             if ($this->server->isLogDrainEnabled()) {
                 StartLogDrain::run($this->server);
@@ -176,6 +180,7 @@ class LogDrains extends Component
     public function submit(string $type)
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true, $type);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {

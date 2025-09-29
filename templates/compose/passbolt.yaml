@@ -1,5 +1,6 @@
 # documentation: https://www.passbolt.com/ce/docker
 # slogan: Passbolt Community Edition (CE) API. The JSON API for the open source password manager for teams!
+# category: auth
 # tags: security, credentials, password-manager, open source
 # logo: svgs/passbolt.svg
 # port: 80
@@ -8,8 +9,8 @@ services:
   passbolt:
     image: passbolt/passbolt:latest-ce
     environment:
-      - SERVICE_FQDN_PASSBOLT
-      - APP_FULL_BASE_URL=${SERVICE_FQDN_PASSBOLT}
+      - SERVICE_URL_PASSBOLT
+      - APP_FULL_BASE_URL=${SERVICE_URL_PASSBOLT}
       - DATASOURCES_DEFAULT_HOST=mariadb
       - DATASOURCES_DEFAULT_USERNAME=${SERVICE_USER_PASSBOLT}
       - DATASOURCES_DEFAULT_PASSWORD=${SERVICE_PASSWORD_PASSBOLT}

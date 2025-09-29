@@ -135,7 +135,13 @@ function getPermissionsPath(GithubApp $source)
 
 function loadRepositoryByPage(GithubApp $source, string $token, int $page)
 {
-    $response = Http::withToken($token)->get("{$source->api_url}/installation/repositories?per_page=100&page={$page}");
+    $response = Http::GitHub($source->api_url, $token)
+        ->timeout(20)
+        ->retry(3, 200, throw: false)
+        ->get('/installation/repositories', [
+            'per_page' => 100,
+            'page' => $page,
+        ]);
     $json = $response->json();
     if ($response->status() !== 200) {
         return [

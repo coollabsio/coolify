@@ -18,10 +18,12 @@
                 href="{{ route('project.service.logs', $parameters) }}">
                 <button>Logs</button>
             </a>
-            <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.service.command', $parameters) }}">
-                <button>Terminal</button>
-            </a>
+            @can('canAccessTerminal')
+                <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
+                    href="{{ route('project.service.command', $parameters) }}">
+                    <button>Terminal</button>
+                </a>
+            @endcan
             <x-services.links :service="$service" />
         </nav>
         @if ($service->isDeployable)

@@ -10,9 +10,10 @@ ARG DOCKER_BUILDX_VERSION=0.25.0
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.38.2
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.39.0
+ARG NIXPACKS_VERSION=1.40.0
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-05-21T01-59-54Z
+ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
+
 
 FROM minio/mc:${MINIO_VERSION} AS minio-client
 

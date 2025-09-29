@@ -9,11 +9,52 @@
             <h2>General</h2>
             <x-forms.button type="submit" label="Save">Save</x-forms.button>
         </div>
-        <div class="flex flex-col gap-2 lg:flex-row">
+        <div class="flex flex-col gap-2 lg:flex-row items-end">
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="email" label="Email" readonly />
+            @if (!$show_email_change && !$show_verification)
+                <x-forms.button wire:click="showEmailChangeForm" type="button">Change Email</x-forms.button>
+            @else
+                <x-forms.button wire:click="showEmailChangeForm" type="button" disabled>Change Email</x-forms.button>
+            @endif
         </div>
     </form>
+
+    <div class="flex flex-col pt-4">
+        @if ($show_email_change)
+            <form wire:submit='requestEmailChange'>
+                <div class="flex gap-2 items-end">
+                    <x-forms.input id="new_email" label="New Email Address" required type="email" />
+                    <x-forms.button type="submit">Send Verification Code</x-forms.button>
+                    <x-forms.button wire:click="$set('show_email_change', false)" type="button"
+                        isError>Cancel</x-forms.button>
+                </div>
+                <div class="text-xs font-bold dark:text-warning pt-2">A verification code will be sent to your
+                    new email
+                    address.</div>
+            </form>
+        @endif
+
+        @if ($show_verification)
+            <form wire:submit='verifyEmailChange'>
+                <div class="flex gap-2 items-end">
+                    <x-forms.input id="email_verification_code" label="Verification Code (6 digits)" required
+                        maxlength="6" />
+                    <x-forms.button type="submit">Verify & Update Email</x-forms.button>
+                    <x-forms.button wire:click="resendVerificationCode" type="button" isWarning>Resend
+                        Code</x-forms.button>
+                    <x-forms.button wire:click="cancelEmailChange" type="button" isError>Cancel</x-forms.button>
+                </div>
+                <div class="text-xs font-bold dark:text-warning pt-2">
+                    Verification code sent to {{ $new_email ?? auth()->user()->pending_email }}.
+                    The code is valid for {{ config('constants.email_change.verification_code_expiry_minutes', 10) }}
+                    minutes.
+                </div>
+
+
+            </form>
+        @endif
+    </div>
     <form wire:submit='resetPassword' class="flex flex-col pt-4">
         <div class="flex items-center gap-2 pb-2">
             <h2>Change Password</h2>

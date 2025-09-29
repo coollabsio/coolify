@@ -17,9 +17,11 @@
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Persistent
                 Storage</a>
-            <a class='menu-item' wire:current.exact="menu-item-active"
-                href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
-                Backups</a>
+            @can('update', $database)
+                <a class='menu-item' wire:current.exact="menu-item-active"
+                    href="{{ route('project.database.import-backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Import
+                    Backups</a>
+            @endcan
             <a class='menu-item' wire:current.exact="menu-item-active"
                 href="{{ route('project.database.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}">Webhooks</a>
             <a class="menu-item" wire:current.exact="menu-item-active"

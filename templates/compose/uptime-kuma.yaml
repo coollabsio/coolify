@@ -1,5 +1,6 @@
 # documentation: https://github.com/louislam/uptime-kuma?tab=readme-ov-file
 # slogan: Uptime Kuma is a monitoring tool for tracking the status and performance of your applications in real-time.
+# category: monitoring
 # tags: monitoring, status, performance, web, services, applications, real-time
 # logo: svgs/uptime-kuma.svg
 # port: 3001
@@ -8,7 +9,7 @@ services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
     environment:
-      - SERVICE_FQDN_UPTIMEKUMA_3001
+      - SERVICE_URL_UPTIMEKUMA_3001
     volumes:
       - uptime-kuma:/app/data
     healthcheck:

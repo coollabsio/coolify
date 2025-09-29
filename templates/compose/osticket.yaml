@@ -1,5 +1,6 @@
 # documentation: https://docs.osticket.com/en/latest/
 # slogan: osTicket is a widely-used open source support ticket system.
+# category: cms
 # tags: helpdesk, ticketing, support, open-source
 # logo: svgs/osticket.png
 # port: 80
@@ -8,8 +9,8 @@ services:
   osticket:
     image: tiredofit/osticket:latest
     environment:
-      - SERVICE_FQDN_OSTICKET_80
-      - APP_URL=${SERVICE_FQDN_OSTICKET}
+      - SERVICE_URL_OSTICKET_80
+      - APP_URL=${SERVICE_URL_OSTICKET}
       - CRON_INTERVAL=${CRON_INTERVAL:-10}
       - DB_HOST=mariadb
       - DB_NAME=${OSTICKET_DATABASE:-osticket-db}

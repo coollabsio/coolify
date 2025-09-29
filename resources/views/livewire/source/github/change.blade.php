@@ -5,29 +5,24 @@
                 <h1>GitHub App</h1>
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
-                        <x-forms.button type="submit">Save</x-forms.button>
-                        <a href="{{ getInstallationPath($github_app) }}">
-                            <x-forms.button>
-                                Update Repositories
-                                <x-external-link />
-                            </x-forms.button>
-                        </a>
+                        <x-forms.button canGate="update" :canResource="$github_app" type="submit">Save</x-forms.button>
                     @endif
-                    @if ($applications->count() > 0)
-                        <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                            submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
-                            confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                            shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                            step2ButtonText="Permanently Delete" />
-                    @else
-                        <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                            submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
-                            confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                            shortConfirmationLabel="GitHub App Name"
-                            confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
-                            step2ButtonText="Permanently Delete" />
-                    @endif
-
+                    @can('delete', $github_app)
+                        @if ($applications->count() > 0)
+                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                                shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                                step2ButtonText="Permanently Delete" />
+                        @else
+                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
+                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                                shortConfirmationLabel="GitHub App Name"
+                                confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
+                                step2ButtonText="Permanently Delete" />
+                        @endif
+                    @endcan
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
@@ -47,47 +42,64 @@
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
                         <div class="flex items-end gap-2 w-full">
-                            <x-forms.input id="github_app.name" label="App Name" />
-                            <x-forms.button wire:click.prevent="updateGithubAppName" class="bg-coollabs">
+                            <x-forms.input canGate="update" :canResource="$github_app" id="github_app.name" label="App Name" />
+                            <x-forms.button canGate="update" :canResource="$github_app" wire:click.prevent="updateGithubAppName">
                                 Sync Name
                             </x-forms.button>
-                            <a href="{{ $this->getGithubAppNameUpdatePath() }}">
-                                <x-forms.button>
-                                    Rename
-                                    <x-external-link />
-                                </x-forms.button>
-                            </a>
+                            @can('update', $github_app)
+                                <a href="{{ $this->getGithubAppNameUpdatePath() }}">
+                                    <x-forms.button
+                                        class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline">
+                                        Rename
+                                        <x-external-link />
+                                    </x-forms.button>
+                                </a>
+                                <a href="{{ getInstallationPath($github_app) }}" class="w-fit">
+                                    <x-forms.button
+                                        class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline whitespace-nowrap">
+                                        Update Repositories
+                                        <x-external-link />
+                                    </x-forms.button>
+                                </a>
+                            @endcan
                         </div>
-                        <x-forms.input id="github_app.organization" label="Organization"
-                            placeholder="If empty, personal user will be used" />
                     </div>
+                    <x-forms.input canGate="update" :canResource="$github_app" id="github_app.organization" label="Organization"
+                        placeholder="If empty, personal user will be used" />
                     @if (!isCloud())
                         <div class="w-48">
-                            <x-forms.checkbox label="System Wide?"
+                            <x-forms.checkbox canGate="update" :canResource="$github_app" label="System Wide?"
                                 helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
                                 instantSave id="github_app.is_system_wide" />
                         </div>
                     @endif
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.html_url" label="HTML Url" />
-                        <x-forms.input id="github_app.api_url" label="API Url" />
+                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.html_url" label="HTML Url" />
+                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.api_url" label="API Url" />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.custom_user" label="User" required />
-                        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
-                    </div>
-                    <div class="flex gap-2">
-                        <x-forms.input type="number" id="github_app.app_id" label="App Id" required />
-                        <x-forms.input type="number" id="github_app.installation_id" label="Installation Id"
+                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.custom_user" label="User"
                             required />
+                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="github_app.custom_port"
+                            label="Port" required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.client_id" label="Client Id" type="password" required />
-                        <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" required />
-                        <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" required />
+                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="github_app.app_id"
+                            label="App Id" required />
+                        <x-forms.input canGate="update" :canResource="$github_app" type="number"
+                            id="github_app.installation_id" label="Installation Id" required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.select id="github_app.private_key_id" label="Private Key" required>
+                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.client_id" label="Client Id"
+                            type="password" required />
+                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.client_secret"
+                            label="Client Secret" type="password" required />
+                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.webhook_secret"
+                            label="Webhook Secret" type="password" required />
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.select canGate="update" :canResource="$github_app" id="github_app.private_key_id"
+                            label="Private Key" required>
                             @if (blank($github_app->private_key_id))
                                 <option value="0" selected>Select a private key</option>
                             @endif
@@ -98,13 +110,15 @@
                     </div>
                     <div class="flex items-end gap-2 ">
                         <h2 class="pt-4">Permissions</h2>
-                        <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
-                        <a href="{{ getPermissionsPath($github_app) }}">
-                            <x-forms.button>
-                                Update
-                                <x-external-link />
-                            </x-forms.button>
-                        </a>
+                        @can('view', $github_app)
+                            <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
+                            <a href="{{ getPermissionsPath($github_app) }}">
+                                <x-forms.button>
+                                    Update
+                                    <x-external-link />
+                                </x-forms.button>
+                            </a>
+                        @endcan
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input id="github_app.contents" helper="read - mandatory." label="Content" readonly
@@ -182,72 +196,83 @@
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                    submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
-                    confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                    shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />
+                @can('delete', $github_app)
+                    <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                        submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                        shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete" />
+                @endcan
             </div>
         </div>
         <div class="flex flex-col gap-2">
-            <h3>Manual Installation</h3>
-            <div class="flex gap-2 items-center">
-                If you want to fill the form manually, you can continue below. Only for advanced users.
-                <x-forms.button wire:click.prevent="createGithubAppManually">
-                    Continue
-                </x-forms.button>
-            </div>
-            <h3>Automated Installation</h3>
-            <div class=" pb-5 rounded-sm alert-error">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>You must complete this step before you can use this source!</span>
-            </div>
+            @can('create', $github_app)
+                <h3>Manual Installation</h3>
+                <div class="flex gap-2 items-center">
+                    If you want to fill the form manually, you can continue below. Only for advanced users.
+                    <x-forms.button wire:click.prevent="createGithubAppManually">
+                        Continue
+                    </x-forms.button>
+                </div>
+                <h3>Automated Installation</h3>
+                <div class=" pb-5 rounded-sm alert-error">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>You must complete this step before you can use this source!</span>
+                </div>
+            @endcan
             <div class="flex flex-col">
                 <div class="pb-10">
-                    @if (!isCloud() || isDev())
-                        <div class="flex items-end gap-2">
-                            <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
-                                helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
-                                @if ($ipv4)
-                                    <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
-                                @endif
-                                @if ($ipv6)
-                                    <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                                @endif
-                                @if ($fqdn)
-                                    <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
-                                @endif
-                                @if (config('app.url'))
-                                    <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
-                                @endif
-                            </x-forms.select>
-                            <x-forms.button isHighlighted
-                                x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
-                                Register Now
-                            </x-forms.button>
+                    @can('create', $github_app)
+                        @if (!isCloud() || isDev())
+                            <div class="flex items-end gap-2">
+                                <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
+                                    helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
+                                    @if ($ipv4)
+                                        <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
+                                    @endif
+                                    @if ($ipv6)
+                                        <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
+                                    @endif
+                                    @if ($fqdn)
+                                        <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                                    @endif
+                                    @if (config('app.url'))
+                                        <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
+                                    @endif
+                                </x-forms.select>
+                                <x-forms.button isHighlighted
+                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                                    Register Now
+                                </x-forms.button>
+                            </div>
+                        @else
+                            <div class="flex gap-2">
+                                <h2>Register a GitHub App</h2>
+                                <x-forms.button isHighlighted
+                                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
+                                    Register Now
+                                </x-forms.button>
+                            </div>
+                            <div>You need to register a GitHub App before using this source.</div>
+                        @endif
+
+                        <div class="flex flex-col gap-2 pt-4 w-96">
+                            <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
+                                helper="Contents: read<br>Metadata: read<br>Email: read" />
+                            <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
+                                helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
+                            {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
+                            helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
                         </div>
                     @else
-                        <div class="flex gap-2">
-                            <h2>Register a GitHub App</h2>
-                            <x-forms.button isHighlighted
-                                x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
-                                Register Now
-                            </x-forms.button>
-                        </div>
-                        <div>You need to register a GitHub App before using this source.</div>
-                    @endif
-
-                    <div class="flex flex-col gap-2 pt-4 w-96">
-                        <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
-                            helper="Contents: read<br>Metadata: read<br>Email: read" />
-                        <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
-                            helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
-                        {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
-                        helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
-                    </div>
+                        <x-callout type="danger" title="Insufficient Permissions">
+                            You don't have permission to create new GitHub Apps. Please contact your team administrator.
+                        </x-callout>
+                    @endcan
                 </div>
             </div>
             <script>

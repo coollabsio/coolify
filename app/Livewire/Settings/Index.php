@@ -35,6 +35,12 @@ class Index extends Component
     #[Validate('required|string|timezone')]
     public string $instance_timezone;
 
+    public array $domainConflicts = [];
+
+    public bool $showDomainConflictModal = false;
+
+    public bool $forceSaveDomains = false;
+
     public function render()
     {
         return view('livewire.settings.index');
@@ -81,6 +87,13 @@ class Index extends Component
         }
     }
 
+    public function confirmDomainUsage()
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+        $this->submit();
+    }
+
     public function submit()
     {
         try {
@@ -102,13 +115,24 @@ class Index extends Component
             $this->validate();
 
             if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
-                if (! validate_dns_entry($this->fqdn, $this->server)) {
+                if (! validateDNSEntry($this->fqdn, $this->server)) {
                     $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
                 }
             }
             if ($this->fqdn) {
-                check_domain_usage(domain: $this->fqdn);
+                if (! $this->forceSaveDomains) {
+                    $result = checkDomainUsage(domain: $this->fqdn);
+                    if ($result['hasConflicts']) {
+                        $this->domainConflicts = $result['conflicts'];
+                        $this->showDomainConflictModal = true;
+
+                        return;
+                    }
+                } else {
+                    // Reset the force flag after using it
+                    $this->forceSaveDomains = false;
+                }
             }
 
             $this->instantSave(isSave: false);

@@ -1,14 +1,16 @@
 # documentation: https://docs.argilla.io/latest/
 # slogan: Argilla is a collaboration tool for AI engineers and domain experts who need to build high-quality datasets for their projects.
+# category: ai
 # tags: workflow, orchestration, data-pipeline, python, argilla, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp
 # logo: svgs/argilla.png
 # port: 6900
+# category: productivity
 
 services:
   argilla:
     image: "argilla/argilla-server:v2.2.0"
     environment:
-      - SERVICE_FQDN_ARGILLA_6900
+      - SERVICE_URL_ARGILLA_6900
       - ARGILLA_HOME_PATH=/var/lib/argilla
       - ARGILLA_ELASTICSEARCH=http://elasticsearch:9200
       - ARGILLA_DATABASE_URL=postgresql+asyncpg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB}

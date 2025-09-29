@@ -3,7 +3,6 @@
 namespace App\Policies;
 
 use App\Models\S3Storage;
-use App\Models\Server;
 use App\Models\User;
 
 class S3StoragePolicy
@@ -21,7 +20,7 @@ class S3StoragePolicy
      */
     public function view(User $user, S3Storage $storage): bool
     {
-        return $user->teams()->where('id', $storage->team_id)->exists();
+        return $user->teams->contains('id', $storage->team_id);
     }
 
     /**
@@ -29,15 +28,16 @@ class S3StoragePolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Server $server): bool
+    public function update(User $user, S3Storage $storage): bool
     {
-        return $user->teams()->get()->firstWhere('id', $server->team_id) !== null;
+        // return $user->teams->contains('id', $storage->team_id) && $user->isAdmin();
+        return $user->teams->contains('id', $storage->team_id);
     }
 
     /**
@@ -45,7 +45,8 @@ class S3StoragePolicy
      */
     public function delete(User $user, S3Storage $storage): bool
     {
-        return $user->teams()->where('id', $storage->team_id)->exists();
+        // return $user->teams->contains('id', $storage->team_id) && $user->isAdmin();
+        return $user->teams->contains('id', $storage->team_id);
     }
 
     /**
@@ -62,5 +63,13 @@ class S3StoragePolicy
     public function forceDelete(User $user, S3Storage $storage): bool
     {
         return false;
+    }
+
+    /**
+     * Determine whether the user can validate the connection of the model.
+     */
+    public function validateConnection(User $user, S3Storage $storage): bool
+    {
+        return $user->teams->contains('id', $storage->team_id);
     }
 }

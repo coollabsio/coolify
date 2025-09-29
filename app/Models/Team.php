@@ -8,7 +8,9 @@ use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
+use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use OpenApi\Attributes as OA;
@@ -36,7 +38,7 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use HasNotificationSettings, Notifiable;
+    use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
     protected $guarded = [];
 
@@ -192,6 +194,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function subscriptionEnded()
     {
         $this->subscription->update([
+            'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,
             'stripe_trial_already_ended' => false,

@@ -1,5 +1,6 @@
 # documentation: https://www.docuseal.co/
 # slogan: Document Signing for Everyone free forever for individuals, extensible for businesses and developers. Open Source Alternative to DocuSign, PandaDoc and more.
+# category: productivity
 # tags: documentation
 # logo: svgs/docuseal.png
 # port: 3000
@@ -8,8 +9,8 @@ services:
   docuseal:
     image: docuseal/docuseal:latest
     environment:
-      - SERVICE_FQDN_DOCUSEAL_3000
-      - HOST=${SERVICE_FQDN_DOCUSEAL}
+      - SERVICE_URL_DOCUSEAL_3000
+      - HOST=${SERVICE_URL_DOCUSEAL}
     volumes:
       - docuseal-data:/data
     healthcheck:

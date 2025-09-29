@@ -7,6 +7,7 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ValidGitBranch;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
@@ -142,7 +143,13 @@ class GithubPrivateRepository extends Component
 
     protected function loadBranchByPage()
     {
-        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
+        $response = Http::GitHub($this->github_app->api_url, $this->token)
+            ->timeout(20)
+            ->retry(3, 200, throw: false)
+            ->get("/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches", [
+                'per_page' => 100,
+                'page' => $this->page,
+            ]);
         $json = $response->json();
         if ($response->status() !== 200) {
             return $this->dispatch('error', $json['message']);
@@ -155,6 +162,21 @@ class GithubPrivateRepository extends Component
     public function submit()
     {
         try {
+            // Validate git repository parts and branch
+            $validator = validator([
+                'selected_repository_owner' => $this->selected_repository_owner,
+                'selected_repository_repo' => $this->selected_repository_repo,
+                'selected_branch_name' => $this->selected_branch_name,
+            ], [
+                'selected_repository_owner' => 'required|string|regex:/^[a-zA-Z0-9\-_]+$/',
+                'selected_repository_repo' => 'required|string|regex:/^[a-zA-Z0-9\-_\.]+$/',
+                'selected_branch_name' => ['required', 'string', new ValidGitBranch],
+            ]);
+
+            if ($validator->fails()) {
+                throw new \RuntimeException('Invalid repository data: '.$validator->errors()->first());
+            }
+
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (! $destination) {
@@ -171,8 +193,8 @@ class GithubPrivateRepository extends Component
             $application = Application::create([
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
-                'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
-                'git_branch' => $this->selected_branch_name,
+                'git_repository' => str($this->selected_repository_owner)->trim()->toString().'/'.str($this->selected_repository_repo)->trim()->toString(),
+                'git_branch' => str($this->selected_branch_name)->trim()->toString(),
                 'build_pack' => $this->build_pack,
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
@@ -192,7 +214,7 @@ class GithubPrivateRepository extends Component
                 $application['docker_compose_location'] = $this->docker_compose_location;
                 $application['base_directory'] = $this->base_directory;
             }
-            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;
 
             $application->name = generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name, $application->uuid);

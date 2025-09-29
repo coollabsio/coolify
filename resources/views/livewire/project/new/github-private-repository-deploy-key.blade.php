@@ -1,13 +1,13 @@
 <div>
     <h1>Create a new Application</h1>
     <div class="pb-4">Deploy any public or private Git repositories through a Deploy Key.</div>
-    <div class="flex flex-col pt-4">
+    <div class="flex flex-col ">
         @if ($current_step === 'private_keys')
             <h2 class="pb-4">Select a private key</h2>
             <div class="flex flex-col justify-center gap-2 text-left ">
                 @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 box"
+                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 box"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -20,7 +20,7 @@
                             </div>
                         </div>
                     @else
-                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 box"
+                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-100 box"
                             wire:click="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex flex-col mx-6">
                                 <div class="box-title">
@@ -46,9 +46,8 @@
             </div>
         @endif
         @if ($current_step === 'repository')
-            <h2 class="pb-4">Select a repository</h2>
-            <form class="flex flex-col gap-2 pt-2" wire:submit='submit'>
-                <x-forms.input id="repository_url" required label="Repository Url (https:// or git@)" />
+            <form class="flex flex-col gap-2" wire:submit='submit'>
+                <x-forms.input id="repository_url" required label="Repository URL (https:// or git@)" />
                 <div class="flex gap-2">
                     <x-forms.input id="branch" required label="Branch" />
                     <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
@@ -62,13 +61,21 @@
                     @endif
                 </div>
                 @if ($build_pack === 'dockercompose')
-                    <x-forms.input placeholder="/" wire:model.blur-sm="base_directory" label="Base Directory"
+                    <div x-data="{ baseDir: '{{ $base_directory }}', composeLocation: '{{ $docker_compose_location }}' }" class="gap-2 flex flex-col">
+                        <x-forms.input placeholder="/" wire:model.blur="base_directory" label="Base Directory"
+                            helper="Directory to use as root. Useful for monorepos." x-model="baseDir" />
+                        <x-forms.input placeholder="/docker-compose.yaml" wire:model.blur="docker_compose_location"
+                            label="Docker Compose Location" helper="It is calculated together with the Base Directory."
+                            x-model="composeLocation" />
+                        <div class="pt-2">
+                            <span>
+                                Compose file location in your repository: </span><span class='dark:text-warning'
+                                x-text='(baseDir === "/" ? "" : baseDir) + (composeLocation.startsWith("/") ? composeLocation : "/" + composeLocation)'></span>
+                        </div>
+                    </div>
+                @else
+                    <x-forms.input wire:model="base_directory" label="Base Directory"
                         helper="Directory to use as root. Useful for monorepos." />
-                    <x-forms.input placeholder="/docker-compose.yaml" id="docker_compose_location"
-                        label="Docker Compose Location"
-                        helper="It is calculated together with the Base Directory:<br><span class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>" />
-                    Compose file location in your repository:<span
-                        class='dark:text-warning'>{{ Str::start($base_directory . $docker_compose_location, '/') }}</span>
                 @endif
                 @if ($show_is_static)
                     <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />

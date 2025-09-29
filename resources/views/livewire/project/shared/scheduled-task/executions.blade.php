@@ -14,7 +14,7 @@
 }">
     @forelse($executions as $execution)
         <a wire:click="selectTask({{ data_get($execution, 'id') }})" @class([
-            'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
+            'relative flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
             'bg-gray-200 dark:bg-coolgray-200' => data_get($execution, 'id') == $selectedKey,
             'border-blue-500/50 border-dashed' => data_get($execution, 'status') === 'running',
             'border-error' => data_get($execution, 'status') === 'failed',
@@ -67,18 +67,22 @@
                 @endif
                 @if ($this->logLines->isNotEmpty())
                     <div>
-                        <pre class="whitespace-pre-wrap">
+                        <div class="max-h-[600px] overflow-y-auto border border-gray-200 dark:border-coolgray-300 rounded p-4 bg-gray-50 dark:bg-coolgray-100 scrollbar">
+                            <pre class="whitespace-pre-wrap">
 @foreach ($this->logLines as $line)
 {{ $line }}
 @endforeach
 </pre>
-                        <div class="flex gap-2">
+                        </div>
+                        <div class="flex gap-2 mt-4">
                             @if ($this->hasMoreLogs())
                                 <x-forms.button wire:click.prevent="loadMoreLogs" isHighlighted>
                                     Load More
                                 </x-forms.button>
+                                <x-forms.button wire:click.prevent="loadAllLogs">
+                                    Load All
+                                </x-forms.button>
                             @endif
-
                         </div>
                     </div>
                 @else

@@ -1,5 +1,6 @@
 # documentation: https://docs.mixpost.app/lite
 # slogan: Mixpost is a robust and versatile social media management software, designed to streamline social media operations and enhance content marketing strategies.
+# category: analytics
 # tags: social media, marketing, content, management, automation, self-hosted
 # logo: svgs/mixpost.svg
 # port: 80
@@ -8,12 +9,12 @@ services:
   mixpost:
     image: 'inovector/mixpost:latest'
     environment:
-      - SERVICE_FQDN_MIXPOST
+      - SERVICE_URL_MIXPOST
       - APP_NAME=Mixpost
       - APP_KEY=${SERVICE_BASE64_MIXPOST}
       - APP_DEBUG=false
       - APP_DOMAIN=${SERVICE_URL_MIXPOST}
-      - APP_URL=${SERVICE_FQDN_MIXPOST}
+      - APP_URL=${SERVICE_URL_MIXPOST}
       - DB_DATABASE=${MYSQL_DATABASE:-mixpost_db}
       - DB_USERNAME=${SERVICE_USER_MYSQL}
       - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}

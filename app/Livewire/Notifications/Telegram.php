@@ -5,12 +5,15 @@ namespace App\Livewire\Notifications;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Notifications\Test;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Telegram extends Component
 {
+    use AuthorizesRequests;
+
     protected $listeners = ['refresh' => '$refresh'];
 
     #[Locked]
@@ -111,6 +114,7 @@ class Telegram extends Component
         try {
             $this->team = auth()->user()->currentTeam();
             $this->settings = $this->team->telegramNotificationSettings;
+            $this->authorize('view', $this->settings);
             $this->syncData();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -121,6 +125,7 @@ class Telegram extends Component
     {
         if ($toModel) {
             $this->validate();
+            $this->authorize('update', $this->settings);
             $this->settings->telegram_enabled = $this->telegramEnabled;
             $this->settings->telegram_token = $this->telegramToken;
             $this->settings->telegram_chat_id = $this->telegramChatId;
@@ -241,6 +246,7 @@ class Telegram extends Component
     public function sendTestNotification()
     {
         try {
+            $this->authorize('sendTest', $this->settings);
             $this->team->notify(new Test(channel: 'telegram'));
             $this->dispatch('success', 'Test notification sent.');
         } catch (\Throwable $e) {

@@ -113,7 +113,7 @@
                         ])>
                             <span x-show="showTimestamps" class="shrink-0 text-gray-500">{{ $line['timestamp'] }}</span>
                             <span @class([
-                                'text-coollabs dark:text-warning' => $line['hidden'],
+                                'text-success dark:text-warning' => $line['hidden'],
                                 'text-red-500' => $line['stderr'],
                                 'font-bold' => isset($line['command']) && $line['command'],
                                 'whitespace-pre-wrap',

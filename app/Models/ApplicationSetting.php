@@ -13,8 +13,10 @@ class ApplicationSetting extends Model
         'is_force_https_enabled' => 'boolean',
         'is_debug_enabled' => 'boolean',
         'is_preview_deployments_enabled' => 'boolean',
+        'is_pr_deployments_public_enabled' => 'boolean',
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
+        'is_git_shallow_clone_enabled' => 'boolean',
     ];
 
     protected $guarded = [];

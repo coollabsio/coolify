@@ -1,5 +1,6 @@
 # documentation: https://rxresu.me/
 # slogan: A one-of-a-kind resume builder that keeps your privacy in mind.
+# category: productivity
 # tags: reactive-resume,resume-builder,open-source,2fa
 # logo: svgs/rxresume.svg
 # port: 3000
@@ -8,9 +9,9 @@ services:
   reactive-resume:
     image: amruthpillai/reactive-resume:latest
     environment:
-      - SERVICE_FQDN_REACTIVERESUME_3000
-      - PUBLIC_URL=$SERVICE_FQDN_REACTIVERESUME
-      - 'STORAGE_URL=${SERVICE_FQDN_MINIO}/default'
+      - SERVICE_URL_REACTIVERESUME_3000
+      - PUBLIC_URL=$SERVICE_URL_REACTIVERESUME
+      - 'STORAGE_URL=${SERVICE_URL_MINIO}/default'
       - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-postgres}
       - ACCESS_TOKEN_SECRET=$SERVICE_PASSWORD_ACCESSTOKEN
       - REFRESH_TOKEN_SECRET=$SERVICE_PASSWORD_REFRESHTOKEN

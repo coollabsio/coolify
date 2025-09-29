@@ -33,7 +33,7 @@
             </div>
         </div>
     </div>
-    @if (auth()->user()->isAdminFromSession())
+    @can('manageInvitations', currentTeam())
         <div class="py-4">
             @if (is_transactional_emails_enabled())
                 <h2 class="pb-4">Invite New Member</h2>
@@ -41,7 +41,7 @@
                 <h2>Invite New Member</h2>
                 @if (isInstanceAdmin())
                     <div class="pb-4 text-xs dark:text-warning">You need to configure (as root team) <a
-                            href="/settings#smtp" class="underline dark:text-warning">Transactional
+                            href="/settings/email" class="underline dark:text-warning">Transactional
                             Emails</a>
                         before
                         you can invite a
@@ -55,5 +55,5 @@
             <livewire:team.invite-link />
         </div>
         <livewire:team.invitations :invitations="$invitations" />
-    @endif
+    @endcan
 </div>

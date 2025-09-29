@@ -3,11 +3,14 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class Rollback extends Component
 {
+    use AuthorizesRequests;
+
     public Application $application;
 
     public $images = [];
@@ -23,6 +26,8 @@ class Rollback extends Component
 
     public function rollbackImage($commit)
     {
+        $this->authorize('deploy', $this->application);
+
         $deployment_uuid = new Cuid2;
 
         queue_application_deployment(
@@ -43,6 +48,8 @@ class Rollback extends Component
 
     public function loadImages($showToast = false)
     {
+        $this->authorize('view', $this->application);
+
         try {
             $image = $this->application->docker_registry_image_name ?? $this->application->uuid;
             if ($this->application->destination->server->isFunctional()) {

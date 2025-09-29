@@ -4,9 +4,11 @@
     </x-slot>
     <div class="flex items-center gap-2">
         <h1>Servers</h1>
-        <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
-            <livewire:server.create />
-        </x-modal-input>
+        @can('createAnyResource')
+            <x-modal-input buttonTitle="+ Add" title="New Server" :closeOutside="false">
+                <livewire:server.create />
+            </x-modal-input>
+        @endcan
     </div>
     <div class="subtitle">All your servers are here.</div>
     <div class="grid gap-4 lg:grid-cols-2">
