@@ -11,6 +11,7 @@ class DiscordMessage
         public string $description,
         public int $color,
         public bool $isCritical = false,
+        public ?string $pingText = null,
     ) {}
 
     public static function successColor(): int
@@ -63,8 +64,8 @@ class DiscordMessage
                 ],
             ],
         ];
-        if ($this->isCritical) {
-            $payload['content'] = '@here';
+        if ($this->isCritical && !empty($this->pingText)) {
+            $payload['content'] = $this->pingText;
         }
 
         return $payload;

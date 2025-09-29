@@ -29,7 +29,7 @@ class DiscordNotificationSettings extends Model
         'server_reachable_discord_notifications',
         'server_unreachable_discord_notifications',
         'server_patch_discord_notifications',
-        'discord_ping_enabled',
+        'discord_ping_text',
     ];
 
     protected $casts = [
@@ -48,7 +48,7 @@ class DiscordNotificationSettings extends Model
         'server_reachable_discord_notifications' => 'boolean',
         'server_unreachable_discord_notifications' => 'boolean',
         'server_patch_discord_notifications' => 'boolean',
-        'discord_ping_enabled' => 'boolean',
+        'discord_ping_text' => 'string',
     ];
 
     public function team()
@@ -63,6 +63,6 @@ class DiscordNotificationSettings extends Model
 
     public function isPingEnabled()
     {
-        return $this->discord_ping_enabled;
+        return !empty($this->discord_ping_text);
     }
 }

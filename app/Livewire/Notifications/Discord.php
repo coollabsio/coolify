@@ -62,8 +62,8 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $serverPatchDiscordNotifications = false;
 
-    #[Validate(['boolean'])]
-    public bool $discordPingEnabled = true;
+    #[Validate(['string', 'nullable'])]
+    public ?string $discordPingText = null;
 
     public function mount()
     {
@@ -99,7 +99,7 @@ class Discord extends Component
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
 
-            $this->settings->discord_ping_enabled = $this->discordPingEnabled;
+            $this->settings->discord_ping_text = $this->discordPingText;
 
             $this->settings->save();
             refreshSession();
@@ -121,24 +121,11 @@ class Discord extends Component
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
 
-            $this->discordPingEnabled = $this->settings->discord_ping_enabled;
+            $this->discordPingText = $this->settings->discord_ping_text;
         }
     }
 
-    public function instantSaveDiscordPingEnabled()
-    {
-        try {
-            $original = $this->discordPingEnabled;
-            $this->validate([
-                'discordPingEnabled' => 'required',
-            ]);
-            $this->saveModel();
-        } catch (\Throwable $e) {
-            $this->discordPingEnabled = $original;
 
-            return handleError($e, $this);
-        }
-    }
 
     public function instantSaveDiscordEnabled()
     {

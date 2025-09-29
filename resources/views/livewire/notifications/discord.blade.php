@@ -22,13 +22,15 @@
         </div>
         <div class="w-48">
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordPingEnabled" id="discordPingEnabled"
-                helper="If enabled, a ping (@here) will be sent to the notification when a critical event happens."
-                label="Ping Enabled" />
         </div>
-        <x-forms.input canGate="update" :canResource="$settings" type="password"
-            helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
-            required id="discordWebhookUrl" label="Webhook" />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <x-forms.input canGate="update" :canResource="$settings" instantSave="saveModel" id="discordPingText"
+                helper="Custom ping message to notify users or roles for critical alerts (e.g., @here, &lt;@&amp;ROLE_ID&gt; for roles, &lt;@USER_ID&gt; for users). Leave empty to disable pinging."
+                label="Ping Text" />
+            <x-forms.input canGate="update" :canResource="$settings" type="password"
+                helper="Generate a webhook URL from your new or existing Discord server. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
+                required id="discordWebhookUrl" label="Webhook" />
+        </div>
     </form>
     <h2 class="mt-4">Notification Settings</h2>
     <p class="mb-4">
