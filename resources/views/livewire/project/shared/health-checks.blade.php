@@ -17,7 +17,10 @@
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
             </x-forms.select>
-            <x-forms.input canGate="update" :canResource="$resource" id="resource.health_check_scheme" placeholder="http" label="Scheme" required />
+            <x-forms.select canGate="update" :canResource="$resource" id="resource.health_check_scheme" label="Scheme" required>
+                <option value="http">http</option>
+                <option value="https">https</option>
+            </x-forms.select>
             <x-forms.input canGate="update" :canResource="$resource" id="resource.health_check_host" placeholder="localhost" label="Host" required />
             <x-forms.input canGate="update" :canResource="$resource" type="number" id="resource.health_check_port"
                 helper="If no port is defined, the first exposed port will be used." placeholder="80" label="Port" />
