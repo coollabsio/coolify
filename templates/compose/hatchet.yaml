@@ -23,7 +23,7 @@ services:
     image: rabbitmq:3-management
     hostname: "rabbitmq"
     environment:
-      - SERVICE_URL_RABBITMQ_15672
+      - SERVICE_URL_RABBITMQ_5672
       - RABBITMQ_DEFAULT_USER=$SERVICE_USER_RABBITMQ
       - RABBITMQ_DEFAULT_PASS=$SERVICE_PASSWORD_RABBITMQ
       - PORT=${RABBITMQ_PORT:-5672}
@@ -99,6 +99,18 @@ services:
     volumes:
       - hatchet_certs:/hatchet/certs
       - hatchet_config:/hatchet/config
+
+  hatchet-worker-example:
+    env_file:
+      - .env
+    build: .
+    environment:
+      HATCHET_CLIENT_TOKEN: ${HATCHET_CLIENT_TOKEN}
+      HATCHET_CLIENT_TLS_STRATEGY: ${HATCHET_CLIENT_TLS_STRATEGY-none}
+      HATCHET_CLIENT_HOST_PORT: ${HATCHET_CLIENT_HOST_PORT:-hatchet-engine:7070}
+    depends_on:
+      hatchet-engine:
+        condition: service_started
 
 volumes:
   hatchet_postgres_data:
