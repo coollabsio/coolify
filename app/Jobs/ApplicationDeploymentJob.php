@@ -1803,22 +1803,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $created_new = true;
         }
 
-        // Always refresh the relationships to ensure we have the latest data
-        // This is critical for the first deployment where variables were just created
         if ($this->pull_request_id === 0) {
             $this->application->load(['nixpacks_environment_variables', 'environment_variables']);
         } else {
             $this->application->load(['nixpacks_environment_variables_preview', 'environment_variables_preview']);
         }
-
-        // // Export these variables to /etc/environment in the helper container
-        // $this->execute_remote_command([
-        //     executeInDocker($this->deployment_uuid, "echo 'NIXPACKS_PHP_FALLBACK_PATH=\"{$nixpacks_php_fallback_path->value}\"' >> /etc/environment"),
-        //     'hidden' => true,
-        // ], [
-        //     executeInDocker($this->deployment_uuid, "echo 'NIXPACKS_PHP_ROOT_DIR=\"{$nixpacks_php_root_dir->value}\"' >> /etc/environment"),
-        //     'hidden' => true,
-        // ]);
     }
 
     private function cleanup_git()
@@ -2539,16 +2528,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
 
-                // if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
-                //     $build_script = "#!/bin/bash\n";
-                //     $build_script .= "set -a\n";
-                //     $build_script .= "source /etc/environment 2>/dev/null || true\n";
-                //     $build_script .= "set +a\n";
-                //     $build_script .= $build_command;
-                //     $base64_build_command = base64_encode($build_script);
-                // } else {
                 $base64_build_command = base64_encode($build_command);
-                // }
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
@@ -2614,16 +2594,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
             $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
-            // if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
-            //     $build_script = "#!/bin/bash\n";
-            //     $build_script .= "set -a\n";
-            //     $build_script .= "source /etc/environment 2>/dev/null || true\n";
-            //     $build_script .= "set +a\n";
-            //     $build_script .= $build_command;
-            //     $base64_build_command = base64_encode($build_script);
-            // } else {
             $base64_build_command = base64_encode($build_command);
-
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d | tee {$this->workdir}/Dockerfile > /dev/null"),
@@ -2664,16 +2635,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                     }
                 }
-                // if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
-                //     $build_script = "#!/bin/bash\n";
-                //     $build_script .= "set -a\n";
-                //     $build_script .= "source /etc/environment 2>/dev/null || true\n";
-                //     $build_script .= "set +a\n";
-                //     $build_script .= $build_command;
-                //     $base64_build_command = base64_encode($build_script);
-                // } else {
                 $base64_build_command = base64_encode($build_command);
-                // }
                 $this->execute_remote_command(
                     [
                         executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
@@ -2725,17 +2687,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}";
                         }
                     }
-                    // If using build secrets, prepend source of /etc/environment to the build script
-                    // if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
-                    //     $build_script = "#!/bin/bash\n";
-                    //     $build_script .= "set -a\n";
-                    //     $build_script .= "source /etc/environment 2>/dev/null || true\n";
-                    //     $build_script .= "set +a\n";
-                    //     $build_script .= $build_command;
-                    //     $base64_build_command = base64_encode($build_script);
-                    // } else {
                     $base64_build_command = base64_encode($build_command);
-                    // }
                     $this->execute_remote_command(
                         [
                             executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
@@ -2769,17 +2721,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             $build_command = "docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
                         }
                     }
-                    // If using build secrets, prepend source of /etc/environment to the build script
-                    // if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
-                    //     $build_script = "#!/bin/bash\n";
-                    //     $build_script .= "set -a\n";
-                    //     $build_script .= "source /etc/environment 2>/dev/null || true\n";
-                    //     $build_script .= "set +a\n";
-                    //     $build_script .= $build_command;
-                    //     $base64_build_command = base64_encode($build_script);
-                    // } else {
                     $base64_build_command = base64_encode($build_command);
-                    // }
                     $this->execute_remote_command(
                         [
                             executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d | tee /artifacts/build.sh > /dev/null"),
