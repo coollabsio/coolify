@@ -8,6 +8,7 @@ use App\Actions\User\DeleteUserServers;
 use App\Actions\User\DeleteUserTeams;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -54,124 +55,141 @@ class CloudDeleteUser extends Command
             return 1;
         }
 
-        $this->logAction("Starting user deletion process for: {$email}");
+        // Implement file lock to prevent concurrent deletions of the same user
+        $lockKey = "user_deletion_{$this->user->id}";
+        $lock = Cache::lock($lockKey, 600); // 10 minute lock
 
-        // Phase 1: Show User Overview (outside transaction)
-        if (! $this->showUserOverview()) {
-            $this->info('User deletion cancelled.');
+        if (! $lock->get()) {
+            $this->error('Another deletion process is already running for this user. Please try again later.');
+            $this->logAction("Deletion blocked for user {$email}: Another process is already running");
 
-            return 0;
+            return 1;
         }
 
-        // If not dry run, wrap everything in a transaction
-        if (! $this->isDryRun) {
-            try {
-                DB::beginTransaction();
+        try {
+            $this->logAction("Starting user deletion process for: {$email}");
 
+            // Phase 1: Show User Overview (outside transaction)
+            if (! $this->showUserOverview()) {
+                $this->info('User deletion cancelled.');
+                $lock->release();
+
+                return 0;
+            }
+
+            // If not dry run, wrap everything in a transaction
+            if (! $this->isDryRun) {
+                try {
+                    DB::beginTransaction();
+
+                    // Phase 2: Delete Resources
+                    if (! $this->skipResources) {
+                        if (! $this->deleteResources()) {
+                            DB::rollBack();
+                            $this->error('User deletion failed at resource deletion phase. All changes rolled back.');
+
+                            return 1;
+                        }
+                    }
+
+                    // Phase 3: Delete Servers
+                    if (! $this->deleteServers()) {
+                        DB::rollBack();
+                        $this->error('User deletion failed at server deletion phase. All changes rolled back.');
+
+                        return 1;
+                    }
+
+                    // Phase 4: Handle Teams
+                    if (! $this->handleTeams()) {
+                        DB::rollBack();
+                        $this->error('User deletion failed at team handling phase. All changes rolled back.');
+
+                        return 1;
+                    }
+
+                    // Phase 5: Cancel Stripe Subscriptions
+                    if (! $this->skipStripe && isCloud()) {
+                        if (! $this->cancelStripeSubscriptions()) {
+                            DB::rollBack();
+                            $this->error('User deletion failed at Stripe cancellation phase. All changes rolled back.');
+
+                            return 1;
+                        }
+                    }
+
+                    // Phase 6: Delete User Profile
+                    if (! $this->deleteUserProfile()) {
+                        DB::rollBack();
+                        $this->error('User deletion failed at final phase. All changes rolled back.');
+
+                        return 1;
+                    }
+
+                    // Commit the transaction
+                    DB::commit();
+
+                    $this->newLine();
+                    $this->info('✅ User deletion completed successfully!');
+                    $this->logAction("User deletion completed for: {$email}");
+
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    $this->error('An error occurred during user deletion: '.$e->getMessage());
+                    $this->logAction("User deletion failed for {$email}: ".$e->getMessage());
+
+                    return 1;
+                }
+            } else {
+                // Dry run mode - just run through the phases without transaction
                 // Phase 2: Delete Resources
                 if (! $this->skipResources) {
                     if (! $this->deleteResources()) {
-                        DB::rollBack();
-                        $this->error('User deletion failed at resource deletion phase. All changes rolled back.');
+                        $this->info('User deletion would be cancelled at resource deletion phase.');
 
-                        return 1;
+                        return 0;
                     }
                 }
 
                 // Phase 3: Delete Servers
                 if (! $this->deleteServers()) {
-                    DB::rollBack();
-                    $this->error('User deletion failed at server deletion phase. All changes rolled back.');
+                    $this->info('User deletion would be cancelled at server deletion phase.');
 
-                    return 1;
+                    return 0;
                 }
 
                 // Phase 4: Handle Teams
                 if (! $this->handleTeams()) {
-                    DB::rollBack();
-                    $this->error('User deletion failed at team handling phase. All changes rolled back.');
+                    $this->info('User deletion would be cancelled at team handling phase.');
 
-                    return 1;
+                    return 0;
                 }
 
                 // Phase 5: Cancel Stripe Subscriptions
                 if (! $this->skipStripe && isCloud()) {
                     if (! $this->cancelStripeSubscriptions()) {
-                        DB::rollBack();
-                        $this->error('User deletion failed at Stripe cancellation phase. All changes rolled back.');
+                        $this->info('User deletion would be cancelled at Stripe cancellation phase.');
 
-                        return 1;
+                        return 0;
                     }
                 }
 
                 // Phase 6: Delete User Profile
                 if (! $this->deleteUserProfile()) {
-                    DB::rollBack();
-                    $this->error('User deletion failed at final phase. All changes rolled back.');
+                    $this->info('User deletion would be cancelled at final phase.');
 
-                    return 1;
+                    return 0;
                 }
-
-                // Commit the transaction
-                DB::commit();
 
                 $this->newLine();
-                $this->info('✅ User deletion completed successfully!');
-                $this->logAction("User deletion completed for: {$email}");
-
-            } catch (\Exception $e) {
-                DB::rollBack();
-                $this->error('An error occurred during user deletion: '.$e->getMessage());
-                $this->logAction("User deletion failed for {$email}: ".$e->getMessage());
-
-                return 1;
-            }
-        } else {
-            // Dry run mode - just run through the phases without transaction
-            // Phase 2: Delete Resources
-            if (! $this->skipResources) {
-                if (! $this->deleteResources()) {
-                    $this->info('User deletion would be cancelled at resource deletion phase.');
-
-                    return 0;
-                }
+                $this->info('✅ DRY RUN completed successfully! No data was deleted.');
             }
 
-            // Phase 3: Delete Servers
-            if (! $this->deleteServers()) {
-                $this->info('User deletion would be cancelled at server deletion phase.');
-
-                return 0;
-            }
-
-            // Phase 4: Handle Teams
-            if (! $this->handleTeams()) {
-                $this->info('User deletion would be cancelled at team handling phase.');
-
-                return 0;
-            }
-
-            // Phase 5: Cancel Stripe Subscriptions
-            if (! $this->skipStripe && isCloud()) {
-                if (! $this->cancelStripeSubscriptions()) {
-                    $this->info('User deletion would be cancelled at Stripe cancellation phase.');
-
-                    return 0;
-                }
-            }
-
-            // Phase 6: Delete User Profile
-            if (! $this->deleteUserProfile()) {
-                $this->info('User deletion would be cancelled at final phase.');
-
-                return 0;
-            }
-
-            $this->newLine();
-            $this->info('✅ DRY RUN completed successfully! No data was deleted.');
+            return 0;
+        } finally {
+            // Ensure lock is always released
+            $lock->release();
         }
-
-        return 0;
     }
 
     private function showUserOverview(): bool
@@ -683,24 +701,21 @@ class CloudDeleteUser extends Command
 
     private function getSubscriptionMonthlyValue(string $planId): int
     {
-        // Map plan IDs to monthly values based on config
-        $subscriptionConfigs = config('subscription');
+        // Try to get pricing from subscription metadata or config
+        // Since we're using dynamic pricing, return 0 for now
+        // This could be enhanced by fetching the actual price from Stripe API
 
-        foreach ($subscriptionConfigs as $key => $value) {
-            if ($value === $planId && str_contains($key, 'stripe_price_id_')) {
-                // Extract price from key pattern: stripe_price_id_basic_monthly -> basic
-                $planType = str($key)->after('stripe_price_id_')->before('_')->toString();
+        // Check if this is a dynamic pricing plan
+        $dynamicMonthlyPlanId = config('subscription.stripe_price_id_dynamic_monthly');
+        $dynamicYearlyPlanId = config('subscription.stripe_price_id_dynamic_yearly');
 
-                // Map to known prices (you may need to adjust these based on your actual pricing)
-                return match ($planType) {
-                    'basic' => 29,
-                    'pro' => 49,
-                    'ultimate' => 99,
-                    default => 0
-                };
-            }
+        if ($planId === $dynamicMonthlyPlanId || $planId === $dynamicYearlyPlanId) {
+            // For dynamic pricing, we can't determine the exact amount without calling Stripe API
+            // Return 0 to indicate dynamic/usage-based pricing
+            return 0;
         }
 
+        // For any other plans, return 0 as we don't have hardcoded prices
         return 0;
     }
 
@@ -716,6 +731,13 @@ class CloudDeleteUser extends Command
 
         // Also log to a dedicated user deletion log file
         $logFile = storage_path('logs/user-deletions.log');
+
+        // Ensure the logs directory exists
+        $logDir = dirname($logFile);
+        if (! is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+
         $timestamp = now()->format('Y-m-d H:i:s');
         file_put_contents($logFile, "[{$timestamp}] {$logMessage}\n", FILE_APPEND | LOCK_EX);
     }
