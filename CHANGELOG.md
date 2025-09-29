@@ -4,10 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🚀 Features
+
+- *(application)* Implement order-based pattern matching for watch paths with negation support
+- *(github)* Enhance Docker Compose input fields for better user experience
+- *(dev-seeders)* Add PersonalAccessTokenSeeder to create development API tokens
+- *(application)* Add conditional .env file creation for Symfony apps during PHP deployment
+- *(application)* Enhance watch path parsing to support negation syntax
+- *(application)* Add normalizeWatchPaths method to improve watch path handling
+- *(validation)* Enhance ValidGitRepositoryUrl to support additional safe characters and add comprehensive unit tests for various Git repository URL formats
+- *(deployment)* Implement detection for Laravel/Symfony frameworks and configure NIXPACKS PHP environment variables accordingly
+
 ### 🐛 Bug Fixes
 
-- *(docker)* Adjust openssh-client installation in Dockerfile to avoid version bug
-- *(docker)* Streamline openssh-client installation in Dockerfile
+- *(application)* Restrict GitHub-based application settings to non-public repositories
+- *(traits)* Update saved_outputs handling in ExecuteRemoteCommand to use collection methods for better performance
+- *(application)* Enhance domain handling by replacing both dots and dashes with underscores for HTML form binding
+- *(constants)* Reduce command timeout from 7200 to 3600 seconds for improved performance
+- *(github)* Update repository URL to point to the v4.x branch for development
+- *(models)* Update sorting of scheduled database backups to order by creation date instead of name
+- *(socialite)* Add custom base URL support for GitLab provider in OAuth settings
+- *(configuration-checker)* Update message to clarify redeployment requirement for configuration changes
+- *(application)* Reduce docker stop timeout from 30 to 10 seconds for improved application shutdown efficiency
+- *(application)* Increase docker stop timeout from 10 to 30 seconds for better application shutdown handling
+- *(validation)* Update git:// URL validation to support port numbers and tilde characters in paths
+- Resolve scroll lock issue after closing quick search modal with escape key
+- Prevent quick search modal duplication from keyboard shortcuts
+
+### 🚜 Refactor
+
+- *(tests)* Simplify matchWatchPaths tests and update implementation for better clarity
+- *(deployment)* Improve environment variable handling in ApplicationDeploymentJob
+- *(deployment)* Remove commented-out code and streamline environment variable handling in ApplicationDeploymentJob
+- *(application)* Improve handling of docker compose domains by normalizing keys and ensuring valid JSON structure
+- *(forms)* Update wire:model bindings to use 'blur' instead of 'blur-sm' for input fields across multiple views
 
 ### 📚 Documentation
 
@@ -15,19 +45,57 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- *(versions)* Increment coolify version numbers to 4.0.0-beta.431 and 4.0.0-beta.432 in configuration files
+- *(application)* Remove debugging statement from loadComposeFile method
+- *(workflows)* Update Claude GitHub Action configuration to support new event types and improve permissions
+
+## [4.0.0-beta.431] - 2025-09-24
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.430] - 2025-09-24
+
+### 🚀 Features
+
+- *(add-watch-paths-for-services)* Show watch paths field for docker compose applications
 
 ### 🐛 Bug Fixes
 
 - *(PreviewCompose)* Adds port to preview urls
 - *(deployment-job)* Enhance build time variable analysis
+- *(docker)* Adjust openssh-client installation in Dockerfile to avoid version bug
+- *(docker)* Streamline openssh-client installation in Dockerfile
+- *(team)* Normalize email case in invite link generation
+- *(README)* Update Juxtdigital description to reflect current services
+- *(environment-variable-warning)* Enhance warning logic to check for problematic variable values
+- *(install)* Ensure proper quoting of environment file paths to prevent issues with spaces
+- *(security)* Implement authorization checks for terminal access management
+- *(ui)* Improve mobile sidebar close behavior
+
+### 🚜 Refactor
+
+- *(installer)* Improve install script
+- *(upgrade)* Improve upgrade script
+- *(installer, upgrade)* Enhance environment variable management
+- *(upgrade)* Enhance logging and quoting in upgrade scripts
+- *(upgrade)* Replace warning div with a callout component for better UI consistency
+- *(ui)* Replace warning and error divs with callout components for improved consistency and readability
+- *(ui)* Improve styling and consistency in environment variable warning and docker cleanup components
+- *(security)* Streamline update check functionality and improve UI button interactions in patches view
 
 ### 📚 Documentation
 
 - Update changelog
 - Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Increment coolify version numbers to 4.0.0-beta.431 and 4.0.0-beta.432 in configuration files
+- *(versions)* Update coolify version numbers to 4.0.0-beta.432 and 4.0.0-beta.433 in configuration files
+- Remove unused files
+- Adjust wording
+- *(workflow)* Update pull request trigger to pull_request_target and refine permissions for enhanced security
 
 ## [4.0.0-beta.429] - 2025-09-23
 
@@ -39,6 +107,7 @@ All notable changes to this project will be documented in this file.
 - *(search)* Enable query logging for global search caching
 - *(environment)* Add dynamic checkbox options for environment variable settings based on user permissions and variable types
 - *(redaction)* Implement sensitive information redaction in logs and commands
+- Improve detection of special network modes
 - *(api)* Add endpoint to update backup configuration by UUID and backup ID; modify response to include backup id
 - *(databases)* Enhance backup management API with new endpoints and improved data handling
 - *(github)* Add GitHub app management endpoints
@@ -119,7 +188,6 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- Improve detection of special network modes
 - *(command)* Add option to sync GitHub releases to BunnyCDN and refactor sync logic
 - *(ui)* Display current version in settings dropdown and update UI accordingly
 - *(settings)* Add option to restrict PR deployments to repository members and contributors
