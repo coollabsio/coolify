@@ -13,7 +13,7 @@
             <x-forms.button canGate="update" :canResource="$resource" wire:click="toggleHealthcheck">Disable Healthcheck</x-forms.button>
         @endif
     </div>
-    <div class="pb-4">Define how your resource's health should be checked.</div>
+    <div class="mt-1 pb-6">Define how your resource's health should be checked.</div>
     <div class="flex flex-col gap-4">
         @if ($resource->custom_healthcheck_found)
             <div class="dark:text-warning">A custom health check has been found and will be used until you enable this.
