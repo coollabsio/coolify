@@ -13,7 +13,10 @@
             <x-forms.checkbox canGate="update" :canResource="$resource" instantSave id="resource.health_check_enabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$resource" id="resource.health_check_method" placeholder="GET" label="Method" required />
+            <x-forms.select canGate="update" :canResource="$resource" id="resource.health_check_method" label="Method" required>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+            </x-forms.select>
             <x-forms.input canGate="update" :canResource="$resource" id="resource.health_check_scheme" placeholder="http" label="Scheme" required />
             <x-forms.input canGate="update" :canResource="$resource" id="resource.health_check_host" placeholder="localhost" label="Host" required />
             <x-forms.input canGate="update" :canResource="$resource" type="number" id="resource.health_check_port"
