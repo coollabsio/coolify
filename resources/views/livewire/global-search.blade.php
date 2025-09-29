@@ -31,8 +31,8 @@
         }
     },
     init() {
-        // Listen for custom event from navbar search button
-        this.$el.addEventListener('open-global-search', () => {
+        // Listen for custom event from navbar search button at window level
+        window.addEventListener('open-global-search', () => {
             this.openModal();
         });
 
