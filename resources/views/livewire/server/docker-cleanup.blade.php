@@ -52,8 +52,7 @@
                                 <li>Optionally delete unused volumes (if enabled in advanced options).</li>
                                 <li>Optionally remove unused networks (if enabled in advanced options).</li>
                             </ul>"
-                            instantSave id="forceDockerCleanup" label="Force Docker Cleanup" 
-                        />
+                            instantSave id="forceDockerCleanup" label="Force Docker Cleanup" />
                     </div>
 
                 </div>
@@ -61,7 +60,8 @@
                 <div class="flex flex-col gap-2 mt-6">
                     <h3>Advanced</h3>
                     <x-callout type="warning" title="Caution">
-                        <p>These options can cause permanent data loss and functional issues. Only enable if you fully understand the consequences</p>
+                        <p>These options can cause permanent data loss and functional issues. Only enable if you fully
+                            understand the consequences.</p>
                     </x-callout>
                     <div class="w-full sm:w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave id="deleteUnusedVolumes"
@@ -70,16 +70,14 @@
                             <ul class='list-disc pl-4 mt-2'>
                                 <li>Volumes not attached to running containers will be permanently deleted (volumes from stopped containers are affected).</li>
                                 <li>Data stored in deleted volumes cannot be recovered.</li>
-                            </ul>" 
-                        />
+                            </ul>" />
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave id="deleteUnusedNetworks"
                             label="Delete Unused Networks"
                             helper="This option will remove all unused Docker networks during cleanup.<br><br><strong>Warning: Functionality may be lost and containers may not be able to communicate with each other!</strong><br><br>Consequences include:<br>
                             <ul class='list-disc pl-4 mt-2'>
                                 <li>Networks not attached to running containers will be permanently deleted (networks used by stopped containers are affected).</li>
                                 <li>Containers may lose connectivity if required networks are removed.</li>
-                            </ul>"
-                        />
+                            </ul>" />
                     </div>
                 </div>
             </form>
