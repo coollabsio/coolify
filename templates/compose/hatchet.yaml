@@ -99,18 +99,6 @@ services:
       - hatchet_certs:/hatchet/certs
       - hatchet_config:/hatchet/config
 
-  hatchet-worker-example:
-    env_file:
-      - .env
-    build: .
-    environment:
-      HATCHET_CLIENT_TOKEN: ${HATCHET_CLIENT_TOKEN}
-      HATCHET_CLIENT_TLS_STRATEGY: ${HATCHET_CLIENT_TLS_STRATEGY-none}
-      HATCHET_CLIENT_HOST_PORT: ${HATCHET_CLIENT_HOST_PORT:-hatchet-engine:7070}
-    depends_on:
-      hatchet-engine:
-        condition: service_started
-
 volumes:
   hatchet_postgres_data:
   hatchet_rabbitmq_data:
