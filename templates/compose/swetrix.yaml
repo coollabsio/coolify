@@ -54,7 +54,7 @@ services:
       # Required service endpoints
       - REDIS_HOST=redis
       - CLICKHOUSE_HOST=http://clickhouse
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
     depends_on:
       redis:
         condition: service_healthy
@@ -92,7 +92,7 @@ services:
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-analytics}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
       - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-8123}
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
     healthcheck:
       test:
         - CMD-SHELL
