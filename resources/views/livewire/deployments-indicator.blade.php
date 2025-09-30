@@ -53,7 +53,7 @@
                                         </path>
                                     </svg>
                                 @else
-                                    <svg class="w-4 h-4 dark:text-coolgray-300 text-gray-500"
+                                    <svg class="w-4 h-4 dark:text-neutral-400 text-gray-500"
                                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -78,7 +78,7 @@
                                 <p class="text-xs mt-1 capitalize"
                                     :class="{
                                         'text-coollabs dark:text-warning': '{{ $deployment->status }}' === 'in_progress',
-                                        'dark:text-coolgray-300 text-gray-500': '{{ $deployment->status }}' === 'queued'
+                                        'dark:text-neutral-400 text-gray-500': '{{ $deployment->status }}' === 'queued'
                                     }">
                                     {{ str_replace('_', ' ', $deployment->status) }}
                                 </p>
