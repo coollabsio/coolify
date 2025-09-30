@@ -1688,7 +1688,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
-            $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
+            $output = $this->saved_outputs->get('git_commit_sha');
+
+            if ($output->isEmpty() || ! str($output)->contains("\t")) {
+                $errorMessage = "Failed to find branch '{$local_branch}' in repository.\n\n";
+                $errorMessage .= "Please verify:\n";
+                $errorMessage .= "- The branch name is correct\n";
+                $errorMessage .= "- The branch exists in the repository\n";
+                $errorMessage .= "- You have access to the repository\n";
+
+                if ($this->pull_request_id !== 0) {
+                    $errorMessage .= "- The pull request #{$this->pull_request_id} exists and is accessible\n";
+                }
+
+                throw new \RuntimeException($errorMessage);
+            }
+
+            $this->commit = $output->before("\t");
             $this->application_deployment_queue->commit = $this->commit;
             $this->application_deployment_queue->save();
         }
