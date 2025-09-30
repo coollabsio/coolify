@@ -18,6 +18,8 @@ services:
       test:
         - CMD-SHELL
         - wget --no-verbose --tries=1 --spider http://localhost:3000/ping || exit 1
+      timeout: 5s
+      retries: 10
       interval: 30s
       start_period: 15s
 
@@ -62,6 +64,8 @@ services:
       test:
         - CMD-SHELL
         - wget --no-verbose --tries=1 --spider http://localhost:5005/ping || exit 1
+      timeout: 5s
+      retries: 10
       interval: 30s
       start_period: 15s
 
@@ -76,6 +80,8 @@ services:
       test:
         - CMD-SHELL
         - redis-cli ping | grep PONG
+      timeout: 5s
+      retries: 10
       interval: 30s
       start_period: 1m
 
@@ -91,6 +97,8 @@ services:
       test:
         - CMD-SHELL
         - wget --no-verbose --tries=1 -O - http://127.0.0.1:8123/ping || exit 1
+      timeout: 5s
+      retries: 10
       interval: 30s
       start_period: 1m
     cap_add:
