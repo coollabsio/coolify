@@ -80,41 +80,42 @@
     <!-- Modal overlay -->
     <template x-teleport="body">
         <div x-show="modalOpen" x-cloak
-            class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen">
-            <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
+            class="fixed top-0 left-0 z-99 flex items-start justify-center w-screen h-screen pt-[20vh]">
+            <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm">
             </div>
-            <div x-show="modalOpen" x-trap.inert="modalOpen" 
-                 x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })" 
-                 x-transition:enter="ease-out duration-100"
-                x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave="ease-in duration-100"
-                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300"
+            <div x-show="modalOpen" x-trap.inert="modalOpen" x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
+                x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-4 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="ease-in duration-150"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 -translate-y-4 scale-95" class="relative w-full max-w-2xl mx-4"
                 @click.stop>
 
-                <div class="flex justify-between items-center pb-3">
-                    <h3 class="pr-8 text-2xl font-bold">Search</h3>
-                    <button @click="closeModal()"
-                        class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
-                        <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <!-- Search input (always visible) -->
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                        <svg class="w-5 h-5 text-neutral-400" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
+                    </div>
+                    <input type="text" wire:model.live.debounce.500ms="searchQuery"
+                        placeholder="Search for resources, servers, projects, and environments" x-ref="searchInput"
+                        x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
+                        class="w-full pl-12 pr-12 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-coollabs dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500" />
+                    <button @click="closeModal()"
+                        class="absolute inset-y-0 right-2 flex items-center justify-center px-2 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded">
+                        ESC
                     </button>
                 </div>
 
-                <div class="relative w-auto">
-                    <input type="text" wire:model.live.debounce.500ms="searchQuery"
-                        placeholder="Type to search for applications, services, databases, and servers..."
-                        x-ref="searchInput" x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })" class="w-full input mb-4" />
-
-                    <!-- Search results -->
-                    <div class="relative min-h-[330px] max-h-[400px] overflow-y-auto scrollbar">
+                <!-- Search results (with background) -->
+                @if (strlen($searchQuery) >= 1)
+                    <div
+                        class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden">
                         <!-- Loading indicator -->
                         <div wire:loading.flex wire:target="searchQuery"
-                            class="min-h-[330px] items-center justify-center">
+                            class="min-h-[200px] items-center justify-center p-8">
                             <div class="text-center">
                                 <svg class="animate-spin mx-auto h-8 w-8 text-neutral-400"
                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -131,59 +132,52 @@
                         </div>
 
                         <!-- Results content - hidden while loading -->
-                        <div wire:loading.remove wire:target="searchQuery">
+                        <div wire:loading.remove wire:target="searchQuery"
+                            class="max-h-[60vh] overflow-y-auto scrollbar">
                             @if (strlen($searchQuery) >= 2 && count($searchResults) > 0)
-                                <div class="space-y-1 my-4 pb-4">
+                                <div class="py-2">
                                     @foreach ($searchResults as $index => $result)
                                         <a href="{{ $result['link'] ?? '#' }}"
-                                            class="search-result-item block p-3 mx-1 hover:bg-neutral-200 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:ring-1 focus:ring-coollabs focus:bg-neutral-100 dark:focus:bg-coolgray-200 ">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex-1">
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="font-medium text-neutral-900 dark:text-white">
+                                            class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 border-l-2 border-transparent hover:border-coollabs focus:border-coollabs">
+                                            <div class="flex items-center justify-between gap-3">
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center gap-2 mb-1">
+                                                        <span
+                                                            class="font-medium text-neutral-900 dark:text-white truncate">
                                                             {{ $result['name'] }}
                                                         </span>
-                                                        @if ($result['type'] === 'server')
-                                                            <span
-                                                                class="px-2 py-0.5 text-xs rounded bg-coolgray-100 text-white">
-                                                                Server
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="flex items-center gap-2">
-                                                        @if (!empty($result['project']) && !empty($result['environment']))
-                                                            <span
-                                                                class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                {{ $result['project'] }} / {{ $result['environment'] }}
-                                                            </span>
-                                                        @endif
-                                                        @if ($result['type'] === 'application')
-                                                            <span
-                                                                class="px-2 py-0.5 text-xs rounded bg-coolgray-100 text-white">
+                                                        <span
+                                                            class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
+                                                            @if ($result['type'] === 'application')
                                                                 Application
-                                                            </span>
-                                                        @elseif ($result['type'] === 'service')
-                                                            <span
-                                                                class="px-2 py-0.5 text-xs rounded bg-coolgray-100 text-white">
+                                                            @elseif ($result['type'] === 'service')
                                                                 Service
-                                                            </span>
-                                                        @elseif ($result['type'] === 'database')
-                                                            <span
-                                                                class="px-2 py-0.5 text-xs rounded bg-coolgray-100 text-white">
+                                                            @elseif ($result['type'] === 'database')
                                                                 {{ ucfirst($result['subtype'] ?? 'Database') }}
-                                                            </span>
-                                                        @endif
+                                                            @elseif ($result['type'] === 'server')
+                                                                Server
+                                                            @elseif ($result['type'] === 'project')
+                                                                Project
+                                                            @elseif ($result['type'] === 'environment')
+                                                                Environment
+                                                            @endif
+                                                        </span>
                                                     </div>
-                                                    @if (!empty($result['description']))
+                                                    @if (!empty($result['project']) && !empty($result['environment']))
                                                         <div
-                                                            class="text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
-                                                            {{ Str::limit($result['description'], 100) }}
+                                                            class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                                                            {{ $result['project'] }} / {{ $result['environment'] }}
+                                                        </div>
+                                                    @endif
+                                                    @if (!empty($result['description']))
+                                                        <div class="text-sm text-neutral-600 dark:text-neutral-400">
+                                                            {{ Str::limit($result['description'], 80) }}
                                                         </div>
                                                     @endif
                                                 </div>
                                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                                    class="shrink-0 ml-2 h-4 w-4 text-neutral-400" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
                                                         stroke-width="2" d="M9 5l7 7-7 7" />
                                                 </svg>
@@ -192,41 +186,29 @@
                                     @endforeach
                                 </div>
                             @elseif (strlen($searchQuery) >= 2 && count($searchResults) === 0)
-                                <div class="flex items-center justify-center min-h-[330px]">
+                                <div class="flex items-center justify-center py-12 px-4">
                                     <div class="text-center">
-                                        <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                                            No results found for "<strong>{{ $searchQuery }}</strong>"
+                                        <p class="mt-4 text-sm font-medium text-neutral-900 dark:text-white">
+                                            No results found
                                         </p>
-                                        <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-2">
+                                        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                                             Try different keywords or check the spelling
                                         </p>
                                     </div>
                                 </div>
                             @elseif (strlen($searchQuery) > 0 && strlen($searchQuery) < 2)
-                                <div class="flex items-center justify-center min-h-[330px]">
+                                <div class="flex items-center justify-center py-12 px-4">
                                     <div class="text-center">
                                         <p class="text-sm text-neutral-600 dark:text-neutral-400">
                                             Type at least 2 characters to search
                                         </p>
                                     </div>
                                 </div>
-                            @else
-                                <div class="flex items-center justify-center min-h-[330px]">
-                                    <div class="text-center">
-                                        <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                                            Start typing to search
-                                        </p>
-                                        <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-2">
-                                            Search for applications, services, databases, and servers
-                                        </p>
-                                    </div>
-                                </div>
                             @endif
                         </div>
                     </div>
-                </div>
+                @endif
             </div>
         </div>
-</div>
-</template>
+    </template>
 </div>
