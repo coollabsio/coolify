@@ -176,13 +176,16 @@ class PublicGitRepository extends Component
                     str($this->repository_url)->startsWith('http://')) &&
                 ! str($this->repository_url)->endsWith('.git') &&
                 (! str($this->repository_url)->contains('github.com') ||
-                    ! str($this->repository_url)->contains('git.sr.ht'))
+                    ! str($this->repository_url)->contains('git.sr.ht')) &&
+                    ! str($this->repository_url)->contains('tangled')
             ) {
+
                 $this->repository_url = $this->repository_url.'.git';
             }
             if (str($this->repository_url)->contains('github.com') && str($this->repository_url)->endsWith('.git')) {
                 $this->repository_url = str($this->repository_url)->beforeLast('.git')->value();
             }
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -190,6 +193,9 @@ class PublicGitRepository extends Component
             $this->branchFound = false;
             $this->getGitSource();
             $this->getBranch();
+            if (str($this->repository_url)->contains('tangled')) {
+                $this->git_branch = 'master';
+            }
             $this->selectedBranch = $this->git_branch;
         } catch (\Throwable $e) {
             if ($this->rate_limit_remaining == 0) {
