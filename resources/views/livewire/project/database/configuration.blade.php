@@ -56,6 +56,8 @@
                     <livewire:project.database.dragonfly.general :database="$database" />
                 @elseif ($database->type() === 'standalone-clickhouse')
                     <livewire:project.database.clickhouse.general :database="$database" />
+                @elseif ($database->type() === 'standalone-libsql')
+                    <livewire:project.database.libsql.general :database="$database" />
                 @endif
             @elseif ($currentRoute === 'project.database.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$database" />

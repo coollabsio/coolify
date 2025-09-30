@@ -12,4 +12,5 @@ enum NewDatabaseTypes: string
     case KEYDB = 'keydb';
     case DRAGONFLY = 'dragonfly';
     case CLICKHOUSE = 'clickhouse';
+    case LIBSQL = 'libsql';
 }

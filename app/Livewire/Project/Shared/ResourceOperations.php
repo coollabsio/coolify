@@ -77,7 +77,8 @@ class ResourceOperations extends Component
             $this->resource->getMorphClass() === \App\Models\StandaloneRedis::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneKeydb::class ||
             $this->resource->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class
+            $this->resource->getMorphClass() === \App\Models\StandaloneClickhouse::class ||
+            $this->resource->getMorphClass() === \App\Models\StandaloneLibsql::class
         ) {
             $uuid = (string) new Cuid2;
             $new_resource = $this->resource->replicate([
@@ -120,6 +121,8 @@ class ResourceOperations extends Component
                     $newName = 'keydb-data-'.$new_resource->uuid;
                 } elseif (str_starts_with($originalName, 'dragonfly-data-')) {
                     $newName = 'dragonfly-data-'.$new_resource->uuid;
+                } elseif (str_starts_with($originalName, 'libsql-data-')) {
+                    $newName = 'libsql-data-'.$new_resource->uuid;
                 } else {
                     if (str_starts_with($volume->name, $this->resource->uuid)) {
                         $newName = str($volume->name)->replace($this->resource->uuid, $new_resource->uuid);

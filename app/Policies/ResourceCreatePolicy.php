@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
+use App\Models\StandaloneLibsql;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -28,6 +29,7 @@ class ResourceCreatePolicy
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneLibsql::class,
         Service::class,
         Application::class,
         GithubApp::class,

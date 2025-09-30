@@ -68,6 +68,11 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function libsqls()
+    {
+        return $this->morphMany(StandaloneLibsql::class, 'destination');
+    }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
@@ -85,8 +90,12 @@ class StandaloneDocker extends BaseModel
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
+        $keydbs = $this->keydbs;
+        $dragonflies = $this->dragonflies;
+        $clickhouses = $this->clickhouses;
+        $libsqls = $this->libsqls;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($libsqls);
     }
 
     public function attachedTo()

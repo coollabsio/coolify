@@ -31,13 +31,15 @@ class Index extends Component
 
     public Collection $clickhouses;
 
+    public Collection $libsqls;
+
     public Collection $services;
 
     public array $parameters;
 
     public function mount()
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->libsqls = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -58,6 +60,7 @@ class Index extends Component
             'keydbs',
             'dragonflies',
             'clickhouses',
+            'libsqls',
             'mariadbs',
             'mongodbs',
             'services',
@@ -91,6 +94,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'libsqls' => 'libsqls',
         ];
 
         foreach ($databaseTypes as $property => $relation) {

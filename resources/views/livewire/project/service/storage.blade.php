@@ -8,7 +8,8 @@
             $resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
             $resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
-            $resource->getMorphClass() == 'App\Models\StandaloneMysql')
+            $resource->getMorphClass() == 'App\Models\StandaloneMysql') ||
+            $resource->getMorphClass() == 'App\Models\StandaloneLibsql')
         <div class="flex items-center gap-2">
             <h2>Storages</h2>
             <x-helper

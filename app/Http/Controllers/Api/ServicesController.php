@@ -871,6 +871,7 @@ class ServicesController extends Controller
                 'standalone_clickhouse_id',
                 'standalone_dragonfly_id',
                 'standalone_keydb_id',
+                'standalone_libsql_id',
                 'standalone_mariadb_id',
                 'standalone_mongodb_id',
                 'standalone_mysql_id',
