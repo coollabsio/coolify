@@ -55,6 +55,7 @@ services:
       - REDIS_HOST=redis
       - CLICKHOUSE_HOST=http://clickhouse
       - CLICKHOUSE_PASSWORD=$SERVICE_PASSWORD_CLICKHOUSE
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
     depends_on:
       redis:
         condition: service_healthy
@@ -75,7 +76,7 @@ services:
     environment:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_USER=${REDIS_USER:-default}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
     healthcheck:
       test:
         - CMD-SHELL
