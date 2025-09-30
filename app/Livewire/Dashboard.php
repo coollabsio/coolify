@@ -23,11 +23,6 @@ class Dashboard extends Component
         $this->projects = Project::ownedByCurrentTeam()->get();
     }
 
-    public function navigateToProject($projectUuid)
-    {
-        return $this->redirect(collect($this->projects)->firstWhere('uuid', $projectUuid)->navigateTo(), navigate: false);
-    }
-
     public function render()
     {
         return view('livewire.dashboard');

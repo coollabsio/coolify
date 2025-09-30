@@ -19,8 +19,8 @@
         @if ($projects->count() > 0)
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 @foreach ($projects as $project)
-                    <div class="gap-2 border cursor-pointer box group"
-                        wire:click="navigateToProject('{{ $project->uuid }}')">
+                    <div class="relative gap-2 border border-transparent cursor-pointer box group">
+                        <a href="{{ $project->navigateTo() }}" class="absolute inset-0"></a>
                         <div class="flex flex-1 mx-6">
                             <div class="flex flex-col justify-center flex-1">
                                 <div class="box-title">{{ $project->name }}</div>
@@ -28,20 +28,20 @@
                                     {{ $project->description }}
                                 </div>
                             </div>
-                            <div class="flex items-center justify-center gap-2 text-xs font-bold">
+                            <div class="relative z-10 flex items-center justify-center gap-4 text-xs font-bold">
                                 @if ($project->environments->first())
                                     @can('createAnyResource')
-                                        <a class="hover:underline" wire:click.stop
+                                        <a class="hover:underline"
                                             href="{{ route('project.resource.create', [
                                                 'project_uuid' => $project->uuid,
                                                 'environment_uuid' => $project->environments->first()->uuid,
                                             ]) }}">
-                                            <span class="p-2 font-bold">+ Add Resource</span>
+                                            + Add Resource
                                         </a>
                                     @endcan
                                 @endif
                                 @can('update', $project)
-                                    <a class="hover:underline" wire:click.stop
+                                    <a class="hover:underline"
                                         href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}">
                                         Settings
                                     </a>
