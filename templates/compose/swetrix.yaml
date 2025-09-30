@@ -8,7 +8,6 @@
 services:
   swetrix:
     image: swetrix/swetrix-fe:v4.0.2
-    restart: always
     depends_on:
       - swetrix-api
     environment:
@@ -25,7 +24,6 @@ services:
 
   swetrix-api:
     image: swetrix/swetrix-api:v4.0.2
-    restart: always
     environment:
       # Required
       - SECRET_KEY_BASE=${SECRET_KEY_BASE:?}
@@ -72,7 +70,6 @@ services:
 
   redis:
     image: redis:8.2-alpine
-    restart: always
     environment:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_USER=${REDIS_USER:-default}
@@ -88,7 +85,6 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.10-alpine
-    restart: always
     environment:
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-analytics}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
