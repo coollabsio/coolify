@@ -26,7 +26,7 @@ services:
     image: swetrix/swetrix-api:v4.0.2
     environment:
       # Required
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE:?}
+      - SECRET_KEY_BASE=$SERVICE_BASE64_64_SECRETKEYBASE
 
       # Optional
       - DISABLE_REGISTRATION=${DISABLE_REGISTRATION:-false}
