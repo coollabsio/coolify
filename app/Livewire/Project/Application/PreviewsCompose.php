@@ -73,7 +73,7 @@ class PreviewsCompose extends Component
                 $host = $url->getHost();
                 $schema = $url->getScheme();
                 $portInt = $url->getPort();
-                $port = $portInt !== null ? ':' . $portInt : '';
+                $port = $portInt !== null ? ':'.$portInt : '';
                 $random = new Cuid2;
                 $preview_fqdn = str_replace('{{random}}', $random, $template);
                 $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);

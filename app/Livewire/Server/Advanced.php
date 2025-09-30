@@ -2,10 +2,7 @@
 
 namespace App\Livewire\Server;
 
-use App\Models\InstanceSettings;
 use App\Models\Server;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -38,8 +35,6 @@ class Advanced extends Component
             return redirect()->route('server.index');
         }
     }
-
-
 
     public function syncData(bool $toModel = false)
     {
