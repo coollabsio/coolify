@@ -155,6 +155,15 @@ class Application extends BaseModel
             if ($application->isDirty('publish_directory')) {
                 $payload['publish_directory'] = str($application->publish_directory)->trim();
             }
+            if ($application->isDirty('git_repository')) {
+                $payload['git_repository'] = str($application->git_repository)->trim();
+            }
+            if ($application->isDirty('git_branch')) {
+                $payload['git_branch'] = str($application->git_branch)->trim();
+            }
+            if ($application->isDirty('git_commit_sha')) {
+                $payload['git_commit_sha'] = str($application->git_commit_sha)->trim();
+            }
             if ($application->isDirty('status')) {
                 $payload['last_online_at'] = now();
             }
