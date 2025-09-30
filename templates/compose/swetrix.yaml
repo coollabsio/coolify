@@ -11,8 +11,8 @@ services:
     depends_on:
       - swetrix-api
     environment:
-      # Required - public URL of the API service (e.g. https://swetrix-api.example.com)
-      - API_URL=${API_URL:?}
+      - SERVICE_URL_SWETRIX_3000
+      - API_URL=$SERVICE_URL_SWETRIXAPI_5005
     healthcheck:
       test:
         - CMD-SHELL
@@ -27,6 +27,7 @@ services:
     environment:
       # Required
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_SECRETKEYBASE
+      - SERVICE_URL_SWETRIXAPI_5005
 
       # Optional
       - DISABLE_REGISTRATION=${DISABLE_REGISTRATION:-false}
