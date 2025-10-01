@@ -88,8 +88,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $is_this_additional_server = false;
 
-    private bool $is_laravel_or_symfony = false;
-
     private ?ApplicationPreview $preview = null;
 
     private ?string $git_type = null;
@@ -778,7 +776,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $this->clone_repository();
-        $this->detect_laravel_symfony();
         $this->cleanup_git();
         $this->generate_nixpacks_confs();
         $this->generate_compose_file();
@@ -1299,24 +1296,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function symfony_finetunes(&$parsed)
+    private function laravel_finetunes()
     {
-        $installCmds = data_get($parsed, 'phases.install.cmds', []);
-        $variables = data_get($parsed, 'variables', []);
+        if ($this->pull_request_id === 0) {
+            $envType = 'environment_variables';
+        } else {
+            $envType = 'environment_variables_preview';
+        }
+        $nixpacks_php_fallback_path = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
+        $nixpacks_php_root_dir = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
 
-        $envCommands = [];
-        foreach (array_keys($variables) as $key) {
-            $envCommands[] = "printf '%s=%s\\n' ".escapeshellarg($key)." \"\${$key}\" >> /app/.env";
+        if (! $nixpacks_php_fallback_path) {
+            $nixpacks_php_fallback_path = new EnvironmentVariable;
+            $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
+            $nixpacks_php_fallback_path->value = '/index.php';
+            $nixpacks_php_fallback_path->resourceable_id = $this->application->id;
+            $nixpacks_php_fallback_path->resourceable_type = 'App\Models\Application';
+            $nixpacks_php_fallback_path->save();
+        }
+        if (! $nixpacks_php_root_dir) {
+            $nixpacks_php_root_dir = new EnvironmentVariable;
+            $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
+            $nixpacks_php_root_dir->value = '/app/public';
+            $nixpacks_php_root_dir->resourceable_id = $this->application->id;
+            $nixpacks_php_root_dir->resourceable_type = 'App\Models\Application';
+            $nixpacks_php_root_dir->save();
         }
 
-        if (! empty($envCommands)) {
-            $createEnvCmd = 'touch /app/.env';
-
-            array_unshift($installCmds, $createEnvCmd);
-            array_splice($installCmds, 1, 0, $envCommands);
-
-            data_set($parsed, 'phases.install.cmds', $installCmds);
-        }
+        return [$nixpacks_php_fallback_path, $nixpacks_php_root_dir];
     }
 
     private function rolling_update()
@@ -1471,7 +1478,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
-        $this->detect_laravel_symfony();
         $this->cleanup_git();
         if ($this->application->build_pack === 'nixpacks') {
             $this->generate_nixpacks_confs();
@@ -1688,23 +1694,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
-            $output = $this->saved_outputs->get('git_commit_sha');
-
-            if ($output->isEmpty() || ! str($output)->contains("\t")) {
-                $errorMessage = "Failed to find branch '{$local_branch}' in repository.\n\n";
-                $errorMessage .= "Please verify:\n";
-                $errorMessage .= "- The branch name is correct\n";
-                $errorMessage .= "- The branch exists in the repository\n";
-                $errorMessage .= "- You have access to the repository\n";
-
-                if ($this->pull_request_id !== 0) {
-                    $errorMessage .= "- The pull request #{$this->pull_request_id} exists and is accessible\n";
-                }
-
-                throw new \RuntimeException($errorMessage);
-            }
-
-            $this->commit = $output->before("\t");
+            $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
             $this->application_deployment_queue->commit = $this->commit;
             $this->application_deployment_queue->save();
         }
@@ -1754,78 +1744,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return $commands;
     }
 
-    private function detect_laravel_symfony()
-    {
-        if ($this->application->build_pack !== 'nixpacks') {
-            return;
-        }
-
-        $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "test -f {$this->workdir}/composer.json && echo 'exists' || echo 'not-exists'"),
-            'save' => 'composer_json_exists',
-            'hidden' => true,
-        ]);
-
-        if ($this->saved_outputs->get('composer_json_exists') == 'exists') {
-            $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, 'grep -E -q "laravel/framework|symfony/dotenv|symfony/framework-bundle|symfony/flex" '.$this->workdir.'/composer.json 2>/dev/null && echo "true" || echo "false"'),
-                'save' => 'is_laravel_or_symfony',
-                'hidden' => true,
-            ]);
-
-            $this->is_laravel_or_symfony = $this->saved_outputs->get('is_laravel_or_symfony') == 'true';
-
-            if ($this->is_laravel_or_symfony) {
-                $this->application_deployment_queue->addLogEntry('Laravel/Symfony framework detected. Setting NIXPACKS PHP variables.');
-                $this->ensure_nixpacks_php_variables();
-            }
-        }
-    }
-
-    private function ensure_nixpacks_php_variables()
-    {
-        if ($this->pull_request_id === 0) {
-            $envType = 'environment_variables';
-        } else {
-            $envType = 'environment_variables_preview';
-        }
-
-        $nixpacks_php_fallback_path = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
-        $nixpacks_php_root_dir = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
-
-        $created_new = false;
-        if (! $nixpacks_php_fallback_path) {
-            $nixpacks_php_fallback_path = new EnvironmentVariable;
-            $nixpacks_php_fallback_path->key = 'NIXPACKS_PHP_FALLBACK_PATH';
-            $nixpacks_php_fallback_path->value = '/index.php';
-            $nixpacks_php_fallback_path->is_buildtime = true;
-            $nixpacks_php_fallback_path->is_preview = $this->pull_request_id !== 0;
-            $nixpacks_php_fallback_path->resourceable_id = $this->application->id;
-            $nixpacks_php_fallback_path->resourceable_type = 'App\Models\Application';
-            $nixpacks_php_fallback_path->save();
-            $this->application_deployment_queue->addLogEntry('Created NIXPACKS_PHP_FALLBACK_PATH environment variable.');
-            $created_new = true;
-        }
-        if (! $nixpacks_php_root_dir) {
-            $nixpacks_php_root_dir = new EnvironmentVariable;
-            $nixpacks_php_root_dir->key = 'NIXPACKS_PHP_ROOT_DIR';
-            $nixpacks_php_root_dir->value = '/app/public';
-            $nixpacks_php_root_dir->is_buildtime = true;
-            $nixpacks_php_root_dir->is_preview = $this->pull_request_id !== 0;
-            $nixpacks_php_root_dir->resourceable_id = $this->application->id;
-            $nixpacks_php_root_dir->resourceable_type = 'App\Models\Application';
-            $nixpacks_php_root_dir->save();
-            $this->application_deployment_queue->addLogEntry('Created NIXPACKS_PHP_ROOT_DIR environment variable.');
-            $created_new = true;
-        }
-
-        if ($this->pull_request_id === 0) {
-            $this->application->load(['nixpacks_environment_variables', 'environment_variables']);
-        } else {
-            $this->application->load(['nixpacks_environment_variables_preview', 'environment_variables_preview']);
-        }
-    }
-
     private function cleanup_git()
     {
         $this->execute_remote_command(
@@ -1835,51 +1753,30 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function generate_nixpacks_confs()
     {
+        $nixpacks_command = $this->nixpacks_build_cmd();
+        $this->application_deployment_queue->addLogEntry("Generating nixpacks configuration with: $nixpacks_command");
+
         $this->execute_remote_command(
+            [executeInDocker($this->deployment_uuid, $nixpacks_command), 'save' => 'nixpacks_plan', 'hidden' => true],
             [executeInDocker($this->deployment_uuid, "nixpacks detect {$this->workdir}"), 'save' => 'nixpacks_type', 'hidden' => true],
         );
-
         if ($this->saved_outputs->get('nixpacks_type')) {
             $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
             if (str($this->nixpacks_type)->isEmpty()) {
                 throw new RuntimeException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
             }
         }
-        $nixpacks_command = $this->nixpacks_build_cmd();
-        $this->application_deployment_queue->addLogEntry("Generating nixpacks configuration with: $nixpacks_command");
-
-        $this->execute_remote_command(
-            [executeInDocker($this->deployment_uuid, $nixpacks_command), 'save' => 'nixpacks_plan', 'hidden' => true],
-        );
 
         if ($this->saved_outputs->get('nixpacks_plan')) {
             $this->nixpacks_plan = $this->saved_outputs->get('nixpacks_plan');
             if ($this->nixpacks_plan) {
                 $this->application_deployment_queue->addLogEntry("Found application type: {$this->nixpacks_type}.");
                 $this->application_deployment_queue->addLogEntry("If you need further customization, please check the documentation of Nixpacks: https://nixpacks.com/docs/providers/{$this->nixpacks_type}");
-                $parsed = json_decode($this->nixpacks_plan);
+                $parsed = json_decode($this->nixpacks_plan, true);
 
                 // Do any modifications here
                 // We need to generate envs here because nixpacks need to know to generate a proper Dockerfile
                 $this->generate_env_variables();
-
-                if ($this->is_laravel_or_symfony) {
-                    if ($this->pull_request_id === 0) {
-                        $envType = 'environment_variables';
-                    } else {
-                        $envType = 'environment_variables_preview';
-                    }
-                    $nixpacks_php_fallback_path = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
-                    $nixpacks_php_root_dir = $this->application->{$envType}->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
-
-                    if ($nixpacks_php_fallback_path) {
-                        data_set($parsed, 'variables.NIXPACKS_PHP_FALLBACK_PATH', $nixpacks_php_fallback_path->value);
-                    }
-                    if ($nixpacks_php_root_dir) {
-                        data_set($parsed, 'variables.NIXPACKS_PHP_ROOT_DIR', $nixpacks_php_root_dir->value);
-                    }
-                }
-
                 $merged_envs = collect(data_get($parsed, 'variables', []))->merge($this->env_args);
                 $aptPkgs = data_get($parsed, 'phases.setup.aptPkgs', []);
                 if (count($aptPkgs) === 0) {
@@ -1895,23 +1792,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     data_set($parsed, 'phases.setup.aptPkgs', $aptPkgs);
                 }
                 data_set($parsed, 'variables', $merged_envs->toArray());
-
-                if ($this->is_laravel_or_symfony) {
-                    $this->symfony_finetunes($parsed);
+                $is_laravel = data_get($parsed, 'variables.IS_LARAVEL', false);
+                if ($is_laravel) {
+                    $variables = $this->laravel_finetunes();
+                    data_set($parsed, 'variables.NIXPACKS_PHP_FALLBACK_PATH', $variables[0]->value);
+                    data_set($parsed, 'variables.NIXPACKS_PHP_ROOT_DIR', $variables[1]->value);
                 }
-
                 if ($this->nixpacks_type === 'elixir') {
                     $this->elixir_finetunes();
                 }
-
+                $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
+                $this->nixpacks_plan_json = collect($parsed);
+                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
                 if ($this->nixpacks_type === 'rust') {
                     // temporary: disable healthcheck for rust because the start phase does not have curl/wget
                     $this->application->health_check_enabled = false;
                     $this->application->save();
                 }
-                $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
-                $this->nixpacks_plan_json = collect($parsed);
-                $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
             }
         }
     }
