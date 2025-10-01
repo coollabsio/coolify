@@ -39,7 +39,32 @@ class Storage extends Component
     public function refreshStorages()
     {
         $this->fileStorage = $this->resource->fileStorages()->get();
-        $this->dispatch('$refresh');
+        $this->resource->refresh();
+    }
+
+    public function getFilesProperty()
+    {
+        return $this->fileStorage->where('is_directory', false);
+    }
+
+    public function getDirectoriesProperty()
+    {
+        return $this->fileStorage->where('is_directory', true);
+    }
+
+    public function getVolumeCountProperty()
+    {
+        return $this->resource->persistentStorages()->count();
+    }
+
+    public function getFileCountProperty()
+    {
+        return $this->files->count();
+    }
+
+    public function getDirectoryCountProperty()
+    {
+        return $this->directories->count();
     }
 
     public function addNewVolume($data)
