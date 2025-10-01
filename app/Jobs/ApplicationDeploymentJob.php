@@ -2899,6 +2899,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $dockerfile->splice(1, 0, ["ARG {$env->key}={$env->real_value}"]);
                     }
                 }
+                // Add Coolify variables as ARGs
+                if ($this->coolify_variables) {
+                    $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
+                        ->filter()
+                        ->map(function ($var) {
+                            return "ARG {$var}";
+                        });
+                    foreach ($coolify_vars as $arg) {
+                        $dockerfile->splice(1, 0, [$arg]);
+                    }
+                }
             } else {
                 // Only add preview environment variables that are available during build
                 $envs = $this->application->environment_variables_preview()
@@ -2910,6 +2921,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $dockerfile->splice(1, 0, ["ARG {$env->key}"]);
                     } else {
                         $dockerfile->splice(1, 0, ["ARG {$env->key}={$env->real_value}"]);
+                    }
+                }
+                // Add Coolify variables as ARGs
+                if ($this->coolify_variables) {
+                    $coolify_vars = collect(explode(' ', trim($this->coolify_variables)))
+                        ->filter()
+                        ->map(function ($var) {
+                            return "ARG {$var}";
+                        });
+                    foreach ($coolify_vars as $arg) {
+                        $dockerfile->splice(1, 0, [$arg]);
                     }
                 }
             }
