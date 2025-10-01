@@ -57,7 +57,7 @@
     @if (!$useInstanceEmailSettings)
         <div class="flex flex-col gap-4">
             <form wire:submit='submitSmtp'
-                class="p-4 border dark:border-coolgray-300 border-neutral-200 flex flex-col gap-2">
+                class="p-4 border dark:border-coolgray-300 border-neutral-200 rounded-lg flex flex-col gap-2">
                 <div class="flex items-center gap-2">
                     <h3>SMTP Server</h3>
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">
@@ -89,7 +89,7 @@
                 </div>
             </form>
             <form wire:submit='submitResend'
-                class="p-4 border dark:border-coolgray-300 border-neutral-200 flex flex-col gap-2">
+                class="p-4 border dark:border-coolgray-300 border-neutral-200 rounded-lg flex flex-col gap-2">
                 <div class="flex items-center gap-2">
                     <h3>Resend</h3>
                     <x-forms.button canGate="update" :canResource="$settings" type="submit">

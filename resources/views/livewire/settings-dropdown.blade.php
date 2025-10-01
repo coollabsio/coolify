@@ -123,7 +123,7 @@
             x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-2" class="absolute right-0 top-full mt-1 z-50 w-48" x-cloak>
             <div
-                class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-black border-neutral-300">
+                class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
                 <div class="flex flex-col gap-1">
                     <!-- What's New Section -->
                     @if ($unreadCount > 0)

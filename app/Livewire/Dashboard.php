@@ -10,7 +10,7 @@ use Livewire\Component;
 
 class Dashboard extends Component
 {
-    public $projects = [];
+    public Collection $projects;
 
     public Collection $servers;
 

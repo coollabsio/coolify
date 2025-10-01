@@ -102,7 +102,7 @@
                     <input type="text" wire:model.live.debounce.500ms="searchQuery"
                         placeholder="Search for resources, servers, projects, and environments" x-ref="searchInput"
                         x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
-                        class="w-full pl-12 pr-12 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-coollabs dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500" />
+                        class="w-full pl-12 pr-12 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500" />
                     <button @click="closeModal()"
                         class="absolute inset-y-0 right-2 flex items-center justify-center px-2 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded">
                         ESC
