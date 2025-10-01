@@ -31,21 +31,15 @@
         }
     },
     init() {
-        // Listen for custom event from navbar search button at window level
-        window.addEventListener('open-global-search', () => {
-            this.openModal();
-        });
-
-        // Listen for / key press globally
-        document.addEventListener('keydown', (e) => {
+        // Create named handlers for proper cleanup
+        const openGlobalSearchHandler = () => this.openModal();
+        const slashKeyHandler = (e) => {
             if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName) && !this.modalOpen) {
                 e.preventDefault();
                 this.openModal();
             }
-        });
-
-        // Listen for Cmd+K or Ctrl+K globally
-        document.addEventListener('keydown', (e) => {
+        };
+        const cmdKHandler = (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
                 e.preventDefault();
                 if (this.modalOpen) {
@@ -54,17 +48,13 @@
                     this.openModal();
                 }
             }
-        });
-
-        // Listen for Escape key to close modal
-        document.addEventListener('keydown', (e) => {
+        };
+        const escapeKeyHandler = (e) => {
             if (e.key === 'Escape' && this.modalOpen) {
                 this.closeModal();
             }
-        });
-
-        // Listen for arrow keys when modal is open
-        document.addEventListener('keydown', (e) => {
+        };
+        const arrowKeyHandler = (e) => {
             if (!this.modalOpen) return;
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -73,6 +63,22 @@
                 e.preventDefault();
                 this.navigateResults('up');
             }
+        };
+
+        // Add event listeners
+        window.addEventListener('open-global-search', openGlobalSearchHandler);
+        document.addEventListener('keydown', slashKeyHandler);
+        document.addEventListener('keydown', cmdKHandler);
+        document.addEventListener('keydown', escapeKeyHandler);
+        document.addEventListener('keydown', arrowKeyHandler);
+
+        // Cleanup on component destroy
+        this.$el.addEventListener('alpine:destroy', () => {
+            window.removeEventListener('open-global-search', openGlobalSearchHandler);
+            document.removeEventListener('keydown', slashKeyHandler);
+            document.removeEventListener('keydown', cmdKHandler);
+            document.removeEventListener('keydown', escapeKeyHandler);
+            document.removeEventListener('keydown', arrowKeyHandler);
         });
     }
 }">
@@ -138,7 +144,7 @@
                                 <div class="py-2">
                                     @foreach ($searchResults as $index => $result)
                                         <a href="{{ $result['link'] ?? '#' }}"
-                                            class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 border-l-2 border-transparent hover:border-coollabs focus:border-coollabs">
+                                            class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
                                             <div class="flex items-center justify-between gap-3">
                                                 <div class="flex-1 min-w-0">
                                                     <div class="flex items-center gap-2 mb-1">
