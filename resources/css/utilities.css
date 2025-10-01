@@ -63,7 +63,7 @@
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
+    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100;
 }
 
 @utility alert-success {
@@ -83,11 +83,11 @@
 }
 
 @utility dropdown-item {
-    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
+    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
 }
 
 @utility dropdown-item-no-padding {
-    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
+    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
 }
 
 @utility badge {

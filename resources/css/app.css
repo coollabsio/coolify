@@ -121,6 +121,11 @@ a {
     @apply hover:text-black dark:hover:text-white;
 }
 
+button:focus-visible,
+a:focus-visible {
+    @apply outline-none ring-2 ring-coollabs dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
+}
+
 label {
     @apply dark:text-neutral-400;
 }
