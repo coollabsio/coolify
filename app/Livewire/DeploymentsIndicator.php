@@ -18,6 +18,7 @@ class DeploymentsIndicator extends Component
 
         return ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])
             ->whereIn('server_id', $servers->pluck('id'))
+            ->orderBy('id')
             ->get([
                 'id',
                 'application_id',
@@ -27,8 +28,7 @@ class DeploymentsIndicator extends Component
                 'server_name',
                 'server_id',
                 'status',
-            ])
-            ->sortBy('id');
+            ]);
     }
 
     #[Computed]
