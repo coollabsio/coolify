@@ -1088,11 +1088,24 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             return $volume;
         });
 
-        $payload = collect($service)->merge([
-            'container_name' => $containerName,
+        // Build payload - conditionally add container_name based on replicas
+        $payloadData = [
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
-        ]);
+        ];
+
+        // Only add container_name if replicas <= 1 (Docker Compose doesn't allow container_name with replicas > 1)
+        $replicas = data_get($resource, 'replicas', 1);
+        if ($replicas <= 1) {
+            $payloadData['container_name'] = $containerName;
+        } else {
+            // When using replicas, add deploy configuration
+            $payloadData['deploy'] = [
+                'replicas' => $replicas,
+            ];
+        }
+
+        $payload = collect($service)->merge($payloadData);
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
@@ -1973,6 +1986,7 @@ function serviceParser(Service $resource): Collection
             return $volume;
         });
 
+        // Build payload - Services don't currently support replicas, always use container_name
         $payload = collect($service)->merge([
             'container_name' => $containerName,
             'restart' => $restart->value(),

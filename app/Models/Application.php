@@ -90,6 +90,7 @@ use Visus\Cuid2\Cuid2;
         'docker_compose_custom_build_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Docker compose custom build command.'],
         'swarm_replicas' => ['type' => 'integer', 'nullable' => true, 'description' => 'Swarm replicas. Only used for swarm deployments.'],
         'swarm_placement_constraints' => ['type' => 'string', 'nullable' => true, 'description' => 'Swarm placement constraints. Only used for swarm deployments.'],
+        'replicas' => ['type' => 'integer', 'description' => 'Number of replicas for horizontal scaling. Default is 1. When > 1, container_name is removed and labels are used for tracking.'],
         'custom_docker_run_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom docker run options.'],
         'post_deployment_command' => ['type' => 'string', 'nullable' => true, 'description' => 'Post deployment command.'],
         'post_deployment_command_container' => ['type' => 'string', 'nullable' => true, 'description' => 'Post deployment command container.'],

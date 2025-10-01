@@ -110,6 +110,7 @@ class General extends Component
             'application.http_basic_auth_password' => 'string|nullable',
             'application.watch_paths' => 'nullable',
             'application.redirect' => 'string|required',
+            'application.replicas' => 'integer|min:1|max:10',
         ];
     }
 

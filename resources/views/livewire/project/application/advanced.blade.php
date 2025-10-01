@@ -49,7 +49,18 @@
                     helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation.</a>"
                     canGate="update" :canResource="$application" />
             @endif
-            <h3 class="pt-4">Container Names</h3>
+            <h3 class="pt-4">Container Names & Scaling</h3>
+            @if ($application->build_pack === 'dockercompose' || $application->build_pack === 'dockerfile' || $application->build_pack === 'nixpacks')
+                <x-forms.input
+                    type="number"
+                    min="1"
+                    max="10"
+                    helper="Number of replicas for horizontal scaling (1-10). <span class='font-bold dark:text-warning'>When > 1, container_name is removed and labels are used for tracking. Only use for stateless applications!</span>"
+                    id="application.replicas"
+                    label="Replicas"
+                    canGate="update"
+                    :canResource="$application" />
+            @endif
             <x-forms.checkbox
                 helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
                 instantSave id="isConsistentContainerNameEnabled" label="Consistent Container Names" canGate="update"
