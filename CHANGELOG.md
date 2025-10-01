@@ -6,6 +6,54 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(user-deletion)* Implement file locking to prevent concurrent user deletions and enhance error handling
+- *(ui)* Enhance resource operations interface with dynamic selection for cloning and moving resources
+- *(global-search)* Integrate projects and environments into global search functionality
+- *(storage)* Consolidate storage management into a single component with enhanced UI
+- *(deployments)* Add support for Coolify variables in Dockerfile
+
+### 🐛 Bug Fixes
+
+- *(workflows)* Update CLAUDE API key reference in GitHub Actions workflow
+- *(ui)* Update docker registry image helper text for clarity
+- *(ui)* Correct HTML structure and improve clarity in Docker cleanup options
+- *(workflows)* Update CLAUDE API key reference in GitHub Actions workflow
+- *(api)* Correct OpenAPI schema annotations for array items
+- *(ui)* Improve queued deployment status readability in dark mode
+- *(git)* Handle additional repository URL cases for 'tangled' and improve branch assignment logic
+- *(git)* Enhance error handling for missing branch information during deployment
+- *(git)* Trim whitespace from repository, branch, and commit SHA fields
+- *(deployments)* Order deployments by ID for consistent retrieval
+
+### 💼 Other
+
+- *(storage)* Enhance file storage management with new properties and UI improvements
+- *(core)* Update projects property type and enhance UI styling
+- *(components)* Adjust SVG icon sizes for consistency across applications and services
+- *(components)* Auto-focus first input in modal on open
+- *(styles)* Enhance focus styles for buttons and links
+- *(components)* Enhance close button accessibility in modal
+
+### 🚜 Refactor
+
+- *(global-search)* Change event listener to window level for global search modal
+- *(dashboard)* Remove deployment loading logic and introduce DeploymentsIndicator component for better UI management
+- *(dashboard)* Replace project navigation method with direct link in UI
+- *(global-search)* Improve event handling and cleanup in global search component
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update coolify version to 4.0.0-beta.433 and nightly version to 4.0.0-beta.434 in configuration files
+
+## [4.0.0-beta.432] - 2025-09-29
+
+### 🚀 Features
+
 - *(application)* Implement order-based pattern matching for watch paths with negation support
 - *(github)* Enhance Docker Compose input fields for better user experience
 - *(dev-seeders)* Add PersonalAccessTokenSeeder to create development API tokens
