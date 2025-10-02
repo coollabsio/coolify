@@ -2788,11 +2788,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $secrets_hash = $this->generate_secrets_hash($variables);
             }
 
-            $this->build_args = $variables->map(function ($value, $key) {
-                $value = escapeshellarg($value);
+            $env_vars = $this->pull_request_id === 0
+                ? $this->application->environment_variables()->where('is_buildtime', true)->get()
+                : $this->application->environment_variables_preview()->where('is_buildtime', true)->get();
 
-                return "--build-arg {$key}={$value}";
+            // Map variables to include is_multiline flag
+            $vars_with_metadata = $variables->map(function ($value, $key) use ($env_vars) {
+                $env = $env_vars->firstWhere('key', $key);
+
+                return [
+                    'key' => $key,
+                    'value' => $value,
+                    'is_multiline' => $env ? $env->is_multiline : false,
+                ];
             });
+
+            $this->build_args = generateDockerBuildArgs($vars_with_metadata);
 
             if ($secrets_hash) {
                 $this->build_args->push("--build-arg COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}");
@@ -2816,14 +2827,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
 
         $secrets_hash = $this->generate_secrets_hash($variables);
-        $env_flags = $variables
-            ->map(function ($env) {
-                $escaped_value = escapeshellarg($env->real_value);
 
-                return "-e {$env->key}={$escaped_value}";
-            })
-            ->implode(' ');
+        // Map to simple array format for the helper function
+        $vars_array = $variables->map(function ($env) {
+            return [
+                'key' => $env->key,
+                'value' => $env->real_value,
+                'is_multiline' => $env->is_multiline,
+            ];
+        });
 
+        $env_flags = generateDockerEnvFlags($vars_array);
         $env_flags .= " -e COOLIFY_BUILD_SECRETS_HASH={$secrets_hash}";
 
         return $env_flags;
