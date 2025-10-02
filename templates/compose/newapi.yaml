@@ -7,7 +7,7 @@
 
 services:
   new-api:
-    image: calciumion/new-api:latest
+    image: calciumion/new-api:v0.9.2.0
     depends_on:
       postgresql:
         condition: service_healthy
