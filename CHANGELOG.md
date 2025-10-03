@@ -389,6 +389,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - *(claude)* Update testing guidelines and add note on Application::team relationship
 - Update changelog
+- Update changelog
 
 ### 🎨 Styling
 
