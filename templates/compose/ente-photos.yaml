@@ -43,13 +43,13 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - museum-data:/data:rw
+      - museum-data:/data
+      - museum-config:/config
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
-      interval: 60s
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/ping"]
+      interval: 5s
       timeout: 5s
-      retries: 3
-      start_period: 10s
+      retries: 10
 
   web:
     image: ghcr.io/ente-io/web
@@ -59,11 +59,10 @@ services:
       - ENTE_ALBUMS_ORIGIN=${SERVICE_URL_WEB_3002}
 
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:3000"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   postgres:
     image: postgres:15
@@ -75,8 +74,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
 
