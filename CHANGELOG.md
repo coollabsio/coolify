@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [4.0.0-beta.434] - 2025-10-03
 
 ### 🚀 Features
 
@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 
 ### ⚙️ Miscellaneous Tasks
@@ -258,6 +259,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Add Ente Photos service template
 - *(command)* Add option to sync GitHub releases to BunnyCDN and refactor sync logic
 - *(ui)* Display current version in settings dropdown and update UI accordingly
 - *(settings)* Add option to restrict PR deployments to repository members and contributors
