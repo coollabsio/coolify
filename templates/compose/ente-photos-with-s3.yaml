@@ -1,0 +1,95 @@
+# documentation: https://help.ente.io/self-hosting/installation/compose
+# slogan: Ente Photos is a fully open source, End to End Encrypted alternative to Google Photos and Apple Photos.
+# category: media
+# tags: photos,gallery,backup,encryption,privacy,self-hosted,google-photos,alternative
+# logo: svgs/ente-photos.svg
+# port: 8080
+
+services:
+  museum:
+    image: ghcr.io/ente-io/server:latest
+    environment:
+      - SERVICE_URL_MUSEUM_8080
+      # Database configuration
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-ente_db}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      # S3/MinIO configuration
+      - S3_ARE_LOCAL_BUCKETS=true
+      - S3_USE_PATH_STYLE_URLS=true
+      - S3_B2_EU_CEN_KEY=${SERVICE_USER_MINIO}
+      - S3_B2_EU_CEN_SECRET=${SERVICE_PASSWORD_MINIO}
+      - S3_B2_EU_CEN_ENDPOINT=${SERVICE_URL_MINIO_3200}
+      - S3_B2_EU_CEN_REGION=eu-central-2
+      - S3_B2_EU_CEN_BUCKET=b2-eu-cen
+      # Security keys
+      - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_ENCRYPTION}
+      - HASH_KEY=${SERVICE_PASSWORD_64_HASH}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      # Admin permissions (grants first account admin access)
+      - ENTE_INTERNAL_ADMIN=1580559962386438
+      # App URLs (optional - for web interface)
+      - APPS_PUBLIC_ALBUMS=${APPS_PUBLIC_ALBUMS:-}
+      - APPS_CAST=${APPS_CAST:-}
+      - APPS_ACCOUNTS=${APPS_ACCOUNTS:-}
+    volumes:
+      - museum-data:/data
+      - museum-config:/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-ente_db}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SERVICE_USER_POSTGRES} -d ${POSTGRES_DB:-ente_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    environment:
+      - SERVICE_URL_MINIO_3200
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    command: server /data --address ":3200" --console-address ":3201"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:3200 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      mc mb minio/b2-eu-cen --ignore-existing;
+      mc mb minio/wasabi-eu-central-2-v3 --ignore-existing;
+      mc mb minio/scw-eu-fr-v3 --ignore-existing;
+      echo 'MinIO buckets created successfully';
+      "
