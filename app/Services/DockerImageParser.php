@@ -14,22 +14,29 @@ class DockerImageParser
 
     public function parse(string $imageString): self
     {
-        // First split by : to handle the tag, but be careful with registry ports
-        $lastColon = strrpos($imageString, ':');
-        $hasSlash = str_contains($imageString, '/');
-
-        // If the last colon appears after the last slash, it's a tag
-        // Otherwise it might be a port in the registry URL
-        if ($lastColon !== false && (! $hasSlash || $lastColon > strrpos($imageString, '/'))) {
-            $mainPart = substr($imageString, 0, $lastColon);
-            $this->tag = substr($imageString, $lastColon + 1);
-
-            // Check if the tag is a SHA256 hash
-            $this->isImageHash = $this->isSha256Hash($this->tag);
+        // Check for @sha256: format first (e.g., nginx@sha256:abc123...)
+        if (preg_match('/^(.+)@sha256:([a-f0-9]{64})$/i', $imageString, $matches)) {
+            $mainPart = $matches[1];
+            $this->tag = $matches[2];
+            $this->isImageHash = true;
         } else {
-            $mainPart = $imageString;
-            $this->tag = 'latest';
-            $this->isImageHash = false;
+            // Split by : to handle the tag, but be careful with registry ports
+            $lastColon = strrpos($imageString, ':');
+            $hasSlash = str_contains($imageString, '/');
+
+            // If the last colon appears after the last slash, it's a tag
+            // Otherwise it might be a port in the registry URL
+            if ($lastColon !== false && (! $hasSlash || $lastColon > strrpos($imageString, '/'))) {
+                $mainPart = substr($imageString, 0, $lastColon);
+                $this->tag = substr($imageString, $lastColon + 1);
+
+                // Check if the tag is a SHA256 hash
+                $this->isImageHash = $this->isSha256Hash($this->tag);
+            } else {
+                $mainPart = $imageString;
+                $this->tag = 'latest';
+                $this->isImageHash = false;
+            }
         }
 
         // Split the main part by / to handle registry and image name

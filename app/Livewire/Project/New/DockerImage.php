@@ -12,7 +12,11 @@ use Visus\Cuid2\Cuid2;
 
 class DockerImage extends Component
 {
-    public string $dockerImage = '';
+    public string $imageName = '';
+
+    public string $imageTag = '';
+
+    public string $imageSha256 = '';
 
     public array $parameters;
 
@@ -27,11 +31,30 @@ class DockerImage extends Component
     public function submit()
     {
         $this->validate([
-            'dockerImage' => 'required',
+            'imageName' => ['required', 'string'],
+            'imageTag' => ['nullable', 'string', 'regex:/^[a-z0-9][a-z0-9._-]*$/i'],
+            'imageSha256' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/i'],
         ]);
 
+        // Validate that either tag or sha256 is provided, but not both
+        if ($this->imageTag && $this->imageSha256) {
+            $this->addError('imageTag', 'Provide either a tag or SHA256 digest, not both.');
+            $this->addError('imageSha256', 'Provide either a tag or SHA256 digest, not both.');
+
+            return;
+        }
+
+        // Build the full Docker image string
+        if ($this->imageSha256) {
+            $dockerImage = $this->imageName.'@sha256:'.$this->imageSha256;
+        } elseif ($this->imageTag) {
+            $dockerImage = $this->imageName.':'.$this->imageTag;
+        } else {
+            $dockerImage = $this->imageName.':latest';
+        }
+
         $parser = new DockerImageParser;
-        $parser->parse($this->dockerImage);
+        $parser->parse($dockerImage);
 
         $destination_uuid = $this->query['destination'];
         $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
