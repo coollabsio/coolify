@@ -23,7 +23,8 @@
                             volumeModalOpen: false,
                             fileModalOpen: false,
                             directoryModalOpen: false
-                        }" @close-storage-modal.window="
+                        }"
+                            @close-storage-modal.window="
                             if ($event.detail === 'volume') volumeModalOpen = false;
                             if ($event.detail === 'file') fileModalOpen = false;
                             if ($event.detail === 'directory') directoryModalOpen = false;
@@ -45,8 +46,7 @@
                                     <div
                                         class="p-1 mt-1 bg-white border rounded-sm shadow-sm dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
                                         <div class="flex flex-col gap-1">
-                                            <a class="dropdown-item"
-                                                @click="volumeModalOpen = true; dropdownOpen = false">
+                                            <a class="dropdown-item" @click="volumeModalOpen = true; dropdownOpen = false">
                                                 <svg class="size-4" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -105,31 +105,41 @@
                                             </button>
                                         </div>
                                         <div class="relative flex items-center justify-center w-auto"
-                                            x-init="$watch('volumeModalOpen', value => { if(value) { $nextTick(() => { const input = $el.querySelector('input'); input?.focus(); }) } })">
-                                            <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submitPersistentVolume'>
+                                            x-init="$watch('volumeModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                                wire:submit='submitPersistentVolume'>
                                                 <div class="flex flex-col">
                                                     <div>Docker Volumes mounted to the container.</div>
                                                 </div>
                                                 @if ($isSwarm)
-                                                    <div class="text-warning">Swarm Mode detected: You need to set a shared volume
-                                                        (EFS/NFS/etc) on all the worker nodes if you would like to use a persistent
+                                                    <div class="text-warning">Swarm Mode detected: You need to set a shared
+                                                        volume
+                                                        (EFS/NFS/etc) on all the worker nodes if you would like to use a
+                                                        persistent
                                                         volumes.</div>
                                                 @endif
                                                 <div class="flex flex-col gap-2">
                                                     <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
                                                         id="name" label="Name" required helper="Volume name." />
                                                     @if ($isSwarm)
-                                                        <x-forms.input canGate="update" :canResource="$resource" placeholder="/root"
-                                                            id="host_path" label="Source Path" required
+                                                        <x-forms.input canGate="update" :canResource="$resource"
+                                                            placeholder="/root" id="host_path" label="Source Path" required
                                                             helper="Directory on the host system." />
                                                     @else
-                                                        <x-forms.input canGate="update" :canResource="$resource" placeholder="/root"
-                                                            id="host_path" label="Source Path"
+                                                        <x-forms.input canGate="update" :canResource="$resource"
+                                                            placeholder="/root" id="host_path" label="Source Path"
                                                             helper="Directory on the host system." />
                                                     @endif
-                                                    <x-forms.input canGate="update" :canResource="$resource" placeholder="/tmp/root"
-                                                        id="mount_path" label="Destination Path" required
-                                                        helper="Directory inside the container." />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/tmp/root" id="mount_path" label="Destination Path"
+                                                        required helper="Directory inside the container." />
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
                                                         Add
                                                     </x-forms.button>
@@ -169,15 +179,24 @@
                                             </button>
                                         </div>
                                         <div class="relative flex items-center justify-center w-auto"
-                                            x-init="$watch('fileModalOpen', value => { if(value) { $nextTick(() => { const input = $el.querySelector('input'); input?.focus(); }) } })">
-                                            <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submitFileStorage'>
+                                            x-init="$watch('fileModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                                wire:submit='submitFileStorage'>
                                                 <div class="flex flex-col">
                                                     <div>Actual file mounted from the host system to the container.</div>
                                                 </div>
                                                 <div class="flex flex-col gap-2">
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/etc/nginx/nginx.conf" id="file_storage_path"
-                                                        label="Destination Path" required helper="File location inside the container" />
+                                                        label="Destination Path" required
+                                                        helper="File location inside the container" />
                                                     <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
                                                         id="file_storage_content"></x-forms.textarea>
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
@@ -219,18 +238,27 @@
                                             </button>
                                         </div>
                                         <div class="relative flex items-center justify-center w-auto"
-                                            x-init="$watch('directoryModalOpen', value => { if(value) { $nextTick(() => { const input = $el.querySelector('input'); input?.focus(); }) } })">
-                                            <form class="flex flex-col w-full gap-2 rounded-sm" wire:submit='submitFileStorageDirectory'>
+                                            x-init="$watch('directoryModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex flex-col w-full gap-2 rounded-sm"
+                                                wire:submit='submitFileStorageDirectory'>
                                                 <div class="flex flex-col">
                                                     <div>Directory mounted from the host system to the container.</div>
                                                 </div>
                                                 <div class="flex flex-col gap-2">
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="{{ application_configuration_dir() }}/{{ $resource->uuid }}/etc/nginx"
-                                                        id="file_storage_directory_source" label="Source Directory" required
-                                                        helper="Directory on the host system." />
-                                                    <x-forms.input canGate="update" :canResource="$resource" placeholder="/etc/nginx"
-                                                        id="file_storage_directory_destination" label="Destination Directory" required
+                                                        id="file_storage_directory_source" label="Source Directory"
+                                                        required helper="Directory on the host system." />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx" id="file_storage_directory_destination"
+                                                        label="Destination Directory" required
                                                         helper="Directory inside the container." />
                                                     <x-forms.button canGate="update" :canResource="$resource" type="submit">
                                                         Add
@@ -270,19 +298,22 @@
                 {{-- Tabs Navigation --}}
                 <div class="flex gap-2 border-b dark:border-coolgray-300 border-neutral-200">
                     <button @click="activeTab = 'volumes'"
-                        :class="activeTab === 'volumes' ? 'border-b-2 dark:border-white border-black' : 'border-b-2 border-transparent'"
+                        :class="activeTab === 'volumes' ? 'border-b-2 dark:border-white border-black' :
+                            'border-b-2 border-transparent'"
                         @if (!$hasVolumes) disabled @endif
                         class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasVolumes ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
                         Volumes ({{ $this->volumeCount }})
                     </button>
                     <button @click="activeTab = 'files'"
-                        :class="activeTab === 'files' ? 'border-b-2 dark:border-white border-black' : 'border-b-2 border-transparent'"
+                        :class="activeTab === 'files' ? 'border-b-2 dark:border-white border-black' :
+                            'border-b-2 border-transparent'"
                         @if (!$hasFiles) disabled @endif
                         class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasFiles ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
                         Files ({{ $this->fileCount }})
                     </button>
                     <button @click="activeTab = 'directories'"
-                        :class="activeTab === 'directories' ? 'border-b-2 dark:border-white border-black' : 'border-b-2 border-transparent'"
+                        :class="activeTab === 'directories' ? 'border-b-2 dark:border-white border-black' :
+                            'border-b-2 border-transparent'"
                         @if (!$hasDirectories) disabled @endif
                         class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasDirectories ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
                         Directories ({{ $this->directoryCount }})
@@ -333,19 +364,96 @@
             </div>
         @endif
     @else
-        @if ($resource->persistentStorages()->get()->count() > 0)
-            <h3>{{ Str::headline($resource->name) }} </h3>
-        @endif
-        @if ($resource->persistentStorages()->get()->count() > 0)
-            <livewire:project.shared.storages.all :resource="$resource" />
-        @endif
-        @if ($fileStorage->count() > 0)
-            <div class="flex flex-col gap-4">
-                @foreach ($fileStorage->sort() as $fileStorage)
-                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                        wire:key="resource-{{ $fileStorage->uuid }}" />
-                @endforeach
+        <div class="flex flex-col gap-4 py-2">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h2>{{ Str::headline($resource->name) }}</h2>
+                </div>
             </div>
-        @endif
+
+            @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
+                <div>No storage found.</div>
+            @endif
+
+            @php
+                $hasVolumes = $this->volumeCount > 0;
+                $hasFiles = $this->fileCount > 0;
+                $hasDirectories = $this->directoryCount > 0;
+                $defaultTab = $hasVolumes ? 'volumes' : ($hasFiles ? 'files' : 'directories');
+            @endphp
+
+            @if ($hasVolumes || $hasFiles || $hasDirectories)
+                <div x-data="{
+                    activeTab: '{{ $defaultTab }}'
+                }">
+                    {{-- Tabs Navigation --}}
+                    <div class="flex gap-2 border-b dark:border-coolgray-300 border-neutral-200">
+                        <button @click="activeTab = 'volumes'"
+                            :class="activeTab === 'volumes' ? 'border-b-2 dark:border-white border-black' :
+                                'border-b-2 border-transparent'"
+                            @if (!$hasVolumes) disabled @endif
+                            class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasVolumes ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
+                            Volumes ({{ $this->volumeCount }})
+                        </button>
+                        <button @click="activeTab = 'files'"
+                            :class="activeTab === 'files' ? 'border-b-2 dark:border-white border-black' :
+                                'border-b-2 border-transparent'"
+                            @if (!$hasFiles) disabled @endif
+                            class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasFiles ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
+                            Files ({{ $this->fileCount }})
+                        </button>
+                        <button @click="activeTab = 'directories'"
+                            :class="activeTab === 'directories' ? 'border-b-2 dark:border-white border-black' :
+                                'border-b-2 border-transparent'"
+                            @if (!$hasDirectories) disabled @endif
+                            class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasDirectories ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
+                            Directories ({{ $this->directoryCount }})
+                        </button>
+                    </div>
+
+                    {{-- Tab Content --}}
+                    <div class="pt-4">
+                        {{-- Volumes Tab --}}
+                        <div x-show="activeTab === 'volumes'" class="flex flex-col gap-4">
+                            @if ($hasVolumes)
+                                <livewire:project.shared.storages.all :resource="$resource" />
+                            @else
+                                <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
+                                    No volumes configured.
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- Files Tab --}}
+                        <div x-show="activeTab === 'files'" class="flex flex-col gap-4">
+                            @if ($hasFiles)
+                                @foreach ($this->files as $fs)
+                                    <livewire:project.service.file-storage :fileStorage="$fs"
+                                        wire:key="file-{{ $fs->id }}" />
+                                @endforeach
+                            @else
+                                <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
+                                    No file mounts configured.
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- Directories Tab --}}
+                        <div x-show="activeTab === 'directories'" class="flex flex-col gap-4">
+                            @if ($hasDirectories)
+                                @foreach ($this->directories as $fs)
+                                    <livewire:project.service.file-storage :fileStorage="$fs"
+                                        wire:key="directory-{{ $fs->id }}" />
+                                @endforeach
+                            @else
+                                <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
+                                    No directory mounts configured.
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
     @endif
 </div>

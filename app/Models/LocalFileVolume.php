@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\FileStorageChanged;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
 {
@@ -191,5 +192,62 @@ class LocalFileVolume extends BaseModel
     public function scopeWherePlainMountPath($query, $path)
     {
         return $query->get()->where('plain_mount_path', $path);
+    }
+
+    // Check if this volume is read-only by parsing the docker-compose content
+    public function isReadOnlyVolume(): bool
+    {
+        try {
+            // Only check for services
+            $service = $this->service;
+            if (! $service || ! method_exists($service, 'service')) {
+                return false;
+            }
+
+            $actualService = $service->service;
+            if (! $actualService || ! $actualService->docker_compose_raw) {
+                return false;
+            }
+
+            // Parse the docker-compose content
+            $compose = Yaml::parse($actualService->docker_compose_raw);
+            if (! isset($compose['services'])) {
+                return false;
+            }
+
+            // Find the service that this volume belongs to
+            $serviceName = $service->name;
+            if (! isset($compose['services'][$serviceName]['volumes'])) {
+                return false;
+            }
+
+            $volumes = $compose['services'][$serviceName]['volumes'];
+
+            // Check each volume to find a match
+            foreach ($volumes as $volume) {
+                // Volume can be string like "host:container:ro" or "host:container"
+                if (is_string($volume)) {
+                    $parts = explode(':', $volume);
+
+                    // Check if this volume matches our fs_path and mount_path
+                    if (count($parts) >= 2) {
+                        $hostPath = $parts[0];
+                        $containerPath = $parts[1];
+                        $options = $parts[2] ?? null;
+
+                        // Match based on fs_path and mount_path
+                        if ($hostPath === $this->fs_path && $containerPath === $this->mount_path) {
+                            return $options === 'ro';
+                        }
+                    }
+                }
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            ray($e->getMessage(), 'Error checking read-only volume');
+
+            return false;
+        }
     }
 }
