@@ -210,10 +210,10 @@ class General extends Component
             }
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
-        // Convert service names with dots to use underscores for HTML form binding
+        // Convert service names with dots and dashes to use underscores for HTML form binding
         $sanitizedDomains = [];
         foreach ($this->parsedServiceDomains as $serviceName => $domain) {
-            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
             $sanitizedDomains[$sanitizedKey] = $domain;
         }
         $this->parsedServiceDomains = $sanitizedDomains;
@@ -305,10 +305,10 @@ class General extends Component
             // Refresh parsedServiceDomains to reflect any changes in docker_compose_domains
             $this->application->refresh();
             $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
-            // Convert service names with dots to use underscores for HTML form binding
+            // Convert service names with dots and dashes to use underscores for HTML form binding
             $sanitizedDomains = [];
             foreach ($this->parsedServiceDomains as $serviceName => $domain) {
-                $sanitizedKey = str($serviceName)->slug('_')->toString();
+                $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
                 $sanitizedDomains[$sanitizedKey] = $domain;
             }
             $this->parsedServiceDomains = $sanitizedDomains;
@@ -334,7 +334,7 @@ class General extends Component
 
             $uuid = new Cuid2;
             $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
-            $sanitizedKey = str($serviceName)->slug('_')->toString();
+            $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
             $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
 
             // Convert back to original service names for storage
@@ -344,7 +344,7 @@ class General extends Component
                 $originalServiceName = $key;
                 if (isset($this->parsedServices['services'])) {
                     foreach ($this->parsedServices['services'] as $originalName => $service) {
-                        if (str($originalName)->slug('_')->toString() === $key) {
+                        if (str($originalName)->replace('-', '_')->replace('.', '_')->toString() === $key) {
                             $originalServiceName = $originalName;
                             break;
                         }

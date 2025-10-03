@@ -1119,3 +1119,64 @@ function escapeDollarSign($value)
 
     return str_replace($search, $replace, $value);
 }
+
+/**
+ * Generate Docker build arguments from environment variables collection
+ *
+ * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings
+ */
+function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
+{
+    $variables = collect($variables);
+
+    return $variables->map(function ($var) {
+        $key = is_array($var) ? data_get($var, 'key') : $var->key;
+        $value = is_array($var) ? data_get($var, 'value') : $var->value;
+        $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
+
+        if ($isMultiline) {
+            // For multiline variables, strip surrounding quotes and escape for bash
+            $raw_value = trim($value, "'");
+            $escaped_value = str_replace(['\\', '"', '$', '`'], ['\\\\', '\\"', '\\$', '\\`'], $raw_value);
+
+            return "--build-arg {$key}=\"{$escaped_value}\"";
+        }
+
+        // For regular variables, use escapeshellarg for security
+        $value = escapeshellarg($value);
+
+        return "--build-arg {$key}={$value}";
+    });
+}
+
+/**
+ * Generate Docker environment flags from environment variables collection
+ *
+ * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return string Space-separated environment flags
+ */
+function generateDockerEnvFlags($variables): string
+{
+    $variables = collect($variables);
+
+    return $variables
+        ->map(function ($var) {
+            $key = is_array($var) ? data_get($var, 'key') : $var->key;
+            $value = is_array($var) ? data_get($var, 'value') : $var->value;
+            $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
+
+            if ($isMultiline) {
+                // For multiline variables, strip surrounding quotes and escape for bash
+                $raw_value = trim($value, "'");
+                $escaped_value = str_replace(['\\', '"', '$', '`'], ['\\\\', '\\"', '\\$', '\\`'], $raw_value);
+
+                return "-e {$key}=\"{$escaped_value}\"";
+            }
+
+            $escaped_value = escapeshellarg($value);
+
+            return "-e {$key}={$escaped_value}";
+        })
+        ->implode(' ');
+}

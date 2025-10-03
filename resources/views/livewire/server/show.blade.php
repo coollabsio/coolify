@@ -62,9 +62,10 @@
                     </x-forms.button>
                 @endif
                 @if ($server->isForceDisabled() && isCloud())
-                    <div class="pt-4 font-bold text-red-500">The system has disabled the server because you have
-                        exceeded the
-                        number of servers for which you have paid.</div>
+                    <x-callout type="danger" title="Server Disabled" class="mt-4">
+                        The system has disabled the server because you have exceeded the
+                        number of servers for which you have paid.
+                    </x-callout>
                 @endif
                 <div class="flex flex-col gap-2 pt-4">
                     <div class="flex flex-col gap-2 w-full lg:flex-row">

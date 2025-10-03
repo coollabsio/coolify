@@ -50,8 +50,8 @@
                                     <div class="flex items-end gap-2">
                                         <x-forms.input
                                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
-                                            label="Domains for {{ str($serviceName)->headline() }}"
-                                            id="parsedServiceDomains.{{ str($serviceName)->slug('_') }}.domain"
+                                            label="Domains for {{ $serviceName }}"
+                                            id="parsedServiceDomains.{{ str($serviceName)->replace('-', '_')->replace('.', '_') }}.domain"
                                             x-bind:disabled="shouldDisable()"></x-forms.input>
                                         @can('update', $application)
                                             <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
@@ -90,12 +90,12 @@
             @if ($application->build_pack !== 'dockercompose')
                 <div class="flex items-end gap-2">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
-                        <x-forms.input placeholder="https://coolify.io" wire:model.blur-sm="application.fqdn"
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn"
                             label="Domains" readonly
                             helper="Readonly labels are disabled. You can set the domains in the labels section."
                             x-bind:disabled="!canUpdate" />
                     @else
-                        <x-forms.input placeholder="https://coolify.io" wire:model.blur-sm="application.fqdn"
+                        <x-forms.input placeholder="https://coolify.io" wire:model.blur="application.fqdn"
                             label="Domains"
                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
                             x-bind:disabled="!canUpdate" />
@@ -166,12 +166,14 @@
                         @if ($application->destination->server->isSwarm())
                             <x-forms.input required id="application.docker_registry_image_name" label="Docker Image"
                                 x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag"
+                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag or Hash"
+                                helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input id="application.docker_registry_image_name" label="Docker Image"
                                 x-bind:disabled="!canUpdate" />
-                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag"
+                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag or Hash"
+                                helper="Enter a tag (e.g., 'latest', 'v1.2.3') or SHA256 hash (e.g., 'sha256-59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0')"
                                 x-bind:disabled="!canUpdate" />
                         @endif
                     @else
@@ -187,7 +189,7 @@
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input id="application.docker_registry_image_name"
-                                helper="Empty means it won't push the image to a docker registry."
+                                helper="Empty means it won't push the image to a docker registry. Pre-tag the image with your registry url if you want to push it to a private registry (default: Dockerhub). <br><br>Example: ghcr.io/myimage"
                                 placeholder="Empty means it won't push the image to a docker registry."
                                 label="Docker Image" x-bind:disabled="!canUpdate" />
                             <x-forms.input id="application.docker_registry_image_tag"
@@ -268,6 +270,14 @@
                                             helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='dark:text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
                                             label="Custom Start Command" />
                                     </div>
+                                    @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                                        <div class="pt-4">
+                                            <x-forms.textarea
+                                                helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
+                                                placeholder="services/api/**" id="application.watch_paths"
+                                                label="Watch Paths" x-bind:disabled="shouldDisable()" />
+                                        </div>
+                                    @endif
                                 </div>
                             @else
                                 <div class="flex flex-col gap-2 xl:flex-row">
@@ -302,7 +312,7 @@
                                 @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                     <div class="pb-4">
                                         <x-forms.textarea
-                                            helper="Gitignore-style rules to filter Git based webhook deployments."
+                                            helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
                                             placeholder="src/pages/**" id="application.watch_paths"
                                             label="Watch Paths" x-bind:disabled="!canUpdate" />
                                     </div>

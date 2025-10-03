@@ -2173,7 +2173,7 @@ class DatabasesController extends Controller
                     properties: [
                         'executions' => new OA\Schema(
                             type: 'array',
-                            items: new OA\Schema(
+                            items: new OA\Items(
                                 type: 'object',
                                 properties: [
                                     'uuid' => ['type' => 'string'],

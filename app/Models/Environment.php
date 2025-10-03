@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use OpenApi\Attributes as OA;
 
@@ -19,6 +20,7 @@ use OpenApi\Attributes as OA;
 )]
 class Environment extends BaseModel
 {
+    use ClearsGlobalSearchCache;
     use HasSafeStringAttribute;
 
     protected $guarded = [];

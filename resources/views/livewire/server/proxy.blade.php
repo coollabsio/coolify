@@ -119,10 +119,9 @@
                         </x-forms.button> --}}
                     </div>
                 @else
-                    <div
-                        class="p-4 mb-4 text-sm text-yellow-800 bg-yellow-100 rounded-sm dark:bg-yellow-900 dark:text-yellow-300">
+                    <x-callout type="warning" title="Permission Required" class="mb-4">
                         You don't have permission to configure proxy settings for this server.
-                    </div>
+                    </x-callout>
                 @endcan
             </div>
     @endif

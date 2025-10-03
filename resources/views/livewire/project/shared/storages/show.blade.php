@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
+    <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300 border-neutral-200">
         @if ($isReadOnly)
             @if ($isFirst)
                 <div class="flex gap-2 items-end w-full  md:flex-row flex-col">

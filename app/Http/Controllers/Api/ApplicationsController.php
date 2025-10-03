@@ -1512,9 +1512,32 @@ class ApplicationsController extends Controller
             if ($return instanceof \Illuminate\Http\JsonResponse) {
                 return $return;
             }
-            if (! $request->docker_registry_image_tag) {
-                $request->offsetSet('docker_registry_image_tag', 'latest');
+            // Process docker image name and tag for SHA256 digests
+            $dockerImageName = $request->docker_registry_image_name;
+            $dockerImageTag = $request->docker_registry_image_tag;
+
+            // Strip 'sha256:' prefix if user provided it in the tag
+            if ($dockerImageTag) {
+                $dockerImageTag = preg_replace('/^sha256:/i', '', trim($dockerImageTag));
             }
+
+            // Remove @sha256 from image name if user added it
+            if ($dockerImageName) {
+                $dockerImageName = preg_replace('/@sha256$/i', '', trim($dockerImageName));
+            }
+
+            // Check if tag is a valid SHA256 hash (64 hex characters)
+            $isSha256Hash = $dockerImageTag && preg_match('/^[a-f0-9]{64}$/i', $dockerImageTag);
+
+            // Append @sha256 to image name if using digest and not already present
+            if ($isSha256Hash && ! str_ends_with($dockerImageName, '@sha256')) {
+                $dockerImageName .= '@sha256';
+            }
+
+            // Set processed values back to request
+            $request->offsetSet('docker_registry_image_name', $dockerImageName);
+            $request->offsetSet('docker_registry_image_tag', $dockerImageTag ?: 'latest');
+
             $application = new Application;
             removeUnnecessaryFieldsFromRequest($request);
 

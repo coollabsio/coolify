@@ -5,7 +5,7 @@
         </x-slot>
         @foreach ($links as $link)
             <a class="dropdown-item" target="_blank" href="{{ $link }}">
-                <x-external-link class="size-4" />{{ $link }}
+                <x-external-link class="size-3.5" />{{ $link }}
             </a>
         @endforeach
     </x-dropdown>

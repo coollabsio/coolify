@@ -3,6 +3,8 @@
 namespace App\Livewire;
 
 use App\Models\Application;
+use App\Models\Environment;
+use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
@@ -335,11 +337,81 @@ class GlobalSearch extends Component
                     ];
                 });
 
+            // Get all projects
+            $projects = Project::ownedByCurrentTeam()
+                ->withCount(['environments', 'applications', 'services'])
+                ->get()
+                ->map(function ($project) {
+                    $resourceCount = $project->applications_count + $project->services_count;
+                    $resourceSummary = $resourceCount > 0
+                        ? "{$resourceCount} resource".($resourceCount !== 1 ? 's' : '')
+                        : 'No resources';
+
+                    return [
+                        'id' => $project->id,
+                        'name' => $project->name,
+                        'type' => 'project',
+                        'uuid' => $project->uuid,
+                        'description' => $project->description,
+                        'link' => $project->navigateTo(),
+                        'project' => null,
+                        'environment' => null,
+                        'resource_count' => $resourceSummary,
+                        'environment_count' => $project->environments_count,
+                        'search_text' => strtolower($project->name.' '.$project->description.' project'),
+                    ];
+                });
+
+            // Get all environments
+            $environments = Environment::query()
+                ->whereHas('project', function ($query) {
+                    $query->where('team_id', auth()->user()->currentTeam()->id);
+                })
+                ->with('project')
+                ->withCount(['applications', 'services'])
+                ->get()
+                ->map(function ($environment) {
+                    $resourceCount = $environment->applications_count + $environment->services_count;
+                    $resourceSummary = $resourceCount > 0
+                        ? "{$resourceCount} resource".($resourceCount !== 1 ? 's' : '')
+                        : 'No resources';
+
+                    // Build description with project context
+                    $descriptionParts = [];
+                    if ($environment->project) {
+                        $descriptionParts[] = "Project: {$environment->project->name}";
+                    }
+                    if ($environment->description) {
+                        $descriptionParts[] = $environment->description;
+                    }
+                    if (empty($descriptionParts)) {
+                        $descriptionParts[] = $resourceSummary;
+                    }
+
+                    return [
+                        'id' => $environment->id,
+                        'name' => $environment->name,
+                        'type' => 'environment',
+                        'uuid' => $environment->uuid,
+                        'description' => implode(' • ', $descriptionParts),
+                        'link' => route('project.resource.index', [
+                            'project_uuid' => $environment->project->uuid,
+                            'environment_uuid' => $environment->uuid,
+                        ]),
+                        'project' => $environment->project->name ?? null,
+                        'environment' => null,
+                        'resource_count' => $resourceSummary,
+                        'search_text' => strtolower($environment->name.' '.$environment->description.' '.$environment->project->name.' environment'),
+                    ];
+                });
+
             // Merge all collections
             $items = $items->merge($applications)
                 ->merge($services)
                 ->merge($databases)
-                ->merge($servers);
+                ->merge($servers)
+                ->merge($projects)
+                ->merge($environments);
 
             return $items->toArray();
         });
