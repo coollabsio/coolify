@@ -8,10 +8,15 @@ All notable changes to this project will be documented in this file.
 
 - *(deployments)* Enhance Docker build argument handling for multiline variables
 - *(deployments)* Add log copying functionality to clipboard in dev
+- *(deployments)* Generate SERVICE_NAME environment variables from Docker Compose services
 
 ### 🐛 Bug Fixes
 
 - *(deployments)* Enhance builder container management and environment variable handling
+
+### 📚 Documentation
+
+- Update changelog
 
 ### ⚙️ Miscellaneous Tasks
 
