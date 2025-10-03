@@ -30,6 +30,16 @@ class DockerImage extends Component
 
     public function submit()
     {
+        // Strip 'sha256:' prefix if user pasted it
+        if ($this->imageSha256) {
+            $this->imageSha256 = preg_replace('/^sha256:/i', '', trim($this->imageSha256));
+        }
+
+        // Remove @sha256 from image name if user added it
+        if ($this->imageName) {
+            $this->imageName = preg_replace('/@sha256$/i', '', trim($this->imageName));
+        }
+
         $this->validate([
             'imageName' => ['required', 'string'],
             'imageTag' => ['nullable', 'string', 'regex:/^[a-z0-9][a-z0-9._-]*$/i'],
@@ -72,6 +82,12 @@ class DockerImage extends Component
         // Determine the image tag based on whether it's a hash or regular tag
         $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
 
+        // Append @sha256 to image name if using digest and not already present
+        $imageName = $parser->getFullImageNameWithoutTag();
+        if ($parser->isImageHash() && ! str_ends_with($imageName, '@sha256')) {
+            $imageName .= '@sha256';
+        }
+
         $application = Application::create([
             'name' => 'docker-image-'.new Cuid2,
             'repository_project_id' => 0,
@@ -79,7 +95,7 @@ class DockerImage extends Component
             'git_branch' => 'main',
             'build_pack' => 'dockerimage',
             'ports_exposes' => 80,
-            'docker_registry_image_name' => $parser->getFullImageNameWithoutTag(),
+            'docker_registry_image_name' => $imageName,
             'docker_registry_image_tag' => $parser->getTag(),
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
