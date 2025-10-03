@@ -1263,6 +1263,21 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
         $commands[] = 'rm -f .env || true';
 
+        $envs = collect([]);
+
+        // Generate SERVICE_NAME_* environment variables from docker-compose services
+        if ($this->docker_compose) {
+            try {
+                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $services = data_get($dockerCompose, 'services', []);
+                foreach ($services as $serviceName => $_) {
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+                }
+            } catch (\Exception $e) {
+                ray($e->getMessage());
+            }
+        }
+
         $envs_from_coolify = $this->environment_variables()->get();
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
@@ -1274,7 +1289,6 @@ class Service extends BaseModel
 
             return 3;
         });
-        $envs = collect([]);
         foreach ($sorted as $env) {
             $envs->push("{$env->key}={$env->real_value}");
         }

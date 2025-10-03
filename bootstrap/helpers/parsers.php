@@ -1172,6 +1172,9 @@ function serviceParser(Service $resource): Collection
 
     $parsedServices = collect([]);
 
+    // Generate SERVICE_NAME variables for docker compose services
+    $serviceNameEnvironments = generateDockerComposeServiceName($services);
+
     $allMagicEnvironments = collect([]);
     // Presave services
     foreach ($services as $serviceName => $service) {
@@ -1988,7 +1991,7 @@ function serviceParser(Service $resource): Collection
             $payload['volumes'] = $volumesParsed;
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
-            $payload['environment'] = $environment->merge($coolifyEnvironments);
+            $payload['environment'] = $environment->merge($coolifyEnvironments)->merge($serviceNameEnvironments);
         }
         if ($logging) {
             $payload['logging'] = $logging;
