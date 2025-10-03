@@ -77,6 +77,22 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- *(deployments)* Enhance Docker build argument handling for multiline variables
+- *(deployments)* Add log copying functionality to clipboard in dev
+
+### 🐛 Bug Fixes
+
+- *(deployments)* Enhance builder container management and environment variable handling
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update version numbers for Coolify releases
+- *(versions)* Bump Coolify stable version to 4.0.0-beta.434
+
+## [4.0.0-beta.433] - 2025-10-01
+
+### 🚀 Features
+
 - *(user-deletion)* Implement file locking to prevent concurrent user deletions and enhance error handling
 - *(ui)* Enhance resource operations interface with dynamic selection for cloning and moving resources
 - *(global-search)* Integrate projects and environments into global search functionality
@@ -114,6 +130,7 @@ All notable changes to this project will be documented in this file.
 
 ### 📚 Documentation
 
+- Update changelog
 - Update changelog
 - Update changelog
 
