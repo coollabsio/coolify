@@ -5,9 +5,8 @@
 # port: 80
 
 services:
-  # https://github.com/vitabaks/autobase/blob/2.3.2/console/db/README.md
   autobase-console-db:
-    image: autobase/console_db:2.3.2
+    image: autobase/console_db:2.4.1
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -18,9 +17,8 @@ services:
     volumes:
       - console_postgres:/var/lib/postgresql
 
-  # https://github.com/vitabaks/autobase/blob/2.3.2/console/service/README.md
   autobase-console-api:
-    image: autobase/console_api:2.3.2
+    image: autobase/console_api:2.4.1
     healthcheck:
       test: ["CMD", "curl", "-fsS",
             "-H", "accept: application/json",
@@ -42,9 +40,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/ansible:/tmp/ansible
 
-  # https://github.com/vitabaks/autobase/blob/2.3.2/console/ui/README.md
   autobase-console-ui:
-    image: autobase/console_ui:2.3.2
+    image: autobase/console_ui:2.4.1
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:80/" ]
       interval: 10s
