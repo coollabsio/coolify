@@ -68,6 +68,9 @@
                                     {{ $deployment->application_name }}
                                 </div>
                                 <p class="text-xs dark:text-neutral-400 text-gray-600 mt-1">
+                                    {{ $deployment->application?->environment?->project?->name }} / {{ $deployment->application?->environment?->name }}
+                                </p>
+                                <p class="text-xs dark:text-neutral-400 text-gray-600">
                                     {{ $deployment->server_name }}
                                 </p>
                                 @if ($deployment->pull_request_id)

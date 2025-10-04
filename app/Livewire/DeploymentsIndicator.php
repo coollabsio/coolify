@@ -16,7 +16,8 @@ class DeploymentsIndicator extends Component
     {
         $servers = Server::ownedByCurrentTeam()->get();
 
-        return ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])
+        return ApplicationDeploymentQueue::with(['application.environment.project'])
+            ->whereIn('status', ['in_progress', 'queued'])
             ->whereIn('server_id', $servers->pluck('id'))
             ->orderBy('id')
             ->get([
