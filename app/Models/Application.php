@@ -182,6 +182,21 @@ class Application extends BaseModel
             ]);
             $application->compose_parsing_version = self::$parserVersion;
             $application->save();
+
+            // Add default NIXPACKS_NODE_VERSION environment variable for Nixpacks applications
+            if ($application->build_pack === 'nixpacks') {
+                EnvironmentVariable::create([
+                    'key' => 'NIXPACKS_NODE_VERSION',
+                    'value' => '22',
+                    'is_multiline' => false,
+                    'is_literal' => false,
+                    'is_buildtime' => true,
+                    'is_runtime' => false,
+                    'is_preview' => false,
+                    'resourceable_type' => Application::class,
+                    'resourceable_id' => $application->id,
+                ]);
+            }
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
