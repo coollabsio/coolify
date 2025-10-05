@@ -352,7 +352,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
-            // $this->graceful_shutdown_container($this->deployment_uuid);
+            $this->graceful_shutdown_container($this->deployment_uuid);
 
             ServiceStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
