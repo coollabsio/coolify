@@ -27,7 +27,7 @@ services:
     volumes:
       - ${COOLIFY_VOLUME_REDIS}:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
