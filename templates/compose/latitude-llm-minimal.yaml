@@ -1,0 +1,104 @@
+# documentation: https://github.com/latitude-data/latitude-llm
+# slogan: Latitude LLM Platform - Minimal deployment (web + db + redis only)
+# tags: ai,llm,typescript,nextjs,postgres,redis,minimal
+# logo: svgs/latitude-llm.svg
+# port: 3000
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
+      - POSTGRES_DB=${DATABASE_NAME:-latitude_production}
+    volumes:
+      - ${COOLIFY_VOLUME_DB}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - ${COOLIFY_VOLUME_REDIS}:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migration:
+    image: ${DOCKER_IMAGE:?}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://${SERVICE_USER_DB}:${SERVICE_PASSWORD_DB}@db:5432/${DATABASE_NAME:-latitude_production}
+    command: ["pnpm", "db:migrate"]
+    exclude_from_hc: true
+    restart: "no"
+
+  web:
+    image: ${DOCKER_IMAGE:?}
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      # Coolify Magic Variables - Generate FQDN
+      - SERVICE_FQDN_WEB
+
+      # Core
+      - NODE_ENV=production
+
+      # Database
+      - DATABASE_URL=postgresql://${SERVICE_USER_DB}:${SERVICE_PASSWORD_DB}@db:5432/${DATABASE_NAME:-latitude_production}
+
+      # Redis
+      - QUEUE_HOST=redis
+      - QUEUE_PORT=6379
+      - QUEUE_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - CACHE_HOST=redis
+      - CACHE_PORT=6379
+      - CACHE_PASSWORD=${SERVICE_PASSWORD_REDIS}
+
+      # Application
+      - APP_DOMAIN=${SERVICE_FQDN_WEB}
+      - APP_URL=https://${SERVICE_FQDN_WEB}
+
+      # File Storage (local)
+      - DRIVE_DISK=local
+      - FILE_STORAGE_ROOT_PATH=/app/storage/files
+      - FILES_STORAGE_PATH=/app/storage/files
+      - PUBLIC_FILES_STORAGE_PATH=/app/public/files
+
+      # Email (Required)
+      - MAIL_TRANSPORT=${MAIL_TRANSPORT:?}
+      - FROM_MAILER_EMAIL=${FROM_MAILER_EMAIL:?}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_EMAIL_DOMAIN=${MAILGUN_EMAIL_DOMAIN:-}
+
+      # OAuth (Required)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:?}
+      - GOOGLE_REDIRECT_URI=https://${SERVICE_FQDN_WEB}/api/auth/google/callback
+
+      # Defaults (Required)
+      - DEFAULT_PROVIDER_API_KEY=${DEFAULT_PROVIDER_API_KEY:?}
+      - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${SERVICE_BASE64_ENCRYPTION}
+
+    volumes:
+      - ${COOLIFY_VOLUME_WEB_STORAGE}:/app/storage
+      - ${COOLIFY_VOLUME_WEB_PUBLIC}:/app/public
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
