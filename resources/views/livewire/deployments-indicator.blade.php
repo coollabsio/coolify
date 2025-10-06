@@ -1,6 +1,6 @@
 <div wire:poll.3000ms x-data="{
     expanded: @entangle('expanded')
-}" class="fixed bottom-0 z-50 mb-4 left-0 lg:left-56 ml-4">
+}" class="fixed bottom-0 z-60 mb-4 left-0 lg:left-56 ml-4">
     @if ($this->deploymentCount > 0)
         <div class="relative">
             <!-- Indicator Button -->
