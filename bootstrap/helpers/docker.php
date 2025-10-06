@@ -1122,9 +1122,10 @@ function escapeDollarSign($value)
 
 /**
  * Generate Docker build arguments from environment variables collection
+ * Returns only keys (no values) since values are sourced from environment via export
  *
  * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
- * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings
+ * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings (keys only)
  */
 function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
 {
@@ -1132,21 +1133,9 @@ function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
 
     return $variables->map(function ($var) {
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
-        $value = is_array($var) ? data_get($var, 'value') : $var->value;
-        $isMultiline = is_array($var) ? data_get($var, 'is_multiline', false) : ($var->is_multiline ?? false);
 
-        if ($isMultiline) {
-            // For multiline variables, strip surrounding quotes and escape for bash
-            $raw_value = trim($value, "'");
-            $escaped_value = str_replace(['\\', '"', '$', '`'], ['\\\\', '\\"', '\\$', '\\`'], $raw_value);
-
-            return "--build-arg {$key}=\"{$escaped_value}\"";
-        }
-
-        // For regular variables, use escapeshellarg for security
-        $value = escapeshellarg($value);
-
-        return "--build-arg {$key}={$value}";
+        // Only return the key - Docker will get the value from the environment
+        return "--build-arg {$key}";
     });
 }
 
