@@ -54,6 +54,24 @@
                     class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>.
             </div>
         @endif
+
+        @if ($preview)
+            <div class="flex gap-2 pt-2">
+                @if ($preview->status !== 'exited' && $preview->fqdn)
+                    <a target="_blank" href="{{ $preview->fqdn }}" class="flex items-center gap-1 text-sm hover:underline">
+                        Open Preview
+                        <x-external-link />
+                    </a>
+                    |
+                @endif
+                @if ($preview->pull_request_html_url)
+                    <a target="_blank" href="{{ $preview->pull_request_html_url }}" class="flex items-center gap-1 text-sm hover:underline">
+                        Open PR on Git
+                        <x-external-link />
+                    </a>
+                @endif
+            </div>
+        @endif
         <div id="screen" :class="fullscreen ? 'fullscreen' : 'relative'">
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                 class="flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto bg-white dark:text-white dark:bg-coolgray-100 scrollbar dark:border-coolgray-300"

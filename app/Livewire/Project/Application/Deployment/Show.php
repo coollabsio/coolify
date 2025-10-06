@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application\Deployment;
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use Livewire\Component;
 
 class Show extends Component
@@ -17,6 +18,8 @@ class Show extends Component
     public string $horizon_job_status;
 
     public $isKeepAliveOn = true;
+
+    public ?ApplicationPreview $preview = null;
 
     public function getListeners()
     {
@@ -57,6 +60,12 @@ class Show extends Component
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->deployment_uuid = $deploymentUuid;
         $this->isKeepAliveOn();
+
+        if ($this->application_deployment_queue->pull_request_id && $this->application_deployment_queue->pull_request_id > 0) {
+            $this->preview = ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $this->application_deployment_queue->pull_request_id)
+                ->first();
+        }
     }
 
     public function refreshQueue()
@@ -79,6 +88,12 @@ class Show extends Component
         $this->application_deployment_queue->refresh();
         $this->horizon_job_status = $this->application_deployment_queue->getHorizonJobStatus();
         $this->isKeepAliveOn();
+
+        if ($this->application_deployment_queue->pull_request_id && $this->application_deployment_queue->pull_request_id > 0) {
+            $this->preview = ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $this->application_deployment_queue->pull_request_id)
+                ->first();
+        }
     }
 
     public function getLogLinesProperty()
