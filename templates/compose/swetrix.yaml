@@ -7,7 +7,7 @@
 
 services:
   swetrix:
-    image: swetrix/swetrix-fe:v4.0.2
+    image: swetrix/swetrix-fe:v4.0.3
     depends_on:
       - swetrix-api
     environment:
@@ -23,7 +23,7 @@ services:
       start_period: 15s
 
   swetrix-api:
-    image: swetrix/swetrix-api:v4.0.2
+    image: swetrix/swetrix-api:v4.0.3
     environment:
       # Required
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_SECRETKEYBASE
