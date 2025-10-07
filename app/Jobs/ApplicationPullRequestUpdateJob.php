@@ -49,7 +49,7 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             } elseif ($this->status === ProcessStatus::ERROR) {
                 $this->body = "The preview deployment failed. 🔴\n\n";
             }
-            $this->build_logs_url = base_url()."/project/{$this->application->environment->project->uuid}/{$this->application->environment->name}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+            $this->build_logs_url = base_url()."/project/{$this->application->environment->project->uuid}/environment/{$this->application->environment->uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
 
             $this->body .= '[Open Build Logs]('.$this->build_logs_url.")\n\n\n";
             $this->body .= 'Last updated at: '.now()->toDateTimeString().' CET';
