@@ -23,6 +23,10 @@
                 href="{{ route('notifications.pushover') }}">
                 <button>Pushover</button>
             </a>
+            <a class="{{ request()->routeIs('notifications.matrix') ? 'dark:text-white' : '' }}"
+                href="{{ route('notifications.matrix') }}">
+                <button>Matrix</button>
+            </a>
         </nav>
     </div>
 </div>
