@@ -1988,6 +1988,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->nixpacks_type === 'elixir') {
                     $this->elixir_finetunes();
                 }
+                if ($this->nixpacks_type === 'node') {
+                    // Check if NIXPACKS_NODE_VERSION is set
+                    $variables = data_get($parsed, 'variables', []);
+                    if (! isset($variables['NIXPACKS_NODE_VERSION'])) {
+                        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+                        $this->application_deployment_queue->addLogEntry('⚠️ NIXPACKS_NODE_VERSION not set. Nixpacks will use Node.js 18 by default, which is EOL.');
+                        $this->application_deployment_queue->addLogEntry('You can override this by setting NIXPACKS_NODE_VERSION=22 in your environment variables.');
+                        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+                    }
+                }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->nixpacks_plan_json = collect($parsed);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
