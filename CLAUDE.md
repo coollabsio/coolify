@@ -31,7 +31,7 @@ Only run artisan commands inside "coolify" container when in development.
 
 ### Running Tests
 **IMPORTANT**: Tests that require database connections MUST be run inside the Docker container:
-- **Inside Docker**: `docker exec -it coolify php artisan test` (for feature tests requiring database)
+- **Inside Docker**: `docker exec coolify php artisan test` (for feature tests requiring database)
 - **Outside Docker**: `./vendor/bin/pest tests/Unit` (for pure unit tests without database dependencies)
 - Unit tests should use mocking and avoid database connections
 - Feature tests that require database must be run in the `coolify` container
@@ -187,7 +187,7 @@ class MyComponent extends Component
 #### Test Execution Environment
 **CRITICAL**: Database-dependent tests MUST run inside Docker container:
 - **Unit Tests** (`tests/Unit/`): Should NOT use database. Use mocking. Run with `./vendor/bin/pest tests/Unit`
-- **Feature Tests** (`tests/Feature/`): May use database. MUST run inside Docker with `docker exec -it coolify php artisan test`
+- **Feature Tests** (`tests/Feature/`): May use database. MUST run inside Docker with `docker exec coolify php artisan test`
 - If a test needs database (factories, migrations, etc.), it belongs in `tests/Feature/`
 - Always mock external services and SSH connections in tests
 
@@ -591,9 +591,9 @@ it('is true', function () {
 - These tests use mocking and don't require PostgreSQL
 
 **Feature Tests (with database):**
-- Run inside Docker: `docker exec -it coolify php artisan test`
-- Run specific file: `docker exec -it coolify php artisan test tests/Feature/ExampleTest.php`
-- Filter by name: `docker exec -it coolify php artisan test --filter=testName`
+- Run inside Docker: `docker exec coolify php artisan test`
+- Run specific file: `docker exec coolify php artisan test tests/Feature/ExampleTest.php`
+- Filter by name: `docker exec coolify php artisan test --filter=testName`
 - These tests require PostgreSQL and use factories/migrations
 
 **General Guidelines:**
@@ -696,7 +696,7 @@ it('has emails', function (string $email) {
 - Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
 - Run the minimum number of tests needed to ensure code quality and speed.
 - **For Unit tests**: Use `./vendor/bin/pest tests/Unit/YourTest.php` (runs outside Docker)
-- **For Feature tests**: Use `docker exec -it coolify php artisan test --filter=YourTest` (runs inside Docker)
+- **For Feature tests**: Use `docker exec coolify php artisan test --filter=YourTest` (runs inside Docker)
 - Choose the correct test type based on database dependency:
   - No database needed? → Unit test with mocking
   - Database needed? → Feature test in Docker

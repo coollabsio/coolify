@@ -23,7 +23,7 @@ Coolify employs **comprehensive testing strategies** using modern PHP testing fr
 
 #### Feature Tests (`tests/Feature/`)
 - **MAY** use database connections (factories, migrations, models)
-- **MUST** run inside Docker container: `docker exec -it coolify php artisan test`
+- **MUST** run inside Docker container: `docker exec coolify php artisan test`
 - **MUST** use `RefreshDatabase` trait if touching database
 - Purpose: Test API endpoints, workflows, and integration scenarios
 
