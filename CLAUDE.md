@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to **Claude Code** (claude.ai/code) when working with code in this repository.
+
+> **Note for AI Assistants**: This file is specifically for Claude Code. If you're using Cursor IDE, refer to the `.cursor/rules/` directory for detailed rule files. Both systems share core principles but are optimized for their respective workflows.
+>
+> **Maintaining Instructions**: When updating AI instructions, see [.AI_INSTRUCTIONS_SYNC.md](.AI_INSTRUCTIONS_SYNC.md) for synchronization guidelines between CLAUDE.md and .cursor/rules/.
 
 ## Project Overview
 
@@ -250,7 +254,9 @@ When developing features:
 
 ## Additional Documentation
 
-For more detailed guidelines and patterns, refer to the `.cursor/rules/` directory:
+This file contains high-level guidelines for Claude Code. For **more detailed, topic-specific documentation**, refer to the `.cursor/rules/` directory (also accessible by Cursor IDE and other AI assistants):
+
+> **Cross-Reference**: The `.cursor/rules/` directory contains comprehensive, detailed documentation organized by topic. Start with [.cursor/rules/README.mdc](.cursor/rules/README.mdc) for an overview, then explore specific topics below.
 
 ### Architecture & Patterns
 - [Application Architecture](.cursor/rules/application-architecture.mdc) - Detailed application structure
@@ -456,7 +462,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ### Database
 - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-- Laravel 11 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
+- Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
 
 ### Models
 - Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
