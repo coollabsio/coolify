@@ -21,7 +21,7 @@ class StopProxy
             ProxyStatusChangedUI::dispatch($server->team_id);
 
             instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
+                "docker stop --timeout=$timeout $containerName",
                 "docker rm -f $containerName",
             ], server: $server, throwError: false);
 

@@ -153,7 +153,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
         $commands = [
-            "docker stop --time=$timeout $containerList",
+            "docker stop --timeout=$timeout $containerList",
             "docker rm -f $containerList",
         ];
 
