@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -72,6 +73,15 @@ class Reachable extends CustomEmailNotification
             title: 'Server revived',
             description: "Server '{$this->server->name}' revived.\nAll automations & integrations are turned on again!",
             color: SlackMessage::successColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
+            title: 'Server revived',
+            message: "Server **'{$this->server->name}'** revived. All automations & integrations are turned on again!",
+            level: 'success',
         );
     }
 }

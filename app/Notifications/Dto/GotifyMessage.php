@@ -29,6 +29,11 @@ class GotifyMessage
             'title' => $this->title,
             'message' => $this->message,
             'priority' => $this->getPriority(),
+            'extras' => [
+                'client::display' => [
+                    'contentType' => 'text/markdown',
+                ],
+            ],
         ];
 
         // See about Gotify extras: https://gotify.net/docs/msgextras
@@ -38,14 +43,9 @@ class GotifyMessage
             if ($buttonUrl && str_contains($buttonUrl, 'http://localhost')) {
                 $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
             }
-            $payload['extras'] = [
-                'client::notification' => [
-                    'click' => [
-                        'url' => $buttonUrl,
-                    ],
-                ],
-                'client::display' => [
-                    'contentType' => 'text/markdown',
+            $payload['extras']['client::notification'] = [
+                'click' => [
+                    'url' => $buttonUrl,
                 ],
             ];
         }

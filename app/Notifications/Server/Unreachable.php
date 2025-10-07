@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -80,6 +81,15 @@ class Unreachable extends CustomEmailNotification
             title: 'Server unreachable',
             description: $description,
             color: SlackMessage::errorColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        return new GotifyMessage(
+            title: 'Server unreachable',
+            level: 'error',
+            message: "Your server **'{$this->server->name}'** is unreachable.\nAll automations & integrations are turned off!\n\n**IMPORTANT:** We automatically try to revive your server and turn on all automations & integrations.",
         );
     }
 }

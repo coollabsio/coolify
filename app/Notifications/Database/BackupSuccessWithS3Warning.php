@@ -5,6 +5,7 @@ namespace App\Notifications\Database;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -111,6 +112,26 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
             title: $title,
             description: $description,
             color: SlackMessage::warningColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        $message = "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to S3.\n\n**Frequency:** {$this->frequency}\n\n**S3 Error:** {$this->s3_error}";
+
+        $buttons = [];
+        if ($this->s3_storage_url) {
+            $buttons[] = [
+                'text' => 'Check S3 Configuration',
+                'url' => $this->s3_storage_url,
+            ];
+        }
+
+        return new GotifyMessage(
+            title: 'Database backup succeeded locally, S3 upload failed',
+            level: 'warning',
+            message: $message,
+            buttons: $buttons,
         );
     }
 }

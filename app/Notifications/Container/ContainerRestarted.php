@@ -5,6 +5,7 @@ namespace App\Notifications\Container;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\GotifyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -100,6 +101,24 @@ class ContainerRestarted extends CustomEmailNotification
             title: $title,
             description: $description,
             color: SlackMessage::warningColor()
+        );
+    }
+
+    public function toGotify(): GotifyMessage
+    {
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Check Proxy in Coolify',
+                'url' => $this->url,
+            ];
+        }
+
+        return new GotifyMessage(
+            title: 'Resource restarted',
+            level: 'warning',
+            message: "A resource ({$this->name}) has been restarted automatically on {$this->server->name}",
+            buttons: $buttons,
         );
     }
 }
