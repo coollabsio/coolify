@@ -9,7 +9,50 @@ alwaysApply: false
 
 Coolify employs **comprehensive testing strategies** using modern PHP testing frameworks to ensure reliability of deployment operations, infrastructure management, and user interactions.
 
-!Important: Always run tests inside `coolify` container.
+### Test Execution Rules
+
+**CRITICAL**: Tests are categorized by database dependency:
+
+#### Unit Tests (`tests/Unit/`)
+- **MUST NOT** use database connections
+- **MUST** use mocking for models and external dependencies
+- **CAN** run outside Docker: `./vendor/bin/pest tests/Unit`
+- Purpose: Test isolated logic, helper functions, and business rules
+
+#### Feature Tests (`tests/Feature/`)
+- **MAY** use database connections (factories, migrations, models)
+- **MUST** run inside Docker container: `docker exec -it coolify php artisan test`
+- **MUST** use `RefreshDatabase` trait if touching database
+- Purpose: Test API endpoints, workflows, and integration scenarios
+
+**Rule of thumb**: If your test needs `Server::factory()->create()` or any database operation, it's a Feature test and MUST run in Docker.
+
+### Prefer Mocking Over Database
+
+When writing tests, always prefer mocking over real database operations:
+
+```php
+// ❌ BAD: Unit test using database
+it('extracts custom commands', function () {
+    $server = Server::factory()->create(['ip' => '1.2.3.4']);
+    $commands = extract_custom_proxy_commands($server, $yaml);
+    expect($commands)->toBeArray();
+});
+
+// ✅ GOOD: Unit test using mocking
+it('extracts custom commands', function () {
+    $server = Mockery::mock('App\Models\Server');
+    $server->shouldReceive('proxyType')->andReturn('traefik');
+    $commands = extract_custom_proxy_commands($server, $yaml);
+    expect($commands)->toBeArray();
+});
+```
+
+**Design principles for testable code:**
+- Use dependency injection instead of global state
+- Create interfaces for external dependencies (SSH, Docker, etc.)
+- Separate business logic from data persistence
+- Make functions accept interfaces instead of concrete models when possible
 
 ## Testing Framework Stack
 
