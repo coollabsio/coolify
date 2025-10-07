@@ -34,9 +34,14 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          
-          # This is an optional setting that allows Claude to read CI results on PRs
+       - name: Run Claude Code
+         id: claude
+         uses: anthropics/claude-code-action@v1
+         with:
+           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+           # This is an optional setting that allows Claude to read CI results on PRs
+           additional_permissions: |
+             actions: read
           additional_permissions: |
             actions: read
 
