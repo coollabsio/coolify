@@ -31,39 +31,35 @@ class GotifyMessage
             'priority' => $this->getPriority(),
         ];
 
-        // See: https://gotify.net/docs/msgextras
-        if (! empty($this->buttons)) {
-            $actions = [];
-
-            foreach ($this->buttons as $button) {
-                $buttonUrl = data_get($button, 'url');
-                $text = data_get($button, 'text', 'Click here');
-
-                // Replace localhost with actual app URL
-                if ($buttonUrl && str_contains($buttonUrl, 'http://localhost')) {
-                    $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
-                }
-
-                if ($buttonUrl) {
-                    $actions[] = [
-                        'label' => $text,
+        // See about Gotify extras: https://gotify.net/docs/msgextras
+        if (count($this->buttons) == 1) {
+            $button = $this->buttons[0];
+            $buttonUrl = data_get($button, 'url');
+            if ($buttonUrl && str_contains($buttonUrl, 'http://localhost')) {
+                $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
+            }
+            $payload['extras'] = [
+                'client::notification' => [
+                    'click' => [
                         'url' => $buttonUrl,
-                    ];
-                }
+                    ],
+                ],
+                'client::display' => [
+                    'contentType' => 'text/markdown',
+                ],
+            ];
+        }
+
+        foreach ($this->buttons as $button) {
+            $buttonUrl = data_get($button, 'url');
+            $text = data_get($button, 'text', 'Click here');
+
+            // Replace localhost with actual app URL
+            if ($buttonUrl && str_contains($buttonUrl, 'http://localhost')) {
+                $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
             }
 
-            if (! empty($actions)) {
-                $payload['extras'] = [
-                    'client::notification' => [
-                        'click' => [
-                            'url' => $actions[0]['url'], // Default click action
-                        ],
-                    ],
-                    'client::display' => [
-                        'contentType' => 'text/plain',
-                    ],
-                ];
-            }
+            $payload['message'] .= "\n\n[{$text}]({$buttonUrl})";
         }
 
         Log::info('Gotify message', $payload);
