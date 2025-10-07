@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsGotify;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
@@ -36,7 +37,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, SendsPushover, SendsSlack
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
@@ -54,6 +55,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->slackNotificationSettings()->create();
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
+            $team->gotifyNotificationSettings()->create();
         });
 
         static::saving(function ($team) {
@@ -165,6 +167,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         ];
     }
 
+    public function routeNotificationForGotify()
+    {
+        return [
+            'url' => data_get($this, 'gotify_url', null),
+            'token' => data_get($this, 'gotify_token', null),
+        ];
+    }
+
     public function getRecipients(): array
     {
         $recipients = $this->members()->pluck('email')->toArray();
@@ -188,7 +198,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('discord')?->isEnabled() ||
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
-            $this->getNotificationSettings('pushover')?->isEnabled();
+            $this->getNotificationSettings('pushover')?->isEnabled() ||
+            $this->getNotificationSettings('gotify')?->isEnabled();
     }
 
     public function subscriptionEnded()
@@ -306,5 +317,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function pushoverNotificationSettings()
     {
         return $this->hasOne(PushoverNotificationSettings::class);
+    }
+
+    public function gotifyNotificationSettings()
+    {
+        return $this->hasOne(GotifyNotificationSettings::class);
     }
 }

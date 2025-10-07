@@ -23,6 +23,10 @@
                 href="{{ route('notifications.pushover') }}">
                 <button>Pushover</button>
             </a>
+            <a class="{{ request()->routeIs('notifications.gotify') ? 'dark:text-white' : '' }}"
+                href="{{ route('notifications.gotify') }}">
+                <button>Gotify</button>
+            </a>
         </nav>
     </div>
 </div>
