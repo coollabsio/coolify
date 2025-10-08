@@ -9,7 +9,6 @@ version: '3.8'
 services:
   api:
     image: 'evoapicloud/evolution-api:v2.3.4'
-    restart: always
     depends_on:
       postgres:
         condition: service_healthy
