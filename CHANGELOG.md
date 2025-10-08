@@ -158,6 +158,7 @@ All notable changes to this project will be documented in this file.
 - *(git)* Trim whitespace from repository, branch, and commit SHA fields
 - *(deployments)* Order deployments by ID for consistent retrieval
 - *(deployments)* Enhance builder container management and environment variable handling
+- *(templates)* Add health checks for Evolution API, Redis, and Postgres
 
 ### 💼 Other
 
@@ -257,6 +258,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog
 - Update changelog
 - *(claude)* Update testing guidelines and add note on Application::team relationship
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
