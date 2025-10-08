@@ -182,4 +182,3 @@ services:
       retries: 20
       start_period: 10s
 
-  postgres_data: null
