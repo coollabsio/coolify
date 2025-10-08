@@ -36,6 +36,12 @@
 
         return this.creatableItems.filter(item => {
             const searchText = `${item.name} ${item.description} ${item.type} ${item.category}`.toLowerCase();
+
+            if (query.startsWith('new ')) {
+                const queryWithoutNew = query.substring(4);
+                return searchText.includes(queryWithoutNew) || searchText.includes(query);
+            }
+
             return searchText.includes(query);
         });
     },
@@ -339,8 +345,8 @@
                                             @foreach ($availableServers as $index => $server)
                                                 <button type="button"
                                                     wire:click="selectServer({{ $server['id'] }}, true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
-                                                    <div class="flex items-center justify-between gap-3">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $server['name'] }}
@@ -349,6 +355,10 @@
                                                                 <div
                                                                     class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                     {{ $server['description'] }}
+                                                                </div>
+                                                            @else
+                                                                <div class="text-xs text-transparent select-none">
+                                                                    &nbsp;
                                                                 </div>
                                                             @endif
                                                         </div>
@@ -414,8 +424,8 @@
                                             @foreach ($availableDestinations as $index => $destination)
                                                 <button type="button"
                                                     wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
-                                                    <div class="flex items-center justify-between gap-3">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $destination['name'] }}
@@ -487,8 +497,8 @@
                                             @foreach ($availableProjects as $index => $project)
                                                 <button type="button"
                                                     wire:click="selectProject('{{ $project['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
-                                                    <div class="flex items-center justify-between gap-3">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $project['name'] }}
@@ -497,6 +507,10 @@
                                                                 <div
                                                                     class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                     {{ $project['description'] }}
+                                                                </div>
+                                                            @else
+                                                                <div class="text-xs text-transparent select-none">
+                                                                    &nbsp;
                                                                 </div>
                                                             @endif
                                                         </div>
@@ -562,8 +576,8 @@
                                             @foreach ($availableEnvironments as $index => $environment)
                                                 <button type="button"
                                                     wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
-                                                    <div class="flex items-center justify-between gap-3">
+                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
+                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
                                                         <div class="flex-1 min-w-0">
                                                             <div class="font-medium text-neutral-900 dark:text-white">
                                                                 {{ $environment['name'] }}
@@ -572,6 +586,10 @@
                                                                 <div
                                                                     class="text-xs text-neutral-500 dark:text-neutral-400">
                                                                     {{ $environment['description'] }}
+                                                                </div>
+                                                            @else
+                                                                <div class="text-xs text-transparent select-none">
+                                                                    &nbsp;
                                                                 </div>
                                                             @endif
                                                         </div>
@@ -745,6 +763,7 @@
                                                     </span>
                                                     <span
                                                         class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
+                                                        <span x-show="result.type === 'navigation'">Navigation</span>
                                                         <span x-show="result.type === 'application'">Application</span>
                                                         <span x-show="result.type === 'service'">Service</span>
                                                         <span x-show="result.type === 'database'"

@@ -585,8 +585,136 @@ class GlobalSearch extends Component
                     ];
                 });
 
+            // Add navigation routes
+            $navigation = collect([
+                [
+                    'name' => 'Dashboard',
+                    'type' => 'navigation',
+                    'description' => 'Go to main dashboard',
+                    'link' => route('dashboard'),
+                    'search_text' => 'dashboard home main overview',
+                ],
+                [
+                    'name' => 'Servers',
+                    'type' => 'navigation',
+                    'description' => 'View all servers',
+                    'link' => route('server.index'),
+                    'search_text' => 'servers all list view',
+                ],
+                [
+                    'name' => 'Projects',
+                    'type' => 'navigation',
+                    'description' => 'View all projects',
+                    'link' => route('project.index'),
+                    'search_text' => 'projects all list view',
+                ],
+                [
+                    'name' => 'Destinations',
+                    'type' => 'navigation',
+                    'description' => 'View all destinations',
+                    'link' => route('destination.index'),
+                    'search_text' => 'destinations docker networks',
+                ],
+                [
+                    'name' => 'Security',
+                    'type' => 'navigation',
+                    'description' => 'Manage private keys and API tokens',
+                    'link' => route('security.private-key.index'),
+                    'search_text' => 'security private keys ssh api tokens',
+                ],
+                [
+                    'name' => 'Sources',
+                    'type' => 'navigation',
+                    'description' => 'Manage GitHub apps and Git sources',
+                    'link' => route('source.all'),
+                    'search_text' => 'sources github apps git repositories',
+                ],
+                [
+                    'name' => 'Storages',
+                    'type' => 'navigation',
+                    'description' => 'Manage S3 storage for backups',
+                    'link' => route('storage.index'),
+                    'search_text' => 'storages s3 backups',
+                ],
+                [
+                    'name' => 'Shared Variables',
+                    'type' => 'navigation',
+                    'description' => 'View all shared variables',
+                    'link' => route('shared-variables.index'),
+                    'search_text' => 'shared variables environment all',
+                ],
+                [
+                    'name' => 'Team Shared Variables',
+                    'type' => 'navigation',
+                    'description' => 'Manage team-wide shared variables',
+                    'link' => route('shared-variables.team.index'),
+                    'search_text' => 'shared variables team environment',
+                ],
+                [
+                    'name' => 'Project Shared Variables',
+                    'type' => 'navigation',
+                    'description' => 'Manage project shared variables',
+                    'link' => route('shared-variables.project.index'),
+                    'search_text' => 'shared variables project environment',
+                ],
+                [
+                    'name' => 'Environment Shared Variables',
+                    'type' => 'navigation',
+                    'description' => 'Manage environment shared variables',
+                    'link' => route('shared-variables.environment.index'),
+                    'search_text' => 'shared variables environment',
+                ],
+                [
+                    'name' => 'Tags',
+                    'type' => 'navigation',
+                    'description' => 'View resources by tags',
+                    'link' => route('tags.show'),
+                    'search_text' => 'tags labels organize',
+                ],
+                [
+                    'name' => 'Terminal',
+                    'type' => 'navigation',
+                    'description' => 'Access server terminal',
+                    'link' => route('terminal'),
+                    'search_text' => 'terminal ssh console shell command line',
+                ],
+                [
+                    'name' => 'Profile',
+                    'type' => 'navigation',
+                    'description' => 'Manage your profile and preferences',
+                    'link' => route('profile'),
+                    'search_text' => 'profile account user settings preferences',
+                ],
+                [
+                    'name' => 'Team',
+                    'type' => 'navigation',
+                    'description' => 'Manage team members and settings',
+                    'link' => route('team.index'),
+                    'search_text' => 'team settings members users invitations',
+                ],
+                [
+                    'name' => 'Notifications',
+                    'type' => 'navigation',
+                    'description' => 'Configure email, Discord, Telegram notifications',
+                    'link' => route('notifications.email'),
+                    'search_text' => 'notifications alerts email discord telegram slack pushover',
+                ],
+            ]);
+
+            // Add instance settings only for self-hosted and root team
+            if (! isCloud() && $team->id === 0) {
+                $navigation->push([
+                    'name' => 'Settings',
+                    'type' => 'navigation',
+                    'description' => 'Instance settings and configuration',
+                    'link' => route('settings.index'),
+                    'search_text' => 'settings configuration instance',
+                ]);
+            }
+
             // Merge all collections
-            $items = $items->merge($applications)
+            $items = $items->merge($navigation)
+                ->merge($applications)
                 ->merge($services)
                 ->merge($databases)
                 ->merge($servers)
