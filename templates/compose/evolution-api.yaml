@@ -171,7 +171,6 @@ services:
       - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
       - 'POSTGRES_DB=${POSTGRES_DB:-postgres}'
       - 'AUTHENTICATION_API_KEY=${SERVICE_PASSWORD_AUTHENTICATIONAPIKEY}'
-    restart: always
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
