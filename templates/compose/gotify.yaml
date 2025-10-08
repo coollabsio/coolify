@@ -7,11 +7,9 @@
 
 services:
   gotify:
-    image: gotify/server
-    ports:
-      - 8080:80
+    image: gotify/server:2.7.3
     environment:
-      - SERVICE_FQDN_GOTIFY_80
+      - SERVICE_URL_GOTIFY_80
       - GOTIFY_DEFAULTUSER_NAME=${GOTIFY_USERNAME:-admin}
       - GOTIFY_DEFAULTUSER_PASS=${SERVICE_PASSWORD_GOTIFY}
       - GOTIFY_DATABASE_DIALECT=${GOTIFY_DATABASE_DIALECT:-sqlite3}
@@ -24,7 +22,7 @@ services:
     volumes:
       - 'gotify-data:/app/data'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/health"]
       interval: 5s
       timeout: 20s
       retries: 10
