@@ -151,7 +151,6 @@ services:
   redis:
     image: 'redis:latest'
     command: "redis-server --port 6379 --appendonly yes\n"
-    restart: always
     volumes:
       - 'evolution_redis:/data'
     healthcheck:
