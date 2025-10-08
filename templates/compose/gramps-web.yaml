@@ -7,7 +7,7 @@
 
 services:
   grampsweb:
-    image: ghcr.io/gramps-project/grampsweb:latest
+    image: ghcr.io/gramps-project/grampsweb:25.9.0
     environment:
       - SERVICE_URL_GRAMPSWEB_5000
       - GRAMPSWEB_TREE=${GRAMPSWEB_TREE:-Gramps Web} # will create a new tree if not exists
@@ -33,7 +33,7 @@ services:
       retries: 3
 
   grampsweb_celery:
-    image: ghcr.io/gramps-project/grampsweb:latest
+    image: ghcr.io/gramps-project/grampsweb:25.9.0
     environment:
       - GRAMPSWEB_TREE=${GRAMPSWEB_TREE:-Gramps Web} # will create a new tree if not exists
       - GRAMPSWEB_CELERY_CONFIG__broker_url=redis://grampsweb_redis:6379/0
