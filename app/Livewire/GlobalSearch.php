@@ -81,6 +81,7 @@ class GlobalSearch extends Component
     {
         $this->isModalOpen = true;
         $this->loadSearchableItems();
+        $this->loadCreatableItems();
         $this->dispatch('search-modal-opened');
     }
 
@@ -972,6 +973,9 @@ class GlobalSearch extends Component
                 'resourceType' => 'database',
             ]);
         }
+
+        // Merge with services
+        $items = $items->merge(collect($this->services));
 
         $this->creatableItems = $items->toArray();
     }
