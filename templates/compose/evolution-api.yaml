@@ -141,25 +141,30 @@ services:
     expose:
       - "8080"
     healthcheck:
-      # Internal healthcheck: success if "/" returns 2xx
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      # Internal healthcheck: success if "/" returns 2xx (sin curl/wget)
+      test:
+        - CMD-SHELL
+        - >
+          node -e "require('http')
+          .get('http://127.0.0.1:8080/',r=>process.exit(r.statusCode>=200&&r.statusCode<300?0:1))
+          .on('error',()=>process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 60s
 
   redis:
-    image: 'redis:latest'
+    image: 'redis:7-alpine'
     command: "redis-server --port 6379 --appendonly yes\n"
     volumes:
       - 'evolution_redis:/data'
-    image: 'redis:7-alpine'
     healthcheck:
       test: ["CMD", "redis-cli", "-h", "127.0.0.1", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 5s
+
   postgres:
     image: 'postgres:16-alpine'
     command:
@@ -182,3 +187,7 @@ services:
       retries: 20
       start_period: 10s
 
+volumes:
+  evolution_instances:
+  evolution_redis:
+  postgres_data:
