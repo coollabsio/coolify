@@ -7,7 +7,7 @@
 
 services:
   lobe-chat:
-    image: "lobehub/lobe-chat:latest"
+    image: "lobehub/lobe-chat:1.135.5"
     environment:
       - SERVICE_URL_LOBECHAT_3210
       - OPENAI_API_KEY=${OPENAI_API_KEY}
