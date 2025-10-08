@@ -34,6 +34,35 @@ class GlobalSearch extends Component
 
     public $autoOpenResource = null;
 
+    // Resource selection state
+    public $isSelectingResource = false;
+
+    public $selectedResourceType = null;
+
+    public $loadingServers = false;
+
+    public $loadingProjects = false;
+
+    public $loadingEnvironments = false;
+
+    public $availableServers = [];
+
+    public $availableProjects = [];
+
+    public $availableEnvironments = [];
+
+    public $selectedServerId = null;
+
+    public $selectedDestinationUuid = null;
+
+    public $selectedProjectUuid = null;
+
+    public $selectedEnvironmentUuid = null;
+
+    public $availableDestinations = [];
+
+    public $loadingDestinations = false;
+
     public function mount()
     {
         $this->searchQuery = '';
@@ -43,6 +72,7 @@ class GlobalSearch extends Component
         $this->isCreateMode = false;
         $this->creatableItems = [];
         $this->autoOpenResource = null;
+        $this->isSelectingResource = false;
     }
 
     public function openSearchModal()
@@ -73,6 +103,9 @@ class GlobalSearch extends Component
     {
         $query = strtolower(trim($this->searchQuery));
 
+        // Reset keyboard navigation index
+        $this->dispatch('reset-selected-index');
+
         if (str_starts_with($query, 'new')) {
             $this->isCreateMode = true;
             $this->loadCreatableItems();
@@ -80,11 +113,18 @@ class GlobalSearch extends Component
 
             // Check for sub-commands like "new project", "new server", etc.
             // Use original query (not trimmed) to ensure exact match without trailing spaces
-            $this->autoOpenResource = $this->detectSpecificResource(strtolower($this->searchQuery));
+            $detectedType = $this->detectSpecificResource(strtolower($this->searchQuery));
+            if ($detectedType) {
+                $this->navigateToResource($detectedType);
+            } else {
+                // If no specific resource detected, reset selection state
+                $this->cancelResourceSelection();
+            }
         } else {
             $this->isCreateMode = false;
             $this->creatableItems = [];
             $this->autoOpenResource = null;
+            $this->isSelectingResource = false;
             $this->search();
         }
     }
@@ -93,6 +133,7 @@ class GlobalSearch extends Component
     {
         // Map of keywords to resource types - order matters for multi-word matches
         $resourceMap = [
+            // Quick Actions
             'new project' => 'project',
             'new server' => 'server',
             'new team' => 'team',
@@ -101,9 +142,38 @@ class GlobalSearch extends Component
             'new private key' => 'private-key',
             'new privatekey' => 'private-key',
             'new key' => 'private-key',
+            'new github app' => 'source',
             'new github' => 'source',
             'new source' => 'source',
-            'new git' => 'source',
+
+            // Applications - Git-based
+            'new public' => 'public',
+            'new public git' => 'public',
+            'new public repo' => 'public',
+            'new public repository' => 'public',
+            'new private github' => 'private-gh-app',
+            'new private gh' => 'private-gh-app',
+            'new private deploy' => 'private-deploy-key',
+            'new deploy key' => 'private-deploy-key',
+
+            // Applications - Docker-based
+            'new dockerfile' => 'dockerfile',
+            'new docker compose' => 'docker-compose-empty',
+            'new compose' => 'docker-compose-empty',
+            'new docker image' => 'docker-image',
+            'new image' => 'docker-image',
+
+            // Databases
+            'new postgresql' => 'postgresql',
+            'new postgres' => 'postgresql',
+            'new mysql' => 'mysql',
+            'new mariadb' => 'mariadb',
+            'new redis' => 'redis',
+            'new keydb' => 'keydb',
+            'new dragonfly' => 'dragonfly',
+            'new mongodb' => 'mongodb',
+            'new mongo' => 'mongodb',
+            'new clickhouse' => 'clickhouse',
         ];
 
         foreach ($resourceMap as $command => $type) {
@@ -122,12 +192,29 @@ class GlobalSearch extends Component
     {
         $user = auth()->user();
 
-        return match ($type) {
-            'project', 'source' => $user->can('createAnyResource'),
-            'server', 'storage', 'private-key' => $user->isAdmin() || $user->isOwner(),
-            'team' => true,
-            default => false,
-        };
+        // Quick Actions
+        if (in_array($type, ['server', 'storage', 'private-key'])) {
+            return $user->isAdmin() || $user->isOwner();
+        }
+
+        if ($type === 'team') {
+            return true;
+        }
+
+        // Applications, Databases, Services, and other resources
+        if (in_array($type, [
+            'project', 'source',
+            // Applications
+            'public', 'private-gh-app', 'private-deploy-key',
+            'dockerfile', 'docker-compose-empty', 'docker-image',
+            // Databases
+            'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
+            'dragonfly', 'mongodb', 'clickhouse',
+        ]) || str_starts_with($type, 'one-click-service-')) {
+            return $user->can('createAnyResource');
+        }
+
+        return false;
     }
 
     private function loadSearchableItems()
@@ -181,7 +268,7 @@ class GlobalSearch extends Component
                         'project' => $app->environment->project->name ?? null,
                         'environment' => $app->environment->name ?? null,
                         'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
-                        'search_text' => strtolower($app->name.' '.$app->description.' '.$fqdnsString),
+                        'search_text' => strtolower($app->name.' '.$app->description.' '.$fqdnsString.' application applications app apps'),
                     ];
                 });
 
@@ -210,7 +297,7 @@ class GlobalSearch extends Component
                         'project' => $service->environment->project->name ?? null,
                         'environment' => $service->environment->name ?? null,
                         'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
-                        'search_text' => strtolower($service->name.' '.$service->description.' '.$fqdnsString),
+                        'search_text' => strtolower($service->name.' '.$service->description.' '.$fqdnsString.' service services'),
                     ];
                 });
 
@@ -233,7 +320,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' postgresql '.$db->description),
+                            'search_text' => strtolower($db->name.' postgresql '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -254,7 +341,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' mysql '.$db->description),
+                            'search_text' => strtolower($db->name.' mysql '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -275,7 +362,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' mariadb '.$db->description),
+                            'search_text' => strtolower($db->name.' mariadb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -296,7 +383,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' mongodb '.$db->description),
+                            'search_text' => strtolower($db->name.' mongodb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -317,7 +404,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' redis '.$db->description),
+                            'search_text' => strtolower($db->name.' redis '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -338,7 +425,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' keydb '.$db->description),
+                            'search_text' => strtolower($db->name.' keydb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -359,7 +446,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' dragonfly '.$db->description),
+                            'search_text' => strtolower($db->name.' dragonfly '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -380,7 +467,7 @@ class GlobalSearch extends Component
                             'link' => $db->link(),
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' clickhouse '.$db->description),
+                            'search_text' => strtolower($db->name.' clickhouse '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -398,10 +485,10 @@ class GlobalSearch extends Component
                         'link' => $server->url(),
                         'project' => null,
                         'environment' => null,
-                        'search_text' => strtolower($server->name.' '.$server->ip.' '.$server->description),
+                        'search_text' => strtolower($server->name.' '.$server->ip.' '.$server->description.' server servers'),
                     ];
                 });
-
+            ray($servers);
             // Get all projects
             $projects = Project::ownedByCurrentTeam()
                 ->withCount(['environments', 'applications', 'services'])
@@ -423,7 +510,7 @@ class GlobalSearch extends Component
                         'environment' => null,
                         'resource_count' => $resourceSummary,
                         'environment_count' => $project->environments_count,
-                        'search_text' => strtolower($project->name.' '.$project->description.' project'),
+                        'search_text' => strtolower($project->name.' '.$project->description.' project projects'),
                     ];
                 });
 
@@ -484,7 +571,7 @@ class GlobalSearch extends Component
 
     private function search()
     {
-        if (strlen($this->searchQuery) < 2) {
+        if (strlen($this->searchQuery) < 1) {
             $this->searchResults = [];
 
             return;
@@ -492,14 +579,126 @@ class GlobalSearch extends Component
 
         $query = strtolower($this->searchQuery);
 
-        // Case-insensitive search in the items
-        $this->searchResults = collect($this->allSearchableItems)
+        // Detect resource category queries
+        $categoryMapping = [
+            'server' => ['server', 'type' => 'server'],
+            'servers' => ['server', 'type' => 'server'],
+            'app' => ['application', 'type' => 'application'],
+            'apps' => ['application', 'type' => 'application'],
+            'application' => ['application', 'type' => 'application'],
+            'applications' => ['application', 'type' => 'application'],
+            'db' => ['database', 'type' => 'standalone-postgresql'],
+            'database' => ['database', 'type' => 'standalone-postgresql'],
+            'databases' => ['database', 'type' => 'standalone-postgresql'],
+            'service' => ['service', 'category' => 'Services'],
+            'services' => ['service', 'category' => 'Services'],
+            'project' => ['project', 'type' => 'project'],
+            'projects' => ['project', 'type' => 'project'],
+        ];
+
+        $priorityCreatableItem = null;
+
+        // Check if query matches a resource category
+        if (isset($categoryMapping[$query])) {
+            $this->loadCreatableItems();
+            $mapping = $categoryMapping[$query];
+
+            // Find the matching creatable item
+            $priorityCreatableItem = collect($this->creatableItems)
+                ->first(function ($item) use ($mapping) {
+                    if (isset($mapping['type'])) {
+                        return $item['type'] === $mapping['type'];
+                    }
+                    if (isset($mapping['category'])) {
+                        return isset($item['category']) && $item['category'] === $mapping['category'];
+                    }
+
+                    return false;
+                });
+
+            if ($priorityCreatableItem) {
+                $priorityCreatableItem['is_creatable_suggestion'] = true;
+            }
+        }
+
+        // Search for matching creatable resources to show as suggestions (if no priority item)
+        if (! $priorityCreatableItem) {
+            $this->loadCreatableItems();
+            $creatableSuggestions = collect($this->creatableItems)
+                ->filter(function ($item) use ($query) {
+                    $searchText = strtolower($item['name'].' '.$item['description'].' '.($item['type'] ?? ''));
+
+                    // Use word boundary matching to avoid substring matches (e.g., "wordpress" shouldn't match "classicpress")
+                    return preg_match('/\b'.preg_quote($query, '/').'/i', $searchText);
+                })
+                ->map(function ($item) use ($query) {
+                    // Calculate match priority: name > type > description
+                    $name = strtolower($item['name']);
+                    $type = strtolower($item['type'] ?? '');
+                    $description = strtolower($item['description']);
+
+                    if (preg_match('/\b'.preg_quote($query, '/').'/i', $name)) {
+                        $item['match_priority'] = 1;
+                    } elseif (preg_match('/\b'.preg_quote($query, '/').'/i', $type)) {
+                        $item['match_priority'] = 2;
+                    } else {
+                        $item['match_priority'] = 3;
+                    }
+
+                    $item['is_creatable_suggestion'] = true;
+
+                    return $item;
+                })
+                ->sortBy('match_priority')
+                ->take(10)
+                ->values()
+                ->toArray();
+        } else {
+            $creatableSuggestions = [];
+        }
+
+        // Case-insensitive search in existing resources
+        $existingResults = collect($this->allSearchableItems)
             ->filter(function ($item) use ($query) {
-                return str_contains($item['search_text'], $query);
+                // Use word boundary matching to avoid substring matches (e.g., "wordpress" shouldn't match "classicpress")
+                return preg_match('/\b'.preg_quote($query, '/').'/i', $item['search_text']);
             })
+            ->map(function ($item) use ($query) {
+                // Calculate match priority: name > type > description
+                $name = strtolower($item['name'] ?? '');
+                $type = strtolower($item['type'] ?? '');
+                $description = strtolower($item['description'] ?? '');
+
+                if (preg_match('/\b'.preg_quote($query, '/').'/i', $name)) {
+                    $item['match_priority'] = 1;
+                } elseif (preg_match('/\b'.preg_quote($query, '/').'/i', $type)) {
+                    $item['match_priority'] = 2;
+                } else {
+                    $item['match_priority'] = 3;
+                }
+
+                return $item;
+            })
+            ->sortBy('match_priority')
             ->take(20)
             ->values()
             ->toArray();
+
+        // Merge results: existing resources first, then priority create item, then other creatable suggestions
+        $results = [];
+
+        // If we have existing results, show them first
+        $results = array_merge($results, $existingResults);
+
+        // Then show the priority "Create New" item (if exists)
+        if ($priorityCreatableItem) {
+            $results[] = $priorityCreatableItem;
+        }
+
+        // Finally show other creatable suggestions
+        $results = array_merge($results, $creatableSuggestions);
+
+        $this->searchResults = $results;
     }
 
     private function loadCreatableItems()
@@ -507,12 +706,16 @@ class GlobalSearch extends Component
         $items = collect();
         $user = auth()->user();
 
+        // === Quick Actions Category ===
+
         // Project - can be created if user has createAnyResource permission
         if ($user->can('createAnyResource')) {
             $items->push([
                 'name' => 'Project',
                 'description' => 'Create a new project to organize your resources',
+                'quickcommand' => '(type: new project)',
                 'type' => 'project',
+                'category' => 'Quick Actions',
                 'component' => 'project.add-empty',
             ]);
         }
@@ -522,7 +725,9 @@ class GlobalSearch extends Component
             $items->push([
                 'name' => 'Server',
                 'description' => 'Add a new server to deploy your applications',
+                'quickcommand' => '(type: new server)',
                 'type' => 'server',
+                'category' => 'Quick Actions',
                 'component' => 'server.create',
             ]);
         }
@@ -531,7 +736,9 @@ class GlobalSearch extends Component
         $items->push([
             'name' => 'Team',
             'description' => 'Create a new team to collaborate with others',
+            'quickcommand' => '(type: new team)',
             'type' => 'team',
+            'category' => 'Quick Actions',
             'component' => 'team.create',
         ]);
 
@@ -540,7 +747,9 @@ class GlobalSearch extends Component
             $items->push([
                 'name' => 'S3 Storage',
                 'description' => 'Add S3 storage for backups and file uploads',
+                'quickcommand' => '(type: new storage)',
                 'type' => 'storage',
+                'category' => 'Quick Actions',
                 'component' => 'storage.create',
             ]);
         }
@@ -550,7 +759,9 @@ class GlobalSearch extends Component
             $items->push([
                 'name' => 'Private Key',
                 'description' => 'Add an SSH private key for server access',
+                'quickcommand' => '(type: new private key)',
                 'type' => 'private-key',
+                'category' => 'Quick Actions',
                 'component' => 'security.private-key.create',
             ]);
         }
@@ -560,12 +771,466 @@ class GlobalSearch extends Component
             $items->push([
                 'name' => 'GitHub App',
                 'description' => 'Connect a GitHub app for source control',
+                'quickcommand' => '(type: new github)',
                 'type' => 'source',
+                'category' => 'Quick Actions',
                 'component' => 'source.github.create',
             ]);
         }
 
+        // === Applications Category ===
+
+        if ($user->can('createAnyResource')) {
+            // Git-based applications
+            $items->push([
+                'name' => 'Public Git Repository',
+                'description' => 'Deploy from any public Git repository',
+                'quickcommand' => '(type: new public)',
+                'type' => 'public',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Private Repository (GitHub App)',
+                'description' => 'Deploy private repositories through GitHub Apps',
+                'quickcommand' => '(type: new private github)',
+                'type' => 'private-gh-app',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Private Repository (Deploy Key)',
+                'description' => 'Deploy private repositories with a deploy key',
+                'quickcommand' => '(type: new private deploy)',
+                'type' => 'private-deploy-key',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            // Docker-based applications
+            $items->push([
+                'name' => 'Dockerfile',
+                'description' => 'Deploy a simple Dockerfile without Git',
+                'quickcommand' => '(type: new dockerfile)',
+                'type' => 'dockerfile',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Docker Compose',
+                'description' => 'Deploy complex applications with Docker Compose',
+                'quickcommand' => '(type: new compose)',
+                'type' => 'docker-compose-empty',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Docker Image',
+                'description' => 'Deploy an existing Docker image from any registry',
+                'quickcommand' => '(type: new image)',
+                'type' => 'docker-image',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+        }
+
+        // === Databases Category ===
+
+        if ($user->can('createAnyResource')) {
+            $items->push([
+                'name' => 'PostgreSQL',
+                'description' => 'Robust, advanced open-source database',
+                'quickcommand' => '(type: new postgresql)',
+                'type' => 'postgresql',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'MySQL',
+                'description' => 'Popular open-source relational database',
+                'quickcommand' => '(type: new mysql)',
+                'type' => 'mysql',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'MariaDB',
+                'description' => 'Community-developed fork of MySQL',
+                'quickcommand' => '(type: new mariadb)',
+                'type' => 'mariadb',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'Redis',
+                'description' => 'In-memory data structure store',
+                'quickcommand' => '(type: new redis)',
+                'type' => 'redis',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'KeyDB',
+                'description' => 'High-performance Redis alternative',
+                'quickcommand' => '(type: new keydb)',
+                'type' => 'keydb',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'Dragonfly',
+                'description' => 'Modern in-memory datastore',
+                'quickcommand' => '(type: new dragonfly)',
+                'type' => 'dragonfly',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'MongoDB',
+                'description' => 'Document-oriented NoSQL database',
+                'quickcommand' => '(type: new mongodb)',
+                'type' => 'mongodb',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'Clickhouse',
+                'description' => 'Column-oriented database for analytics',
+                'quickcommand' => '(type: new clickhouse)',
+                'type' => 'clickhouse',
+                'category' => 'Databases',
+                'resourceType' => 'database',
+            ]);
+        }
+
+        // === Services Category ===
+
+        if ($user->can('createAnyResource')) {
+            // Load all services
+            $allServices = get_service_templates();
+
+            foreach ($allServices as $serviceKey => $service) {
+                $items->push([
+                    'name' => str($serviceKey)->headline()->toString(),
+                    'description' => data_get($service, 'slogan', 'Deploy '.str($serviceKey)->headline()),
+                    'type' => 'one-click-service-'.$serviceKey,
+                    'category' => 'Services',
+                    'resourceType' => 'service',
+                ]);
+            }
+        }
+
         $this->creatableItems = $items->toArray();
+    }
+
+    public function navigateToResource($type)
+    {
+        // Find the item by type
+        $item = collect($this->creatableItems)->firstWhere('type', $type);
+
+        if (! $item) {
+            return;
+        }
+
+        // If it has a component, it's a modal-based resource
+        // Close search modal and open the appropriate creation modal
+        if (isset($item['component'])) {
+            $this->dispatch('closeSearchModal');
+            $this->dispatch('open-create-modal-'.$type);
+
+            return;
+        }
+
+        // For applications, databases, and services, navigate to resource creation
+        // with smart defaults (auto-select if only 1 server/project/environment)
+        if (isset($item['resourceType'])) {
+            $this->navigateToResourceCreation($type);
+        }
+    }
+
+    private function navigateToResourceCreation($type)
+    {
+        // Start the selection flow
+        $this->selectedResourceType = $type;
+        $this->isSelectingResource = true;
+
+        // Reset selections
+        $this->selectedServerId = null;
+        $this->selectedDestinationUuid = null;
+        $this->selectedProjectUuid = null;
+        $this->selectedEnvironmentUuid = null;
+
+        // Start loading servers first (in order: servers -> destinations -> projects -> environments)
+        $this->loadServers();
+    }
+
+    public function loadServers()
+    {
+        $this->loadingServers = true;
+        $servers = Server::isUsable()->get()->sortBy('name');
+        $this->availableServers = $servers->map(fn ($s) => [
+            'id' => $s->id,
+            'name' => $s->name,
+            'description' => $s->description,
+        ])->toArray();
+        $this->loadingServers = false;
+
+        // Auto-select if only one server
+        if (count($this->availableServers) === 1) {
+            $this->selectServer($this->availableServers[0]['id']);
+        }
+    }
+
+    public function selectServer($serverId, $shouldProgress = true)
+    {
+        $this->selectedServerId = $serverId;
+
+        if ($shouldProgress) {
+            $this->loadDestinations();
+        }
+    }
+
+    public function loadDestinations()
+    {
+        $this->loadingDestinations = true;
+        $server = Server::find($this->selectedServerId);
+
+        if (! $server) {
+            $this->loadingDestinations = false;
+
+            return $this->dispatch('error', message: 'Server not found');
+        }
+
+        $destinations = $server->destinations();
+
+        if ($destinations->isEmpty()) {
+            $this->loadingDestinations = false;
+
+            return $this->dispatch('error', message: 'No destinations found on this server');
+        }
+
+        $this->availableDestinations = $destinations->map(fn ($d) => [
+            'uuid' => $d->uuid,
+            'name' => $d->name,
+            'network' => $d->network ?? 'default',
+        ])->toArray();
+
+        $this->loadingDestinations = false;
+
+        // Auto-select if only one destination
+        if (count($this->availableDestinations) === 1) {
+            $this->selectDestination($this->availableDestinations[0]['uuid']);
+        }
+    }
+
+    public function selectDestination($destinationUuid, $shouldProgress = true)
+    {
+        $this->selectedDestinationUuid = $destinationUuid;
+
+        if ($shouldProgress) {
+            $this->loadProjects();
+        }
+    }
+
+    public function loadProjects()
+    {
+        $this->loadingProjects = true;
+        $user = auth()->user();
+        $team = $user->currentTeam();
+        $projects = Project::where('team_id', $team->id)->get();
+
+        if ($projects->isEmpty()) {
+            $this->loadingProjects = false;
+
+            return $this->dispatch('error', message: 'Please create a project first');
+        }
+
+        $this->availableProjects = $projects->map(fn ($p) => [
+            'uuid' => $p->uuid,
+            'name' => $p->name,
+            'description' => $p->description,
+        ])->toArray();
+        $this->loadingProjects = false;
+
+        // Auto-select if only one project
+        if (count($this->availableProjects) === 1) {
+            $this->selectProject($this->availableProjects[0]['uuid']);
+        }
+    }
+
+    public function selectProject($projectUuid, $shouldProgress = true)
+    {
+        $this->selectedProjectUuid = $projectUuid;
+
+        if ($shouldProgress) {
+            $this->loadEnvironments();
+        }
+    }
+
+    public function loadEnvironments()
+    {
+        $this->loadingEnvironments = true;
+        $project = Project::where('uuid', $this->selectedProjectUuid)->first();
+
+        if (! $project) {
+            $this->loadingEnvironments = false;
+
+            return;
+        }
+
+        $environments = $project->environments;
+
+        if ($environments->isEmpty()) {
+            $this->loadingEnvironments = false;
+
+            return $this->dispatch('error', message: 'No environments found in project');
+        }
+
+        $this->availableEnvironments = $environments->map(fn ($e) => [
+            'uuid' => $e->uuid,
+            'name' => $e->name,
+            'description' => $e->description,
+        ])->toArray();
+        $this->loadingEnvironments = false;
+
+        // Auto-select if only one environment
+        if (count($this->availableEnvironments) === 1) {
+            $this->selectEnvironment($this->availableEnvironments[0]['uuid']);
+        }
+    }
+
+    public function selectEnvironment($environmentUuid, $shouldProgress = true)
+    {
+        $this->selectedEnvironmentUuid = $environmentUuid;
+
+        if ($shouldProgress) {
+            $this->completeResourceCreation();
+        }
+    }
+
+    private function completeResourceCreation()
+    {
+        // All selections made - navigate to resource creation
+        if ($this->selectedProjectUuid && $this->selectedEnvironmentUuid && $this->selectedResourceType && $this->selectedServerId !== null && $this->selectedDestinationUuid) {
+            $queryParams = [
+                'type' => $this->selectedResourceType,
+                'destination' => $this->selectedDestinationUuid,
+                'server_id' => $this->selectedServerId,
+            ];
+
+            // PostgreSQL requires a database_image parameter
+            if ($this->selectedResourceType === 'postgresql') {
+                $queryParams['database_image'] = 'postgres:16-alpine';
+            }
+
+            return redirect()->route('project.resource.create', [
+                'project_uuid' => $this->selectedProjectUuid,
+                'environment_uuid' => $this->selectedEnvironmentUuid,
+            ] + $queryParams);
+        }
+    }
+
+    public function cancelResourceSelection()
+    {
+        $this->isSelectingResource = false;
+        $this->selectedResourceType = null;
+        $this->selectedServerId = null;
+        $this->selectedDestinationUuid = null;
+        $this->selectedProjectUuid = null;
+        $this->selectedEnvironmentUuid = null;
+        $this->availableServers = [];
+        $this->availableDestinations = [];
+        $this->availableProjects = [];
+        $this->availableEnvironments = [];
+        $this->autoOpenResource = null;
+    }
+
+    public function getFilteredCreatableItemsProperty()
+    {
+        $query = strtolower(trim($this->searchQuery));
+
+        // Check if query matches a category keyword
+        $categoryKeywords = ['server', 'servers', 'app', 'apps', 'application', 'applications', 'db', 'database', 'databases', 'service', 'services', 'project', 'projects'];
+        if (in_array($query, $categoryKeywords)) {
+            return $this->filterCreatableItemsByCategory($query);
+        }
+
+        // Extract search term - everything after "new "
+        if (str_starts_with($query, 'new ')) {
+            $searchTerm = trim(substr($query, strlen('new ')));
+
+            if (empty($searchTerm)) {
+                return $this->creatableItems;
+            }
+
+            // Filter items by name or description
+            return collect($this->creatableItems)->filter(function ($item) use ($searchTerm) {
+                $searchText = strtolower($item['name'].' '.$item['description'].' '.$item['category']);
+
+                return str_contains($searchText, $searchTerm);
+            })->values()->toArray();
+        }
+
+        return $this->creatableItems;
+    }
+
+    private function filterCreatableItemsByCategory($categoryKeyword)
+    {
+        // Map keywords to category names
+        $categoryMap = [
+            'server' => 'Quick Actions',
+            'servers' => 'Quick Actions',
+            'app' => 'Applications',
+            'apps' => 'Applications',
+            'application' => 'Applications',
+            'applications' => 'Applications',
+            'db' => 'Databases',
+            'database' => 'Databases',
+            'databases' => 'Databases',
+            'service' => 'Services',
+            'services' => 'Services',
+            'project' => 'Applications',
+            'projects' => 'Applications',
+        ];
+
+        $category = $categoryMap[$categoryKeyword] ?? null;
+
+        if (! $category) {
+            return [];
+        }
+
+        return collect($this->creatableItems)
+            ->filter(fn ($item) => $item['category'] === $category)
+            ->values()
+            ->toArray();
+    }
+
+    public function getSelectedResourceNameProperty()
+    {
+        if (! $this->selectedResourceType) {
+            return null;
+        }
+
+        // Load creatable items if not loaded yet
+        if (empty($this->creatableItems)) {
+            $this->loadCreatableItems();
+        }
+
+        // Find the item by type
+        $item = collect($this->creatableItems)->firstWhere('type', $this->selectedResourceType);
+
+        return $item ? $item['name'] : null;
     }
 
     public function render()

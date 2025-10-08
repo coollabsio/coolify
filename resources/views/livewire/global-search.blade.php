@@ -31,27 +31,60 @@
         }
     },
     init() {
+        // Listen for reset index event from Livewire
+        Livewire.on('reset-selected-index', () => {
+            this.selectedIndex = -1;
+        });
+
         // Create named handlers for proper cleanup
         const openGlobalSearchHandler = () => this.openModal();
         const slashKeyHandler = (e) => {
-            if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName) && !this.modalOpen) {
+            if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
                 e.preventDefault();
-                this.openModal();
+                if (!this.modalOpen) {
+                    this.openModal();
+                } else {
+                    // If modal is open, focus the input
+                    this.$refs.searchInput?.focus();
+                    this.selectedIndex = -1;
+                }
             }
         };
         const cmdKHandler = (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
                 e.preventDefault();
                 if (this.modalOpen) {
-                    this.closeModal();
+                    // If modal is open, focus the input instead of closing
+                    this.$refs.searchInput?.focus();
+                    this.selectedIndex = -1;
                 } else {
                     this.openModal();
                 }
             }
         };
-        const escapeKeyHandler = (e) => {
+        const escapeKeyHandler = async (e) => {
             if (e.key === 'Escape' && this.modalOpen) {
-                this.closeModal();
+                // If search query is empty, close the modal
+                const searchQuery = await @this.get('searchQuery');
+                if (searchQuery === '') {
+                    // Check if we're in a selection state - go back to main menu first
+                    const selectingServer = await @this.get('selectingServer');
+                    const selectingProject = await @this.get('selectingProject');
+                    const selectingEnvironment = await @this.get('selectingEnvironment');
+                    const selectingDestination = await @this.get('selectingDestination');
+
+                    if (selectingServer || selectingProject || selectingEnvironment || selectingDestination) {
+                        @this.call('cancelResourceSelection');
+                        setTimeout(() => this.$refs.searchInput?.focus(), 100);
+                    } else {
+                        // Close the modal if in main menu
+                        this.closeModal();
+                    }
+                } else {
+                    // If search query has text, just clear it
+                    @this.set('searchQuery', '');
+                    setTimeout(() => this.$refs.searchInput?.focus(), 100);
+                }
             }
         };
         const arrowKeyHandler = (e) => {
@@ -94,13 +127,18 @@
                 }, 150);
             }
         });
+
+        // Listen for closeSearchModal event from backend
+        window.addEventListener('closeSearchModal', () => {
+            this.closeModal();
+        });
     }
 }">
 
     <!-- Modal overlay -->
     <template x-teleport="body">
         <div x-show="modalOpen" x-cloak
-            class="fixed top-0 left-0 z-99 flex items-start justify-center w-screen h-screen pt-[20vh]">
+            class="fixed top-0 left-0 z-99 flex items-start justify-center w-screen h-screen pt-[10vh]">
             <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm">
             </div>
             <div x-show="modalOpen" x-trap.inert="modalOpen" x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
@@ -119,14 +157,19 @@
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
-                    <input type="text" wire:model.live.debounce.500ms="searchQuery"
-                        placeholder="Search for resources... (Type 'new' to create, or 'new project' to add directly)"
-                        x-ref="searchInput" x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
-                        class="w-full pl-12 pr-12 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500" />
-                    <button @click="closeModal()"
-                        class="absolute inset-y-0 right-2 flex items-center justify-center px-2 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded">
-                        ESC
-                    </button>
+                    <input type="text" wire:model.live.debounce.200ms="searchQuery"
+                        placeholder="Search resources (type new for create things)..." x-ref="searchInput"
+                        x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
+                        class="w-full pl-12 pr-32 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500" />
+                    <div class="absolute inset-y-0 right-2 flex items-center gap-2 pointer-events-none">
+                        <span class="text-xs font-medium text-neutral-400 dark:text-neutral-500">
+                            / or ⌘K to focus
+                        </span>
+                        <button @click="closeModal()"
+                            class="pointer-events-auto px-2 py-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded">
+                            ESC
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Search results (with background) -->
@@ -154,22 +197,326 @@
                         <!-- Results content - hidden while loading -->
                         <div wire:loading.remove wire:target="searchQuery"
                             class="max-h-[60vh] overflow-y-auto scrollbar">
-                            @if ($isCreateMode && count($creatableItems) > 0 && !$autoOpenResource)
+                            @if ($isSelectingResource)
+                                <!-- Resource Selection Flow -->
+                                <div class="p-6">
+                                    <!-- Server Selection -->
+                                    @if ($selectedServerId === null)
+                                        <div class="mb-4" x-init="selectedIndex = -1">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <button type="button"
+                                                    @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                    class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                    </svg>
+                                                </button>
+                                                <div>
+                                                    <h2
+                                                        class="text-base font-semibold text-neutral-900 dark:text-white">
+                                                        Select Server
+                                                    </h2>
+                                                    @if ($this->selectedResourceName)
+                                                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                            for {{ $this->selectedResourceName }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            @if ($loadingServers)
+                                                <div
+                                                    class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                    <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                            stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
+                                                    </svg>
+                                                    <span class="text-sm text-neutral-600 dark:text-neutral-400">Loading
+                                                        servers...</span>
+                                                </div>
+                                            @elseif (count($availableServers) > 0)
+                                                @foreach ($availableServers as $index => $server)
+                                                    <button type="button"
+                                                        wire:click="selectServer({{ $server['id'] }}, true)"
+                                                        class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
+                                                        <div class="flex items-center justify-between gap-3">
+                                                            <div class="flex-1 min-w-0">
+                                                                <div
+                                                                    class="font-medium text-neutral-900 dark:text-white">
+                                                                    {{ $server['name'] }}
+                                                                </div>
+                                                                @if (!empty($server['description']))
+                                                                    <div
+                                                                        class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                        {{ $server['description'] }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </div>
+                                                    </button>
+                                                @endforeach
+                                            @else
+                                                <div
+                                                    class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                                    <p class="text-sm text-red-800 dark:text-red-200">No servers
+                                                        available</p>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    <!-- Destination Selection -->
+                                    @if ($selectedServerId !== null && $selectedDestinationUuid === null)
+                                        <div class="mb-4" x-init="selectedIndex = -1">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <button type="button"
+                                                    @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                    class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                    </svg>
+                                                </button>
+                                                <div>
+                                                    <h2
+                                                        class="text-base font-semibold text-neutral-900 dark:text-white">
+                                                        Select Destination
+                                                    </h2>
+                                                    @if ($this->selectedResourceName)
+                                                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                            for {{ $this->selectedResourceName }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            @if ($loadingDestinations)
+                                                <div
+                                                    class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                    <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12"
+                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
+                                                    </svg>
+                                                    <span
+                                                        class="text-sm text-neutral-600 dark:text-neutral-400">Loading
+                                                        destinations...</span>
+                                                </div>
+                                            @elseif (count($availableDestinations) > 0)
+                                                @foreach ($availableDestinations as $index => $destination)
+                                                    <button type="button"
+                                                        wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
+                                                        class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
+                                                        <div class="flex items-center justify-between gap-3">
+                                                            <div class="flex-1 min-w-0">
+                                                                <div
+                                                                    class="font-medium text-neutral-900 dark:text-white">
+                                                                    {{ $destination['name'] }}
+                                                                </div>
+                                                                <div
+                                                                    class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                    Network: {{ $destination['network'] }}
+                                                                </div>
+                                                            </div>
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </div>
+                                                    </button>
+                                                @endforeach
+                                            @else
+                                                <div
+                                                    class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                                    <p class="text-sm text-red-800 dark:text-red-200">No destinations
+                                                        available</p>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    <!-- Project Selection -->
+                                    @if ($selectedDestinationUuid !== null && $selectedProjectUuid === null)
+                                        <div class="mb-4" x-init="selectedIndex = -1">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <button type="button"
+                                                    @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                    class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                    </svg>
+                                                </button>
+                                                <div>
+                                                    <h2
+                                                        class="text-base font-semibold text-neutral-900 dark:text-white">
+                                                        Select Project
+                                                    </h2>
+                                                    @if ($this->selectedResourceName)
+                                                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                            for {{ $this->selectedResourceName }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            @if ($loadingProjects)
+                                                <div
+                                                    class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                    <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12"
+                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
+                                                    </svg>
+                                                    <span
+                                                        class="text-sm text-neutral-600 dark:text-neutral-400">Loading
+                                                        projects...</span>
+                                                </div>
+                                            @elseif (count($availableProjects) > 0)
+                                                @foreach ($availableProjects as $index => $project)
+                                                    <button type="button"
+                                                        wire:click="selectProject('{{ $project['uuid'] }}', true)"
+                                                        class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
+                                                        <div class="flex items-center justify-between gap-3">
+                                                            <div class="flex-1 min-w-0">
+                                                                <div
+                                                                    class="font-medium text-neutral-900 dark:text-white">
+                                                                    {{ $project['name'] }}
+                                                                </div>
+                                                                @if (!empty($project['description']))
+                                                                    <div
+                                                                        class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                        {{ $project['description'] }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </div>
+                                                    </button>
+                                                @endforeach
+                                            @else
+                                                <div
+                                                    class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                                    <p class="text-sm text-red-800 dark:text-red-200">No projects
+                                                        available</p>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    <!-- Environment Selection -->
+                                    @if ($selectedProjectUuid !== null && $selectedEnvironmentUuid === null)
+                                        <div class="mb-4" x-init="selectedIndex = -1">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <button type="button"
+                                                    @click="$wire.set('searchQuery', ''); setTimeout(() => $refs.searchInput.focus(), 100)"
+                                                    class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 19l-7-7 7-7" />
+                                                    </svg>
+                                                </button>
+                                                <div>
+                                                    <h2
+                                                        class="text-base font-semibold text-neutral-900 dark:text-white">
+                                                        Select Environment
+                                                    </h2>
+                                                    @if ($this->selectedResourceName)
+                                                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                            for {{ $this->selectedResourceName }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            @if ($loadingEnvironments)
+                                                <div
+                                                    class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
+                                                    <svg class="animate-spin h-5 w-5 text-yellow-500"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12"
+                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
+                                                    </svg>
+                                                    <span
+                                                        class="text-sm text-neutral-600 dark:text-neutral-400">Loading
+                                                        environments...</span>
+                                                </div>
+                                            @elseif (count($availableEnvironments) > 0)
+                                                @foreach ($availableEnvironments as $index => $environment)
+                                                    <button type="button"
+                                                        wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
+                                                        class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30">
+                                                        <div class="flex items-center justify-between gap-3">
+                                                            <div class="flex-1 min-w-0">
+                                                                <div
+                                                                    class="font-medium text-neutral-900 dark:text-white">
+                                                                    {{ $environment['name'] }}
+                                                                </div>
+                                                                @if (!empty($environment['description']))
+                                                                    <div
+                                                                        class="text-xs text-neutral-500 dark:text-neutral-400">
+                                                                        {{ $environment['description'] }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400"
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M9 5l7 7-7 7" />
+                                                            </svg>
+                                                        </div>
+                                                    </button>
+                                                @endforeach
+                                            @else
+                                                <div
+                                                    class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                                    <p class="text-sm text-red-800 dark:text-red-200">No environments
+                                                        available</p>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            @elseif ($isCreateMode && count($this->filteredCreatableItems) > 0 && !$autoOpenResource)
                                 <!-- Create new resources section -->
-                                <div class="py-2" x-data="{
-                                    openModal(type) {
-                                        // Close the parent search modal properly
-                                        const parentModal = this.$root.closest('[x-data]');
-                                        if (parentModal && parentModal.__x) {
-                                            parentModal.__x.$data.closeModal();
-                                        }
-                                        // Dispatch event to open creation modal after a short delay
-                                        setTimeout(() => {
-                                            this.$dispatch('open-create-modal-' + type);
-                                        }, 150);
-                                    }
-                                }">
-                                    <div
+                                <div class="py-2">
+                                    {{-- <div
                                         class="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-100 dark:border-yellow-800">
                                         <h3 class="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
                                             Create New Resources
@@ -177,96 +524,166 @@
                                         <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-0.5">
                                             Click on any item below to create a new resource
                                         </p>
-                                    </div>
-                                    @foreach ($creatableItems as $item)
-                                        <button type="button" @click="openModal('{{ $item['type'] }}')"
-                                            class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-transparent hover:border-yellow-500 focus:border-yellow-500">
-                                            <div class="flex items-center justify-between gap-3">
-                                                <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                    <div
-                                                        class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="h-5 w-5 text-yellow-600 dark:text-yellow-400"
-                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="2" d="M12 4v16m8-8H4" />
-                                                        </svg>
+                                    </div> --}}
+
+                                    @php
+                                        $grouped = collect($this->filteredCreatableItems)->groupBy('category');
+                                    @endphp
+
+                                    @foreach ($grouped as $category => $items)
+                                        <!-- Category Header -->
+                                        <div class="px-4 pt-3 pb-1">
+                                            <h4
+                                                class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                                                {{ $category }}
+                                            </h4>
+                                        </div>
+
+                                        <!-- Category Items -->
+                                        @foreach ($items as $item)
+                                            <button type="button"
+                                                wire:click="navigateToResource('{{ $item['type'] }}')"
+                                                class="search-result-item w-full text-left block px-4 py-3 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-transparent hover:border-yellow-500 focus:border-yellow-500">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                                                        <div
+                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="h-5 w-5 text-yellow-600 dark:text-yellow-400"
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M12 4v16m8-8H4" />
+                                                            </svg>
+                                                        </div>
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="flex items-center gap-2 mb-1">
+                                                                <div
+                                                                    class="font-medium text-neutral-900 dark:text-white truncate">
+                                                                    {{ $item['name'] }}
+                                                                </div>
+                                                                @if (isset($item['quickcommand']))
+                                                                    <span
+                                                                        class="text-xs text-neutral-500 dark:text-neutral-400 shrink-0">{{ $item['quickcommand'] }}</span>
+                                                                @endif
+                                                            </div>
+                                                            <div
+                                                                class="text-sm text-neutral-600 dark:text-neutral-400 truncate">
+                                                                {{ $item['description'] }}
+                                                            </div>
+                                                        </div>
                                                     </div>
+                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                        class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400 self-center"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </div>
+                                            </button>
+                                        @endforeach
+                                    @endforeach
+                                </div>
+                            @elseif (strlen($searchQuery) >= 1 && count($searchResults) > 0)
+                                <div class="py-2">
+                                    @foreach ($searchResults as $index => $result)
+                                        @if (isset($result['is_creatable_suggestion']) && $result['is_creatable_suggestion'])
+                                            {{-- Creatable suggestion with yellow theme --}}
+                                            <button type="button"
+                                                wire:click="navigateToResource('{{ $result['type'] }}')"
+                                                class="search-result-item w-full text-left block px-4 py-3 bg-yellow-50 dark:bg-yellow-900/10 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 transition-colors focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-900/30 border-l-4 border-yellow-500">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                                                        <div
+                                                            class="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                                class="h-5 w-5 text-yellow-600 dark:text-yellow-400"
+                                                                fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M12 4v16m8-8H4" />
+                                                            </svg>
+                                                        </div>
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="flex items-center gap-2 mb-1">
+                                                                <span
+                                                                    class="font-medium text-neutral-900 dark:text-white truncate">
+                                                                    {{ $result['name'] }}
+                                                                </span>
+                                                                <span
+                                                                    class="px-2 py-0.5 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 shrink-0">
+                                                                    Create New
+                                                                </span>
+                                                                @if (isset($result['quickcommand']))
+                                                                    <span
+                                                                        class="text-xs text-neutral-500 dark:text-neutral-400 shrink-0">{{ $result['quickcommand'] }}</span>
+                                                                @endif
+                                                            </div>
+                                                            <div
+                                                                class="text-sm text-neutral-600 dark:text-neutral-400 truncate">
+                                                                {{ $result['description'] }}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                        class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400 self-center"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </div>
+                                            </button>
+                                        @else
+                                            {{-- Regular search result --}}
+                                            <a href="{{ $result['link'] ?? '#' }}"
+                                                class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
+                                                <div class="flex items-center justify-between gap-3">
                                                     <div class="flex-1 min-w-0">
                                                         <div class="flex items-center gap-2 mb-1">
                                                             <span
                                                                 class="font-medium text-neutral-900 dark:text-white truncate">
-                                                                {{ $item['name'] }}
+                                                                {{ $result['name'] }}
                                                             </span>
                                                             <span
-                                                                class="px-2 py-0.5 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 shrink-0">
-                                                                New
+                                                                class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
+                                                                @if ($result['type'] === 'application')
+                                                                    Application
+                                                                @elseif ($result['type'] === 'service')
+                                                                    Service
+                                                                @elseif ($result['type'] === 'database')
+                                                                    {{ ucfirst($result['subtype'] ?? 'Database') }}
+                                                                @elseif ($result['type'] === 'server')
+                                                                    Server
+                                                                @elseif ($result['type'] === 'project')
+                                                                    Project
+                                                                @elseif ($result['type'] === 'environment')
+                                                                    Environment
+                                                                @endif
                                                             </span>
                                                         </div>
-                                                        <div class="text-sm text-neutral-600 dark:text-neutral-400">
-                                                            {{ $item['description'] }}
-                                                        </div>
+                                                        @if (!empty($result['project']) && !empty($result['environment']))
+                                                            <div
+                                                                class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                                                                {{ $result['project'] }} /
+                                                                {{ $result['environment'] }}
+                                                            </div>
+                                                        @endif
+                                                        @if (!empty($result['description']))
+                                                            <div
+                                                                class="text-sm text-neutral-600 dark:text-neutral-400">
+                                                                {{ Str::limit($result['description'], 80) }}
+                                                            </div>
+                                                        @endif
                                                     </div>
+                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                        class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M9 5l7 7-7 7" />
+                                                    </svg>
                                                 </div>
-                                                <svg xmlns="http://www.w3.org/2000/svg"
-                                                    class="shrink-0 h-5 w-5 text-yellow-500 dark:text-yellow-400 self-center"
-                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </div>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @elseif (strlen($searchQuery) >= 2 && count($searchResults) > 0)
-                                <div class="py-2">
-                                    @foreach ($searchResults as $index => $result)
-                                        <a href="{{ $result['link'] ?? '#' }}"
-                                            class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
-                                            <div class="flex items-center justify-between gap-3">
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="flex items-center gap-2 mb-1">
-                                                        <span
-                                                            class="font-medium text-neutral-900 dark:text-white truncate">
-                                                            {{ $result['name'] }}
-                                                        </span>
-                                                        <span
-                                                            class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
-                                                            @if ($result['type'] === 'application')
-                                                                Application
-                                                            @elseif ($result['type'] === 'service')
-                                                                Service
-                                                            @elseif ($result['type'] === 'database')
-                                                                {{ ucfirst($result['subtype'] ?? 'Database') }}
-                                                            @elseif ($result['type'] === 'server')
-                                                                Server
-                                                            @elseif ($result['type'] === 'project')
-                                                                Project
-                                                            @elseif ($result['type'] === 'environment')
-                                                                Environment
-                                                            @endif
-                                                        </span>
-                                                    </div>
-                                                    @if (!empty($result['project']) && !empty($result['environment']))
-                                                        <div
-                                                            class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                                                            {{ $result['project'] }} / {{ $result['environment'] }}
-                                                        </div>
-                                                    @endif
-                                                    @if (!empty($result['description']))
-                                                        <div class="text-sm text-neutral-600 dark:text-neutral-400">
-                                                            {{ Str::limit($result['description'], 80) }}
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                                <svg xmlns="http://www.w3.org/2000/svg"
-                                                    class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
-                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </div>
-                                        </a>
+                                            </a>
+                                        @endif
                                     @endforeach
                                 </div>
                             @elseif (strlen($searchQuery) >= 2 && count($searchResults) === 0 && !$autoOpenResource)
@@ -277,14 +694,6 @@
                                         </p>
                                         <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                                             Try different keywords or check the spelling
-                                        </p>
-                                    </div>
-                                </div>
-                            @elseif (strlen($searchQuery) > 0 && strlen($searchQuery) < 2)
-                                <div class="flex items-center justify-center py-12 px-4">
-                                    <div class="text-center">
-                                        <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                                            Type at least 2 characters to search
                                         </p>
                                     </div>
                                 </div>
