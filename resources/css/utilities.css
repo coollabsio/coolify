@@ -6,8 +6,29 @@
     @apply hidden!;
 }
 
+@utility apexcharts-grid-borders {
+    @apply dark:hidden!;
+}
+
 @utility apexcharts-xaxistooltip {
     @apply hidden!;
+}
+
+@utility apexcharts-tooltip-custom {
+    @apply bg-white dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300 rounded-lg shadow-lg p-3 text-sm;
+    min-width: 160px;
+}
+
+@utility apexcharts-tooltip-custom-value {
+    @apply text-neutral-700 dark:text-neutral-300 mb-1;
+}
+
+@utility apexcharts-tooltip-value-bold {
+    @apply font-bold text-black dark:text-white;
+}
+
+@utility apexcharts-tooltip-custom-title {
+    @apply text-xs text-neutral-500 dark:text-neutral-400 font-medium;
 }
 
 @utility input-sticky {
@@ -42,7 +63,7 @@
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 py-1 text-sm text-black normal-case rounded-sm border outline-0 cursor-pointer bg-neutral-200/50 border-neutral-300 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-500 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300;
+    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100;
 }
 
 @utility alert-success {
@@ -62,11 +83,11 @@
 }
 
 @utility dropdown-item {
-    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
+    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
 }
 
 @utility dropdown-item-no-padding {
-    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50;
+    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
 }
 
 @utility badge {
@@ -134,15 +155,15 @@
 }
 
 @utility box {
-    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow-sm bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow-sm bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-coolgray-300 hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline rounded-sm;
 }
 
 @utility box-boarding {
-    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-black hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black;
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-coolgray-300 hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black rounded-sm;
 }
 
 @utility box-without-bg {
-    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] border border-neutral-200 dark:border-black;
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] border border-neutral-200 dark:border-coolgray-300 rounded-sm;
 }
 
 @utility box-without-bg-without-border {
@@ -178,7 +199,7 @@
 }
 
 @utility info-helper-popup {
-    @apply hidden absolute z-40 text-xs rounded-sm text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300;
+    @apply hidden absolute z-40 text-xs rounded-sm text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300 max-w-xs whitespace-normal break-words;
 }
 
 @utility buyme {

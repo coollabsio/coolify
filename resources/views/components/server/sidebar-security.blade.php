@@ -3,4 +3,8 @@
         href="{{ route('server.security.patches', $parameters) }}">
         Server Patching
     </a>
+    <a class="{{ request()->routeIs('server.security.terminal-access') ? 'menu-item menu-item-active' : 'menu-item' }}"
+        href="{{ route('server.security.terminal-access', $parameters) }}">
+        Terminal Access
+    </a>
 </div>

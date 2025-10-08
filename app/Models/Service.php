@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProcessStatus;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -41,7 +42,7 @@ use Visus\Cuid2\Cuid2;
 )]
 class Service extends BaseModel
 {
-    use HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasFactory, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -1262,6 +1263,21 @@ class Service extends BaseModel
         $commands[] = "cd $workdir";
         $commands[] = 'rm -f .env || true';
 
+        $envs = collect([]);
+
+        // Generate SERVICE_NAME_* environment variables from docker-compose services
+        if ($this->docker_compose) {
+            try {
+                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $services = data_get($dockerCompose, 'services', []);
+                foreach ($services as $serviceName => $_) {
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+                }
+            } catch (\Exception $e) {
+                ray($e->getMessage());
+            }
+        }
+
         $envs_from_coolify = $this->environment_variables()->get();
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
@@ -1273,7 +1289,6 @@ class Service extends BaseModel
 
             return 3;
         });
-        $envs = collect([]);
         foreach ($sorted as $env) {
             $envs->push("{$env->key}={$env->real_value}");
         }

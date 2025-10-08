@@ -5,6 +5,9 @@
     @else
         <x-forms.button wire:click.prevent="show_debug">Show Debug Logs</x-forms.button>
     @endif
+    @if (isDev())
+        <x-forms.button x-on:click="$wire.copyLogsToClipboard().then(text => navigator.clipboard.writeText(text))">Copy Logs</x-forms.button>
+    @endif
     @if (data_get($application_deployment_queue, 'status') === 'queued')
         <x-forms.button wire:click.prevent="force_start">Force Start</x-forms.button>
     @endif

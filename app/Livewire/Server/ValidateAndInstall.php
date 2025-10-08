@@ -146,7 +146,7 @@ class ValidateAndInstall extends Component
                 StartProxy::dispatch($this->server);
             } else {
                 $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
-                $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not instaled. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                 $this->server->update([
                     'validation_logs' => $this->error,
                 ]);

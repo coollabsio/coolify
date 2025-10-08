@@ -11,7 +11,7 @@
         @endcan
     </div>
     <div class="subtitle">All your projects are here.</div>
-    <div x-data="searchComponent()">
+    <div x-data="searchComponent()" class="-mt-1">
         <x-forms.input placeholder="Search for name, description..." x-model="search" id="null" />
         <div class="grid grid-cols-2 gap-4 pt-4">
             <template x-if="filteredProjects.length === 0">

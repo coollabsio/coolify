@@ -2,32 +2,113 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
-
-### 📚 Documentation
-
-- Update changelog
-
-### ⚙️ Miscellaneous Tasks
-
-- *(docker)* Add a blank line for improved readability in Dockerfile
-
-## [4.0.0-beta.428] - 2025-09-15
+## [4.0.0-beta.434] - 2025-10-03
 
 ### 🚀 Features
 
-- *(deployment)* Enhance deployment status reporting with detailed information on active deployments and team members
+- *(deployments)* Enhance Docker build argument handling for multiline variables
+- *(deployments)* Add log copying functionality to clipboard in dev
+- *(deployments)* Generate SERVICE_NAME environment variables from Docker Compose services
 
 ### 🐛 Bug Fixes
 
-- *(application)* Improve watch paths handling by trimming and filtering empty paths to prevent unnecessary triggers
+- *(deployments)* Enhance builder container management and environment variable handling
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update version numbers for Coolify releases
+- *(versions)* Bump Coolify stable version to 4.0.0-beta.434
+
+## [4.0.0-beta.433] - 2025-10-01
+
+### 🚀 Features
+
+- *(user-deletion)* Implement file locking to prevent concurrent user deletions and enhance error handling
+- *(ui)* Enhance resource operations interface with dynamic selection for cloning and moving resources
+- *(global-search)* Integrate projects and environments into global search functionality
+- *(storage)* Consolidate storage management into a single component with enhanced UI
+- *(deployments)* Add support for Coolify variables in Dockerfile
+
+### 🐛 Bug Fixes
+
+- *(workflows)* Update CLAUDE API key reference in GitHub Actions workflow
+- *(ui)* Update docker registry image helper text for clarity
+- *(ui)* Correct HTML structure and improve clarity in Docker cleanup options
+- *(workflows)* Update CLAUDE API key reference in GitHub Actions workflow
+- *(api)* Correct OpenAPI schema annotations for array items
+- *(ui)* Improve queued deployment status readability in dark mode
+- *(git)* Handle additional repository URL cases for 'tangled' and improve branch assignment logic
+- *(git)* Enhance error handling for missing branch information during deployment
+- *(git)* Trim whitespace from repository, branch, and commit SHA fields
+- *(deployments)* Order deployments by ID for consistent retrieval
+
+### 💼 Other
+
+- *(storage)* Enhance file storage management with new properties and UI improvements
+- *(core)* Update projects property type and enhance UI styling
+- *(components)* Adjust SVG icon sizes for consistency across applications and services
+- *(components)* Auto-focus first input in modal on open
+- *(styles)* Enhance focus styles for buttons and links
+- *(components)* Enhance close button accessibility in modal
 
 ### 🚜 Refactor
 
-- *(deployment)* Streamline environment variable handling for dockercompose and improve sorting of runtime variables
-- *(remoteProcess)* Remove command log comments for file transfers to simplify code
-- *(remoteProcess)* Remove file transfer handling from remote_process and instant_remote_process functions to simplify code
-- *(deployment)* Update environment file paths in docker compose commands to use working directory for improved consistency
+- *(global-search)* Change event listener to window level for global search modal
+- *(dashboard)* Remove deployment loading logic and introduce DeploymentsIndicator component for better UI management
+- *(dashboard)* Replace project navigation method with direct link in UI
+- *(global-search)* Improve event handling and cleanup in global search component
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Update coolify version to 4.0.0-beta.433 and nightly version to 4.0.0-beta.434 in configuration files
+
+## [4.0.0-beta.432] - 2025-09-29
+
+### 🚀 Features
+
+- *(application)* Implement order-based pattern matching for watch paths with negation support
+- *(github)* Enhance Docker Compose input fields for better user experience
+- *(dev-seeders)* Add PersonalAccessTokenSeeder to create development API tokens
+- *(application)* Add conditional .env file creation for Symfony apps during PHP deployment
+- *(application)* Enhance watch path parsing to support negation syntax
+- *(application)* Add normalizeWatchPaths method to improve watch path handling
+- *(validation)* Enhance ValidGitRepositoryUrl to support additional safe characters and add comprehensive unit tests for various Git repository URL formats
+- *(deployment)* Implement detection for Laravel/Symfony frameworks and configure NIXPACKS PHP environment variables accordingly
+
+### 🐛 Bug Fixes
+
+- *(application)* Restrict GitHub-based application settings to non-public repositories
+- *(traits)* Update saved_outputs handling in ExecuteRemoteCommand to use collection methods for better performance
+- *(application)* Enhance domain handling by replacing both dots and dashes with underscores for HTML form binding
+- *(constants)* Reduce command timeout from 7200 to 3600 seconds for improved performance
+- *(github)* Update repository URL to point to the v4.x branch for development
+- *(models)* Update sorting of scheduled database backups to order by creation date instead of name
+- *(socialite)* Add custom base URL support for GitLab provider in OAuth settings
+- *(configuration-checker)* Update message to clarify redeployment requirement for configuration changes
+- *(application)* Reduce docker stop timeout from 30 to 10 seconds for improved application shutdown efficiency
+- *(application)* Increase docker stop timeout from 10 to 30 seconds for better application shutdown handling
+- *(validation)* Update git:// URL validation to support port numbers and tilde characters in paths
+- Resolve scroll lock issue after closing quick search modal with escape key
+- Prevent quick search modal duplication from keyboard shortcuts
+
+### 🚜 Refactor
+
+- *(tests)* Simplify matchWatchPaths tests and update implementation for better clarity
+- *(deployment)* Improve environment variable handling in ApplicationDeploymentJob
+- *(deployment)* Remove commented-out code and streamline environment variable handling in ApplicationDeploymentJob
+- *(application)* Improve handling of docker compose domains by normalizing keys and ensuring valid JSON structure
+- *(forms)* Update wire:model bindings to use 'blur' instead of 'blur-sm' for input fields across multiple views
 
 ### 📚 Documentation
 
@@ -35,13 +116,150 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- *(constants)* Update realtime_version from 1.0.10 to 1.0.11
-- *(versions)* Increment coolify version to 4.0.0-beta.428 and update realtime_version to 1.0.10
+- *(application)* Remove debugging statement from loadComposeFile method
+- *(workflows)* Update Claude GitHub Action configuration to support new event types and improve permissions
+
+## [4.0.0-beta.431] - 2025-09-24
+
+### 📚 Documentation
+
+- Update changelog
+
+## [4.0.0-beta.430] - 2025-09-24
+
+### 🚀 Features
+
+- *(add-watch-paths-for-services)* Show watch paths field for docker compose applications
+
+### 🐛 Bug Fixes
+
+- *(PreviewCompose)* Adds port to preview urls
+- *(deployment-job)* Enhance build time variable analysis
+- *(docker)* Adjust openssh-client installation in Dockerfile to avoid version bug
+- *(docker)* Streamline openssh-client installation in Dockerfile
+- *(team)* Normalize email case in invite link generation
+- *(README)* Update Juxtdigital description to reflect current services
+- *(environment-variable-warning)* Enhance warning logic to check for problematic variable values
+- *(install)* Ensure proper quoting of environment file paths to prevent issues with spaces
+- *(security)* Implement authorization checks for terminal access management
+- *(ui)* Improve mobile sidebar close behavior
+
+### 🚜 Refactor
+
+- *(installer)* Improve install script
+- *(upgrade)* Improve upgrade script
+- *(installer, upgrade)* Enhance environment variable management
+- *(upgrade)* Enhance logging and quoting in upgrade scripts
+- *(upgrade)* Replace warning div with a callout component for better UI consistency
+- *(ui)* Replace warning and error divs with callout components for improved consistency and readability
+- *(ui)* Improve styling and consistency in environment variable warning and docker cleanup components
+- *(security)* Streamline update check functionality and improve UI button interactions in patches view
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+
+### ⚙️ Miscellaneous Tasks
+
+- *(versions)* Increment coolify version numbers to 4.0.0-beta.431 and 4.0.0-beta.432 in configuration files
+- *(versions)* Update coolify version numbers to 4.0.0-beta.432 and 4.0.0-beta.433 in configuration files
+- Remove unused files
+- Adjust wording
+- *(workflow)* Update pull request trigger to pull_request_target and refine permissions for enhanced security
+
+## [4.0.0-beta.429] - 2025-09-23
+
+### 🚀 Features
+
+- *(environment)* Replace is_buildtime_only with is_runtime and is_buildtime flags for environment variables, updating related logic and views
+- *(deployment)* Handle buildtime and runtime variables during deployment
+- *(search)* Implement global search functionality with caching and modal interface
+- *(search)* Enable query logging for global search caching
+- *(environment)* Add dynamic checkbox options for environment variable settings based on user permissions and variable types
+- *(redaction)* Implement sensitive information redaction in logs and commands
+- Improve detection of special network modes
+- *(api)* Add endpoint to update backup configuration by UUID and backup ID; modify response to include backup id
+- *(databases)* Enhance backup management API with new endpoints and improved data handling
+- *(github)* Add GitHub app management endpoints
+- *(github)* Add update and delete endpoints for GitHub apps
+- *(databases)* Enhance backup update and deletion logic with validation
+- *(environment-variables)* Implement environment variable analysis for build-time issues
+- *(databases)* Implement unique UUID generation for backup execution
+- *(cloud-check)* Enhance subscription reporting in CloudCheckSubscription command
+- *(cloud-check)* Enhance CloudCheckSubscription command with fix options
+- *(stripe)* Enhance subscription handling and verification process
+- *(private-key-refresh)* Add refresh dispatch on private key update and connection check
+- *(comments)* Add automated comments for labeled pull requests to guide documentation updates
+- *(comments)* Ping PR author
+
+### 🐛 Bug Fixes
+
+- *(docker)* Enhance container status aggregation to include restarting and exited states
+- *(environment)* Correct grammatical errors in helper text for environment variable sorting checkbox
+- *(ui)* Change order and fix ui on small screens
+- Order for git deploy types
+- *(deployment)* Enhance Dockerfile modification for build-time variables and secrets during deployment in case of docker compose buildpack
+- Hide sensitive email change fields in team member responses
+- *(domains)* Trim whitespace from domains before validation
+- *(databases)* Update backup retrieval logic to include team context
+- *(environment-variables)* Update affected services in environment variable analysis
+- *(team)* Clear stripe_subscription_id on subscription end
+- *(github)* Update authentication method for GitHub app operations
+- *(databases)* Restrict database updates to allowed fields only
+- *(cache)* Add Model import to ClearsGlobalSearchCache trait for improved functionality
+- *(environment-variables)* Correct method call syntax in analyzeBuildVariable function
+- *(clears-global-search-cache)* Refine team retrieval logic in getTeamIdForCache method
+- *(subscription-job)* Enhance retry logic for VerifyStripeSubscriptionStatusJob
+- *(environment-variable)* Update checkbox visibility and helper text for build and runtime options
+- *(deployment-job)* Escape single quotes in build arguments for Docker Compose command
+
+### 🚜 Refactor
+
+- *(environment)* Conditionally render Docker Build Secrets checkbox based on build pack type
+- *(search)* Optimize cache clearing logic to only trigger on searchable field changes
+- *(environment)* Streamline rendering of Docker Build Secrets checkbox and adjust layout for environment variable settings
+- *(proxy)* Streamline proxy configuration form layout and improve button placements
+- *(remoteProcess)* Remove redundant file transfer functions for improved clarity
+- *(github)* Enhance API request handling and validation
+- *(databases)* Remove deprecated backup parameters from API documentation
+- *(databases)* Streamline backup queries to use team context
+- *(databases)* Update backup queries to use team-specific method
+- *(server)* Update dispatch messages and streamline data synchronization
+- *(cache)* Update team retrieval method in ClearsGlobalSearchCache trait
+- *(database-backup)* Move unique UUID generation for backup execution to database loop
+- *(cloud-commands)* Consolidate and enhance subscription management commands
+- *(toast-component)* Improve layout and icon handling in toast notifications
+- *(private-key-update)* Implement transaction for private key association and connection validation
+
+### 📚 Documentation
+
+- Update changelog
+- Update changelog
+- *(claude)* Update testing guidelines and add note on Application::team relationship
+
+### 🎨 Styling
+
+- *(environment-variable)* Adjust SVG icon margin for improved layout in locked state
+- *(proxy)* Adjust padding in proxy configuration form for better visual alignment
+
+### ⚙️ Miscellaneous Tasks
+
+- Change order of runtime and buildtime
+- *(docker-compose)* Update soketi image version to 1.0.10 in production and Windows configurations
+- *(versions)* Update coolify version numbers to 4.0.0-beta.430 and 4.0.0-beta.431 in configuration files
+
+## [4.0.0-beta.428] - 2025-09-15
+
+### 📚 Documentation
+
+- Update changelog
 
 ## [4.0.0-beta.427] - 2025-09-15
 
 ### 🚀 Features
 
+- Add Ente Photos service template
 - *(command)* Add option to sync GitHub releases to BunnyCDN and refactor sync logic
 - *(ui)* Display current version in settings dropdown and update UI accordingly
 - *(settings)* Add option to restrict PR deployments to repository members and contributors
@@ -67,6 +285,9 @@ All notable changes to this project will be documented in this file.
 - *(executions)* Add 'Load All' button to view all logs and implement loadAllLogs method for complete log retrieval
 - *(auth)* Enhance user login flow to handle team invitations, attaching users to invited teams upon first login and maintaining personal team logic for regular logins
 - *(laravel-boost)* Add Laravel Boost guidelines and MCP server configuration to enhance development experience
+- *(deployment)* Enhance deployment status reporting with detailed information on active deployments and team members
+- *(deployment)* Implement cancellation checks during deployment process to enhance user control and prevent unnecessary execution
+- *(deployment)* Introduce 'use_build_secrets' setting for enhanced security during Docker builds and update related logic in deployment process
 
 ### 🐛 Bug Fixes
 
@@ -93,6 +314,13 @@ All notable changes to this project will be documented in this file.
 - *(security)* Update contact email for vulnerability reports to improve security communication
 - *(navbar)* Restrict subscription link visibility to admin users in cloud environment
 - *(docker)* Enhance container status aggregation for multi-container applications, including exclusion handling based on docker-compose configuration
+- *(application)* Improve watch paths handling by trimming and filtering empty paths to prevent unnecessary triggers
+- *(server)* Update server usability check to reflect actual Docker availability status
+- *(server)* Add build server check to disable Sentinel and update related logic
+- *(server)* Implement refreshServer method and update navbar event listener for improved server state management
+- *(deployment)* Prevent removal of running containers for pull request deployments in case of failure
+- *(docker)* Redirect stderr to stdout for container log retrieval to capture error messages
+- *(clone)* Update destinations method call to ensure correct retrieval of selected destination
 
 ### 🚜 Refactor
 
@@ -132,6 +360,16 @@ All notable changes to this project will be documented in this file.
 - *(environment)* Remove 'is_build_time' attribute from environment variable handling across the application to simplify configuration
 - *(environment)* Streamline environment variable handling by replacing sorting methods with direct property access and enhancing query ordering for improved performance
 - *(stripe-jobs)* Comment out internal notification calls and add subscription status verification before sending failure notifications
+- *(deployment)* Streamline environment variable handling for dockercompose and improve sorting of runtime variables
+- *(remoteProcess)* Remove command log comments for file transfers to simplify code
+- *(remoteProcess)* Remove file transfer handling from remote_process and instant_remote_process functions to simplify code
+- *(deployment)* Update environment file paths in docker compose commands to use working directory for improved consistency
+- *(server)* Remove debugging ray call from validateConnection method for cleaner code
+- *(deployment)* Conditionally cleanup build secrets based on Docker BuildKit support and remove redundant calls for improved efficiency
+- *(deployment)* Remove redundant environment variable documentation from Dockerfile comments to streamline the deployment process
+- *(deployment)* Streamline Docker BuildKit detection and environment variable handling for enhanced security during application deployment
+- *(deployment)* Optimize BuildKit capabilities detection and remove unnecessary comments for cleaner deployment logic
+- *(deployment)* Rename method for modifying Dockerfile to improve clarity and streamline build secrets integration
 
 ### 📚 Documentation
 
@@ -145,6 +383,10 @@ All notable changes to this project will be documented in this file.
 - Remove webhooks table cleanup
 - *(cleanup)* Remove deprecated ServerCheck and related job classes to streamline codebase
 - *(versions)* Update sentinel version from 0.0.15 to 0.0.16 in versions.json files
+- *(constants)* Update realtime_version from 1.0.10 to 1.0.11
+- *(versions)* Increment coolify version to 4.0.0-beta.428 and update realtime_version to 1.0.10
+- *(docker)* Add a blank line for improved readability in Dockerfile
+- *(versions)* Bump coolify version to 4.0.0-beta.429 and nightly version to 4.0.0-beta.430
 
 ## [4.0.0-beta.426] - 2025-08-28
 

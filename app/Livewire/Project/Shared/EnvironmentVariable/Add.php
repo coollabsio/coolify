@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Traits\EnvironmentVariableAnalyzer;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Add extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer;
 
     public $parameters;
 
@@ -23,7 +24,11 @@ class Add extends Component
 
     public bool $is_literal = false;
 
-    public bool $is_buildtime_only = false;
+    public bool $is_runtime = true;
+
+    public bool $is_buildtime = true;
+
+    public array $problematicVariables = [];
 
     protected $listeners = ['clearAddEnv' => 'clear'];
 
@@ -32,7 +37,8 @@ class Add extends Component
         'value' => 'nullable',
         'is_multiline' => 'required|boolean',
         'is_literal' => 'required|boolean',
-        'is_buildtime_only' => 'required|boolean',
+        'is_runtime' => 'required|boolean',
+        'is_buildtime' => 'required|boolean',
     ];
 
     protected $validationAttributes = [
@@ -40,12 +46,14 @@ class Add extends Component
         'value' => 'value',
         'is_multiline' => 'multiline',
         'is_literal' => 'literal',
-        'is_buildtime_only' => 'buildtime only',
+        'is_runtime' => 'runtime',
+        'is_buildtime' => 'buildtime',
     ];
 
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        $this->problematicVariables = self::getProblematicVariablesForFrontend();
     }
 
     public function submit()
@@ -56,7 +64,8 @@ class Add extends Component
             'value' => $this->value,
             'is_multiline' => $this->is_multiline,
             'is_literal' => $this->is_literal,
-            'is_buildtime_only' => $this->is_buildtime_only,
+            'is_runtime' => $this->is_runtime,
+            'is_buildtime' => $this->is_buildtime,
             'is_preview' => $this->is_preview,
         ]);
         $this->clear();
@@ -68,6 +77,7 @@ class Add extends Component
         $this->value = '';
         $this->is_multiline = false;
         $this->is_literal = false;
-        $this->is_buildtime_only = false;
+        $this->is_runtime = true;
+        $this->is_buildtime = true;
     }
 }

@@ -17,6 +17,46 @@ trait ExecuteRemoteCommand
 
     public static int $batch_counter = 0;
 
+    private function redact_sensitive_info($text)
+    {
+        $text = remove_iip($text);
+
+        if (! isset($this->application)) {
+            return $text;
+        }
+
+        $lockedVars = collect([]);
+
+        if (isset($this->application->environment_variables)) {
+            $lockedVars = $lockedVars->merge(
+                $this->application->environment_variables
+                    ->where('is_shown_once', true)
+                    ->pluck('real_value', 'key')
+                    ->filter()
+            );
+        }
+
+        if (isset($this->pull_request_id) && $this->pull_request_id !== 0 && isset($this->application->environment_variables_preview)) {
+            $lockedVars = $lockedVars->merge(
+                $this->application->environment_variables_preview
+                    ->where('is_shown_once', true)
+                    ->pluck('real_value', 'key')
+                    ->filter()
+            );
+        }
+
+        foreach ($lockedVars as $key => $value) {
+            $escapedValue = preg_quote($value, '/');
+            $text = preg_replace(
+                '/'.$escapedValue.'/',
+                REDACTED,
+                $text
+            );
+        }
+
+        return $text;
+    }
+
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
@@ -46,6 +86,14 @@ trait ExecuteRemoteCommand
                 }
             }
 
+            // Check for cancellation before executing commands
+            if (isset($this->application_deployment_queue)) {
+                $this->application_deployment_queue->refresh();
+                if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                    throw new \RuntimeException('Deployment cancelled by user', 69420);
+                }
+            }
+
             $maxRetries = config('constants.ssh.max_retries');
             $attempt = 0;
             $lastError = null;
@@ -66,13 +114,19 @@ trait ExecuteRemoteCommand
                         // Track SSH retry event in Sentry
                         $this->trackSshRetryEvent($attempt, $maxRetries, $delay, $errorMessage, [
                             'server' => $this->server->name ?? $this->server->ip ?? 'unknown',
-                            'command' => remove_iip($command),
+                            'command' => $this->redact_sensitive_info($command),
                             'trait' => 'ExecuteRemoteCommand',
                         ]);
 
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
                             $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
+
+                            // Check for cancellation during retry wait
+                            $this->application_deployment_queue->refresh();
+                            if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                                throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                            }
                         }
 
                         sleep($delay);
@@ -85,6 +139,11 @@ trait ExecuteRemoteCommand
 
             // If we exhausted all retries and still failed
             if (! $commandExecuted && $lastError) {
+                // Now we can set the status to FAILED since all retries have been exhausted
+                if (isset($this->application_deployment_queue)) {
+                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
+                    $this->application_deployment_queue->save();
+                }
                 throw $lastError;
             }
         });
@@ -96,7 +155,7 @@ trait ExecuteRemoteCommand
     private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors)
     {
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-        $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
             $output = str($output)->trim();
             if ($output->startsWith('╔')) {
                 $output = "\n".$output;
@@ -106,8 +165,8 @@ trait ExecuteRemoteCommand
             $sanitized_output = sanitize_utf8_text($output);
 
             $new_log_entry = [
-                'command' => remove_iip($command),
-                'output' => remove_iip($sanitized_output),
+                'command' => $this->redact_sensitive_info($command),
+                'output' => $this->redact_sensitive_info($sanitized_output),
                 'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
@@ -143,13 +202,13 @@ trait ExecuteRemoteCommand
 
             if ($this->save) {
                 if (data_get($this->saved_outputs, $this->save, null) === null) {
-                    data_set($this->saved_outputs, $this->save, str());
+                    $this->saved_outputs->put($this->save, str());
                 }
                 if ($append) {
-                    $this->saved_outputs[$this->save] .= str($sanitized_output)->trim();
-                    $this->saved_outputs[$this->save] = str($this->saved_outputs[$this->save]);
+                    $current_value = $this->saved_outputs->get($this->save);
+                    $this->saved_outputs->put($this->save, str($current_value.str($sanitized_output)->trim()));
                 } else {
-                    $this->saved_outputs[$this->save] = str($sanitized_output)->trim();
+                    $this->saved_outputs->put($this->save, str($sanitized_output)->trim());
                 }
             }
         });
@@ -160,8 +219,8 @@ trait ExecuteRemoteCommand
         $process_result = $process->wait();
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
-                $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
-                $this->application_deployment_queue->save();
+                // Don't immediately set to FAILED - let the retry logic handle it
+                // This prevents premature status changes during retryable SSH errors
                 throw new \RuntimeException($process_result->errorOutput());
             }
         }
@@ -175,7 +234,7 @@ trait ExecuteRemoteCommand
         $retryMessage = "SSH connection failed. Retrying... (Attempt {$attempt}/{$maxRetries}, waiting {$delay}s)\nError: {$errorMessage}";
 
         $new_log_entry = [
-            'output' => remove_iip($retryMessage),
+            'output' => $this->redact_sensitive_info($retryMessage),
             'type' => 'stdout',
             'timestamp' => Carbon::now('UTC'),
             'hidden' => false,
