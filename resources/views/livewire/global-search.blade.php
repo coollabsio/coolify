@@ -1,14 +1,20 @@
 <div x-data="{
     modalOpen: false,
     selectedIndex: -1,
+    isSearching: false,
+    isLoadingInitialData: false,
     openModal() {
         this.modalOpen = true;
         this.selectedIndex = -1;
-        @this.openSearchModal();
+        this.isLoadingInitialData = true;
+        // Dispatch event to load initial data
+        $wire.dispatch('loadInitialData');
     },
     closeModal() {
         this.modalOpen = false;
         this.selectedIndex = -1;
+        this.isSearching = false;
+        this.isLoadingInitialData = false;
         // Ensure scroll is restored
         document.body.style.overflow = '';
         @this.closeSearchModal();
@@ -34,6 +40,46 @@
         // Listen for reset index event from Livewire
         Livewire.on('reset-selected-index', () => {
             this.selectedIndex = -1;
+        });
+
+        // Listen for loading state changes
+        $wire.on('loadInitialData', () => {
+            this.isLoadingInitialData = true;
+            $wire.openSearchModal().finally(() => {
+                this.isLoadingInitialData = false;
+                // Focus input after data is loaded
+                setTimeout(() => this.$refs.searchInput?.focus(), 50);
+            });
+        });
+
+        // Use Livewire lifecycle hooks for accurate loading state
+        const componentId = $wire.__instance.id;
+
+        Livewire.hook('message.sent', (message, component) => {
+            // Only handle messages for this component instance
+            if (component.id !== componentId) return;
+
+            // Check if this is a searchQuery update
+            if (message.updateQueue && message.updateQueue.some(update => update.payload.name === 'searchQuery')) {
+                this.isSearching = true;
+            }
+        });
+
+        Livewire.hook('message.processed', (message, component) => {
+            // Only handle messages for this component instance
+            if (component.id !== componentId) return;
+
+            // Check if this was a searchQuery update
+            if (message.updateQueue && message.updateQueue.some(update => update.payload.name === 'searchQuery')) {
+                this.isSearching = false;
+            }
+        });
+
+        // Also clear loading state when search is emptied
+        this.$watch('$wire.searchQuery', (value) => {
+            if (!value || value.length === 0) {
+                this.isSearching = false;
+            }
         });
 
         // Create named handlers for proper cleanup
@@ -62,19 +108,13 @@
                 }
             }
         };
-        const escapeKeyHandler = async (e) => {
+        const escapeKeyHandler = (e) => {
             if (e.key === 'Escape' && this.modalOpen) {
                 // If search query is empty, close the modal
-                const searchQuery = await @this.get('searchQuery');
-                if (searchQuery === '') {
-                    // Check if we're in a selection state - go back to main menu first
-                    const selectingServer = await @this.get('selectingServer');
-                    const selectingProject = await @this.get('selectingProject');
-                    const selectingEnvironment = await @this.get('selectingEnvironment');
-                    const selectingDestination = await @this.get('selectingDestination');
-
-                    if (selectingServer || selectingProject || selectingEnvironment || selectingDestination) {
-                        @this.call('cancelResourceSelection');
+                if (!$wire.searchQuery || $wire.searchQuery === '') {
+                    // Check if we're in a selection state using Alpine-accessible Livewire state
+                    if ($wire.isSelectingResource) {
+                        $wire.cancelResourceSelection();
                         setTimeout(() => this.$refs.searchInput?.focus(), 100);
                     } else {
                         // Close the modal if in main menu
@@ -82,7 +122,7 @@
                     }
                 } else {
                     // If search query has text, just clear it
-                    @this.set('searchQuery', '');
+                    $wire.searchQuery = '';
                     setTimeout(() => this.$refs.searchInput?.focus(), 100);
                 }
             }
@@ -159,8 +199,8 @@
                     </div>
                     <input type="text" wire:model.live.debounce.200ms="searchQuery"
                         placeholder="Search resources (type new for create things)..." x-ref="searchInput"
-                        x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
-                        class="w-full pl-12 pr-32 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500" />
+                        x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })" :disabled="isLoadingInitialData"
+                        class="w-full pl-12 pr-32 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:ring-2 focus:ring-neutral-400 dark:focus:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 disabled:opacity-50 disabled:cursor-not-allowed" />
                     <div class="absolute inset-y-0 right-2 flex items-center gap-2 pointer-events-none">
                         <span class="text-xs font-medium text-neutral-400 dark:text-neutral-500">
                             / or ⌘K to focus
@@ -172,31 +212,53 @@
                     </div>
                 </div>
 
+                <!-- Initial Loading State when opening modal -->
+                <div x-show="isLoadingInitialData && !$wire.searchQuery" x-cloak
+                    class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden">
+                    <div class="flex items-center justify-center min-h-[200px] p-8">
+                        <div class="text-center">
+                            <svg class="animate-spin mx-auto h-8 w-8 text-neutral-400 mb-3"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-1">
+                                Please wait while we fetch your data
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Search results (with background) -->
                 @if (strlen($searchQuery) >= 1)
                     <div
                         class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden">
-                        <!-- Loading indicator -->
-                        <div wire:loading.flex wire:target="searchQuery"
-                            class="min-h-[200px] items-center justify-center p-8">
-                            <div class="text-center">
-                                <svg class="animate-spin mx-auto h-8 w-8 text-neutral-400"
-                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10"
-                                        stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                    </path>
-                                </svg>
-                                <p class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                                    Searching...
-                                </p>
+                        <!-- Loading indicator with skeleton loaders -->
+                        <div x-show="isSearching" x-cloak class="min-h-[200px] flex flex-col p-4">
+                            <!-- Show skeleton loaders instead of just spinner -->
+                            <div class="animate-pulse">
+                                @for ($i = 0; $i < 3; $i++)
+                                    <div
+                                        class="px-4 py-3 {{ $i > 0 ? 'border-t border-neutral-100 dark:border-coolgray-200' : '' }}">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 bg-neutral-200 dark:bg-coolgray-300 rounded-lg"></div>
+                                            <div class="flex-1">
+                                                <div class="h-4 bg-neutral-200 dark:bg-coolgray-300 rounded w-32 mb-2">
+                                                </div>
+                                                <div class="h-3 bg-neutral-100 dark:bg-coolgray-400 rounded w-48"></div>
+                                            </div>
+                                            <div class="w-4 h-4 bg-neutral-100 dark:bg-coolgray-400 rounded"></div>
+                                        </div>
+                                    </div>
+                                @endfor
                             </div>
                         </div>
 
-                        <!-- Results content - hidden while loading -->
-                        <div wire:loading.remove wire:target="searchQuery"
-                            class="max-h-[60vh] overflow-y-auto scrollbar">
+                        <!-- Results content - show when not searching -->
+                        <div x-show="!isSearching" x-cloak class="max-h-[60vh] overflow-y-auto scrollbar">
                             @if ($isSelectingResource)
                                 <!-- Resource Selection Flow -->
                                 <div class="p-6">
@@ -516,15 +578,71 @@
                             @elseif ($isCreateMode && count($this->filteredCreatableItems) > 0 && !$autoOpenResource)
                                 <!-- Create new resources section -->
                                 <div class="py-2">
-                                    {{-- <div
-                                        class="px-4 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-100 dark:border-yellow-800">
-                                        <h3 class="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
-                                            Create New Resources
-                                        </h3>
-                                        <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-0.5">
-                                            Click on any item below to create a new resource
-                                        </p>
-                                    </div> --}}
+                                    {{-- Show existing resources first if any match --}}
+                                    @php
+                                        $existingResources = collect($searchResults)->filter(fn($r) => !isset($r['is_creatable_suggestion']))->count();
+                                    @endphp
+                                    @if ($existingResources > 0)
+                                        <!-- Existing Resources Section -->
+                                        <div class="px-4 pt-3 pb-1">
+                                            <h4
+                                                class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                                                Existing Resources
+                                            </h4>
+                                        </div>
+                                        @foreach ($searchResults as $result)
+                                            @if (!isset($result['is_creatable_suggestion']))
+                                                <a href="{{ $result['link'] ?? '#' }}"
+                                                    class="search-result-item block px-4 py-3 hover:bg-neutral-50 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-yellow-50 dark:focus:bg-yellow-900/20 border-transparent hover:border-coollabs focus:border-yellow-500 dark:focus:border-yellow-400">
+                                                    <div class="flex items-center justify-between gap-3">
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="flex items-center gap-2 mb-1">
+                                                                <span
+                                                                    class="font-medium text-neutral-900 dark:text-white truncate">
+                                                                    {{ $result['name'] }}
+                                                                </span>
+                                                                <span
+                                                                    class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
+                                                                    @if ($result['type'] === 'application')
+                                                                        Application
+                                                                    @elseif ($result['type'] === 'service')
+                                                                        Service
+                                                                    @elseif ($result['type'] === 'database')
+                                                                        {{ ucfirst($result['subtype'] ?? 'Database') }}
+                                                                    @elseif ($result['type'] === 'server')
+                                                                        Server
+                                                                    @elseif ($result['type'] === 'project')
+                                                                        Project
+                                                                    @elseif ($result['type'] === 'environment')
+                                                                        Environment
+                                                                    @endif
+                                                                </span>
+                                                            </div>
+                                                            @if (!empty($result['project']) && !empty($result['environment']))
+                                                                <div
+                                                                    class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                                                                    {{ $result['project'] }} /
+                                                                    {{ $result['environment'] }}
+                                                                </div>
+                                                            @endif
+                                                            @if (!empty($result['description']))
+                                                                <div
+                                                                    class="text-sm text-neutral-600 dark:text-neutral-400">
+                                                                    {{ Str::limit($result['description'], 80) }}
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                                            class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M9 5l7 7-7 7" />
+                                                        </svg>
+                                                    </div>
+                                                </a>
+                                            @endif
+                                        @endforeach
+                                    @endif
 
                                     @php
                                         $grouped = collect($this->filteredCreatableItems)->groupBy('category');
@@ -694,6 +812,9 @@
                                         </p>
                                         <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                                             Try different keywords or check the spelling
+                                        </p>
+                                        <p class="mt-2 text-xs text-neutral-400 dark:text-neutral-500">
+                                            💡 Tip: Search for service names like "wordpress", "postgres", or "redis"
                                         </p>
                                     </div>
                                 </div>
@@ -957,4 +1078,5 @@
             </div>
         </template>
     </div>
+
 </div>

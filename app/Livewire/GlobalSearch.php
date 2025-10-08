@@ -22,6 +22,8 @@ class GlobalSearch extends Component
 {
     public $searchQuery = '';
 
+    private $previousTrimmedQuery = '';
+
     public $isModalOpen = false;
 
     public $searchResults = [];
@@ -86,6 +88,7 @@ class GlobalSearch extends Component
     {
         $this->isModalOpen = false;
         $this->searchQuery = '';
+        $this->previousTrimmedQuery = '';
         $this->searchResults = [];
     }
 
@@ -101,25 +104,49 @@ class GlobalSearch extends Component
 
     public function updatedSearchQuery()
     {
-        $query = strtolower(trim($this->searchQuery));
+        $trimmedQuery = trim($this->searchQuery);
+
+        // If only spaces were added/removed, don't trigger a search
+        if ($trimmedQuery === $this->previousTrimmedQuery) {
+            return;
+        }
+
+        $this->previousTrimmedQuery = $trimmedQuery;
+
+        // If search query is empty, just clear results without processing
+        if (empty($trimmedQuery)) {
+            $this->searchResults = [];
+            $this->isCreateMode = false;
+            $this->creatableItems = [];
+            $this->autoOpenResource = null;
+            $this->isSelectingResource = false;
+            $this->cancelResourceSelection();
+
+            return;
+        }
+
+        $query = strtolower($trimmedQuery);
 
         // Reset keyboard navigation index
         $this->dispatch('reset-selected-index');
 
-        if (str_starts_with($query, 'new')) {
+        // Only enter create mode if query is exactly "new" or starts with "new " (space after)
+        if ($query === 'new' || str_starts_with($query, 'new ')) {
             $this->isCreateMode = true;
             $this->loadCreatableItems();
-            $this->searchResults = [];
 
             // Check for sub-commands like "new project", "new server", etc.
-            // Use original query (not trimmed) to ensure exact match without trailing spaces
-            $detectedType = $this->detectSpecificResource(strtolower($this->searchQuery));
+            $detectedType = $this->detectSpecificResource($query);
             if ($detectedType) {
                 $this->navigateToResource($detectedType);
             } else {
                 // If no specific resource detected, reset selection state
                 $this->cancelResourceSelection();
             }
+
+            // Also search for existing resources that match the query
+            // This allows users to find resources with "new" in their name
+            $this->search();
         } else {
             $this->isCreateMode = false;
             $this->creatableItems = [];
@@ -624,6 +651,8 @@ class GlobalSearch extends Component
         // Search for matching creatable resources to show as suggestions (if no priority item)
         if (! $priorityCreatableItem) {
             $this->loadCreatableItems();
+
+            // Search in regular creatable items (apps, databases, quick actions)
             $creatableSuggestions = collect($this->creatableItems)
                 ->filter(function ($item) use ($query) {
                     $searchText = strtolower($item['name'].' '.$item['description'].' '.($item['type'] ?? ''));
@@ -648,7 +677,37 @@ class GlobalSearch extends Component
                     $item['is_creatable_suggestion'] = true;
 
                     return $item;
+                });
+
+            // Also search in services (loaded on-demand)
+            $serviceSuggestions = collect($this->services)
+                ->filter(function ($item) use ($query) {
+                    $searchText = strtolower($item['name'].' '.$item['description'].' '.($item['type'] ?? ''));
+
+                    return preg_match('/\b'.preg_quote($query, '/').'/i', $searchText);
                 })
+                ->map(function ($item) use ($query) {
+                    // Calculate match priority: name > type > description
+                    $name = strtolower($item['name']);
+                    $type = strtolower($item['type'] ?? '');
+                    $description = strtolower($item['description']);
+
+                    if (preg_match('/\b'.preg_quote($query, '/').'/i', $name)) {
+                        $item['match_priority'] = 1;
+                    } elseif (preg_match('/\b'.preg_quote($query, '/').'/i', $type)) {
+                        $item['match_priority'] = 2;
+                    } else {
+                        $item['match_priority'] = 3;
+                    }
+
+                    $item['is_creatable_suggestion'] = true;
+
+                    return $item;
+                });
+
+            // Merge and sort all suggestions
+            $creatableSuggestions = $creatableSuggestions
+                ->merge($serviceSuggestions)
                 ->sortBy('match_priority')
                 ->take(10)
                 ->values()
@@ -914,30 +973,17 @@ class GlobalSearch extends Component
             ]);
         }
 
-        // === Services Category ===
-
-        if ($user->can('createAnyResource')) {
-            // Load all services
-            $allServices = get_service_templates();
-
-            foreach ($allServices as $serviceKey => $service) {
-                $items->push([
-                    'name' => str($serviceKey)->headline()->toString(),
-                    'description' => data_get($service, 'slogan', 'Deploy '.str($serviceKey)->headline()),
-                    'type' => 'one-click-service-'.$serviceKey,
-                    'category' => 'Services',
-                    'resourceType' => 'service',
-                ]);
-            }
-        }
-
         $this->creatableItems = $items->toArray();
     }
 
     public function navigateToResource($type)
     {
-        // Find the item by type
+        // Find the item by type - check regular items first, then services
         $item = collect($this->creatableItems)->firstWhere('type', $type);
+
+        if (! $item) {
+            $item = collect($this->services)->firstWhere('type', $type);
+        }
 
         if (! $item) {
             return;
@@ -1227,10 +1273,50 @@ class GlobalSearch extends Component
             $this->loadCreatableItems();
         }
 
-        // Find the item by type
+        // Find the item by type - check regular items first, then services
         $item = collect($this->creatableItems)->firstWhere('type', $this->selectedResourceType);
 
+        if (! $item) {
+            $item = collect($this->services)->firstWhere('type', $this->selectedResourceType);
+        }
+
         return $item ? $item['name'] : null;
+    }
+
+    public function getServicesProperty()
+    {
+        // Cache services in a static property to avoid reloading on every access
+        static $cachedServices = null;
+
+        if ($cachedServices !== null) {
+            return $cachedServices;
+        }
+
+        $user = auth()->user();
+
+        if (! $user->can('createAnyResource')) {
+            $cachedServices = [];
+
+            return $cachedServices;
+        }
+
+        // Load all services
+        $allServices = get_service_templates();
+        $items = collect();
+
+        foreach ($allServices as $serviceKey => $service) {
+            $items->push([
+                'name' => str($serviceKey)->headline()->toString(),
+                'description' => data_get($service, 'slogan', 'Deploy '.str($serviceKey)->headline()),
+                'type' => 'one-click-service-'.$serviceKey,
+                'category' => 'Services',
+                'resourceType' => 'service',
+            ]);
+        }
+
+        $cachedServices = $items->toArray();
+
+        return $cachedServices;
     }
 
     public function render()
