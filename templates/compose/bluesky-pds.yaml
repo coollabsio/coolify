@@ -9,7 +9,7 @@ services:
   pds:
     image: 'ghcr.io/bluesky-social/pds:0.4.182'
     volumes:
-      - './pds-data:/pds'
+      - pds-data:/pds
     environment:
       - SERVICE_URL_PDS_3000
       - 'PDS_HOSTNAME=${SERVICE_FQDN_PDS_3000}'
