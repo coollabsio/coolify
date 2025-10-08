@@ -185,7 +185,4 @@ services:
       retries: 20
       start_period: 10s
 
-volumes:
-  evolution_instances: null
-  evolution_redis: null
   postgres_data: null
