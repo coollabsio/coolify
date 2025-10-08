@@ -543,10 +543,7 @@ class GlobalSearch extends Component
                 });
 
             // Get all environments
-            $environments = Environment::query()
-                ->whereHas('project', function ($query) {
-                    $query->where('team_id', auth()->user()->currentTeam()->id);
-                })
+            $environments = Environment::ownedByCurrentTeam()
                 ->with('project')
                 ->withCount(['applications', 'services'])
                 ->get()
