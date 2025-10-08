@@ -6,8 +6,13 @@
             <a href="{{ route('security.private-key.index') }}">
                 <button>Private Keys</button>
             </a>
+            @can('viewAny', App\Models\CloudProviderToken::class)
+                <a href="{{ route('security.cloud-tokens') }}">
+                    <button>Cloud Tokens</button>
+                </a>
+            @endcan
             <a href="{{ route('security.api-tokens') }}">
-                <button>API tokens</button>
+                <button>API Tokens</button>
             </a>
         </nav>
     </div>
