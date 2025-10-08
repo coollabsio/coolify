@@ -36,7 +36,7 @@
     <p class="mb-4">
         Select events for which you would like to receive Telegram notifications.
     </p>
-    <div class="flex flex-col gap-4 ">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 ">
         <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
             <h3 class="text-lg font-medium mb-3">Deployments</h3>
             <div class="flex flex-col gap-1.5 pl-1">
