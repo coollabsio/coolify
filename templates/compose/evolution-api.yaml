@@ -153,13 +153,13 @@ services:
     command: "redis-server --port 6379 --appendonly yes\n"
     volumes:
       - 'evolution_redis:/data'
+    image: 'redis:7-alpine'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-h", "127.0.0.1", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 5s
-
   postgres:
     image: 'postgres:16-alpine'
     command:
