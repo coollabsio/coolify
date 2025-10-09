@@ -1,0 +1,2 @@
+docker ps -a
+docker network ls

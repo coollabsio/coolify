@@ -1,0 +1,3 @@
+docker ps -a
+docker network ls
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash -x | tee coolify-install.log
