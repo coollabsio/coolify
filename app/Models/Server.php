@@ -162,6 +162,7 @@ class Server extends BaseModel
         'description',
         'private_key_id',
         'team_id',
+        'hetzner_server_id',
     ];
 
     protected $guarded = [];

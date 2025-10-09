@@ -9,6 +9,16 @@
             <form wire:submit.prevent='submit' class="flex flex-col">
                 <div class="flex gap-2">
                     <h2>General</h2>
+                    @if ($server->hetzner_server_id)
+                        <div
+                            class="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded bg-white dark:bg-coolgray-100 dark:text-white ">
+                            <svg class="w-4 h-4" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                <rect width="200" height="200" fill="#D50C2D" rx="8" />
+                                <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z" fill="white" />
+                            </svg>
+                            <span>Hetzner</span>
+                        </div>
+                    @endif
                     @if ($server->id === 0)
                         <x-modal-confirmation title="Confirm Server Settings Change?" buttonTitle="Save"
                             submitAction="submit" :actions="[
@@ -141,8 +151,9 @@
                                     <input readonly disabled autocomplete="off"
                                         class="w-full input opacity-50 cursor-not-allowed"
                                         value="{{ $serverTimezone ?: 'No timezone set' }}" placeholder="Server Timezone">
-                                    <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50" xmlns="http://www.w3.org/2000/svg"
-                                        fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50"
+                                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round"
                                             d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
                                     </svg>

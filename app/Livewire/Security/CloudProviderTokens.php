@@ -100,7 +100,7 @@ class CloudProviderTokens extends Component
     public function deleteToken(int $tokenId)
     {
         try {
-            $token = CloudProviderToken::findOrFail($tokenId);
+            $token = CloudProviderToken::ownedByCurrentTeam()->findOrFail($tokenId);
             $this->authorize('delete', $token);
 
             $token->delete();
