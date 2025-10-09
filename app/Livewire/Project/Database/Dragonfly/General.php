@@ -6,7 +6,6 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
-use App\Models\SslCertificate;
 use App\Models\StandaloneDragonfly;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -249,13 +248,13 @@ class General extends Component
 
             $server = $this->database->destination->server;
 
-            $caCert = SslCertificate::where('server_id', $server->id)
+            $caCert = $server->sslCertificates()
                 ->where('is_ca_certificate', true)
                 ->first();
 
             if (! $caCert) {
                 $server->generateCaCertificate();
-                $caCert = SslCertificate::where('server_id', $server->id)->where('is_ca_certificate', true)->first();
+                $caCert = $server->sslCertificates()->where('is_ca_certificate', true)->first();
             }
 
             if (! $caCert) {

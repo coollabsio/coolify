@@ -1342,7 +1342,7 @@ $schema://$host {
                 isCaCertificate: true,
                 validityDays: 10 * 365
             );
-            $caCertificate = SslCertificate::where('server_id', $this->id)->where('is_ca_certificate', true)->first();
+            $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
             ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;

@@ -6,7 +6,6 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Helpers\SslHelper;
 use App\Models\Server;
-use App\Models\SslCertificate;
 use App\Models\StandaloneKeydb;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -255,7 +254,7 @@ class General extends Component
                 return;
             }
 
-            $caCert = SslCertificate::where('server_id', $existingCert->server_id)
+            $caCert = $this->server->sslCertificates()
                 ->where('is_ca_certificate', true)
                 ->first();
 
