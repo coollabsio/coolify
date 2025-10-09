@@ -1,0 +1,2 @@
+sudo systemctl status docker
+docker info
