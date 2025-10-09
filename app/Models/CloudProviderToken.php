@@ -17,6 +17,16 @@ class CloudProviderToken extends Model
         return $this->belongsTo(Team::class);
     }
 
+    public function servers()
+    {
+        return $this->hasMany(Server::class);
+    }
+
+    public function hasServers(): bool
+    {
+        return $this->servers()->exists();
+    }
+
     public static function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);

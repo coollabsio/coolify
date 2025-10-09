@@ -8,8 +8,11 @@
     'content' => null,
     'closeOutside' => true,
     'minWidth' => '36rem',
+    'isFullWidth' => false,
 ])
-<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
+<div x-data="{ modalOpen: false }"
+    x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
+    :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     class="relative w-auto h-auto" wire:ignore>
     @if ($content)
         <div @click="modalOpen=true">
@@ -17,13 +20,13 @@
         </div>
     @else
         @if ($disabled)
-            <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError disabled @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @elseif ($isErrorButton)
-            <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @elseif ($isHighlightedButton)
-            <x-forms.button isHighlighted @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isHighlighted @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @else
-            <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @endif
     @endif
     <template x-teleport="body">

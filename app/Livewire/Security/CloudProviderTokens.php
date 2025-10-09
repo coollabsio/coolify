@@ -4,7 +4,6 @@ namespace App\Livewire\Security;
 
 use App\Models\CloudProviderToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class CloudProviderTokens extends Component
@@ -13,34 +12,16 @@ class CloudProviderTokens extends Component
 
     public $tokens;
 
-    public string $provider = 'hetzner';
-
-    public string $token = '';
-
-    public string $name = '';
-
     public function mount()
     {
         $this->authorize('viewAny', CloudProviderToken::class);
         $this->loadTokens();
     }
 
-    protected function rules(): array
+    public function getListeners()
     {
         return [
-            'provider' => 'required|string|in:hetzner,digitalocean',
-            'token' => 'required|string',
-            'name' => 'required|string|max:255',
-        ];
-    }
-
-    protected function messages(): array
-    {
-        return [
-            'provider.required' => 'Please select a cloud provider.',
-            'provider.in' => 'Invalid cloud provider selected.',
-            'token.required' => 'API token is required.',
-            'name.required' => 'Token name is required.',
+            'tokenAdded' => 'loadTokens',
         ];
     }
 
@@ -49,59 +30,19 @@ class CloudProviderTokens extends Component
         $this->tokens = CloudProviderToken::ownedByCurrentTeam()->get();
     }
 
-    private function validateToken(string $provider, string $token): bool
-    {
-        try {
-            if ($provider === 'hetzner') {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer '.$token,
-                ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-
-                return $response->successful();
-            }
-
-            // Add other providers here in the future
-            // if ($provider === 'digitalocean') { ... }
-
-            return false;
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    public function addNewToken()
-    {
-        $this->validate();
-
-        try {
-            $this->authorize('create', CloudProviderToken::class);
-
-            // Validate the token with the provider's API
-            if (! $this->validateToken($this->provider, $this->token)) {
-                return $this->dispatch('error', 'Invalid API token. Please check your token and try again.');
-            }
-
-            CloudProviderToken::create([
-                'team_id' => currentTeam()->id,
-                'provider' => $this->provider,
-                'token' => $this->token,
-                'name' => $this->name,
-            ]);
-
-            $this->reset(['token', 'name']);
-            $this->loadTokens();
-
-            $this->dispatch('success', 'Cloud provider token added successfully.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function deleteToken(int $tokenId)
     {
         try {
             $token = CloudProviderToken::ownedByCurrentTeam()->findOrFail($tokenId);
             $this->authorize('delete', $token);
+
+            // Check if any servers are using this token
+            if ($token->hasServers()) {
+                $serverCount = $token->servers()->count();
+                $this->dispatch('error', "Cannot delete this token. It is currently used by {$serverCount} server(s). Please reassign those servers to a different token first.");
+
+                return;
+            }
 
             $token->delete();
             $this->loadTokens();

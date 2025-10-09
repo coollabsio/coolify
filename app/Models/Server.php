@@ -161,6 +161,7 @@ class Server extends BaseModel
         'user',
         'description',
         'private_key_id',
+        'cloud_provider_token_id',
         'team_id',
         'hetzner_server_id',
     ];
@@ -888,6 +889,11 @@ $schema://$host {
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);
+    }
+
+    public function cloudProviderToken()
+    {
+        return $this->belongsTo(CloudProviderToken::class);
     }
 
     public function muxFilename()

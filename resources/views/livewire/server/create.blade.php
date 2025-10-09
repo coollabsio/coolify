@@ -3,7 +3,7 @@
         @can('viewAny', App\Models\CloudProviderToken::class)
             <div>
                 <div class="flex gap-2 flex-wrap">
-                    <x-modal-input title="Connect to Hetzner">
+                    <x-modal-input title="Connect a Hetzner Server">
                         <x-slot:button-title>
                             <div class="flex items-center gap-2">
                                 <svg class="w-5 h-5" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">

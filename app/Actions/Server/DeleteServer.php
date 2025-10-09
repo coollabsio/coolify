@@ -25,10 +25,14 @@ class DeleteServer
     private function deleteFromHetzner(Server $server): void
     {
         try {
-            // Get the cloud provider token for Hetzner
-            $token = CloudProviderToken::where('team_id', $server->team_id)
-                ->where('provider', 'hetzner')
-                ->first();
+            // Use the server's associated token, or fallback to first available team token
+            $token = $server->cloudProviderToken;
+
+            if (! $token) {
+                $token = CloudProviderToken::where('team_id', $server->team_id)
+                    ->where('provider', 'hetzner')
+                    ->first();
+            }
 
             if (! $token) {
                 ray('No Hetzner token found for team, skipping Hetzner deletion', [

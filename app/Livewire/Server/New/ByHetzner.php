@@ -34,12 +34,6 @@ class ByHetzner extends Component
     // Step 1: Token selection
     public ?int $selected_token_id = null;
 
-    public string $hetzner_token = '';
-
-    public bool $save_token = false;
-
-    public ?string $token_name = null;
-
     // Step 2: Server configuration
     public array $locations = [];
 
@@ -64,31 +58,50 @@ class ByHetzner extends Component
     public function mount()
     {
         $this->authorize('viewAny', CloudProviderToken::class);
-        $this->available_tokens = CloudProviderToken::ownedByCurrentTeam()
-            ->where('provider', 'hetzner')
-            ->get();
+        $this->loadTokens();
         $this->server_name = generate_random_name();
         if ($this->private_keys->count() > 0) {
             $this->private_key_id = $this->private_keys->first()->id;
         }
     }
 
+    public function getListeners()
+    {
+        return [
+            'tokenAdded' => 'handleTokenAdded',
+            'modalClosed' => 'resetSelection',
+        ];
+    }
+
+    public function resetSelection()
+    {
+        $this->selected_token_id = null;
+        $this->current_step = 1;
+    }
+
+    public function loadTokens()
+    {
+        $this->available_tokens = CloudProviderToken::ownedByCurrentTeam()
+            ->where('provider', 'hetzner')
+            ->get();
+    }
+
+    public function handleTokenAdded($tokenId)
+    {
+        // Refresh token list
+        $this->loadTokens();
+
+        // Auto-select the new token
+        $this->selected_token_id = $tokenId;
+
+        // Automatically proceed to next step
+        $this->nextStep();
+    }
+
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'nullable|integer',
-            'hetzner_token' => 'required_without:selected_token_id|string',
-            'save_token' => 'boolean',
-            'token_name' => [
-                'nullable',
-                'string',
-                'max:255',
-                function ($attribute, $value, $fail) {
-                    if ($this->save_token && ! empty($this->hetzner_token) && empty($value)) {
-                        $fail('Please provide a name for the token.');
-                    }
-                },
-            ],
+            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
         ];
 
         if ($this->current_step === 2) {
@@ -108,8 +121,8 @@ class ByHetzner extends Component
     protected function messages(): array
     {
         return [
-            'hetzner_token.required_without' => 'Please provide a Hetzner API token or select a saved token.',
-            'token_name.required_if' => 'Please provide a name for the token.',
+            'selected_token_id.required' => 'Please select a Hetzner token.',
+            'selected_token_id.exists' => 'Selected token not found.',
         ];
     }
 
@@ -139,50 +152,21 @@ class ByHetzner extends Component
             return $token ? $token->token : '';
         }
 
-        return $this->hetzner_token;
+        return '';
     }
 
     public function nextStep()
     {
-        // Validate step 1
+        // Validate step 1 - just need a token selected
         $this->validate([
-            'selected_token_id' => 'nullable|integer',
-            'hetzner_token' => 'required_without:selected_token_id|string',
-            'save_token' => 'boolean',
-            'token_name' => [
-                'nullable',
-                'string',
-                'max:255',
-                function ($attribute, $value, $fail) {
-                    if ($this->save_token && ! empty($this->hetzner_token) && empty($value)) {
-                        $fail('Please provide a name for the token.');
-                    }
-                },
-            ],
+            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
         ]);
 
         try {
             $hetznerToken = $this->getHetznerToken();
 
             if (! $hetznerToken) {
-                return $this->dispatch('error', 'Please provide a valid Hetzner API token.');
-            }
-
-            // Validate token if it's a new one
-            if (! $this->selected_token_id) {
-                if (! $this->validateHetznerToken($hetznerToken)) {
-                    return $this->dispatch('error', 'Invalid Hetzner API token. Please check your token and try again.');
-                }
-
-                // Save token if requested
-                if ($this->save_token) {
-                    CloudProviderToken::create([
-                        'team_id' => currentTeam()->id,
-                        'provider' => 'hetzner',
-                        'token' => $this->hetzner_token,
-                        'name' => $this->token_name,
-                    ]);
-                }
+                return $this->dispatch('error', 'Please select a valid Hetzner token.');
             }
 
             // Load Hetzner data
@@ -424,6 +408,7 @@ class ByHetzner extends Component
                 'port' => 22,
                 'team_id' => currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
+                'cloud_provider_token_id' => $this->selected_token_id,
                 'hetzner_server_id' => $hetznerServer['id'],
             ]);
 

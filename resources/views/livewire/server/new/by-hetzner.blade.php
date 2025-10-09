@@ -3,40 +3,37 @@
         <x-limit-reached name="servers" />
     @else
         @if ($current_step === 1)
-            <form class="flex flex-col w-full gap-2" wire:submit.prevent="nextStep">
+            <div class="flex flex-col w-full gap-4">
                 @if ($available_tokens->count() > 0)
-                    <div>
-                        <x-forms.select label="Use Saved Token" id="selected_token_id"
-                            wire:change="selectToken($event.target.value)">
-                            <option value="">Select a saved token...</option>
-                            @foreach ($available_tokens as $token)
-                                <option value="{{ $token->id }}">
-                                    {{ $token->name ?? 'Hetzner Token' }} (***{{ substr($token->token, -4) }})
-                                </option>
-                            @endforeach
-                        </x-forms.select>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <x-forms.select label="Select Hetzner Token" id="selected_token_id"
+                                wire:change="selectToken($event.target.value)" required>
+                                <option value="">Select a saved token...</option>
+                                @foreach ($available_tokens as $token)
+                                    <option value="{{ $token->id }}">
+                                        {{ $token->name ?? 'Hetzner Token' }}
+                                    </option>
+                                @endforeach
+                            </x-forms.select>
+                        </div>
+                        <div class="flex items-end">
+                            <x-forms.button canGate="create" :canResource="App\Models\Server::class"
+                                wire:click="nextStep" :disabled="!$selected_token_id">
+                                Continue
+                            </x-forms.button>
+                        </div>
                     </div>
-                    <div class="text-center text-sm dark:text-neutral-500 py-2">OR</div>
+
+                    <div class="text-center text-sm dark:text-neutral-500">OR</div>
                 @endif
 
-                <div>
-                    <x-forms.input type="password" id="hetzner_token" label="New Hetzner API Token"
-                        helper="Your Hetzner Cloud API token. You can create one in your <a href='https://console.hetzner.cloud/' target='_blank' class='underline dark:text-white'>Hetzner Cloud Console</a>." />
-                </div>
-
-                <div>
-                    <x-forms.checkbox id="save_token" label="Save this token for my team" />
-                </div>
-
-                <div>
-                    <x-forms.input id="token_name" label="Token Name" placeholder="e.g., Production Hetzner"
-                        helper="Give this token a friendly name to identify it later." />
-                </div>
-
-                <x-forms.button canGate="create" :canResource="App\Models\Server::class" type="submit">
-                    Continue
-                </x-forms.button>
-            </form>
+                <x-modal-input isFullWidth
+                    buttonTitle="{{ $available_tokens->count() > 0 ? '+ Add New Token' : 'Add Hetzner Token' }}"
+                    title="Add Hetzner Token">
+                    <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
+                </x-modal-input>
+            </div>
         @elseif ($current_step === 2)
             @if ($loading_data)
                 <div class="flex items-center justify-center py-8">
@@ -66,7 +63,9 @@
                     <div>
                         <x-forms.select label="Server Type" id="selected_server_type"
                             wire:model.live="selected_server_type" required :disabled="!$selected_location">
-                            <option value="">{{ $selected_location ? 'Select a server type...' : 'Select a location first' }}</option>
+                            <option value="">
+                                {{ $selected_location ? 'Select a server type...' : 'Select a location first' }}
+                            </option>
                             @foreach ($this->availableServerTypes as $serverType)
                                 <option value="{{ $serverType['name'] }}">
                                     {{ $serverType['description'] }} -
@@ -87,7 +86,9 @@
 
                     <div>
                         <x-forms.select label="Image" id="selected_image" required :disabled="!$selected_server_type">
-                            <option value="">{{ $selected_server_type ? 'Select an image...' : 'Select a server type first' }}</option>
+                            <option value="">
+                                {{ $selected_server_type ? 'Select an image...' : 'Select a server type first' }}
+                            </option>
                             @foreach ($this->availableImages as $image)
                                 <option value="{{ $image['id'] }}">
                                     {{ $image['description'] ?? $image['name'] }}
