@@ -1,0 +1,1 @@
+docker system prune -af
