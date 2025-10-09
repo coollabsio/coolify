@@ -22,7 +22,7 @@ class Checkbox extends Component
         public string|bool|null $checked = false,
         public string|bool $instantSave = false,
         public bool $disabled = false,
-        public string $defaultClass = 'dark:border-neutral-700 text-coolgray-400 dark:bg-coolgray-100 rounded-sm cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100',
+        public string $defaultClass = 'dark:border-neutral-700 text-coolgray-400 dark:bg-coolgray-100 rounded-sm cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base',
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
