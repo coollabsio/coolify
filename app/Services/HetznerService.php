@@ -89,6 +89,20 @@ class HetznerService
         return $response['server'] ?? [];
     }
 
+    public function getServer(int $serverId): array
+    {
+        $response = $this->request('get', "/servers/{$serverId}");
+
+        return $response['server'] ?? [];
+    }
+
+    public function powerOnServer(int $serverId): array
+    {
+        $response = $this->request('post', "/servers/{$serverId}/actions/poweron");
+
+        return $response['action'] ?? [];
+    }
+
     public function deleteServer(int $serverId): void
     {
         $this->request('delete', "/servers/{$serverId}");

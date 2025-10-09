@@ -746,7 +746,13 @@ class ServersController extends Controller
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
         $server->delete();
-        DeleteServer::dispatch($server);
+        DeleteServer::dispatch(
+            $server->id,
+            false, // Don't delete from Hetzner via API
+            $server->hetzner_server_id,
+            $server->cloud_provider_token_id,
+            $server->team_id
+        );
 
         return response()->json(['message' => 'Server deleted.']);
     }

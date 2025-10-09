@@ -54,6 +54,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            // Check Hetzner server status if applicable
+            if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
+                $this->checkHetznerStatus();
+            }
+
             // Temporarily disable mux if requested
             if ($this->disableMux) {
                 $this->disableSshMux();
@@ -92,6 +97,37 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             throw $e;
+        }
+    }
+
+    private function checkHetznerStatus(): void
+    {
+        try {
+            $hetznerService = new \App\Services\HetznerService($this->server->cloudProviderToken->token);
+            $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
+            $status = $serverData['status'] ?? null;
+
+            // Save status to database
+            $this->server->update(['hetzner_server_status' => $status]);
+
+            // If Hetzner reports server is off, mark as unreachable
+            if ($status === 'off') {
+                $this->server->settings->update([
+                    'is_reachable' => false,
+                    'is_usable' => false,
+                ]);
+
+                Log::info('ServerConnectionCheck: Hetzner server is powered off', [
+                    'server_id' => $this->server->id,
+                    'server_name' => $this->server->name,
+                    'hetzner_status' => $status,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: Hetzner status check failed', [
+                'server_id' => $this->server->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

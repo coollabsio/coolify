@@ -136,6 +136,7 @@ class Server extends BaseModel
                 $destination->delete();
             });
             $server->settings()->delete();
+            $server->sslCertificates()->delete();
         });
     }
 
@@ -164,6 +165,8 @@ class Server extends BaseModel
         'cloud_provider_token_id',
         'team_id',
         'hetzner_server_id',
+        'hetzner_server_status',
+        'is_validating',
     ];
 
     protected $guarded = [];
@@ -894,6 +897,11 @@ $schema://$host {
     public function cloudProviderToken()
     {
         return $this->belongsTo(CloudProviderToken::class);
+    }
+
+    public function sslCertificates()
+    {
+        return $this->hasMany(SslCertificate::class);
     }
 
     public function muxFilename()

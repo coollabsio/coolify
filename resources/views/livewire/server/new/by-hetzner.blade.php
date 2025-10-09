@@ -18,8 +18,7 @@
                             </x-forms.select>
                         </div>
                         <div class="flex items-end">
-                            <x-forms.button canGate="create" :canResource="App\Models\Server::class"
-                                wire:click="nextStep" :disabled="!$selected_token_id">
+                            <x-forms.button canGate="create" :canResource="App\Models\Server::class" wire:click="nextStep" :disabled="!$selected_token_id">
                                 Continue
                             </x-forms.button>
                         </div>
@@ -111,16 +110,12 @@
                         </x-forms.select>
                     </div>
 
-                    <div>
-                        <x-forms.checkbox id="start_after_create" label="Start server after creation" />
-                    </div>
-
                     <div class="flex gap-2 justify-between">
                         <x-forms.button type="button" wire:click="previousStep">
                             Back
                         </x-forms.button>
                         <x-forms.button isHighlighted canGate="create" :canResource="App\Models\Server::class" type="submit">
-                            Create Server
+                            Buy & Create Server
                         </x-forms.button>
                     </div>
                 </form>

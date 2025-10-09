@@ -49,8 +49,6 @@ class ByHetzner extends Component
 
     public string $server_name = '';
 
-    public bool $start_after_create = true;
-
     public ?int $private_key_id = null;
 
     public bool $loading_data = false;
@@ -111,7 +109,6 @@ class ByHetzner extends Component
                 'selected_image' => 'required|integer',
                 'selected_server_type' => 'required|string',
                 'private_key_id' => 'required|integer|exists:private_keys,id,team_id,'.currentTeam()->id,
-                'start_after_create' => 'boolean',
             ]);
         }
 
@@ -370,7 +367,7 @@ class ByHetzner extends Component
             'server_type' => $this->selected_server_type,
             'image' => $this->selected_image,
             'location' => $this->selected_location,
-            'start_after_create' => $this->start_after_create,
+            'start_after_create' => true,
             'ssh_keys' => [$sshKeyId],
         ];
 

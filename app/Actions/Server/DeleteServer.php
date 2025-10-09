@@ -11,57 +11,86 @@ class DeleteServer
 {
     use AsAction;
 
-    public function handle(Server $server, bool $deleteFromHetzner = false)
+    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null)
     {
-        // Delete from Hetzner Cloud if requested and server has hetzner_server_id
-        if ($deleteFromHetzner && $server->hetzner_server_id) {
-            $this->deleteFromHetzner($server);
+        $server = Server::withTrashed()->find($serverId);
+
+        // Delete from Hetzner even if server is already gone from Coolify
+        if ($deleteFromHetzner && ($hetznerServerId || ($server && $server->hetzner_server_id))) {
+            $this->deleteFromHetznerById(
+                $hetznerServerId ?? $server->hetzner_server_id,
+                $cloudProviderTokenId ?? $server->cloud_provider_token_id,
+                $teamId ?? $server->team_id
+            );
         }
 
-        StopSentinel::run($server);
-        $server->forceDelete();
+        ray($server ? 'Deleting server from Coolify' : 'Server already deleted from Coolify, skipping Coolify deletion');
+
+        // If server is already deleted from Coolify, skip this part
+        if (! $server) {
+            return; // Server already force deleted from Coolify
+        }
+
+        ray('force deleting server from Coolify', ['server_id' => $server->id]);
+
+        try {
+            $server->forceDelete();
+        } catch (\Throwable $e) {
+            ray('Failed to force delete server from Coolify', [
+                'error' => $e->getMessage(),
+                'server_id' => $server->id,
+            ]);
+            logger()->error('Failed to force delete server from Coolify', [
+                'error' => $e->getMessage(),
+                'server_id' => $server->id,
+            ]);
+        }
     }
 
-    private function deleteFromHetzner(Server $server): void
+    private function deleteFromHetznerById(int $hetznerServerId, ?int $cloudProviderTokenId, int $teamId): void
     {
         try {
-            // Use the server's associated token, or fallback to first available team token
-            $token = $server->cloudProviderToken;
+            // Use the provided token, or fallback to first available team token
+            $token = null;
+
+            if ($cloudProviderTokenId) {
+                $token = CloudProviderToken::find($cloudProviderTokenId);
+            }
 
             if (! $token) {
-                $token = CloudProviderToken::where('team_id', $server->team_id)
+                $token = CloudProviderToken::where('team_id', $teamId)
                     ->where('provider', 'hetzner')
                     ->first();
             }
 
             if (! $token) {
                 ray('No Hetzner token found for team, skipping Hetzner deletion', [
-                    'team_id' => $server->team_id,
-                    'server_id' => $server->id,
+                    'team_id' => $teamId,
+                    'hetzner_server_id' => $hetznerServerId,
                 ]);
 
                 return;
             }
 
             $hetznerService = new HetznerService($token->token);
-            $hetznerService->deleteServer($server->hetzner_server_id);
+            $hetznerService->deleteServer($hetznerServerId);
 
             ray('Deleted server from Hetzner', [
-                'hetzner_server_id' => $server->hetzner_server_id,
-                'server_id' => $server->id,
+                'hetzner_server_id' => $hetznerServerId,
+                'team_id' => $teamId,
             ]);
         } catch (\Throwable $e) {
             ray('Failed to delete server from Hetzner', [
                 'error' => $e->getMessage(),
-                'hetzner_server_id' => $server->hetzner_server_id,
-                'server_id' => $server->id,
+                'hetzner_server_id' => $hetznerServerId,
+                'team_id' => $teamId,
             ]);
 
             // Log the error but don't prevent the server from being deleted from Coolify
             logger()->error('Failed to delete server from Hetzner', [
                 'error' => $e->getMessage(),
-                'hetzner_server_id' => $server->hetzner_server_id,
-                'server_id' => $server->id,
+                'hetzner_server_id' => $hetznerServerId,
+                'team_id' => $teamId,
             ]);
         }
     }

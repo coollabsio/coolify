@@ -45,7 +45,13 @@ class Delete extends Component
             }
 
             $this->server->delete();
-            DeleteServer::dispatch($this->server, $this->delete_from_hetzner);
+            DeleteServer::dispatch(
+                $this->server->id,
+                $this->delete_from_hetzner,
+                $this->server->hetzner_server_id,
+                $this->server->cloud_provider_token_id,
+                $this->server->team_id
+            );
 
             return redirect()->route('server.index');
         } catch (\Throwable $e) {
