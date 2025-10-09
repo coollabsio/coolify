@@ -160,6 +160,7 @@ class MyComponent extends Component
 - Use database transactions for critical operations
 - Leverage query scopes for reusable queries
 - Apply indexes for performance-critical queries
+- **CRITICAL**: When adding new database columns, ALWAYS update the model's `$fillable` array to allow mass assignment
 
 ### Security Best Practices
 - **Authentication**: Multi-provider auth via Laravel Fortify & Sanctum
