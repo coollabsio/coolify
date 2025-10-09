@@ -1,0 +1,2 @@
+ping coolify-db
+ping coolify-redis

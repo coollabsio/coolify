@@ -1,0 +1,4 @@
+services:
+  soketi:
+    image: quay.io/soketi/soketi:latest
+    # ...other options...

@@ -1,0 +1,4 @@
+services:
+  soketi:
+    build: ./path/to/soketi
+    # ...other options...

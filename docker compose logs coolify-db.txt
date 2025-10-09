@@ -1,0 +1,2 @@
+docker compose logs coolify-db
+docker compose logs coolify-redis
