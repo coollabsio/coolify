@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -57,6 +58,15 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stucked resources: {$e->getMessage()}\n";
+        }
+        try {
+            $servers = Server::onlyTrashed()->get();
+            foreach ($servers as $server) {
+                echo "Force deleting stuck server: {$server->name}\n";
+                $server->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck servers: {$e->getMessage()}\n";
         }
         try {
             $applicationsDeploymentQueue = ApplicationDeploymentQueue::get();
@@ -426,6 +436,19 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in ServiceDatabases: {$e->getMessage()}\n";
+        }
+
+        try {
+            $orphanedCerts = SslCertificate::whereNotIn('server_id', function ($query) {
+                $query->select('id')->from('servers');
+            })->get();
+
+            foreach ($orphanedCerts as $cert) {
+                echo "Deleting orphaned SSL certificate: {$cert->id} (server_id: {$cert->server_id})\n";
+                $cert->delete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning orphaned SSL certificates: {$e->getMessage()}\n";
         }
     }
 }
