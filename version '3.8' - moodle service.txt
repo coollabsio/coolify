@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  soketi:
+    image: quay.io/soketi/soketi:latest
+    ports:
+      - "6001:6001"
+    environment:
+      - DEBUG=1
+      - SOKETI_METRICS_ENABLED=true
