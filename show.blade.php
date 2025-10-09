@@ -1,0 +1,253 @@
+{{-- ...existing code... --}}
+
+@php
+    $showLiteral = !$is_redis_credential && (
+        ($type === 'service') ||
+        ($is_shared) ||
+        (!$env->is_nixpacks && $is_multiline === false)
+    );
+@endphp
+
+<div>
+    <form wire:submit='submit' @class([
+        'flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base',
+        'border-error' => $is_really_required,
+        'dark:border-coolgray-300 border-neutral-200' => !$is_really_required,
+    ])>
+        {{-- Locked State --}}
+        @if ($isLocked)
+            <div class="flex flex-1 w-full gap-2">
+                <x-forms.input disabled id="key" />
+                <svg class="icon  my-1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                        <path d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6z" />
+                        <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0-2 0m-3-5V7a4 4 0 1 1 8 0v4" />
+                    </g>
+                </svg>
+                @can('delete', $this->env)
+                    <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton buttonTitle="Delete"
+                        submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']" confirmationText="{{ $env->key }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
+                        shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete" />
+                @endcan
+            </div>
+            @can('update', $this->env)
+                {{-- Checkbox Options Section --}}
+                <div class="flex flex-col w-full gap-3">
+                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                        @if (!$is_redis_credential)
+                            @if ($type === 'service')
+                                <x-forms.checkbox instantSave id="is_buildtime"
+                                    helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                    label="Available at Buildtime" />
+                                <x-forms.checkbox instantSave id="is_runtime"
+                                    helper="Make this variable available in the running container at runtime."
+                                    label="Available at Runtime" />
+                                <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
+                                <x-forms.checkbox-literal instantSave />
+                            @else
+                                @if ($is_shared)
+                                    <x-forms.checkbox-literal instantSave />
+                                @else
+                                    @if ($isSharedVariable)
+                                        <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
+                                    @else
+                                        @if (!$env->is_nixpacks)
+                                            <x-forms.checkbox instantSave id="is_buildtime"
+                                                helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                                label="Available at Buildtime" />
+                                        @endif
+                                        <x-forms.checkbox instantSave id="is_runtime"
+                                            helper="Make this variable available in the running container at runtime."
+                                            label="Available at Runtime" />
+                                        @if (!$env->is_nixpacks)
+                                            <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
+                                            @if ($is_multiline === false)
+                                                <x-forms.checkbox-literal instantSave />
+                                            @endif
+                                        @endif
+                                    @endif
+                                @endif
+                            @endif
+                        @endif
+                    </div>
+                </div>
+            @else
+                {{-- Checkbox Options Section (Read-only) --}}
+                <div class="flex flex-col w-full gap-3">
+                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                        @if (!$is_redis_credential)
+                            @if ($type === 'service')
+                                <x-forms.checkbox disabled id="is_buildtime"
+                                    helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                    label="Available at Buildtime" />
+                                <x-forms.checkbox disabled id="is_runtime"
+                                    helper="Make this variable available in the running container at runtime."
+                                    label="Available at Runtime" />
+                                <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                <x-forms.checkbox-literal disabled />
+                            @else
+                                @if ($is_shared)
+                                    <x-forms.checkbox-literal disabled />
+                                @else
+                                    @if ($isSharedVariable)
+                                        <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                    @else
+                                        <x-forms.checkbox disabled id="is_buildtime"
+                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                            label="Available at Buildtime" />
+                                        <x-forms.checkbox disabled id="is_runtime"
+                                            helper="Make this variable available in the running container at runtime."
+                                            label="Available at Runtime" />
+                                        <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                        @if ($is_multiline === false)
+                                            <x-forms.checkbox-literal disabled />
+                                        @endif
+                                    @endif
+                                @endif
+                            @endif
+                        @endif
+                    </div>
+                </div>
+            @endcan
+        @else
+            @can('update', $this->env)
+                {{-- Variable Input Section --}}
+                @if ($isDisabled)
+                    <div class="flex flex-col w-full gap-2 lg:flex-row">
+                        <x-forms.input disabled id="key" />
+                        <x-forms.input disabled type="password" id="value" />
+                        @if ($is_shared)
+                            <x-forms.input disabled type="password" id="real_value" />
+                        @endif
+                    </div>
+                @else
+                    <div class="flex flex-col w-full gap-2 lg:flex-row">
+                        @if ($is_multiline)
+                            <x-forms.input :required="$is_redis_credential" isMultiline="{{ $is_multiline }}" id="key" />
+                            <x-forms.textarea :required="$is_redis_credential" type="password" id="value" />
+                        @else
+                            <x-forms.input :disabled="$is_redis_credential" :required="$is_redis_credential" id="key" />
+                            <x-forms.input :required="$is_redis_credential" type="password" id="value" />
+                        @endif
+                        @if ($is_shared)
+                            <x-forms.input :disabled="$is_redis_credential" :required="$is_redis_credential" disabled type="password" id="real_value" />
+                        @endif
+                    </div>
+                @endif
+            @else
+                {{-- Variable Input Section (Read-only) --}}
+                <div class="flex flex-col w-full gap-2 lg:flex-row">
+                    <x-forms.input disabled id="key" />
+                    <x-forms.input disabled type="password" id="value" />
+                    @if ($is_shared)
+                        <x-forms.input disabled type="password" id="real_value" />
+                    @endif
+                </div>
+            @endcan
+            @can('update', $this->env)
+                {{-- Checkbox Options Section --}}
+                <div class="flex flex-col w-full gap-3">
+                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                        @if (!$is_redis_credential)
+                            @if ($type === 'service')
+                                <x-forms.checkbox instantSave id="is_buildtime"
+                                    helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                    label="Available at Buildtime" />
+                                <x-forms.checkbox instantSave id="is_runtime"
+                                    helper="Make this variable available in the running container at runtime."
+                                    label="Available at Runtime" />
+                                <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
+                                <x-forms.checkbox-literal instantSave />
+                            @else
+                                @if ($is_shared)
+                                    <x-forms.checkbox-literal instantSave />
+                                @else
+                                    @if ($isSharedVariable)
+                                        <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
+                                    @else
+                                        @if (!$env->is_nixpacks)
+                                            <x-forms.checkbox instantSave id="is_buildtime"
+                                                helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                                label="Available at Buildtime" />
+                                        @endif
+                                        <x-forms.checkbox instantSave id="is_runtime"
+                                            helper="Make this variable available in the running container at runtime."
+                                            label="Available at Runtime" />
+                                        @if (!$env->is_nixpacks)
+                                            <x-forms.checkbox instantSave id="is_multiline" label="Is Multiline?" />
+                                            @if ($is_multiline === false)
+                                                <x-forms.checkbox-literal instantSave />
+                                            @endif
+                                        @endif
+                                    @endif
+                                @endif
+                            @endif
+                        @endif
+                    </div>
+                    <x-environment-variable-warning :problematic-variables="$problematicVariables" />
+                    <div class="flex w-full justify-end gap-2">
+                        @if ($isDisabled)
+                            <x-forms.button disabled type="submit">Update</x-forms.button>
+                            <x-forms.button wire:click='lock'>Lock</x-forms.button>
+                            <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
+                                buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
+                                confirmationText="{{ $key }}" buttonFullWidth="true"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
+                                shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                                step2ButtonText="Permanently Delete" />
+                        @else
+                            <x-forms.button type="submit">Update</x-forms.button>
+                            <x-forms.button wire:click='lock'>Lock</x-forms.button>
+                            <x-modal-confirmation title="Confirm Environment Variable Deletion?" isErrorButton
+                                buttonTitle="Delete" submitAction="delete" :actions="['The selected environment variable will be permanently deleted.']"
+                                confirmationText="{{ $key }}" buttonFullWidth="true"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Environment Variable Name below"
+                                shortConfirmationLabel="Environment Variable Name" :confirmWithPassword="false"
+                                step2ButtonText="Permanently Delete" />
+                        @endif
+                    </div>
+                </div>
+            @else
+                {{-- Checkbox Options Section (Read-only) --}}
+                <div class="flex flex-col w-full gap-3">
+                    <div class="flex w-full items-center gap-4 overflow-x-auto whitespace-nowrap">
+                        @if (!$is_redis_credential)
+                            @if ($type === 'service')
+                                <x-forms.checkbox disabled id="is_buildtime"
+                                    helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                    label="Available at Buildtime" />
+                                <x-forms.checkbox disabled id="is_runtime"
+                                    helper="Make this variable available in the running container at runtime."
+                                    label="Available at Runtime" />
+                                <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                <x-forms.checkbox-literal disabled />
+                            @else
+                                @if ($is_shared)
+                                    <x-forms.checkbox-literal disabled />
+                                @else
+                                    @if ($isSharedVariable)
+                                        <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                    @else
+                                        <x-forms.checkbox disabled id="is_buildtime"
+                                            helper="Make this variable available during Docker build process. Useful for build secrets and dependencies."
+                                            label="Available at Buildtime" />
+                                        <x-forms.checkbox disabled id="is_runtime"
+                                            helper="Make this variable available in the running container at runtime."
+                                            label="Available at Runtime" />
+                                        <x-forms.checkbox disabled id="is_multiline" label="Is Multiline?" />
+                                        @if ($is_multiline === false)
+                                            <x-forms.checkbox-literal disabled />
+                                        @endif
+                                    @endif
+                                @endif
+                            @endif
+                        @endif
+                    </div>
+                </div>
+            @endcan
+        @endif
+
+    </form>
+</div>
