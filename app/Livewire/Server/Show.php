@@ -392,9 +392,9 @@ class Show extends Component
             if ($this->server->hetzner_server_status !== $this->hetznerServerStatus) {
                 $this->server->hetzner_server_status = $this->hetznerServerStatus;
                 $this->server->update(['hetzner_server_status' => $this->hetznerServerStatus]);
-                if ($manual) {
-                    $this->dispatch('success', 'Server status refreshed: '.ucfirst($this->hetznerServerStatus ?? 'unknown'));
-                }
+            }
+            if ($manual) {
+                $this->dispatch('success', 'Server status refreshed: '.ucfirst($this->hetznerServerStatus ?? 'unknown'));
             }
 
             // If Hetzner server is off but Coolify thinks it's still reachable, update Coolify's state
