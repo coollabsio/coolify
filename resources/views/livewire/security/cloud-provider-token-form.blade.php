@@ -14,10 +14,19 @@
             <x-forms.input required id="name" label="Token Name"
                 placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier" />
 
-            <x-forms.input required type="password" id="token" label="API Token" placeholder="Enter your API token"
-                helper="Your {{ ucfirst($provider) }} Cloud API token. You can create one in your <a href='{{ $provider === 'hetzner' ? 'https://console.hetzner.cloud/' : '#' }}' target='_blank' class='underline dark:text-white'>{{ ucfirst($provider) }} Console</a>." />
+            <x-forms.input required type="password" id="token" label="API Token"
+                placeholder="Enter your API token" />
 
-            <x-forms.button type="submit">Add Token</x-forms.button>
+            @if (auth()->user()->currentTeam()->cloudProviderTokens->where('provider', $provider)->isEmpty())
+                <div class="text-sm text-neutral-500 dark:text-neutral-400">
+                    Create an API token in the <a
+                        href='{{ $provider === 'hetzner' ? 'https://console.hetzner.com/projects' : '#' }}'
+                        target='_blank' class='underline dark:text-white'>{{ ucfirst($provider) }} Console</a> → choose
+                    Project → Security → API Tokens.
+                </div>
+            @endif
+
+            <x-forms.button type="submit">Validate & Add Token</x-forms.button>
         @else
             {{-- Full page layout: horizontal, spacious --}}
             <div class="flex gap-2 items-end flex-wrap">
@@ -32,13 +41,18 @@
                         placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier" />
                 </div>
             </div>
-            <div class="flex gap-2 items-end flex-wrap">
-                <div class="flex-1 min-w-64">
-                    <x-forms.input required type="password" id="token" label="API Token"
-                        placeholder="Enter your API token" />
-                </div>
-                <x-forms.button type="submit">Add Token</x-forms.button>
+            <div class="flex-1 min-w-64">
+                <x-forms.input required type="password" id="token" label="API Token"
+                    placeholder="Enter your API token" />
+                @if (auth()->user()->currentTeam()->cloudProviderTokens->where('provider', $provider)->isEmpty())
+                    <div class="text-sm text-neutral-500 dark:text-neutral-400 mt-2">
+                        Create an API token in the <a href='https://console.hetzner.com/projects' target='_blank'
+                            class='underline dark:text-white'>Hetzner Console</a> → choose Project → Security → API
+                        Tokens.
+                    </div>
+                @endif
             </div>
+            <x-forms.button type="submit">Validate & Add Token</x-forms.button>
         @endif
     </form>
 </div>
