@@ -1,7 +1,7 @@
 {
     "scripts": {
         "setup": "./scripts/conductor-setup.sh",
-        "run": "echo Running..."
+        "run": "spin up"
     },
     "runScriptMode": "nonconcurrent"
 }
