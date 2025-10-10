@@ -19,7 +19,31 @@ class HetznerService
     {
         $response = Http::withHeaders([
             'Authorization' => 'Bearer '.$this->token,
-        ])->timeout(30)->{$method}($this->baseUrl.$endpoint, $data);
+        ])
+            ->timeout(30)
+            ->retry(3, function (int $attempt, \Exception $exception) {
+                // Handle rate limiting (429 Too Many Requests)
+                if ($exception instanceof \Illuminate\Http\Client\RequestException) {
+                    $response = $exception->response;
+
+                    if ($response && $response->status() === 429) {
+                        // Get rate limit reset timestamp from headers
+                        $resetTime = $response->header('RateLimit-Reset');
+
+                        if ($resetTime) {
+                            // Calculate wait time until rate limit resets
+                            $waitSeconds = max(0, $resetTime - time());
+
+                            // Cap wait time at 60 seconds for safety
+                            return min($waitSeconds, 60) * 1000;
+                        }
+                    }
+                }
+
+                // Exponential backoff for other retriable errors: 100ms, 200ms, 400ms
+                return $attempt * 100;
+            })
+            ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
             throw new \Exception('Hetzner API error: '.$response->json('error.message', 'Unknown error'));
