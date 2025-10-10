@@ -10,7 +10,7 @@ class WebhookChannel
     /**
      * Send the given notification.
      */
-    public function send(SendsWebhook $notifiable, Notification $notification): void
+    public function send($notifiable, Notification $notification): void
     {
         $webhookSettings = $notifiable->webhookNotificationSettings;
 

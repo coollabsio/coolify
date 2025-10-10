@@ -7,7 +7,6 @@ use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
-use App\Notifications\Channels\SendsWebhook;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -37,7 +36,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack, SendsWebhook
+class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
     use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
@@ -165,11 +164,6 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             'user' => data_get($this, 'pushover_user_key', null),
             'token' => data_get($this, 'pushover_api_token', null),
         ];
-    }
-
-    public function routeNotificationForWebhook()
-    {
-        return data_get($this, 'webhook_url', null);
     }
 
     public function getRecipients(): array
