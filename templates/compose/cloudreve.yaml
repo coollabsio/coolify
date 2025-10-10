@@ -49,7 +49,7 @@ services:
     image: redis:latest
     command: --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
-      - cloudreve-redis-data:/data
+      - cloudreve_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
       interval: 10s
