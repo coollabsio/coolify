@@ -91,6 +91,11 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
         } catch (\Throwable $e) {
+
+            Log::error('ServerConnectionCheckJob failed', [
+                'error' => $e->getMessage(),
+                'server_id' => $this->server->id,
+            ]);
             $this->server->settings->update([
                 'is_reachable' => false,
                 'is_usable' => false,
@@ -107,28 +112,21 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
             $status = $serverData['status'] ?? null;
 
-            // Save status to database
-            $this->server->update(['hetzner_server_status' => $status]);
-
-            // If Hetzner reports server is off, mark as unreachable
-            if ($status === 'off') {
-                $this->server->settings->update([
-                    'is_reachable' => false,
-                    'is_usable' => false,
-                ]);
-
-                Log::info('ServerConnectionCheck: Hetzner server is powered off', [
-                    'server_id' => $this->server->id,
-                    'server_name' => $this->server->name,
-                    'hetzner_status' => $status,
-                ]);
-            }
         } catch (\Throwable $e) {
             Log::debug('ServerConnectionCheck: Hetzner status check failed', [
                 'server_id' => $this->server->id,
                 'error' => $e->getMessage(),
             ]);
         }
+        if ($this->server->hetzner_server_status !== $status) {
+            $this->server->update(['hetzner_server_status' => $status]);
+            $this->server->hetzner_server_status = $status;
+            if ($status === 'off') {
+                ray('Server is powered off, marking as unreachable');
+                throw new \Exception('Server is powered off');
+            }
+        }
+
     }
 
     private function checkConnection(): bool
