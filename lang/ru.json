@@ -6,7 +6,7 @@
     "auth.login.clerk": "Войти через Clerk",
     "auth.login.discord": "Войти через Discord",
     "auth.login.github": "Войти через GitHub",
-    "auth.login.gitlab": "Войти через Gitlab",
+    "auth.login.gitlab": "Войти через GitLab",
     "auth.login.google": "Войти через Google",
     "auth.login.infomaniak": "Войти через Infomaniak",
     "auth.login.zitadel": "Войти через Zitadel",
