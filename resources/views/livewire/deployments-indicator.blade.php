@@ -1,6 +1,6 @@
 <div wire:poll.3000ms x-data="{
     expanded: @entangle('expanded')
-}" class="fixed bottom-0 z-50 mb-4 left-0 lg:left-56 ml-4">
+}" class="fixed bottom-0 z-60 mb-4 left-0 lg:left-56 ml-4">
     @if ($this->deploymentCount > 0)
         <div class="relative">
             <!-- Indicator Button -->
@@ -68,6 +68,9 @@
                                     {{ $deployment->application_name }}
                                 </div>
                                 <p class="text-xs dark:text-neutral-400 text-gray-600 mt-1">
+                                    {{ $deployment->application?->environment?->project?->name }} / {{ $deployment->application?->environment?->name }}
+                                </p>
+                                <p class="text-xs dark:text-neutral-400 text-gray-600">
                                     {{ $deployment->server_name }}
                                 </p>
                                 @if ($deployment->pull_request_id)

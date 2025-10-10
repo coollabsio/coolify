@@ -116,15 +116,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $env_args;
 
-    private $environment_variables;
-
     private $env_nixpacks_args;
 
     private $docker_compose;
 
     private $docker_compose_base64;
-
-    private ?string $env_filename = null;
 
     private ?string $nixpacks_plan = null;
 
@@ -503,7 +499,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $this->dockerImageTag = $this->application->docker_registry_image_tag;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
+
+        // Check if this is an image hash deployment
+        $isImageHash = str($this->dockerImageTag)->startsWith('sha256-');
+        $displayName = $isImageHash ? "{$this->dockerImage}@sha256:".str($this->dockerImageTag)->after('sha256-') : "{$this->dockerImage}:{$this->dockerImageTag}";
+
+        $this->application_deployment_queue->addLogEntry("Starting deployment of {$displayName} to {$this->server->name}.");
         $this->generate_image_names();
         $this->prepare_builder_image();
         $this->generate_compose_file();
@@ -571,7 +572,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             $this->application->oldRawParser();
             $yaml = $composeFile = $this->application->docker_compose_raw;
-            $this->generate_runtime_environment_variables();
 
             // For raw compose, we cannot automatically add secrets configuration
             // User must define it manually in their docker-compose file
@@ -580,16 +580,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'));
-            $this->generate_runtime_environment_variables();
-            if (filled($this->env_filename)) {
-                $services = collect(data_get($composeFile, 'services', []));
-                $services = $services->map(function ($service, $name) {
-                    $service['env_file'] = [$this->env_filename];
+            // Always add .env file to services
+            $services = collect(data_get($composeFile, 'services', []));
+            $services = $services->map(function ($service, $name) {
+                $service['env_file'] = ['.env'];
 
-                    return $service;
-                });
-                $composeFile['services'] = $services->toArray();
-            }
+                return $service;
+            });
+            $composeFile['services'] = $services->toArray();
             if (empty($composeFile)) {
                 $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
@@ -615,6 +613,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Build new container to limit downtime.
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
         if ($this->docker_compose_custom_build_command) {
             // Prepend DOCKER_BUILDKIT=1 if BuildKit is supported
             $build_command = $this->docker_compose_custom_build_command;
@@ -630,9 +631,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->dockerBuildkitSupported) {
                 $command = "DOCKER_BUILDKIT=1 {$command}";
             }
-            if (filled($this->env_filename)) {
-                $command .= " --env-file {$this->workdir}/{$this->env_filename}";
-            }
+            // Use build-time .env file from /artifacts (outside Docker context to prevent it from being in the image)
+            $command .= ' --env-file /artifacts/build-time.env';
             if ($this->force_rebuild) {
                 $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
             } else {
@@ -651,6 +651,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
             );
         }
+
+        // Save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
 
         $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
@@ -685,9 +689,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->docker_compose_location = '/docker-compose.yaml';
 
                 $command = "{$this->coolify_variables} docker compose";
-                if (filled($this->env_filename)) {
-                    $command .= " --env-file {$server_workdir}/{$this->env_filename}";
-                }
+                // Always use .env file
+                $command .= " --env-file {$server_workdir}/.env";
                 $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
                 $this->execute_remote_command(
                     ['command' => $command, 'hidden' => true],
@@ -702,9 +705,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $command = "{$this->coolify_variables} docker compose";
                 if ($this->preserveRepository) {
-                    if (filled($this->env_filename)) {
-                        $command .= " --env-file {$server_workdir}/{$this->env_filename}";
-                    }
+                    // Always use .env file
+                    $command .= " --env-file {$server_workdir}/.env";
                     $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
                     $this->write_deployment_configurations();
 
@@ -712,9 +714,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         ['command' => $command, 'hidden' => true],
                     );
                 } else {
-                    if (filled($this->env_filename)) {
-                        $command .= " --env-file {$this->workdir}/{$this->env_filename}";
-                    }
+                    // Always use .env file
+                    $command .= " --env-file {$this->workdir}/.env";
                     $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
                     $this->execute_remote_command(
                         [executeInDocker($this->deployment_uuid, $command), 'hidden' => true],
@@ -748,9 +749,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->cleanup_git();
         $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+
+        // Save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
+
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -774,11 +784,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->cleanup_git();
         $this->generate_nixpacks_confs();
         $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build for Nixpacks
+        $this->save_buildtime_environment_variables();
+
         $this->generate_build_env_variables();
         $this->build_image();
 
         // For Nixpacks, save runtime environment variables AFTER the build
-        // to prevent them from being accessible during the build process
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
         $this->push_to_docker_registry();
         $this->rolling_update();
@@ -802,7 +816,16 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
         $this->build_static_image();
+
+        // Save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
+
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -934,7 +957,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->production_image_name = "{$this->application->uuid}:latest";
             }
         } elseif ($this->application->build_pack === 'dockerimage') {
-            $this->production_image_name = "{$this->dockerImage}:{$this->dockerImageTag}";
+            // Check if this is an image hash deployment
+            if (str($this->dockerImageTag)->startsWith('sha256-')) {
+                $hash = str($this->dockerImageTag)->after('sha256-');
+                $this->production_image_name = "{$this->dockerImage}@sha256:{$hash}";
+            } else {
+                $this->production_image_name = "{$this->dockerImage}:{$this->dockerImageTag}";
+            }
         } elseif ($this->pull_request_id !== 0) {
             if ($this->application->docker_registry_image_name) {
                 $this->build_image_name = "{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build";
@@ -976,6 +1005,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->skip_build = true;
                 $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->generate_compose_file();
+
+                // Save runtime environment variables even when skipping build
+                $this->save_runtime_environment_variables();
+
                 $this->push_to_docker_registry();
                 $this->rolling_update();
 
@@ -985,6 +1018,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $this->application_deployment_queue->addLogEntry("No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.");
                 $this->skip_build = true;
                 $this->generate_compose_file();
+
+                // Save runtime environment variables even when skipping build
+                $this->save_runtime_environment_variables();
+
                 $this->push_to_docker_registry();
                 $this->rolling_update();
 
@@ -1049,8 +1086,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $envs->push($key.'='.$item);
         });
         if ($this->pull_request_id === 0) {
-            $this->env_filename = '.env';
-
             // Generate SERVICE_ variables first for dockercompose
             if ($this->build_pack === 'dockercompose') {
                 $domains = collect(json_decode($this->application->docker_compose_domains)) ?? collect([]);
@@ -1109,8 +1144,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push('HOST=0.0.0.0');
             }
         } else {
-            $this->env_filename = '.env';
-
             // Generate SERVICE_ variables first for dockercompose preview
             if ($this->build_pack === 'dockercompose') {
                 $domains = collect(json_decode(data_get($this->preview, 'docker_compose_domains'))) ?? collect([]);
@@ -1165,99 +1198,250 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $envs->push('HOST=0.0.0.0');
             }
         }
-        if ($envs->isEmpty()) {
-            if ($this->env_filename) {
-                if ($this->use_build_server) {
-                    $this->server = $this->original_server;
-                    $this->execute_remote_command(
-                        [
-                            'command' => "rm -f $this->configuration_dir/{$this->env_filename}",
-                            'hidden' => true,
-                            'ignore_errors' => true,
-                        ]
-                    );
-                    $this->server = $this->build_server;
-                    $this->execute_remote_command(
-                        [
-                            'command' => "rm -f $this->configuration_dir/{$this->env_filename}",
-                            'hidden' => true,
-                            'ignore_errors' => true,
-                        ]
-                    );
-                } else {
-                    $this->execute_remote_command(
-                        [
-                            'command' => "rm -f $this->configuration_dir/{$this->env_filename}",
-                            'hidden' => true,
-                            'ignore_errors' => true,
-                        ]
-                    );
-                }
-            }
-            $this->env_filename = null;
-        } else {
-            // For Nixpacks builds, we save the .env file AFTER the build to prevent
-            // runtime-only variables from being accessible during the build process
-            if ($this->application->build_pack !== 'nixpacks' || $this->skip_build) {
-                $envs_base64 = base64_encode($envs->implode("\n"));
-                $this->execute_remote_command(
-                    [
-                        executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null"),
-                    ],
 
-                );
-                if ($this->use_build_server) {
-                    $this->server = $this->original_server;
-                    $this->execute_remote_command(
-                        [
-                            "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null",
-                        ]
-                    );
-                    $this->server = $this->build_server;
-                } else {
-                    $this->execute_remote_command(
-                        [
-                            "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null",
-                        ]
-                    );
-                }
-            }
-        }
-        $this->environment_variables = $envs;
+        // Return the generated environment variables instead of storing them globally
+        return $envs;
     }
 
     private function save_runtime_environment_variables()
     {
-        // This method saves the .env file with runtime variables
-        // It should be called AFTER the build for Nixpacks to prevent runtime-only variables
-        // from being accessible during the build process
+        // This method saves the .env file with ALL runtime variables
+        // For builds, it should be called AFTER the build to include runtime-only variables
 
-        if ($this->environment_variables && $this->environment_variables->isNotEmpty() && $this->env_filename) {
-            $envs_base64 = base64_encode($this->environment_variables->implode("\n"));
+        // Generate runtime environment variables locally
+        $environment_variables = $this->generate_runtime_environment_variables();
 
-            // Write .env file to workdir (for container runtime)
+        // Handle empty environment variables
+        if ($environment_variables->isEmpty()) {
+            // For Docker Compose, we need to create an empty .env file
+            // because we always reference it in the compose file
+            if ($this->build_pack === 'dockercompose') {
+                $this->application_deployment_queue->addLogEntry('Creating empty .env file (no environment variables defined).');
+
+                // Create empty .env file
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, "touch $this->workdir/.env"),
+                    ]
+                );
+
+                // Also create in configuration directory
+                if ($this->use_build_server) {
+                    $this->server = $this->original_server;
+                    $this->execute_remote_command(
+                        [
+                            "touch $this->configuration_dir/.env",
+                        ]
+                    );
+                    $this->server = $this->build_server;
+                } else {
+                    $this->execute_remote_command(
+                        [
+                            "touch $this->configuration_dir/.env",
+                        ]
+                    );
+                }
+            } else {
+                // For non-Docker Compose deployments, clean up any existing .env files
+                if ($this->use_build_server) {
+                    $this->server = $this->original_server;
+                    $this->execute_remote_command(
+                        [
+                            'command' => "rm -f $this->configuration_dir/.env",
+                            'hidden' => true,
+                            'ignore_errors' => true,
+                        ]
+                    );
+                    $this->server = $this->build_server;
+                    $this->execute_remote_command(
+                        [
+                            'command' => "rm -f $this->configuration_dir/.env",
+                            'hidden' => true,
+                            'ignore_errors' => true,
+                        ]
+                    );
+                } else {
+                    $this->execute_remote_command(
+                        [
+                            'command' => "rm -f $this->configuration_dir/.env",
+                            'hidden' => true,
+                            'ignore_errors' => true,
+                        ]
+                    );
+                }
+            }
+
+            return;
+        }
+
+        // Write the environment variables to file
+        $envs_base64 = base64_encode($environment_variables->implode("\n"));
+
+        // Write .env file to workdir (for container runtime)
+        $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for build phase.', hidden: true);
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
+            ],
+            [
+                executeInDocker($this->deployment_uuid, "cat $this->workdir/.env"),
+                'hidden' => true,
+
+            ]
+        );
+
+        // Write .env file to configuration directory
+        if ($this->use_build_server) {
+            $this->server = $this->original_server;
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/{$this->env_filename} > /dev/null"),
+                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+                ]
+            );
+            $this->server = $this->build_server;
+        } else {
+            $this->execute_remote_command(
+                [
+                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+                ]
+            );
+        }
+    }
+
+    private function generate_buildtime_environment_variables()
+    {
+        $envs = collect([]);
+        $coolify_envs = $this->generate_coolify_env_variables();
+
+        // Add COOLIFY variables
+        $coolify_envs->each(function ($item, $key) use ($envs) {
+            $envs->push($key.'='.$item);
+        });
+
+        // Add SERVICE_NAME variables for Docker Compose builds
+        if ($this->build_pack === 'dockercompose') {
+            if ($this->pull_request_id === 0) {
+                // Generate SERVICE_NAME for dockercompose services from processed compose
+                if ($this->application->settings->is_raw_compose_deployment_enabled) {
+                    $dockerCompose = Yaml::parse($this->application->docker_compose_raw);
+                } else {
+                    $dockerCompose = Yaml::parse($this->application->docker_compose);
+                }
+                $services = data_get($dockerCompose, 'services', []);
+                foreach ($services as $serviceName => $_) {
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->upper().'='.$serviceName);
+                }
+
+                // Generate SERVICE_FQDN & SERVICE_URL for non-PR deployments
+                $domains = collect(json_decode($this->application->docker_compose_domains)) ?? collect([]);
+                foreach ($domains as $forServiceName => $domain) {
+                    $parsedDomain = data_get($domain, 'domain');
+                    if (filled($parsedDomain)) {
+                        $parsedDomain = str($parsedDomain)->explode(',')->first();
+                        $coolifyUrl = Url::fromString($parsedDomain);
+                        $coolifyScheme = $coolifyUrl->getScheme();
+                        $coolifyFqdn = $coolifyUrl->getHost();
+                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                    }
+                }
+            } else {
+                // Generate SERVICE_NAME for preview deployments
+                $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
+                $rawServices = data_get($rawDockerCompose, 'services', []);
+                foreach ($rawServices as $rawServiceName => $_) {
+                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                }
+
+                // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
+                $domains = collect(json_decode(data_get($this->preview, 'docker_compose_domains'))) ?? collect([]);
+                foreach ($domains as $forServiceName => $domain) {
+                    $parsedDomain = data_get($domain, 'domain');
+                    if (filled($parsedDomain)) {
+                        $parsedDomain = str($parsedDomain)->explode(',')->first();
+                        $coolifyUrl = Url::fromString($parsedDomain);
+                        $coolifyScheme = $coolifyUrl->getScheme();
+                        $coolifyFqdn = $coolifyUrl->getHost();
+                        $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
+                        $envs->push('SERVICE_URL_'.str($forServiceName)->upper().'='.$coolifyUrl->__toString());
+                        $envs->push('SERVICE_FQDN_'.str($forServiceName)->upper().'='.$coolifyFqdn);
+                    }
+                }
+            }
+        }
+
+        // Add build-time user variables only
+        if ($this->pull_request_id === 0) {
+            $sorted_environment_variables = $this->application->environment_variables()
+                ->where('key', 'not like', 'NIXPACKS_%')
+                ->where('is_buildtime', true)  // ONLY build-time variables
+                ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                ->get();
+
+            // For Docker Compose, filter out SERVICE_FQDN and SERVICE_URL as we generate these
+            if ($this->build_pack === 'dockercompose') {
+                $sorted_environment_variables = $sorted_environment_variables->filter(function ($env) {
+                    return ! str($env->key)->startsWith('SERVICE_FQDN_') && ! str($env->key)->startsWith('SERVICE_URL_');
+                });
+            }
+
+            foreach ($sorted_environment_variables as $env) {
+                $envs->push($env->key.'='.$env->real_value);
+            }
+        } else {
+            $sorted_environment_variables = $this->application->environment_variables_preview()
+                ->where('key', 'not like', 'NIXPACKS_%')
+                ->where('is_buildtime', true)  // ONLY build-time variables
+                ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                ->get();
+
+            // For Docker Compose, filter out SERVICE_FQDN and SERVICE_URL as we generate these with PR-specific values
+            if ($this->build_pack === 'dockercompose') {
+                $sorted_environment_variables = $sorted_environment_variables->filter(function ($env) {
+                    return ! str($env->key)->startsWith('SERVICE_FQDN_') && ! str($env->key)->startsWith('SERVICE_URL_');
+                });
+            }
+
+            foreach ($sorted_environment_variables as $env) {
+                $envs->push($env->key.'='.$env->real_value);
+            }
+        }
+
+        // Return the generated environment variables
+        return $envs;
+    }
+
+    private function save_buildtime_environment_variables()
+    {
+        // Generate build-time environment variables locally
+        $environment_variables = $this->generate_buildtime_environment_variables();
+
+        // Save .env file for build phase in /artifacts to prevent it from being copied into Docker images
+        if ($environment_variables->isNotEmpty()) {
+            $envs_base64 = base64_encode($environment_variables->implode("\n"));
+
+            $this->application_deployment_queue->addLogEntry('Creating build-time .env file in /artifacts (outside Docker context).', hidden: true);
+
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee /artifacts/build-time.env > /dev/null"),
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'cat /artifacts/build-time.env'),
+                    'hidden' => true,
                 ],
             );
+        } elseif ($this->build_pack === 'dockercompose') {
+            // For Docker Compose, create an empty .env file even if there are no build-time variables
+            // This ensures the file exists when referenced in docker-compose commands
+            $this->application_deployment_queue->addLogEntry('Creating empty build-time .env file in /artifacts (no build-time variables defined).', hidden: true);
 
-            // Write .env file to configuration directory
-            if ($this->use_build_server) {
-                $this->server = $this->original_server;
-                $this->execute_remote_command(
-                    [
-                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null",
-                    ]
-                );
-                $this->server = $this->build_server;
-            } else {
-                $this->execute_remote_command(
-                    [
-                        "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/{$this->env_filename} > /dev/null",
-                    ]
-                );
-            }
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, 'touch /artifacts/build-time.env'),
+                ]
+            );
         }
     }
 
@@ -1472,15 +1656,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->generate_nixpacks_confs();
         }
         $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
         $this->generate_build_env_variables();
         if ($this->application->build_pack === 'dockerfile') {
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_image();
-        // For Nixpacks, save runtime environment variables AFTER the build
-        if ($this->application->build_pack === 'nixpacks') {
-            $this->save_runtime_environment_variables();
-        }
+
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
@@ -1515,7 +1702,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function prepare_builder_image()
+    private function prepare_builder_image(bool $firstTry = true)
     {
         $this->checkForCancellation();
         $settings = instanceSettings();
@@ -1538,7 +1725,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} {$env_flags} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
-        $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage.");
+        if ($firstTry) {
+            $this->application_deployment_queue->addLogEntry("Preparing container with helper image: $helperImage");
+        } else {
+            $this->application_deployment_queue->addLogEntry('Preparing container with helper image with updated envs.');
+        }
+
         $this->graceful_shutdown_container($this->deployment_uuid);
         $this->execute_remote_command(
             [
@@ -1561,7 +1753,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->env_args = null;
 
         // Restart the helper container with updated environment variables (including actual SOURCE_COMMIT)
-        $this->prepare_builder_image();
+        $this->prepare_builder_image(firstTry: false);
     }
 
     private function deploy_to_additional_destinations()
@@ -1809,6 +2001,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->nixpacks_type === 'elixir') {
                     $this->elixir_finetunes();
                 }
+                if ($this->nixpacks_type === 'node') {
+                    // Check if NIXPACKS_NODE_VERSION is set
+                    $variables = data_get($parsed, 'variables', []);
+                    if (! isset($variables['NIXPACKS_NODE_VERSION'])) {
+                        $this->application_deployment_queue->addLogEntry('----------------------------------------');
+                        $this->application_deployment_queue->addLogEntry('⚠️ NIXPACKS_NODE_VERSION not set. Nixpacks will use Node.js 18 by default, which is EOL.');
+                        $this->application_deployment_queue->addLogEntry('You can override this by setting NIXPACKS_NODE_VERSION=22 in your environment variables.');
+                    }
+                }
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
                 $this->nixpacks_plan_json = collect($parsed);
                 $this->application_deployment_queue->addLogEntry("Final Nixpacks plan: {$this->nixpacks_plan}", hidden: true);
@@ -1954,10 +2155,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->env_args = collect([]);
         $this->env_args->put('SOURCE_COMMIT', $this->commit);
+
         $coolify_envs = $this->generate_coolify_env_variables();
+        $coolify_envs->each(function ($value, $key) {
+            $this->env_args->put($key, $value);
+        });
+
         // For build process, include only environment variables where is_buildtime = true
         if ($this->pull_request_id === 0) {
-            // Get environment variables that are marked as available during build
             $envs = $this->application->environment_variables()
                 ->where('key', 'not like', 'NIXPACKS_%')
                 ->where('is_buildtime', true)
@@ -1966,24 +2171,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($envs as $env) {
                 if (! is_null($env->real_value)) {
                     $this->env_args->put($env->key, $env->real_value);
-                    if (str($env->real_value)->startsWith('$')) {
-                        $variable_key = str($env->real_value)->after('$');
-                        if ($variable_key->startsWith('COOLIFY_')) {
-                            $variable = $coolify_envs->get($variable_key->value());
-                            if (filled($variable)) {
-                                $this->env_args->prepend($variable, $variable_key->value());
-                            }
-                        } else {
-                            $variable = $this->application->environment_variables()->where('key', $variable_key)->first();
-                            if ($variable) {
-                                $this->env_args->prepend($variable->real_value, $env->key);
-                            }
-                        }
-                    }
                 }
             }
         } else {
-            // Get preview environment variables that are marked as available during build
             $envs = $this->application->environment_variables_preview()
                 ->where('key', 'not like', 'NIXPACKS_%')
                 ->where('is_buildtime', true)
@@ -1992,29 +2182,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($envs as $env) {
                 if (! is_null($env->real_value)) {
                     $this->env_args->put($env->key, $env->real_value);
-                    if (str($env->real_value)->startsWith('$')) {
-                        $variable_key = str($env->real_value)->after('$');
-                        if ($variable_key->startsWith('COOLIFY_')) {
-                            $variable = $coolify_envs->get($variable_key->value());
-                            if (filled($variable)) {
-                                $this->env_args->prepend($variable, $variable_key->value());
-                            }
-                        } else {
-                            $variable = $this->application->environment_variables_preview()->where('key', $variable_key)->first();
-                            if ($variable) {
-                                $this->env_args->prepend($variable->real_value, $env->key);
-                            }
-                        }
-                    }
                 }
             }
         }
-
-        // Merge COOLIFY_* variables into env_args for build process
-        // This ensures they're available for both build args and build secrets
-        $coolify_envs->each(function ($value, $key) {
-            $this->env_args->put($key, $value);
-        });
     }
 
     private function generate_compose_file()
@@ -2025,7 +2195,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->application->fileStorages()->get();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-        $this->generate_runtime_environment_variables();
         if (data_get($this->application, 'custom_labels')) {
             $this->application->parseContainerLabels();
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
@@ -2094,9 +2263,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ],
             ],
         ];
-        if (filled($this->env_filename)) {
-            $docker_compose['services'][$this->container_name]['env_file'] = [$this->env_filename];
-        }
+        // Always use .env file
+        $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
         $docker_compose['services'][$this->container_name]['healthcheck'] = [
             'test' => [
                 'CMD-SHELL',
@@ -2381,6 +2549,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
+    /**
+     * Wrap a docker build command with environment export from /artifacts/build-time.env
+     * This enables shell interpolation of variables (e.g., APP_URL=$COOLIFY_URL)
+     *
+     * @param  string  $build_command  The docker build command to wrap
+     * @return string The wrapped command with export statement
+     */
+    private function wrap_build_command_with_env_export(string $build_command): string
+    {
+        return "cd {$this->workdir} && set -a && source /artifacts/build-time.env && set +a && {$build_command}";
+    }
+
     private function build_image()
     {
         // Add Coolify related variables to the build args/secrets
@@ -2388,13 +2568,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Coolify variables are already included in the secrets from generate_build_env_variables
             // build_secrets is already a string at this point
         } else {
-            // Traditional build args approach
-            $this->environment_variables->filter(function ($key, $value) {
-                return str($key)->startsWith('COOLIFY_');
-            })->each(function ($key, $value) {
+            // Traditional build args approach - generate COOLIFY_ variables locally
+            // Generate COOLIFY_ variables locally for build args
+            $coolify_envs = $this->generate_coolify_env_variables();
+            $coolify_envs->each(function ($value, $key) {
                 $this->build_args->push("--build-arg '{$key}'");
             });
-
             $this->build_args = $this->build_args instanceof \Illuminate\Support\Collection
                 ? $this->build_args->implode(' ')
                 : (string) $this->build_args;
@@ -2431,12 +2610,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         // Modify the nixpacks Dockerfile to use build secrets
                         $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                         $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
-                        $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}");
                     } elseif ($this->dockerBuildkitSupported) {
                         // BuildKit without secrets
-                        $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}");
+                        ray($build_command);
                     } else {
-                        $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}");
                     }
                 } else {
                     $this->execute_remote_command([
@@ -2446,13 +2626,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
                         'hidden' => true,
                     ]);
-                    if ($this->dockerBuildkitSupported) {
+                    if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
                         // Modify the nixpacks Dockerfile to use build secrets
                         $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                         $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
-                        $build_command = "DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->workdir}");
+                    } elseif ($this->dockerBuildkitSupported) {
+                        // BuildKit without secrets
+                        $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                        $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}");
                     } else {
-                        $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->build_image_name} {$this->build_args} {$this->workdir}");
                     }
                 }
 
@@ -2479,16 +2664,25 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $this->modify_dockerfile_for_secrets("{$this->workdir}{$this->dockerfile_location}");
                     $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                     if ($this->force_rebuild) {
-                        $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->workdir}");
                     } else {
-                        $build_command = "DOCKER_BUILDKIT=1 docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->workdir}");
+                    }
+                } elseif ($this->dockerBuildkitSupported) {
+                    // BuildKit without secrets
+                    $this->modify_dockerfile_for_secrets("{$this->workdir}{$this->dockerfile_location}");
+                    $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
+                    if ($this->force_rebuild) {
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->build_args} {$this->workdir}");
+                    } else {
+                        $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t $this->build_image_name {$this->build_args} {$this->workdir}");
                     }
                 } else {
                     // Traditional build with args
                     if ($this->force_rebuild) {
-                        $build_command = "docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}");
                     } else {
-                        $build_command = "docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}");
                     }
                 }
                 $base64_build_command = base64_encode($build_command);
@@ -2521,7 +2715,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $nginx_config = base64_encode(defaultNginxConfiguration());
                 }
             }
-            $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+            $build_command = $this->wrap_build_command_with_env_export("docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}");
             $base64_build_command = base64_encode($build_command);
             $this->execute_remote_command(
                 [
@@ -2558,9 +2752,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 } else {
                     // Traditional build with args
                     if ($this->force_rebuild) {
-                        $build_command = "docker build --no-cache --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("docker build --no-cache --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}");
                     } else {
-                        $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $build_command = $this->wrap_build_command_with_env_export("docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}");
                     }
                 }
                 $base64_build_command = base64_encode($build_command);
@@ -2590,13 +2784,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
                             'hidden' => true,
                         ]);
-                        if ($this->dockerBuildkitSupported) {
+                        if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
                             // Modify the nixpacks Dockerfile to use build secrets
                             $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                             $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
-                            $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}");
+                        } elseif ($this->dockerBuildkitSupported) {
+                            // BuildKit without secrets
+                            $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                            $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}");
                         } else {
-                            $build_command = "docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("docker build --no-cache {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}");
                         }
                     } else {
                         $this->execute_remote_command([
@@ -2606,13 +2805,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             executeInDocker($this->deployment_uuid, "cat {$this->workdir}/.nixpacks/Dockerfile"),
                             'hidden' => true,
                         ]);
-                        if ($this->dockerBuildkitSupported) {
+                        if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
                             // Modify the nixpacks Dockerfile to use build secrets
                             $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
                             $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
-                            $build_command = "DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}");
+                        } elseif ($this->dockerBuildkitSupported) {
+                            // BuildKit without secrets
+                            $this->modify_dockerfile_for_secrets("{$this->workdir}/.nixpacks/Dockerfile");
+                            $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}");
                         } else {
-                            $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("docker build {$this->addHosts} --network host -f {$this->workdir}/.nixpacks/Dockerfile --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}");
                         }
                     }
                     $base64_build_command = base64_encode($build_command);
@@ -2633,22 +2837,31 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, 'rm /artifacts/thegameplan.json'), 'hidden' => true]);
                 } else {
                     // Dockerfile buildpack
-                    if ($this->dockerBuildkitSupported) {
+                    if ($this->dockerBuildkitSupported && $this->application->settings->use_build_secrets) {
                         // Modify the Dockerfile to use build secrets
                         $this->modify_dockerfile_for_secrets("{$this->workdir}{$this->dockerfile_location}");
                         // Use BuildKit with secrets
                         $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
                         if ($this->force_rebuild) {
-                            $build_command = "DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}");
                         } else {
-                            $build_command = "DOCKER_BUILDKIT=1 docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->workdir}");
+                        }
+                    } elseif ($this->dockerBuildkitSupported) {
+                        // BuildKit without secrets
+                        $this->modify_dockerfile_for_secrets("{$this->workdir}{$this->dockerfile_location}");
+                        $secrets_flags = $this->build_secrets ? " {$this->build_secrets}" : '';
+                        if ($this->force_rebuild) {
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}");
+                        } else {
+                            $build_command = $this->wrap_build_command_with_env_export("DOCKER_BUILDKIT=1 docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location}{$secrets_flags} --progress plain -t {$this->production_image_name} {$this->build_args} {$this->workdir}");
                         }
                     } else {
                         // Traditional build with args
                         if ($this->force_rebuild) {
-                            $build_command = "docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}");
                         } else {
-                            $build_command = "docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                            $build_command = $this->wrap_build_command_with_env_export("docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}");
                         }
                     }
                     $base64_build_command = base64_encode($build_command);
@@ -2924,6 +3137,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
                 'hidden' => true,
                 'save' => 'dockerfile',
+                'ignore_errors' => true,
             ]);
             $dockerfile = collect(str($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
             if ($this->pull_request_id === 0) {
@@ -2982,10 +3196,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-            $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
-                'hidden' => true,
-            ]);
+            $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info');
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ]);
         }
     }
 
@@ -3143,7 +3364,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $argsToAdd->push("ARG {$key}");
             }
 
-            ray($argsToAdd);
             if ($argsToAdd->isEmpty()) {
                 $this->application_deployment_queue->addLogEntry("Service {$serviceName}: No build-time variables to add.");
 

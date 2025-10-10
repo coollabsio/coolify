@@ -37,6 +37,11 @@ class Show extends Component
         'host_path' => 'host',
     ];
 
+    public function mount()
+    {
+        $this->isReadOnly = $this->storage->isReadOnlyVolume();
+    }
+
     public function submit()
     {
         $this->authorize('update', $this->resource);

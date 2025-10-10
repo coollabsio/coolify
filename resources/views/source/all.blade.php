@@ -11,7 +11,7 @@
         @endcan
     </div>
     <div class="subtitle">Git sources for your applications.</div>
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div class="grid gap-4 lg:grid-cols-2 -mt-1">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
                 <a class="flex gap-2 text-center hover:no-underline box group"

@@ -547,6 +547,21 @@ class Service extends BaseModel
                     }
                     $fields->put('Grafana', $data->toArray());
                     break;
+                case $image->contains('elasticsearch'):
+                    $data = collect([]);
+                    $elastic_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ELASTICSEARCH')->first();
+                    if ($elastic_password) {
+                        $data = $data->merge([
+                            'Password (default user: elastic)' => [
+                                'key' => data_get($elastic_password, 'key'),
+                                'value' => data_get($elastic_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Elasticsearch', $data->toArray());
+                    break;
                 case $image->contains('directus'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
@@ -1231,9 +1246,9 @@ class Service extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->orderByRaw("
-                CASE 
-                    WHEN LOWER(key) LIKE 'service_%' THEN 1
-                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                CASE
+                    WHEN is_required = true THEN 1
+                    WHEN LOWER(key) LIKE 'service_%' THEN 2
                     ELSE 3
                 END,
                 LOWER(key) ASC

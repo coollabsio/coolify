@@ -114,7 +114,7 @@
         }
     }
 }"
-    @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
+    @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)

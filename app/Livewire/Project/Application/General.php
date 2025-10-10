@@ -544,6 +544,9 @@ class General extends Component
     {
         try {
             $this->authorize('update', $this->application);
+
+            $this->validate();
+
             $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
             $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
@@ -584,7 +587,6 @@ class General extends Component
                     return;
                 }
             }
-            $this->validate();
 
             if ($this->ports_exposes !== $this->application->ports_exposes || $this->is_container_label_escape_enabled !== $this->application->settings->is_container_label_escape_enabled) {
                 $this->resetDefaultLabels();

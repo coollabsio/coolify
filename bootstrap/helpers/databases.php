@@ -237,12 +237,11 @@ function removeOldBackups($backup): void
 {
     try {
         if ($backup->executions) {
-            // If local backup is disabled, mark all executions as having local storage deleted
-            if ($backup->disable_local_backup && $backup->save_s3) {
-                $backup->executions()
-                    ->where('local_storage_deleted', false)
-                    ->update(['local_storage_deleted' => true]);
-            } else {
+            // Delete old local backups (only if local backup is NOT disabled)
+            // Note: When disable_local_backup is enabled, each execution already marks its own
+            // local_storage_deleted status at the time of backup, so we don't need to retroactively
+            // update old executions
+            if (! $backup->disable_local_backup) {
                 $localBackupsToDelete = deleteOldBackupsLocally($backup);
                 if ($localBackupsToDelete->isNotEmpty()) {
                     $backup->executions()
@@ -261,18 +260,18 @@ function removeOldBackups($backup): void
             }
         }
 
-        // Delete executions where both local and S3 storage are marked as deleted
-        // or where only S3 is enabled and S3 storage is deleted
-        if ($backup->disable_local_backup && $backup->save_s3) {
-            $backup->executions()
-                ->where('s3_storage_deleted', true)
-                ->delete();
-        } else {
-            $backup->executions()
-                ->where('local_storage_deleted', true)
-                ->where('s3_storage_deleted', true)
-                ->delete();
-        }
+        // Delete execution records where all backup copies are gone
+        // Case 1: Both local and S3 backups are deleted
+        $backup->executions()
+            ->where('local_storage_deleted', true)
+            ->where('s3_storage_deleted', true)
+            ->delete();
+
+        // Case 2: Local backup is deleted and S3 was never used (s3_uploaded is null)
+        $backup->executions()
+            ->where('local_storage_deleted', true)
+            ->whereNull('s3_uploaded')
+            ->delete();
 
     } catch (\Exception $e) {
         throw $e;
