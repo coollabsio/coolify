@@ -1,6 +1,7 @@
 services:
   coolify:
     image: coolify:dev
+    pull_policy: never
     build:
       context: .
       dockerfile: ./docker/development/Dockerfile
@@ -43,6 +44,7 @@ services:
       - dev_redis_data:/data
   soketi:
     image: coolify-realtime:dev
+    pull_policy: never
     build:
       context: .
       dockerfile: ./docker/coolify-realtime/Dockerfile
@@ -76,6 +78,7 @@ services:
       - coolify
   testing-host:
     image: coolify-testing-host:dev
+    pull_policy: never
     build:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
