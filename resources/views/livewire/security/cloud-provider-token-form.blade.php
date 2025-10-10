@@ -12,7 +12,7 @@
             @endif
 
             <x-forms.input required id="name" label="Token Name"
-                placeholder="e.g., Production Hetzner. tip: add Hetzner project name in it" />
+                placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier" />
 
             <x-forms.input required type="password" id="token" label="API Token" placeholder="Enter your API token"
                 helper="Your {{ ucfirst($provider) }} Cloud API token. You can create one in your <a href='{{ $provider === 'hetzner' ? 'https://console.hetzner.cloud/' : '#' }}' target='_blank' class='underline dark:text-white'>{{ ucfirst($provider) }} Console</a>." />
@@ -22,13 +22,14 @@
             {{-- Full page layout: horizontal, spacious --}}
             <div class="flex gap-2 items-end flex-wrap">
                 <div class="w-64">
-                    <x-forms.select required id="provider" label="Provider">
-                        <option value="hetzner">Hetzner</option>
+                    <x-forms.select required id="provider" label="Provider" disabled>
+                        <option value="hetzner" selected>Hetzner</option>
                         <option value="digitalocean">DigitalOcean</option>
                     </x-forms.select>
                 </div>
                 <div class="flex-1 min-w-64">
-                    <x-forms.input required id="name" label="Token Name" placeholder="e.g., Production Hetzner" />
+                    <x-forms.input required id="name" label="Token Name"
+                        placeholder="e.g., Production Hetzner. tip: add Hetzner project name to identify easier" />
                 </div>
             </div>
             <div class="flex gap-2 items-end flex-wrap">
