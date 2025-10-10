@@ -2,12 +2,13 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Traits\EnvironmentVariableAnalyzer;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Add extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer;
 
     public $parameters;
 
@@ -26,6 +27,8 @@ class Add extends Component
     public bool $is_runtime = true;
 
     public bool $is_buildtime = true;
+
+    public array $problematicVariables = [];
 
     protected $listeners = ['clearAddEnv' => 'clear'];
 
@@ -50,6 +53,7 @@ class Add extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        $this->problematicVariables = self::getProblematicVariablesForFrontend();
     }
 
     public function submit()

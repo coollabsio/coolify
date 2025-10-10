@@ -62,9 +62,10 @@
                     </x-forms.button>
                 @endif
                 @if ($server->isForceDisabled() && isCloud())
-                    <div class="pt-4 font-bold text-red-500">The system has disabled the server because you have
-                        exceeded the
-                        number of servers for which you have paid.</div>
+                    <x-callout type="danger" title="Server Disabled" class="mt-4">
+                        The system has disabled the server because you have exceeded the
+                        number of servers for which you have paid.
+                    </x-callout>
                 @endif
                 <div class="flex flex-col gap-2 pt-4">
                     <div class="flex flex-col gap-2 w-full lg:flex-row">
@@ -239,7 +240,6 @@
                         @endif
                     </div>
                     <div class="flex flex-col gap-2">
-
                         <div class="w-96">
                             <x-forms.checkbox canGate="update" :canResource="$server" wire:model.live="isSentinelEnabled"
                                 label="Enable Sentinel" />
@@ -267,9 +267,7 @@
                                     $wire.set('sentinelCustomDockerImage', this.customImage);
                                 }
                             }" x-init="$wire.set('sentinelCustomDockerImage', customImage)">
-                                <x-forms.input 
-                                    x-model="customImage"
-                                    @input.debounce.500ms="saveCustomImage()"
+                                <x-forms.input x-model="customImage" @input.debounce.500ms="saveCustomImage()"
                                     placeholder="e.g., sentinel:latest or myregistry/sentinel:dev"
                                     label="Custom Sentinel Docker Image (Dev Only)"
                                     helper="Override the default Sentinel Docker image for testing. Leave empty to use the default." />

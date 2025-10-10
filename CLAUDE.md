@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to **Claude Code** (claude.ai/code) when working with code in this repository.
+
+> **Note for AI Assistants**: This file is specifically for Claude Code. If you're using Cursor IDE, refer to the `.cursor/rules/` directory for detailed rule files. Both systems share core principles but are optimized for their respective workflows.
+>
+> **Maintaining Instructions**: When updating AI instructions, see [.AI_INSTRUCTIONS_SYNC.md](.AI_INSTRUCTIONS_SYNC.md) for synchronization guidelines between CLAUDE.md and .cursor/rules/.
 
 ## Project Overview
 
@@ -23,7 +27,14 @@ Only run artisan commands inside "coolify" container when in development.
 ### Code Quality
 - `./vendor/bin/pint` - Run Laravel Pint for code formatting
 - `./vendor/bin/phpstan` - Run PHPStan for static analysis
-- `./vendor/bin/pest` - Run Pest tests
+- `./vendor/bin/pest` - Run Pest tests (unit tests only, without database)
+
+### Running Tests
+**IMPORTANT**: Tests that require database connections MUST be run inside the Docker container:
+- **Inside Docker**: `docker exec coolify php artisan test` (for feature tests requiring database)
+- **Outside Docker**: `./vendor/bin/pest tests/Unit` (for pure unit tests without database dependencies)
+- Unit tests should use mocking and avoid database connections
+- Feature tests that require database must be run in the `coolify` container
 
 ## Architecture Overview
 
@@ -173,6 +184,21 @@ class MyComponent extends Component
 - **Mocking**: Use Laravel's built-in mocking for external services
 - **Database**: Use RefreshDatabase trait for test isolation
 
+#### Test Execution Environment
+**CRITICAL**: Database-dependent tests MUST run inside Docker container:
+- **Unit Tests** (`tests/Unit/`): Should NOT use database. Use mocking. Run with `./vendor/bin/pest tests/Unit`
+- **Feature Tests** (`tests/Feature/`): May use database. MUST run inside Docker with `docker exec coolify php artisan test`
+- If a test needs database (factories, migrations, etc.), it belongs in `tests/Feature/`
+- Always mock external services and SSH connections in tests
+
+#### Test Design Philosophy
+**PREFER MOCKING**: When designing features and writing tests:
+- **Design for testability**: Structure code so it can be tested without database (use dependency injection, interfaces)
+- **Mock by default**: Unit tests should mock models and external dependencies using Mockery
+- **Avoid database when possible**: If you can test the logic without database, write it as a Unit test
+- **Only use database when necessary**: Feature tests should test integration points, not isolated logic
+- **Example**: Instead of `Server::factory()->create()`, use `Mockery::mock('App\Models\Server')` in unit tests
+
 ### Routing Conventions
 - Group routes by middleware and prefix
 - Use route model binding for cleaner controllers
@@ -228,7 +254,9 @@ When developing features:
 
 ## Additional Documentation
 
-For more detailed guidelines and patterns, refer to the `.cursor/rules/` directory:
+This file contains high-level guidelines for Claude Code. For **more detailed, topic-specific documentation**, refer to the `.cursor/rules/` directory (also accessible by Cursor IDE and other AI assistants):
+
+> **Cross-Reference**: The `.cursor/rules/` directory contains comprehensive, detailed documentation organized by topic. Start with [.cursor/rules/README.mdc](.cursor/rules/README.mdc) for an overview, then explore specific topics below.
 
 ### Architecture & Patterns
 - [Application Architecture](.cursor/rules/application-architecture.mdc) - Detailed application structure
@@ -434,7 +462,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ### Database
 - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-- Laravel 11 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
+- Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
 
 ### Models
 - Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
@@ -543,6 +571,10 @@ document.addEventListener('livewire:init', function () {
 - You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files - these are core to the application.
 - Tests should test all of the happy paths, failure paths, and weird paths.
 - Tests live in the `tests/Feature` and `tests/Unit` directories.
+- **Unit tests** MUST use mocking and avoid database. They can run outside Docker.
+- **Feature tests** can use database but MUST run inside Docker container.
+- **Design for testability**: Structure code to be testable without database when possible. Use dependency injection and interfaces.
+- **Mock by default**: Prefer `Mockery::mock()` over `Model::factory()->create()` in unit tests.
 - Pest tests look and behave like this:
 <code-snippet name="Basic Pest Test Example" lang="php">
 it('is true', function () {
@@ -551,11 +583,23 @@ it('is true', function () {
 </code-snippet>
 
 ### Running Tests
-- Run the minimal number of tests using an appropriate filter before finalizing code edits.
-- To run all tests: `php artisan test`.
-- To run all tests in a file: `php artisan test tests/Feature/ExampleTest.php`.
-- To filter on a particular test name: `php artisan test --filter=testName` (recommended after making a change to a related file).
-- When the tests relating to your changes are passing, ask the user if they would like to run the entire test suite to ensure everything is still passing.
+**IMPORTANT**: Always run tests in the correct environment based on database dependencies:
+
+**Unit Tests (no database):**
+- Run outside Docker: `./vendor/bin/pest tests/Unit`
+- Run specific file: `./vendor/bin/pest tests/Unit/ProxyCustomCommandsTest.php`
+- These tests use mocking and don't require PostgreSQL
+
+**Feature Tests (with database):**
+- Run inside Docker: `docker exec coolify php artisan test`
+- Run specific file: `docker exec coolify php artisan test tests/Feature/ExampleTest.php`
+- Filter by name: `docker exec coolify php artisan test --filter=testName`
+- These tests require PostgreSQL and use factories/migrations
+
+**General Guidelines:**
+- Run the minimal number of tests using an appropriate filter before finalizing code edits
+- When the tests relating to your changes are passing, ask the user if they would like to run the entire test suite
+- If you get database connection errors, you're running a Feature test outside Docker - move it inside
 
 ### Pest Assertions
 - When asserting status codes on a response, use the specific method like `assertForbidden` and `assertNotFound` instead of using `assertStatus(403)` or similar, e.g.:
@@ -650,5 +694,14 @@ it('has emails', function (string $email) {
 ## Test Enforcement
 
 - Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter.
+- Run the minimum number of tests needed to ensure code quality and speed.
+- **For Unit tests**: Use `./vendor/bin/pest tests/Unit/YourTest.php` (runs outside Docker)
+- **For Feature tests**: Use `docker exec coolify php artisan test --filter=YourTest` (runs inside Docker)
+- Choose the correct test type based on database dependency:
+  - No database needed? → Unit test with mocking
+  - Database needed? → Feature test in Docker
 </laravel-boost-guidelines>
+
+
+Random other things you should remember:
+- App\Models\Application::team must return a relationship instance., always use team()

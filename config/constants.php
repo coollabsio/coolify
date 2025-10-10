@@ -2,7 +2,7 @@
 
 return [
     'coolify' => [
-        'version' => '4.0.0-beta.429',
+        'version' => '4.0.0-beta.435',
         'helper_version' => '1.0.11',
         'realtime_version' => '1.0.10',
         'self_hosted' => env('SELF_HOSTED', true),
@@ -64,7 +64,7 @@ return [
         'mux_max_age' => env('SSH_MUX_MAX_AGE', 1800), // 30 minutes
         'connection_timeout' => 10,
         'server_interval' => 20,
-        'command_timeout' => 7200,
+        'command_timeout' => 3600,
         'max_retries' => env('SSH_MAX_RETRIES', 3),
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds

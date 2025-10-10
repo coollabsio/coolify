@@ -4,13 +4,14 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Models\SharedEnvironmentVariable;
+use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Show extends Component
 {
-    use AuthorizesRequests, EnvironmentVariableProtection;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
 
     public $parameters;
 
@@ -48,6 +49,8 @@ class Show extends Component
 
     public bool $is_redis_credential = false;
 
+    public array $problematicVariables = [];
+
     protected $listeners = [
         'refreshEnvs' => 'refresh',
         'refresh',
@@ -77,6 +80,7 @@ class Show extends Component
         if ($this->type === 'standalone-redis' && ($this->env->key === 'REDIS_PASSWORD' || $this->env->key === 'REDIS_USERNAME')) {
             $this->is_redis_credential = true;
         }
+        $this->problematicVariables = self::getProblematicVariablesForFrontend();
     }
 
     public function getResourceProperty()

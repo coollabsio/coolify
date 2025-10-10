@@ -20,8 +20,11 @@
     --color-warning: #fcd452;
     --color-success: #16a34a;
     --color-error: #dc2626;
+    --color-coollabs-50: #f5f0ff;
     --color-coollabs: #6b16ed;
     --color-coollabs-100: #7317ff;
+    --color-coollabs-200: #5a12c7;
+    --color-coollabs-300: #4a0fa3;
     --color-coolgray-100: #181818;
     --color-coolgray-200: #202020;
     --color-coolgray-300: #242424;
@@ -91,11 +94,11 @@ option {
 }
 
 button[isError]:not(:disabled) {
-    @apply text-white bg-red-600 hover:bg-red-700;
+    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800 hover:bg-red-300 hover:text-white dark:hover:bg-red-800 dark:hover:text-white;
 }
 
 button[isHighlighted]:not(:disabled) {
-    @apply text-white bg-coollabs hover:bg-coollabs-100;
+    @apply text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;
 }
 
 h1 {
@@ -116,6 +119,11 @@ h4 {
 
 a {
     @apply hover:text-black dark:hover:text-white;
+}
+
+button:focus-visible,
+a:focus-visible {
+    @apply outline-none ring-2 ring-coollabs dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
 }
 
 label {

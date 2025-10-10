@@ -48,6 +48,8 @@ class InviteLink extends Component
             if (auth()->user()->role() === 'admin' && $this->role === 'owner') {
                 throw new \Exception('Admins cannot invite owners.');
             }
+            $this->email = strtolower($this->email);
+
             $member_emails = currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
                 return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of ".currentTeam()->name.'.');

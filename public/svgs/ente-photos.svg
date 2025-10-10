@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Official Ente Photos icon based on the official PNG -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00D4AA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00A693;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main circular background matching official Ente green -->
+  <circle cx="128" cy="128" r="120" fill="url(#gradient)"/>
+
+  <!-- Official Ente "e" letterform based on the PNG icon -->
+  <path d="M75 128 C75 90, 95 70, 128 70 C161 70, 181 90, 181 118 L85 118 C85 148, 105 168, 128 168 C146 168, 160 158, 170 144 L185 160 C172 178, 152 190, 128 190 C95 190, 75 170, 75 128 Z M85 102 L171 102 C167 84, 149 82, 128 82 C107 82, 89 84, 85 102 Z" fill="#FFFFFF"/>
+</svg>

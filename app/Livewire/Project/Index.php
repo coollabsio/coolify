@@ -21,6 +21,14 @@ class Index extends Component
         $this->projects = Project::ownedByCurrentTeam()->get()->map(function ($project) {
             $project->settingsRoute = route('project.edit', ['project_uuid' => $project->uuid]);
             $project->canUpdate = auth()->user()->can('update', $project);
+            $project->canCreateResource = auth()->user()->can('createAnyResource');
+            $firstEnvironment = $project->environments->first();
+            $project->addResourceRoute = $firstEnvironment
+                ? route('project.resource.create', [
+                    'project_uuid' => $project->uuid,
+                    'environment_uuid' => $firstEnvironment->uuid,
+                ])
+                : null;
 
             return $project;
         });

@@ -20,7 +20,7 @@ services:
       - mariadb-data:/var/lib/mysql
 
   moodle:
-    image: docker.io/bitnami/moodle:4.3
+    image: docker.io/bitnamilegacy/moodle:4.3
     environment:
       - SERVICE_URL_MOODLE_8080
       - MOODLE_DATABASE_HOST=mariadb
