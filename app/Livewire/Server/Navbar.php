@@ -120,7 +120,6 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
-        $forceStop = $this->server->proxy->force_stop ?? false;
 
         switch ($this->proxyStatus) {
             case 'running':
