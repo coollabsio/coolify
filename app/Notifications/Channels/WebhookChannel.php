@@ -2,8 +2,8 @@
 
 namespace App\Notifications\Channels;
 
+use App\Jobs\SendWebhookJob;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 
 class WebhookChannel
 {
@@ -18,16 +18,8 @@ class WebhookChannel
             return;
         }
 
-        // TODO: Implement actual webhook delivery
-        // This is a placeholder implementation
-        // You'll need to:
-        // 1. Get the webhook payload from $notification->toWebhook()
-        // 2. Create a job to send the HTTP POST request to $webhookSettings->webhook_url
-        // 3. Handle retries and errors appropriately
+        $payload = $notification->toWebhook();
 
-        Log::info('Webhook notification would be sent', [
-            'url' => $webhookSettings->webhook_url,
-            'notification' => get_class($notification),
-        ]);
+        SendWebhookJob::dispatch($payload, $webhookSettings->webhook_url);
     }
 }
