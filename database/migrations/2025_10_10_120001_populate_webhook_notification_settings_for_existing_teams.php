@@ -30,6 +30,7 @@ return new class extends Migration
                     'server_disk_usage_webhook_notifications' => true,
                     'server_reachable_webhook_notifications' => false,
                     'server_unreachable_webhook_notifications' => true,
+                    'server_patch_webhook_notifications' => false,
                 ]
             );
         }
