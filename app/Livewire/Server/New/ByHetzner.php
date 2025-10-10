@@ -72,6 +72,7 @@ class ByHetzner extends Component
     {
         return [
             'tokenAdded' => 'handleTokenAdded',
+            'privateKeyCreated' => 'handlePrivateKeyCreated',
             'modalClosed' => 'resetSelection',
         ];
     }
@@ -99,6 +100,18 @@ class ByHetzner extends Component
 
         // Automatically proceed to next step
         $this->nextStep();
+    }
+
+    public function handlePrivateKeyCreated($keyId)
+    {
+        // Refresh private keys list
+        $this->private_keys = PrivateKey::ownedByCurrentTeam()->get();
+
+        // Auto-select the new key
+        $this->private_key_id = $keyId;
+
+        // Clear validation errors for private_key_id
+        $this->resetErrorBag('private_key_id');
     }
 
     protected function rules(): array

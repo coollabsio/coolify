@@ -100,14 +100,37 @@
                     </div>
 
                     <div>
-                        <x-forms.select label="Private Key" id="private_key_id" required>
-                            <option value="">Select a private key...</option>
-                            @foreach ($private_keys as $key)
-                                <option value="{{ $key->id }}">
-                                    {{ $key->name }}
-                                </option>
-                            @endforeach
-                        </x-forms.select>
+                        @if ($private_keys->count() === 0)
+                            <div class="flex flex-col gap-2">
+                                <label class="flex gap-1 items-center mb-1 text-sm font-medium">
+                                    Private Key
+                                    <x-highlighted text="*" />
+                                </label>
+                                <div
+                                    class="p-4 border border-yellow-500 dark:border-yellow-600 rounded bg-yellow-50 dark:bg-yellow-900/10">
+                                    <p class="text-sm mb-3 text-neutral-700 dark:text-neutral-300">
+                                        No private keys found. You need to create a private key to continue.
+                                    </p>
+                                    <x-modal-input buttonTitle="Create New Private Key" title="New Private Key"
+                                        isHighlightedButton>
+                                        <livewire:security.private-key.create :modal_mode="true" from="server" />
+                                    </x-modal-input>
+                                </div>
+                            </div>
+                        @else
+                            <x-forms.select label="Private Key" id="private_key_id" required>
+                                <option value="">Select a private key...</option>
+                                @foreach ($private_keys as $key)
+                                    <option value="{{ $key->id }}">
+                                        {{ $key->name }}
+                                    </option>
+                                @endforeach
+                            </x-forms.select>
+                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                                This SSH key will be automatically added to your Hetzner account and used to access the
+                                server.
+                            </p>
+                        @endif
                     </div>
                     <div>
                         <x-forms.datalist label="Additional SSH Keys (from Hetzner)" id="selectedHetznerSshKeyIds"
@@ -126,7 +149,8 @@
                         <x-forms.button type="button" wire:click="previousStep">
                             Back
                         </x-forms.button>
-                        <x-forms.button isHighlighted canGate="create" :canResource="App\Models\Server::class" type="submit">
+                        <x-forms.button isHighlighted canGate="create" :canResource="App\Models\Server::class" type="submit"
+                            :disabled="!$private_key_id">
                             Buy & Create Server
                         </x-forms.button>
                     </div>
