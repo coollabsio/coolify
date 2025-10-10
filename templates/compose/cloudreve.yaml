@@ -38,7 +38,7 @@ services:
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
       - POSTGRES_DB=${POSTGRES_DB:-cloudreve}
     volumes:
-      - cloudreve-db-data:/var/lib/postgresql/data
+      - cloudreve_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
