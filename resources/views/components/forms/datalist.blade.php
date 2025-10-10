@@ -19,7 +19,7 @@
             selected: @entangle($id).live,
             options: [],
             filteredOptions: [],
-
+        
             init() {
                 this.options = Array.from(this.$refs.datalist.querySelectorAll('option')).map(opt => {
                     // Try to parse as integer, fallback to string
@@ -39,7 +39,7 @@
                     this.selected = [];
                 }
             },
-
+        
             filterOptions() {
                 if (!this.search) {
                     this.filteredOptions = this.options;
@@ -50,7 +50,7 @@
                     opt.text.toLowerCase().includes(searchLower)
                 );
             },
-
+        
             toggleOption(value) {
                 // Ensure selected is an array
                 if (!Array.isArray(this.selected)) {
@@ -64,20 +64,24 @@
                 }
                 this.search = '';
                 this.filterOptions();
+                // Focus input after selection
+                this.$refs.searchInput.focus();
             },
-
-            removeOption(value) {
+        
+            removeOption(value, event) {
                 // Ensure selected is an array
                 if (!Array.isArray(this.selected)) {
                     this.selected = [];
                     return;
                 }
+                // Prevent triggering container click
+                event.stopPropagation();
                 const index = this.selected.indexOf(value);
                 if (index > -1) {
                     this.selected.splice(index, 1);
                 }
             },
-
+        
             isSelected(value) {
                 // Ensure selected is an array
                 if (!Array.isArray(this.selected)) {
@@ -85,113 +89,93 @@
                 }
                 return this.selected.includes(value);
             },
-
+        
             getSelectedText(value) {
                 const option = this.options.find(opt => opt.value == value);
                 return option ? option.text : value;
             }
-        }"
-        @click.outside="open = false"
-        class="relative">
+        }" @click.outside="open = false" class="relative">
 
-            {{-- Selected Items Display --}}
-            <div class="grid grid-cols-2 gap-2 mb-2 max-h-32 overflow-y-auto" x-show="Array.isArray(selected) && selected.length > 0">
+            {{-- Unified Input Container with Tags Inside --}}
+            <div @click="$refs.searchInput.focus()"
+                class="flex flex-wrap gap-1.5 p-2 min-h-[42px] max-h-40 overflow-y-auto {{ $defaultClass }} cursor-text"
+                :class="{
+                    'opacity-50': {{ $disabled ? 'true' : 'false' }}
+                }"
+                wire:loading.class="opacity-50">
+
+                {{-- Selected Tags Inside Input --}}
                 <template x-for="value in selected" :key="value">
-                    <span class="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-coolgray-200 dark:bg-coolgray-700 rounded">
-                        <span x-text="getSelectedText(value)" class="truncate flex-1"></span>
-                        <button
-                            type="button"
-                            @click="removeOption(value)"
-                            :disabled="{{ $disabled ? 'true' : 'false' }}"
-                            class="text-lg leading-none hover:text-red-500 {{ $disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer' }}"
-                            aria-label="Remove">
-                            ×
-                        </button>
-                    </span>
-                </template>
-            </div>
-
-            {{-- Search Input --}}
-            <input
-                type="text"
-                x-model="search"
-                @input="filterOptions()"
-                @focus="open = true"
-                @keydown.escape="open = false"
-                :placeholder="{{ json_encode($placeholder ?: 'Search...') }}"
-                {{ $attributes->merge(['class' => $defaultClass]) }}
-                @required($required)
-                @readonly($readonly)
-                @disabled($disabled)
-                wire:dirty.class="dark:ring-warning ring-warning"
-                wire:loading.attr="disabled"
-                @if ($autofocus) x-ref="autofocusInput" @endif
-            >
-
-            {{-- Dropdown Options --}}
-            <div
-                x-show="open && !{{ $disabled ? 'true' : 'false' }}"
-                x-transition
-                class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto">
-
-                <template x-if="filteredOptions.length === 0">
-                    <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
-                        No options found
-                    </div>
+                    <button
+                        type="button"
+                        @click.stop="removeOption(value, $event)"
+                        :disabled="{{ $disabled ? 'true' : 'false' }}"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs bg-coolgray-200 dark:bg-coolgray-700 rounded whitespace-nowrap {{ $disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400' }}"
+                        aria-label="Remove">
+                        <span x-text="getSelectedText(value)" class="max-w-[200px] truncate"></span>
+                    </button>
                 </template>
 
-                <template x-for="option in filteredOptions" :key="option.value">
-                    <div
-                        @click="toggleOption(option.value)"
-                        class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-3"
-                        :class="{ 'bg-neutral-50 dark:bg-coolgray-300': isSelected(option.value) }">
-                        <input
-                            type="checkbox"
-                            :checked="isSelected(option.value)"
-                            class="w-4 h-4 rounded border-neutral-300 dark:border-neutral-600 bg-white dark:bg-coolgray-100 text-black dark:text-white checked:bg-white dark:checked:bg-coolgray-100 focus:ring-coollabs dark:focus:ring-warning pointer-events-none"
-                            tabindex="-1">
-                        <span class="text-sm flex-1" x-text="option.text"></span>
-                    </div>
-                </template>
-            </div>
-
-            {{-- Hidden datalist for options --}}
-            <datalist x-ref="datalist" style="display: none;">
-                {{ $slot }}
-            </datalist>
-        </div>
-    @else
-        {{-- Single Selection Mode (Standard HTML5 Datalist) --}}
-        <input
-            list="{{ $id }}"
-            {{ $attributes->merge(['class' => $defaultClass]) }}
-            @required($required)
-            @readonly($readonly)
-            @disabled($disabled)
-            wire:dirty.class="dark:ring-warning ring-warning"
-            wire:loading.attr="disabled"
-            name="{{ $id }}"
-            @if ($value) value="{{ $value }}" @endif
-            @if ($placeholder) placeholder="{{ $placeholder }}" @endif
-            @if ($attributes->whereStartsWith('wire:model')->first())
-                {{ $attributes->whereStartsWith('wire:model')->first() }}
-            @else
-                wire:model="{{ $id }}"
-            @endif
-            @if ($instantSave)
-                wire:change="{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}"
-                wire:blur="{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}"
-            @endif
-            @if ($autofocus) x-ref="autofocusInput" @endif
-        >
-        <datalist id="{{ $id }}">
-            {{ $slot }}
-        </datalist>
+                {{-- Search Input (Borderless, Inside Container) --}}
+                <input type="text" x-model="search" x-ref="searchInput" @input="filterOptions()" @focus="open = true"
+                    @keydown.escape="open = false"
+                    :placeholder="(Array.isArray(selected) && selected.length > 0) ? '' :
+                    {{ json_encode($placeholder ?: 'Search...') }}"
+                    @required($required) @readonly($readonly) @disabled($disabled) @if ($autofocus)
+                autofocus
     @endif
+    class="flex-1 min-w-[120px] text-sm border-0 outline-none bg-transparent p-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600"
+    />
+</div>
 
-    @error($id)
-        <label class="label">
-            <span class="text-red-500 label-text-alt">{{ $message }}</span>
-        </label>
-    @enderror
+{{-- Dropdown Options --}}
+<div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
+    class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto">
+
+    <template x-if="filteredOptions.length === 0">
+        <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+            No options found
+        </div>
+    </template>
+
+    <template x-for="option in filteredOptions" :key="option.value">
+        <div @click="toggleOption(option.value)"
+            class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-3"
+            :class="{ 'bg-neutral-50 dark:bg-coolgray-300': isSelected(option.value) }">
+            <input type="checkbox" :checked="isSelected(option.value)"
+                class="w-4 h-4 rounded border-neutral-300 dark:border-neutral-600 bg-white dark:bg-coolgray-100 text-black dark:text-white checked:bg-white dark:checked:bg-coolgray-100 focus:ring-coollabs dark:focus:ring-warning pointer-events-none"
+                tabindex="-1">
+            <span class="text-sm flex-1" x-text="option.text"></span>
+        </div>
+    </template>
+</div>
+
+{{-- Hidden datalist for options --}}
+<datalist x-ref="datalist" style="display: none;">
+    {{ $slot }}
+</datalist>
+</div>
+@else
+{{-- Single Selection Mode (Standard HTML5 Datalist) --}}
+<input list="{{ $id }}" {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+    @readonly($readonly) @disabled($disabled) wire:dirty.class="dark:ring-warning ring-warning"
+    wire:loading.attr="disabled" name="{{ $id }}"
+    @if ($value) value="{{ $value }}" @endif
+    @if ($placeholder) placeholder="{{ $placeholder }}" @endif
+    @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }}
+            @else
+                wire:model="{{ $id }}" @endif
+    @if ($instantSave) wire:change="{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}"
+                wire:blur="{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}" @endif
+    @if ($autofocus) x-ref="autofocusInput" @endif>
+<datalist id="{{ $id }}">
+    {{ $slot }}
+</datalist>
+@endif
+
+@error($id)
+    <label class="label">
+        <span class="text-red-500 label-text-alt">{{ $message }}</span>
+    </label>
+@enderror
 </div>
