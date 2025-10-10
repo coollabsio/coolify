@@ -7,6 +7,7 @@ use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\WebhookChannel;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasNotificationSettings
@@ -79,6 +80,7 @@ trait HasNotificationSettings
             'telegram' => TelegramChannel::class,
             'slack' => SlackChannel::class,
             'pushover' => PushoverChannel::class,
+            'webhook' => WebhookChannel::class,
         ];
 
         if ($event === 'general') {
