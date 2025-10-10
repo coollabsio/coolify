@@ -113,4 +113,27 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification
             color: SlackMessage::warningColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+
+        $data = [
+            'success' => true,
+            'message' => 'Database backup succeeded locally, S3 upload failed',
+            'event' => 'backup_success_with_s3_warning',
+            'database_name' => $this->name,
+            'database_uuid' => $this->database->uuid,
+            'database_type' => $this->database_name,
+            'frequency' => $this->frequency,
+            's3_error' => $this->s3_error,
+            'url' => $url,
+        ];
+
+        if ($this->s3_storage_url) {
+            $data['s3_storage_url'] = $this->s3_storage_url;
+        }
+
+        return $data;
+    }
 }
