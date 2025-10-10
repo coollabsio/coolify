@@ -1,0 +1,38 @@
+version: '3.8'
+ 
+services:
+  app:
+    image: evershop/evershop:latest
+    restart: always
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_PASSWORD: postgres
+      DB_USER: postgres
+      DB_NAME: postgres
+    networks:
+      - myevershop
+    depends_on:
+      - database
+    ports:
+      - 3001:3000
+  
+  #The postgres database: 
+  database:
+    image: postgres:16
+    restart: unless-stopped
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - myevershop
+ 
+networks:
+  myevershop:
+    name: MyEverShop
+    driver: bridge
