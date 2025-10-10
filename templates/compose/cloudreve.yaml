@@ -7,7 +7,7 @@
 
 services:
   cloudreve:
-    image: cloudreve/cloudreve:latest
+    image: cloudreve/cloudreve:4.8.0
     depends_on:
       cloudreve-db:
         condition: service_healthy
