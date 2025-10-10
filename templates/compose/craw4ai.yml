@@ -1,0 +1,28 @@
+# documentation: https://github.com/unclecode/crawl4ai#readme
+# slogan: Crawl4AI is a modern AI-powered web crawler with support for screenshots, PDFs, JavaScript execution, and LLM-based extraction. Includes an interactive playground and MCP (Model Context Protocol) integration.
+# tags: craw4ai
+# logo: svgs/your-service.svg
+# port: 11235
+
+version: '3.8'
+services:
+  crawl4ai:
+    image: 'unclecode/crawl4ai:latest'
+    restart: unless-stopped
+    shm_size: 1g
+    expose:
+      - 11235
+    ports:
+      - 11235:11235
+    environment:
+      - 'LLM_PROVIDER=${LLM_PROVIDER}'
+      - 'GEMINI_API_TOKEN=${GEMINI_API_TOKEN}'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:11235/health'
+      interval: 30s
+      timeout: 10s
+      retries: 3
