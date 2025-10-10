@@ -24,7 +24,7 @@
             <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveWebhookEnabled" id="webhookEnabled" label="Enabled" />
         </div>
         <div class="flex items-end gap-2">
-            <span class="px-3 py-2 text-sm font-mono font-semibold rounded btn btn-sm btn-warning no-animation">POST</span>
+            <span class="px-3 py-2 text-sm font-mono font-semibold rounded btn btn-sm btn-primary no-animation">POST</span>
             <x-forms.input canGate="update" :canResource="$settings" type="password"
                 helper="Enter a valid HTTP or HTTPS URL. Coolify will send POST requests to this endpoint when events occur."
                 required id="webhookUrl" label="Webhook URL" />
