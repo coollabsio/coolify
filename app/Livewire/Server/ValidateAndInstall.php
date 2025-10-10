@@ -64,6 +64,19 @@ class ValidateAndInstall extends Component
         $this->init();
     }
 
+    public function retry()
+    {
+        $this->authorize('update', $this->server);
+        $this->uptime = null;
+        $this->supported_os_type = null;
+        $this->docker_installed = null;
+        $this->docker_compose_installed = null;
+        $this->docker_version = null;
+        $this->error = null;
+        $this->number_of_tries = 0;
+        $this->init();
+    }
+
     public function validateConnection()
     {
         $this->authorize('update', $this->server);
