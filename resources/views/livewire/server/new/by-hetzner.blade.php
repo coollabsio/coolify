@@ -162,7 +162,7 @@
                         </x-forms.button>
                         <x-forms.button isHighlighted canGate="create" :canResource="App\Models\Server::class" type="submit"
                             :disabled="!$private_key_id">
-                            Buy & Create Server
+                            Buy & Create Server{{ $this->selectedServerPrice ? ' (' . $this->selectedServerPrice . '/mo)' : '' }}
                         </x-forms.button>
                     </div>
                 </form>

@@ -333,6 +333,23 @@ class ByHetzner extends Component
         return $filtered;
     }
 
+    public function getSelectedServerPriceProperty(): ?string
+    {
+        if (! $this->selected_server_type) {
+            return null;
+        }
+
+        $serverType = collect($this->serverTypes)->firstWhere('name', $this->selected_server_type);
+
+        if (! $serverType || ! isset($serverType['prices'][0]['price_monthly']['gross'])) {
+            return null;
+        }
+
+        $price = $serverType['prices'][0]['price_monthly']['gross'];
+
+        return '€'.number_format($price, 2);
+    }
+
     public function updatedSelectedLocation($value)
     {
         ray('Location selected', $value);
