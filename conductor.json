@@ -1,5 +1,7 @@
 {
     "scripts": {
-        "setup": "./scripts/conductor-setup.sh"
-    }
+        "setup": "./scripts/conductor-setup.sh",
+        "run": "echo Running..."
+    },
+    "runScriptMode": "nonconcurrent"
 }
