@@ -31,6 +31,7 @@ trait HasNotificationSettings
             'telegram' => $this->telegramNotificationSettings,
             'slack' => $this->slackNotificationSettings,
             'pushover' => $this->pushoverNotificationSettings,
+            'webhook' => $this->webhookNotificationSettings,
             default => null,
         };
     }

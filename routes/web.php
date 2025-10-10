@@ -14,6 +14,7 @@ use App\Livewire\Notifications\Email as NotificationEmail;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
+use App\Livewire\Notifications\Webhook as NotificationWebhook;
 use App\Livewire\Profile\Index as ProfileIndex;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
@@ -128,6 +129,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
         Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
         Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
+        Route::get('/webhook', NotificationWebhook::class)->name('notifications.webhook');
     });
 
     Route::prefix('storages')->group(function () {
