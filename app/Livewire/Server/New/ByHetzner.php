@@ -58,6 +58,10 @@ class ByHetzner extends Component
 
     public bool $loading_data = false;
 
+    public bool $enable_ipv4 = true;
+
+    public bool $enable_ipv6 = true;
+
     public function mount()
     {
         $this->authorize('viewAny', CloudProviderToken::class);
@@ -129,6 +133,8 @@ class ByHetzner extends Component
                 'private_key_id' => 'required|integer|exists:private_keys,id,team_id,'.currentTeam()->id,
                 'selectedHetznerSshKeyIds' => 'nullable|array',
                 'selectedHetznerSshKeyIds.*' => 'integer',
+                'enable_ipv4' => 'required|boolean',
+                'enable_ipv6' => 'required|boolean',
             ]);
         }
 
@@ -410,6 +416,10 @@ class ByHetzner extends Component
             'location' => $this->selected_location,
             'start_after_create' => true,
             'ssh_keys' => $sshKeys,
+            'public_net' => [
+                'enable_ipv4' => $this->enable_ipv4,
+                'enable_ipv6' => $this->enable_ipv6,
+            ],
         ];
 
         ray('Server creation parameters', $params);
@@ -438,10 +448,22 @@ class ByHetzner extends Component
             // Create server on Hetzner
             $hetznerServer = $this->createHetznerServer($hetznerToken);
 
+            // Determine IP address to use (prefer IPv4, fallback to IPv6)
+            $ipAddress = null;
+            if ($this->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
+                $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
+            } elseif ($this->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
+                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
+            }
+
+            if (! $ipAddress) {
+                throw new \Exception('No public IP address available. Enable at least one of IPv4 or IPv6.');
+            }
+
             // Create server in Coolify database
             $server = Server::create([
                 'name' => $this->server_name,
-                'ip' => $hetznerServer['public_net']['ipv4']['ip'],
+                'ip' => $ipAddress,
                 'user' => 'root',
                 'port' => 22,
                 'team_id' => currentTeam()->id,

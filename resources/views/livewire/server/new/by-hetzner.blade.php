@@ -145,6 +145,17 @@
                             @endforeach
                         </x-forms.datalist>
                     </div>
+
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-medium">Network Configuration</label>
+                        <div class="flex gap-4">
+                            <x-forms.checkbox id="enable_ipv4" label="Enable IPv4"
+                                helper="Enable public IPv4 address for this server" />
+                            <x-forms.checkbox id="enable_ipv6" label="Enable IPv6"
+                                helper="Enable public IPv6 address for this server" />
+                        </div>
+                    </div>
+
                     <div class="flex gap-2 justify-between">
                         <x-forms.button type="button" wire:click="previousStep">
                             Back
