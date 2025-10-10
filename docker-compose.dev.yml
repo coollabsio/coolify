@@ -1,5 +1,6 @@
 services:
   coolify:
+    image: coolify:dev
     build:
       context: .
       dockerfile: ./docker/development/Dockerfile
@@ -41,6 +42,7 @@ services:
     volumes:
       - dev_redis_data:/data
   soketi:
+    image: coolify-realtime:dev
     build:
       context: .
       dockerfile: ./docker/coolify-realtime/Dockerfile
@@ -73,6 +75,7 @@ services:
     networks:
       - coolify
   testing-host:
+    image: coolify-testing-host:dev
     build:
       context: .
       dockerfile: ./docker/testing-host/Dockerfile
