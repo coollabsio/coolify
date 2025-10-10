@@ -24,7 +24,7 @@ services:
       - CR_CONF_Redis.Server=cloudreve-redis:6379
       - CR_CONF_Redis.Password=${SERVICE_PASSWORD_REDIS}
     volumes:
-      - backend_data:/cloudreve/data
+      - cloudreve_data:/cloudreve/data
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5212"]
       interval: 1m30s
