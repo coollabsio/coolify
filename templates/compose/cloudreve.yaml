@@ -27,7 +27,7 @@ services:
       - cloudreve_data:/cloudreve/data
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5212"]
-      interval: 1m30s
+      interval: 20s
       timeout: 10s
       retries: 3
 
