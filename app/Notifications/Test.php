@@ -36,6 +36,7 @@ class Test extends Notification implements ShouldQueue
                 'telegram' => [TelegramChannel::class],
                 'slack' => [SlackChannel::class],
                 'pushover' => [PushoverChannel::class],
+                'webhook' => [], // WebhookChannel will be implemented later
                 default => [],
             };
         } else {
