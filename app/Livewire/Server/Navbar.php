@@ -118,6 +118,7 @@ class Navbar extends Component
 
     public function showNotification()
     {
+        $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
         $forceStop = $this->server->proxy->force_stop ?? false;
 
