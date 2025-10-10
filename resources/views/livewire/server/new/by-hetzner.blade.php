@@ -100,6 +100,22 @@
                     </div>
 
                     <div>
+                        <x-forms.datalist
+                            label="Additional SSH Keys (from Hetzner)"
+                            id="selectedHetznerSshKeyIds"
+                            helper="Select existing SSH keys from your Hetzner account to add to this server. The Coolify SSH key will be automatically added."
+                            :multiple="true"
+                            :disabled="count($hetznerSshKeys) === 0"
+                            :placeholder="count($hetznerSshKeys) > 0 ? 'Search and select SSH keys...' : 'No SSH keys found in Hetzner account'">
+                            @foreach ($hetznerSshKeys as $sshKey)
+                                <option value="{{ $sshKey['id'] }}">
+                                    {{ $sshKey['name'] }} - {{ substr($sshKey['fingerprint'], 0, 20) }}...
+                                </option>
+                            @endforeach
+                        </x-forms.datalist>
+                    </div>
+
+                    <div>
                         <x-forms.select label="Private Key" id="private_key_id" required>
                             <option value="">Select a private key...</option>
                             @foreach ($private_keys as $key)

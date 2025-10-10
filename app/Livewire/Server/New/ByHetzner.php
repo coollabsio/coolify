@@ -42,11 +42,15 @@ class ByHetzner extends Component
 
     public array $serverTypes = [];
 
+    public array $hetznerSshKeys = [];
+
     public ?string $selected_location = null;
 
     public ?int $selected_image = null;
 
     public ?string $selected_server_type = null;
+
+    public array $selectedHetznerSshKeyIds = [];
 
     public string $server_name = '';
 
@@ -110,6 +114,8 @@ class ByHetzner extends Component
                 'selected_image' => 'required|integer',
                 'selected_server_type' => 'required|string',
                 'private_key_id' => 'required|integer|exists:private_keys,id,team_id,'.currentTeam()->id,
+                'selectedHetznerSshKeyIds' => 'nullable|array',
+                'selectedHetznerSshKeyIds.*' => 'integer',
             ]);
         }
 
@@ -222,6 +228,14 @@ class ByHetzner extends Component
             ray('Filtered images', [
                 'filtered_count' => count($this->images),
                 'debian_images' => collect($this->images)->filter(fn ($img) => str_contains($img['name'] ?? '', 'debian'))->values(),
+            ]);
+
+            // Load SSH keys from Hetzner
+            $this->hetznerSshKeys = $hetznerService->getSshKeys();
+
+            ray('Hetzner SSH Keys', [
+                'total_count' => count($this->hetznerSshKeys),
+                'keys' => $this->hetznerSshKeys,
             ]);
 
             $this->loading_data = false;
@@ -365,6 +379,16 @@ class ByHetzner extends Component
         // Normalize server name to lowercase for RFC 1123 compliance
         $normalizedServerName = strtolower(trim($this->server_name));
 
+        // Prepare SSH keys array: Coolify key + user-selected Hetzner keys
+        $sshKeys = array_merge(
+            [$sshKeyId], // Coolify key (always included)
+            $this->selectedHetznerSshKeyIds // User-selected Hetzner keys
+        );
+
+        // Remove duplicates in case the Coolify key was also selected
+        $sshKeys = array_unique($sshKeys);
+        $sshKeys = array_values($sshKeys); // Re-index array
+
         // Prepare server creation parameters
         $params = [
             'name' => $normalizedServerName,
@@ -372,7 +396,7 @@ class ByHetzner extends Component
             'image' => $this->selected_image,
             'location' => $this->selected_location,
             'start_after_create' => true,
-            'ssh_keys' => [$sshKeyId],
+            'ssh_keys' => $sshKeys,
         ];
 
         ray('Server creation parameters', $params);
