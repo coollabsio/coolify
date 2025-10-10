@@ -7,6 +7,12 @@ use Illuminate\Support\Facades\Log;
 return new class extends Migration
 {
     /**
+     * Disable transactions for this migration because CREATE INDEX CONCURRENTLY
+     * cannot run inside a transaction block in PostgreSQL.
+     */
+    public bool $withinTransaction = false;
+
+    /**
      * Run the migrations.
      */
     public function up(): void
