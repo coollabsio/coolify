@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  wallos:
+    image: bellamy/wallos:latest
+    ports:
+      - '80'
+    environment:
+      TZ: 'Europe/Paris'
+    volumes:
+      - wallos_db:/var/www/html/db
+      - wallos_logos:/var/www/html/images/uploads/logos
+    restart: unless-stopped
+
+volumes:
+  wallos_db:
+  wallos_logos:
