@@ -4,15 +4,12 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\StripeProcessJob;
-use App\Models\Webhook;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class Stripe extends Controller
 {
-    protected $webhook;
-
     public function events(Request $request)
     {
         try {
@@ -40,19 +37,10 @@ class Stripe extends Controller
 
                 return response('Webhook received. Cool cool cool cool cool.', 200);
             }
-            $this->webhook = Webhook::create([
-                'type' => 'stripe',
-                'payload' => $request->getContent(),
-            ]);
             StripeProcessJob::dispatch($event);
 
             return response('Webhook received. Cool cool cool cool cool.', 200);
         } catch (Exception $e) {
-            $this->webhook->update([
-                'status' => 'failed',
-                'failure_reason' => $e->getMessage(),
-            ]);
-
             return response($e->getMessage(), 400);
         }
     }

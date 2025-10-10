@@ -60,15 +60,28 @@ function remote_process(
 
 function instant_scp(string $source, string $dest, Server $server, $throwError = true)
 {
-    $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
-    $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
-    $output = trim($process->output());
-    $exitCode = $process->exitCode();
-    if ($exitCode !== 0) {
-        return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
-    }
+    return \App\Helpers\SshRetryHandler::retry(
+        function () use ($source, $dest, $server) {
+            $scp_command = SshMultiplexingHelper::generateScpCommand($server, $source, $dest);
+            $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
 
-    return $output === 'null' ? null : $output;
+            $output = trim($process->output());
+            $exitCode = $process->exitCode();
+
+            if ($exitCode !== 0) {
+                excludeCertainErrors($process->errorOutput(), $exitCode);
+            }
+
+            return $output === 'null' ? null : $output;
+        },
+        [
+            'server' => $server->ip,
+            'source' => $source,
+            'dest' => $dest,
+            'function' => 'instant_scp',
+        ],
+        $throwError
+    );
 }
 
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
@@ -79,54 +92,65 @@ function instant_remote_process_with_timeout(Collection|array $command, Server $
     }
     $command_string = implode("\n", $command);
 
-    // $start_time = microtime(true);
-    $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-    $process = Process::timeout(30)->run($sshCommand);
-    // $end_time = microtime(true);
+    return \App\Helpers\SshRetryHandler::retry(
+        function () use ($server, $command_string) {
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
+            $process = Process::timeout(30)->run($sshCommand);
 
-    // $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
-    // ray('SSH command execution time:', $execution_time.' ms')->orange();
+            $output = trim($process->output());
+            $exitCode = $process->exitCode();
 
-    $output = trim($process->output());
-    $exitCode = $process->exitCode();
+            if ($exitCode !== 0) {
+                excludeCertainErrors($process->errorOutput(), $exitCode);
+            }
 
-    if ($exitCode !== 0) {
-        return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
-    }
+            // Sanitize output to ensure valid UTF-8 encoding
+            $output = $output === 'null' ? null : sanitize_utf8_text($output);
 
-    // Sanitize output to ensure valid UTF-8 encoding
-    $output = $output === 'null' ? null : sanitize_utf8_text($output);
-
-    return $output;
+            return $output;
+        },
+        [
+            'server' => $server->ip,
+            'command_preview' => substr($command_string, 0, 100),
+            'function' => 'instant_remote_process_with_timeout',
+        ],
+        $throwError
+    );
 }
 
 function instant_remote_process(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
+
     if ($server->isNonRoot() && ! $no_sudo) {
         $command = parseCommandsByLineForSudo(collect($command), $server);
     }
     $command_string = implode("\n", $command);
 
-    // $start_time = microtime(true);
-    $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
-    $process = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand);
-    // $end_time = microtime(true);
+    return \App\Helpers\SshRetryHandler::retry(
+        function () use ($server, $command_string) {
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string);
+            $process = Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand);
 
-    // $execution_time = ($end_time - $start_time) * 1000; // Convert to milliseconds
-    // ray('SSH command execution time:', $execution_time.' ms')->orange();
+            $output = trim($process->output());
+            $exitCode = $process->exitCode();
 
-    $output = trim($process->output());
-    $exitCode = $process->exitCode();
+            if ($exitCode !== 0) {
+                excludeCertainErrors($process->errorOutput(), $exitCode);
+            }
 
-    if ($exitCode !== 0) {
-        return $throwError ? excludeCertainErrors($process->errorOutput(), $exitCode) : null;
-    }
+            // Sanitize output to ensure valid UTF-8 encoding
+            $output = $output === 'null' ? null : sanitize_utf8_text($output);
 
-    // Sanitize output to ensure valid UTF-8 encoding
-    $output = $output === 'null' ? null : sanitize_utf8_text($output);
-
-    return $output;
+            return $output;
+        },
+        [
+            'server' => $server->ip,
+            'command_preview' => substr($command_string, 0, 100),
+            'function' => 'instant_remote_process',
+        ],
+        $throwError
+    );
 }
 
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
@@ -136,11 +160,18 @@ function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
         'Could not resolve hostname',
     ]);
     $ignored = $ignoredErrors->contains(fn ($error) => Str::contains($errorOutput, $error));
+
+    // Ensure we always have a meaningful error message
+    $errorMessage = trim($errorOutput);
+    if (empty($errorMessage)) {
+        $errorMessage = "SSH command failed with exit code: $exitCode";
+    }
+
     if ($ignored) {
         // TODO: Create new exception and disable in sentry
-        throw new \RuntimeException($errorOutput, $exitCode);
+        throw new \RuntimeException($errorMessage, $exitCode);
     }
-    throw new \RuntimeException($errorOutput, $exitCode);
+    throw new \RuntimeException($errorMessage, $exitCode);
 }
 
 function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection

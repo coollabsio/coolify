@@ -26,10 +26,11 @@
                 <div class="text-xl font-bold dark:text-white">{{ currentTeam()->servers->count() }}</div>
             </div>
             @if (currentTeam()->serverOverflow())
-                <div class="py-4"><span class="font-bold text-red-500">WARNING:</span> You must delete
-                    {{ currentTeam()->servers->count() - $server_limits }} servers,
+                <x-callout type="danger" title="WARNING" class="my-4">
+                    You must delete {{ currentTeam()->servers->count() - $server_limits }} servers,
                     or upgrade your subscription. {{ currentTeam()->servers->count() - $server_limits }} servers will be
-                    deactivated.</div>
+                    deactivated.
+                </x-callout>
             @endif
             <x-forms.button class="gap-2" wire:click='stripeCustomerPortal'>Change Server Quantity
             </x-forms.button>

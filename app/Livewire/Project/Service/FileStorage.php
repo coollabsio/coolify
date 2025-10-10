@@ -34,6 +34,8 @@ class FileStorage extends Component
 
     public bool $permanently_delete = true;
 
+    public bool $isReadOnly = false;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
@@ -52,6 +54,8 @@ class FileStorage extends Component
             $this->workdir = null;
             $this->fs_path = $this->fileStorage->fs_path;
         }
+
+        $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
     }
 
     public function convertToDirectory()

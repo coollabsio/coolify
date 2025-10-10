@@ -1,6 +1,9 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
+    <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300 border-neutral-200">
         @if ($isReadOnly)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                This volume is mounted as read-only and cannot be modified from the UI.
+            </div>
             @if ($isFirst)
                 <div class="flex gap-2 items-end w-full  md:flex-row flex-col">
                     @if (

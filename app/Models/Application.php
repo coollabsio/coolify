@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Services\ConfigurationGenerator;
+use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -110,7 +111,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
-    use HasConfiguration, HasFactory, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -122,6 +123,97 @@ class Application extends BaseModel
         'custom_network_aliases' => 'array',
         'http_basic_auth_password' => 'encrypted',
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope('withRelations', function ($builder) {
+            $builder->withCount([
+                'additional_servers',
+                'additional_networks',
+            ]);
+        });
+        static::saving(function ($application) {
+            $payload = [];
+            if ($application->isDirty('fqdn')) {
+                if ($application->fqdn === '') {
+                    $application->fqdn = null;
+                }
+                $payload['fqdn'] = $application->fqdn;
+            }
+            if ($application->isDirty('install_command')) {
+                $payload['install_command'] = str($application->install_command)->trim();
+            }
+            if ($application->isDirty('build_command')) {
+                $payload['build_command'] = str($application->build_command)->trim();
+            }
+            if ($application->isDirty('start_command')) {
+                $payload['start_command'] = str($application->start_command)->trim();
+            }
+            if ($application->isDirty('base_directory')) {
+                $payload['base_directory'] = str($application->base_directory)->trim();
+            }
+            if ($application->isDirty('publish_directory')) {
+                $payload['publish_directory'] = str($application->publish_directory)->trim();
+            }
+            if ($application->isDirty('git_repository')) {
+                $payload['git_repository'] = str($application->git_repository)->trim();
+            }
+            if ($application->isDirty('git_branch')) {
+                $payload['git_branch'] = str($application->git_branch)->trim();
+            }
+            if ($application->isDirty('git_commit_sha')) {
+                $payload['git_commit_sha'] = str($application->git_commit_sha)->trim();
+            }
+            if ($application->isDirty('status')) {
+                $payload['last_online_at'] = now();
+            }
+            if ($application->isDirty('custom_nginx_configuration')) {
+                if ($application->custom_nginx_configuration === '') {
+                    $payload['custom_nginx_configuration'] = null;
+                }
+            }
+            if (count($payload) > 0) {
+                $application->forceFill($payload);
+            }
+        });
+        static::created(function ($application) {
+            ApplicationSetting::create([
+                'application_id' => $application->id,
+            ]);
+            $application->compose_parsing_version = self::$parserVersion;
+            $application->save();
+
+            // Add default NIXPACKS_NODE_VERSION environment variable for Nixpacks applications
+            if ($application->build_pack === 'nixpacks') {
+                EnvironmentVariable::create([
+                    'key' => 'NIXPACKS_NODE_VERSION',
+                    'value' => '22',
+                    'is_multiline' => false,
+                    'is_literal' => false,
+                    'is_buildtime' => true,
+                    'is_runtime' => false,
+                    'is_preview' => false,
+                    'resourceable_type' => Application::class,
+                    'resourceable_id' => $application->id,
+                ]);
+            }
+        });
+        static::forceDeleting(function ($application) {
+            $application->update(['fqdn' => null]);
+            $application->settings()->delete();
+            $application->persistentStorages()->delete();
+            $application->environment_variables()->delete();
+            $application->environment_variables_preview()->delete();
+            foreach ($application->scheduled_tasks as $task) {
+                $task->delete();
+            }
+            $application->tags()->detach();
+            $application->previews()->delete();
+            foreach ($application->deployment_queue as $deployment) {
+                $deployment->delete();
+            }
+        });
+    }
 
     public function customNetworkAliases(): Attribute
     {
@@ -181,73 +273,6 @@ class Application extends BaseModel
         json_decode($string);
 
         return json_last_error() === JSON_ERROR_NONE;
-    }
-
-    protected static function booted()
-    {
-        static::addGlobalScope('withRelations', function ($builder) {
-            $builder->withCount([
-                'additional_servers',
-                'additional_networks',
-            ]);
-        });
-        static::saving(function ($application) {
-            $payload = [];
-            if ($application->isDirty('fqdn')) {
-                if ($application->fqdn === '') {
-                    $application->fqdn = null;
-                }
-                $payload['fqdn'] = $application->fqdn;
-            }
-            if ($application->isDirty('install_command')) {
-                $payload['install_command'] = str($application->install_command)->trim();
-            }
-            if ($application->isDirty('build_command')) {
-                $payload['build_command'] = str($application->build_command)->trim();
-            }
-            if ($application->isDirty('start_command')) {
-                $payload['start_command'] = str($application->start_command)->trim();
-            }
-            if ($application->isDirty('base_directory')) {
-                $payload['base_directory'] = str($application->base_directory)->trim();
-            }
-            if ($application->isDirty('publish_directory')) {
-                $payload['publish_directory'] = str($application->publish_directory)->trim();
-            }
-            if ($application->isDirty('status')) {
-                $payload['last_online_at'] = now();
-            }
-            if ($application->isDirty('custom_nginx_configuration')) {
-                if ($application->custom_nginx_configuration === '') {
-                    $payload['custom_nginx_configuration'] = null;
-                }
-            }
-            if (count($payload) > 0) {
-                $application->forceFill($payload);
-            }
-        });
-        static::created(function ($application) {
-            ApplicationSetting::create([
-                'application_id' => $application->id,
-            ]);
-            $application->compose_parsing_version = self::$parserVersion;
-            $application->save();
-        });
-        static::forceDeleting(function ($application) {
-            $application->update(['fqdn' => null]);
-            $application->settings()->delete();
-            $application->persistentStorages()->delete();
-            $application->environment_variables()->delete();
-            $application->environment_variables_preview()->delete();
-            foreach ($application->scheduled_tasks as $task) {
-                $task->delete();
-            }
-            $application->tags()->detach();
-            $application->previews()->delete();
-            foreach ($application->deployment_queue as $deployment) {
-                $deployment->delete();
-            }
-        });
     }
 
     public static function ownedByCurrentTeamAPI(int $teamId)
@@ -728,21 +753,20 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->orderBy('key', 'asc');
+            ->orderByRaw("
+                CASE
+                    WHEN is_required = true THEN 1
+                    WHEN LOWER(key) LIKE 'service_%' THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            ");
     }
 
     public function runtime_environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
-            ->where('key', 'not like', 'NIXPACKS_%');
-    }
-
-    public function build_environment_variables()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', false)
-            ->where('is_build_time', true)
             ->where('key', 'not like', 'NIXPACKS_%');
     }
 
@@ -757,21 +781,20 @@ class Application extends BaseModel
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->orderByRaw("LOWER(key) LIKE LOWER('SERVICE%') DESC, LOWER(key) ASC");
+            ->orderByRaw("
+                CASE
+                    WHEN is_required = true THEN 1
+                    WHEN LOWER(key) LIKE 'service_%' THEN 2
+                    ELSE 3
+                END,
+                LOWER(key) ASC
+            ");
     }
 
     public function runtime_environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
-            ->where('key', 'not like', 'NIXPACKS_%');
-    }
-
-    public function build_environment_variables_preview()
-    {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->where('is_preview', true)
-            ->where('is_build_time', true)
             ->where('key', 'not like', 'NIXPACKS_%');
     }
 
@@ -934,11 +957,11 @@ class Application extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->custom_labels);
+        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->custom_labels.$this->settings->use_build_secrets);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+            $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview->get('value')->sort());
+            $newConfigHash .= json_encode($this->environment_variables_preview->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->sort());
         }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1478,17 +1501,18 @@ class Application extends BaseModel
             $this->save();
             $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
-                $json = collect(json_decode($this->docker_compose_domains));
+                $decoded = json_decode($this->docker_compose_domains, true);
+                $json = collect(is_array($decoded) ? $decoded : []);
+                $normalized = collect();
                 foreach ($json as $key => $value) {
-                    if (str($key)->contains('-')) {
-                        $key = str($key)->replace('-', '_');
-                    }
-                    $json->put((string) $key, $value);
+                    $normalizedKey = (string) str($key)->replace('-', '_')->replace('.', '_');
+                    $normalized->put($normalizedKey, $value);
                 }
+                $json = $normalized;
                 $services = collect(data_get($parsedServices, 'services', []));
                 foreach ($services as $name => $service) {
-                    if (str($name)->contains('-')) {
-                        $replacedName = str($name)->replace('-', '_');
+                    if (str($name)->contains('-') || str($name)->contains('.')) {
+                        $replacedName = str($name)->replace('-', '_')->replace('.', '_');
                         $services->put((string) $replacedName, $service);
                         $services->forget((string) $name);
                     }
@@ -1556,15 +1580,190 @@ class Application extends BaseModel
         return $command;
     }
 
+    private function parseWatchPaths($value)
+    {
+        if ($value) {
+            $watch_paths = collect(explode("\n", $value))
+                ->map(function (string $path): string {
+                    // Trim whitespace
+                    $path = trim($path);
+
+                    if (str_starts_with($path, '!')) {
+                        $negation = '!';
+                        $pathWithoutNegation = substr($path, 1);
+                        $pathWithoutNegation = ltrim(trim($pathWithoutNegation), '/');
+
+                        return $negation.$pathWithoutNegation;
+                    }
+
+                    return ltrim($path, '/');
+                })
+                ->filter(function (string $path): bool {
+                    return strlen($path) > 0;
+                });
+
+            return trim($watch_paths->implode("\n"));
+        }
+    }
+
     public function watchPaths(): Attribute
     {
         return Attribute::make(
             set: function ($value) {
                 if ($value) {
-                    return trim($value);
+                    return $this->parseWatchPaths($value);
                 }
             }
         );
+    }
+
+    public function matchWatchPaths(Collection $modified_files, ?Collection $watch_paths): Collection
+    {
+        return self::matchPaths($modified_files, $watch_paths);
+    }
+
+    /**
+     * Static method to match paths against watch patterns with negation support
+     * Uses order-based matching: last matching pattern wins
+     */
+    public static function matchPaths(Collection $modified_files, ?Collection $watch_paths): Collection
+    {
+        if (is_null($watch_paths) || $watch_paths->isEmpty()) {
+            return collect([]);
+        }
+
+        return $modified_files->filter(function ($file) use ($watch_paths) {
+            $shouldInclude = null; // null means no patterns matched
+
+            // Process patterns in order - last match wins
+            foreach ($watch_paths as $pattern) {
+                $pattern = trim($pattern);
+                if (empty($pattern)) {
+                    continue;
+                }
+
+                $isExclusion = str_starts_with($pattern, '!');
+                $matchPattern = $isExclusion ? substr($pattern, 1) : $pattern;
+
+                if (self::globMatch($matchPattern, $file)) {
+                    // This pattern matches - it determines the current state
+                    $shouldInclude = ! $isExclusion;
+                }
+            }
+
+            // If no patterns matched and we only have exclusion patterns, include by default
+            if ($shouldInclude === null) {
+                // Check if we only have exclusion patterns
+                $hasInclusionPatterns = $watch_paths->contains(fn ($p) => ! str_starts_with(trim($p), '!'));
+
+                return ! $hasInclusionPatterns;
+            }
+
+            return $shouldInclude;
+        })->values();
+    }
+
+    /**
+     * Check if a path matches a glob pattern
+     * Supports: *, **, ?, [abc], [!abc]
+     */
+    public static function globMatch(string $pattern, string $path): bool
+    {
+        $regex = self::globToRegex($pattern);
+
+        return preg_match($regex, $path) === 1;
+    }
+
+    /**
+     * Convert a glob pattern to a regular expression
+     */
+    public static function globToRegex(string $pattern): string
+    {
+        $regex = '';
+        $inGroup = false;
+        $chars = str_split($pattern);
+        $len = count($chars);
+
+        for ($i = 0; $i < $len; $i++) {
+            $c = $chars[$i];
+
+            switch ($c) {
+                case '*':
+                    // Check for **
+                    if ($i + 1 < $len && $chars[$i + 1] === '*') {
+                        // ** matches any number of directories
+                        $regex .= '.*';
+                        $i++; // Skip next *
+                        // Skip optional /
+                        if ($i + 1 < $len && $chars[$i + 1] === '/') {
+                            $i++;
+                        }
+                    } else {
+                        // * matches anything except /
+                        $regex .= '[^/]*';
+                    }
+                    break;
+
+                case '?':
+                    // ? matches any single character except /
+                    $regex .= '[^/]';
+                    break;
+
+                case '[':
+                    // Character class
+                    $inGroup = true;
+                    $regex .= '[';
+                    // Check for negation
+                    if ($i + 1 < $len && ($chars[$i + 1] === '!' || $chars[$i + 1] === '^')) {
+                        $regex .= '^';
+                        $i++;
+                    }
+                    break;
+
+                case ']':
+                    if ($inGroup) {
+                        $inGroup = false;
+                        $regex .= ']';
+                    } else {
+                        $regex .= preg_quote($c, '#');
+                    }
+                    break;
+
+                case '.':
+                case '(':
+                case ')':
+                case '+':
+                case '{':
+                case '}':
+                case '$':
+                case '^':
+                case '|':
+                case '\\':
+                    // Escape regex special characters
+                    $regex .= '\\'.$c;
+                    break;
+
+                default:
+                    $regex .= $c;
+                    break;
+            }
+        }
+
+        // Wrap in delimiters and anchors
+        return '#^'.$regex.'$#';
+    }
+
+    public function normalizeWatchPaths(): void
+    {
+        if (is_null($this->watch_paths)) {
+            return;
+        }
+
+        $normalized = $this->parseWatchPaths($this->watch_paths);
+        if ($normalized !== $this->watch_paths) {
+            $this->watch_paths = $normalized;
+            $this->save();
+        }
     }
 
     public function isWatchPathsTriggered(Collection $modified_files): bool
@@ -1572,12 +1771,15 @@ class Application extends BaseModel
         if (is_null($this->watch_paths)) {
             return false;
         }
+
+        $this->normalizeWatchPaths();
+
         $watch_paths = collect(explode("\n", $this->watch_paths));
-        $matches = $modified_files->filter(function ($file) use ($watch_paths) {
-            return $watch_paths->contains(function ($glob) use ($file) {
-                return fnmatch($glob, $file);
-            });
-        });
+
+        if ($watch_paths->isEmpty()) {
+            return false;
+        }
+        $matches = $this->matchWatchPaths($modified_files, $watch_paths);
 
         return $matches->count() > 0;
     }

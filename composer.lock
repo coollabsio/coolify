@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a78cf8fdfec25eac43de77c05640dc91",
+    "content-hash": "a993799242581bd06b5939005ee458d9",
     "packages": [
         {
             "name": "amphp/amp",
@@ -12748,6 +12748,71 @@
             "time": "2025-04-30T06:54:44+00:00"
         },
         {
+            "name": "laravel/boost",
+            "version": "v1.1.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/boost.git",
+                "reference": "70f909465bf73dad7e791fad8b7716b3b2712076"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/boost/zipball/70f909465bf73dad7e791fad8b7716b3b2712076",
+                "reference": "70f909465bf73dad7e791fad8b7716b3b2712076",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.9",
+                "illuminate/console": "^10.0|^11.0|^12.0",
+                "illuminate/contracts": "^10.0|^11.0|^12.0",
+                "illuminate/routing": "^10.0|^11.0|^12.0",
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "laravel/mcp": "^0.1.1",
+                "laravel/prompts": "^0.1.9|^0.3",
+                "laravel/roster": "^0.2.5",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.14",
+                "mockery/mockery": "^1.6",
+                "orchestra/testbench": "^8.22.0|^9.0|^10.0",
+                "pestphp/pest": "^2.0|^3.0",
+                "phpstan/phpstan": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Laravel\\Boost\\BoostServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-master": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Laravel\\Boost\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Laravel Boost accelerates AI-assisted development to generate high-quality, Laravel-specific code.",
+            "homepage": "https://github.com/laravel/boost",
+            "keywords": [
+                "ai",
+                "dev",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/laravel/boost/issues",
+                "source": "https://github.com/laravel/boost"
+            },
+            "time": "2025-09-04T12:16:09+00:00"
+        },
+        {
             "name": "laravel/dusk",
             "version": "v8.3.3",
             "source": {
@@ -12822,6 +12887,70 @@
             "time": "2025-06-10T13:59:27+00:00"
         },
         {
+            "name": "laravel/mcp",
+            "version": "v0.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/mcp.git",
+                "reference": "6d6284a491f07c74d34f48dfd999ed52c567c713"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/mcp/zipball/6d6284a491f07c74d34f48dfd999ed52c567c713",
+                "reference": "6d6284a491f07c74d34f48dfd999ed52c567c713",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/console": "^10.0|^11.0|^12.0",
+                "illuminate/contracts": "^10.0|^11.0|^12.0",
+                "illuminate/http": "^10.0|^11.0|^12.0",
+                "illuminate/routing": "^10.0|^11.0|^12.0",
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "illuminate/validation": "^10.0|^11.0|^12.0",
+                "php": "^8.1|^8.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.14",
+                "orchestra/testbench": "^8.22.0|^9.0|^10.0",
+                "phpstan/phpstan": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Mcp": "Laravel\\Mcp\\Server\\Facades\\Mcp"
+                    },
+                    "providers": [
+                        "Laravel\\Mcp\\Server\\McpServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Laravel\\Mcp\\": "src/",
+                    "Workbench\\App\\": "workbench/app/",
+                    "Laravel\\Mcp\\Tests\\": "tests/",
+                    "Laravel\\Mcp\\Server\\": "src/Server/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "The easiest way to add MCP servers to your Laravel app.",
+            "homepage": "https://github.com/laravel/mcp",
+            "keywords": [
+                "dev",
+                "laravel",
+                "mcp"
+            ],
+            "support": {
+                "issues": "https://github.com/laravel/mcp/issues",
+                "source": "https://github.com/laravel/mcp"
+            },
+            "time": "2025-08-16T09:50:43+00:00"
+        },
+        {
             "name": "laravel/pint",
             "version": "v1.24.0",
             "source": {
@@ -12889,6 +13018,67 @@
                 "source": "https://github.com/laravel/pint"
             },
             "time": "2025-07-10T18:09:32+00:00"
+        },
+        {
+            "name": "laravel/roster",
+            "version": "v0.2.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/roster.git",
+                "reference": "5615acdf860c5a5c61d04aba44f2d3312550c514"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/roster/zipball/5615acdf860c5a5c61d04aba44f2d3312550c514",
+                "reference": "5615acdf860c5a5c61d04aba44f2d3312550c514",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/console": "^10.0|^11.0|^12.0",
+                "illuminate/contracts": "^10.0|^11.0|^12.0",
+                "illuminate/routing": "^10.0|^11.0|^12.0",
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "php": "^8.1|^8.2",
+                "symfony/yaml": "^6.4|^7.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.14",
+                "mockery/mockery": "^1.6",
+                "orchestra/testbench": "^8.22.0|^9.0|^10.0",
+                "pestphp/pest": "^2.0|^3.0",
+                "phpstan/phpstan": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Laravel\\Roster\\RosterServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-master": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Laravel\\Roster\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Detect packages & approaches in use within a Laravel project",
+            "homepage": "https://github.com/laravel/roster",
+            "keywords": [
+                "dev",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/laravel/roster/issues",
+                "source": "https://github.com/laravel/roster"
+            },
+            "time": "2025-09-04T07:31:39+00:00"
         },
         {
             "name": "laravel/telescope",

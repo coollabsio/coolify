@@ -51,6 +51,7 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Security\Patches;
+use App\Livewire\Server\Security\TerminalAccess;
 use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
@@ -260,6 +261,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/docker-cleanup', DockerCleanup::class)->name('server.docker-cleanup');
         Route::get('/security', fn () => redirect(route('dashboard')))->name('server.security')->middleware('can.update.resource');
         Route::get('/security/patches', Patches::class)->name('server.security.patches')->middleware('can.update.resource');
+        Route::get('/security/terminal-access', TerminalAccess::class)->name('server.security.terminal-access')->middleware('can.update.resource');
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
@@ -326,7 +328,11 @@ Route::middleware(['auth'])->group(function () {
                 'root' => '/',
             ]);
             if (! $disk->exists($filename)) {
-                return response()->json(['message' => 'Backup not found.'], 404);
+                if ($execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
+                    return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
+                }
+
+                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
             }
 
             return new StreamedResponse(function () use ($disk, $filename) {

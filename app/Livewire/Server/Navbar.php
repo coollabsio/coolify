@@ -32,7 +32,7 @@ class Navbar extends Component
         $teamId = auth()->user()->currentTeam()->id;
 
         return [
-            'refreshServerShow' => '$refresh',
+            'refreshServerShow' => 'refreshServer',
             "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
         ];
     }
@@ -132,6 +132,12 @@ class Navbar extends Component
                 break;
         }
 
+    }
+
+    public function refreshServer()
+    {
+        $this->server->refresh();
+        $this->server->load('settings');
     }
 
     public function render()

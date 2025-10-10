@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Channels;
 
+use App\Exceptions\NonReportableException;
 use App\Models\Team;
 use Exception;
 use Illuminate\Notifications\Notification;
@@ -101,13 +102,11 @@ class EmailChannel
                 $mailer->send($email);
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('EmailChannel failed: '.$e->getMessage(), [
-                'notification' => get_class($notification),
-                'notifiable' => get_class($notifiable),
-                'team_id' => data_get($notifiable, 'id'),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            // Check if this is a Resend domain verification error on cloud instances
+            if (isCloud() && str_contains($e->getMessage(), 'domain is not verified')) {
+                // Throw as NonReportableException so it won't go to Sentry
+                throw NonReportableException::fromException($e);
+            }
             throw $e;
         }
     }

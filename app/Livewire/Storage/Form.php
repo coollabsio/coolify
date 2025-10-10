@@ -5,6 +5,7 @@ namespace App\Livewire\Storage;
 use App\Models\S3Storage;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Form extends Component
@@ -91,9 +92,24 @@ class Form extends Component
         try {
             $this->authorize('update', $this->storage);
 
-            $this->validate();
-            $this->testConnection();
+            DB::transaction(function () {
+                $this->validate();
+                $this->storage->save();
+
+                // Test connection with new values - if this fails, transaction will rollback
+                $this->storage->testConnection(shouldSave: false);
+
+                // If we get here, the connection test succeeded
+                $this->storage->is_usable = true;
+                $this->storage->unusable_email_sent = false;
+                $this->storage->save();
+            });
+
+            $this->dispatch('success', 'Storage settings updated and connection verified.');
         } catch (\Throwable $e) {
+            // Refresh the model to revert UI to database values after rollback
+            $this->storage->refresh();
+
             return handleError($e, $this);
         }
     }

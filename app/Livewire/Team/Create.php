@@ -35,7 +35,7 @@ class Create extends Component
                 'personal_team' => false,
             ]);
             auth()->user()->teams()->attach($team, ['role' => 'admin']);
-            refreshSession();
+            refreshSession($team);
 
             return redirect()->route('team.index');
         } catch (\Throwable $e) {

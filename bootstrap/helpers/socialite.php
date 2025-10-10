@@ -70,8 +70,14 @@ function get_socialite_provider(string $provider)
         'infomaniak' => \SocialiteProviders\Infomaniak\Provider::class,
     ];
 
-    return Socialite::buildProvider(
+    $socialite = Socialite::buildProvider(
         $provider_class_map[$provider],
         $config
     );
+
+    if ($provider == 'gitlab' && ! empty($oauth_setting->base_url)) {
+        $socialite->setHost($oauth_setting->base_url);
+    }
+
+    return $socialite;
 }
