@@ -4,6 +4,8 @@ namespace App\Actions\Server;
 
 use App\Models\CloudProviderToken;
 use App\Models\Server;
+use App\Models\Team;
+use App\Notifications\Server\HetznerDeletionFailed;
 use App\Services\HetznerService;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -92,6 +94,10 @@ class DeleteServer
                 'hetzner_server_id' => $hetznerServerId,
                 'team_id' => $teamId,
             ]);
+
+            // Notify the team about the failure
+            $team = Team::find($teamId);
+            $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, $e->getMessage()));
         }
     }
 }
