@@ -40,6 +40,21 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        Http::post($this->webhookUrl, $this->payload);
+        if (isDev()) {
+            ray('Sending webhook notification', [
+                'url' => $this->webhookUrl,
+                'payload' => $this->payload,
+            ]);
+        }
+
+        $response = Http::post($this->webhookUrl, $this->payload);
+
+        if (isDev()) {
+            ray('Webhook response', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'successful' => $response->successful(),
+            ]);
+        }
     }
 }
