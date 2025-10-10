@@ -33,7 +33,13 @@ class GetProxyConfiguration
         // 1. Force regenerate is requested
         // 2. Configuration file doesn't exist or is empty
         if ($forceRegenerate || empty(trim($proxy_configuration ?? ''))) {
-            $proxy_configuration = str(generate_default_proxy_configuration($server))->trim()->value();
+            // Extract custom commands from existing config before regenerating
+            $custom_commands = [];
+            if (! empty(trim($proxy_configuration ?? ''))) {
+                $custom_commands = extractCustomProxyCommands($server, $proxy_configuration);
+            }
+
+            $proxy_configuration = str(generateDefaultProxyConfiguration($server, $custom_commands))->trim()->value();
         }
 
         if (empty($proxy_configuration)) {

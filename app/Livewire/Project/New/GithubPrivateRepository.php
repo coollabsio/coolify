@@ -55,7 +55,7 @@ class GithubPrivateRepository extends Component
     public ?string $publish_directory = null;
 
     // In case of docker compose
-    public ?string $base_directory = null;
+    public ?string $base_directory = '/';
 
     public ?string $docker_compose_location = '/docker-compose.yaml';
     // End of docker compose
@@ -198,6 +198,7 @@ class GithubPrivateRepository extends Component
                 'build_pack' => $this->build_pack,
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
+                'base_directory' => $this->base_directory,
                 'environment_id' => $environment->id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
@@ -212,7 +213,6 @@ class GithubPrivateRepository extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application['docker_compose_location'] = $this->docker_compose_location;
-                $application['base_directory'] = $this->base_directory;
             }
             $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
             $application->fqdn = $fqdn;

@@ -51,12 +51,14 @@
                                 data_get($execution, 'status') === 'running',
                             'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' =>
                                 data_get($execution, 'status') === 'failed',
+                            'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 dark:shadow-amber-900/5' =>
+                                data_get($execution, 'status') === 'success' && data_get($execution, 's3_uploaded') === false,
                             'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' =>
-                                data_get($execution, 'status') === 'success',
+                                data_get($execution, 'status') === 'success' && data_get($execution, 's3_uploaded') !== false,
                         ])>
                             @php
                                 $statusText = match (data_get($execution, 'status')) {
-                                    'success' => 'Success',
+                                    'success' => data_get($execution, 's3_uploaded') === false ? 'Success (S3 Warning)' : 'Success',
                                     'running' => 'In Progress',
                                     'failed' => 'Failed',
                                     default => ucfirst(data_get($execution, 'status')),
@@ -120,20 +122,15 @@
                                 Local Storage
                             </span>
                         </span>
-                        @if ($backup->save_s3)
+                        @if (data_get($execution, 's3_uploaded') !== null)
                             <span @class([
                                 'px-2 py-1 rounded-sm text-xs font-medium',
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' => !data_get(
-                                    $execution,
-                                    's3_storage_deleted',
-                                    false),
-                                'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400' => data_get(
-                                    $execution,
-                                    's3_storage_deleted',
-                                    false),
+                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' => data_get($execution, 's3_uploaded') === false && !data_get($execution, 's3_storage_deleted', false),
+                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' => data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false),
+                                'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400' => data_get($execution, 's3_storage_deleted', false),
                             ])>
                                 <span class="flex items-center gap-1">
-                                    @if (!data_get($execution, 's3_storage_deleted', false))
+                                    @if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false))
                                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"
                                             xmlns="http://www.w3.org/2000/svg">
                                             <path fill-rule="evenodd"
@@ -163,9 +160,25 @@
                             <x-forms.button class="dark:hover:bg-coolgray-400"
                                 x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
                         @endif
+                        @php
+                            $executionCheckboxes = [];
+                            $deleteActions = [];
+
+                            if (!data_get($execution, 'local_storage_deleted', false)) {
+                                $deleteActions[] = 'This backup will be permanently deleted from local storage.';
+                            }
+
+                            if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false)) {
+                                $executionCheckboxes[] = ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'];
+                            }
+
+                            if (empty($deleteActions)) {
+                                $deleteActions[] = 'This backup execution record will be deleted.';
+                            }
+                        @endphp
                         <x-modal-confirmation title="Confirm Backup Deletion?" buttonTitle="Delete" isErrorButton
-                            submitAction="deleteBackup({{ data_get($execution, 'id') }})" :checkboxes="$checkboxes"
-                            :actions="['This backup will be permanently deleted from local storage.']" confirmationText="{{ data_get($execution, 'filename') }}"
+                            submitAction="deleteBackup({{ data_get($execution, 'id') }})" :checkboxes="$executionCheckboxes"
+                            :actions="$deleteActions" confirmationText="{{ data_get($execution, 'filename') }}"
                             confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
                             shortConfirmationLabel="Backup Filename" 1 />
                     </div>

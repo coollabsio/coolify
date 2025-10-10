@@ -212,6 +212,12 @@ class All extends Component
         $environment = $this->createEnvironmentVariable($data);
         $environment->order = $maxOrder + 1;
         $environment->save();
+
+        // Clear computed property cache to force refresh
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
+
+        $this->dispatch('success', 'Environment variable added.');
     }
 
     private function createEnvironmentVariable($data)
@@ -300,6 +306,9 @@ class All extends Component
     public function refreshEnvs()
     {
         $this->resource->refresh();
+        // Clear computed property cache to force refresh
+        unset($this->environmentVariables);
+        unset($this->environmentVariablesPreview);
         $this->getDevView();
     }
 }

@@ -20,9 +20,9 @@
         }" x-cloak class="mx-auto" :class="pageWidth === 'full' ? '' : 'max-w-7xl'">
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
-                <div class="fixed h-full flex">
+                <div class="fixed inset-y-0 right-0 h-full flex">
                     <div class="relative flex flex-1 w-full max-w-56 ">
-                        <div class="absolute top-0 flex justify-center w-16 pt-5 left-full">
+                        <div class="absolute top-0 flex justify-center w-16 pt-5 right-full">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
                                 <span class="sr-only">Close sidebar</span>
                                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -45,8 +45,12 @@
                 </div>
             </div>
 
-            <div class="sticky top-0 z-40 flex items-center px-4 py-4 gap-x-6 sm:px-6 lg:hidden">
-                <button type="button" class="-m-2.5 p-2.5 dark:text-warning lg:hidden" x-on:click="open = !open">
+            <div class="sticky top-0 z-40 flex items-center justify-between px-4 py-4 gap-x-6 sm:px-6 lg:hidden">
+                <div class="flex items-center gap-3 flex-shrink-0">
+                    <div class="text-xl font-bold tracking-wide dark:text-white">Coolify</div>
+                    <livewire:switch-team />
+                </div>
+                <button type="button" class="-m-2.5 p-2.5 dark:text-warning" x-on:click="open = !open">
                     <span class="sr-only">Open sidebar</span>
                     <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24">
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"

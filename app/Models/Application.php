@@ -182,6 +182,21 @@ class Application extends BaseModel
             ]);
             $application->compose_parsing_version = self::$parserVersion;
             $application->save();
+
+            // Add default NIXPACKS_NODE_VERSION environment variable for Nixpacks applications
+            if ($application->build_pack === 'nixpacks') {
+                EnvironmentVariable::create([
+                    'key' => 'NIXPACKS_NODE_VERSION',
+                    'value' => '22',
+                    'is_multiline' => false,
+                    'is_literal' => false,
+                    'is_buildtime' => true,
+                    'is_runtime' => false,
+                    'is_preview' => false,
+                    'resourceable_type' => Application::class,
+                    'resourceable_id' => $application->id,
+                ]);
+            }
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
@@ -739,9 +754,9 @@ class Application extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', false)
             ->orderByRaw("
-                CASE 
-                    WHEN LOWER(key) LIKE 'service_%' THEN 1
-                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                CASE
+                    WHEN is_required = true THEN 1
+                    WHEN LOWER(key) LIKE 'service_%' THEN 2
                     ELSE 3
                 END,
                 LOWER(key) ASC
@@ -767,9 +782,9 @@ class Application extends BaseModel
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
             ->where('is_preview', true)
             ->orderByRaw("
-                CASE 
-                    WHEN LOWER(key) LIKE 'service_%' THEN 1
-                    WHEN is_required = true AND (value IS NULL OR value = '') THEN 2
+                CASE
+                    WHEN is_required = true THEN 1
+                    WHEN LOWER(key) LIKE 'service_%' THEN 2
                     ELSE 3
                 END,
                 LOWER(key) ASC

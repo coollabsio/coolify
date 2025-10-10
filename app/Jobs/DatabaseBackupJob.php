@@ -15,6 +15,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
+use App\Notifications\Database\BackupSuccessWithS3Warning;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -74,6 +75,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->onQueue('high');
         $this->timeout = $backup->timeout;
+        $this->backup_log_uuid = (string) new Cuid2;
     }
 
     public function handle(): void
@@ -298,6 +300,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 } while ($exists);
 
                 $size = 0;
+                $localBackupSucceeded = false;
+                $s3UploadError = null;
+
+                // Step 1: Create local backup
                 try {
                     if (str($databaseType)->contains('postgres')) {
                         $this->backup_file = "/pg-dump-$database-".Carbon::now()->timestamp.'.dmp';
@@ -310,6 +316,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_postgresql($database);
                     } elseif (str($databaseType)->contains('mongo')) {
@@ -330,6 +337,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $databaseName,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mongodb($database);
                     } elseif (str($databaseType)->contains('mysql')) {
@@ -343,6 +351,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mysql($database);
                     } elseif (str($databaseType)->contains('mariadb')) {
@@ -356,56 +365,77 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'database_name' => $database,
                             'filename' => $this->backup_location,
                             'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mariadb($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
+
                     $size = $this->calculate_size();
-                    if ($this->backup->save_s3) {
+
+                    // Verify local backup succeeded
+                    if ($size > 0) {
+                        $localBackupSucceeded = true;
+                    } else {
+                        throw new \Exception('Local backup file is empty or was not created');
+                    }
+                } catch (\Throwable $e) {
+                    // Local backup failed
+                    if ($this->backup_log) {
+                        $this->backup_log->update([
+                            'status' => 'failed',
+                            'message' => $this->error_output ?? $this->backup_output ?? $e->getMessage(),
+                            'size' => $size,
+                            'filename' => null,
+                            's3_uploaded' => null,
+                        ]);
+                    }
+                    $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->error_output ?? $this->backup_output ?? $e->getMessage(), $database));
+
+                    continue;
+                }
+
+                // Step 2: Upload to S3 if enabled (independent of local backup)
+                $localStorageDeleted = false;
+                if ($this->backup->save_s3 && $localBackupSucceeded) {
+                    try {
                         $this->upload_to_s3();
 
                         // If local backup is disabled, delete the local file immediately after S3 upload
                         if ($this->backup->disable_local_backup) {
                             deleteBackupsLocally($this->backup_location, $this->server);
+                            $localStorageDeleted = true;
                         }
+                    } catch (\Throwable $e) {
+                        // S3 upload failed but local backup succeeded
+                        $s3UploadError = $e->getMessage();
                     }
+                }
 
-                    $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
+                // Step 3: Update status and send notifications based on results
+                if ($localBackupSucceeded) {
+                    $message = $this->backup_output;
+
+                    if ($s3UploadError) {
+                        $message = $message
+                            ? $message."\n\nWarning: S3 upload failed: ".$s3UploadError
+                            : 'Warning: S3 upload failed: '.$s3UploadError;
+                    }
 
                     $this->backup_log->update([
                         'status' => 'success',
-                        'message' => $this->backup_output,
+                        'message' => $message,
                         'size' => $size,
+                        's3_uploaded' => $this->backup->save_s3 ? $this->s3_uploaded : null,
+                        'local_storage_deleted' => $localStorageDeleted,
                     ]);
-                } catch (\Throwable $e) {
-                    // Check if backup actually failed or if it's just a post-backup issue
-                    $actualBackupFailed = ! $this->s3_uploaded && $this->backup->save_s3;
 
-                    if ($actualBackupFailed || $size === 0) {
-                        // Real backup failure
-                        if ($this->backup_log) {
-                            $this->backup_log->update([
-                                'status' => 'failed',
-                                'message' => $this->error_output ?? $this->backup_output ?? $e->getMessage(),
-                                'size' => $size,
-                                'filename' => null,
-                            ]);
-                        }
-                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->error_output ?? $this->backup_output ?? $e->getMessage(), $database));
+                    // Send appropriate notification
+                    if ($s3UploadError) {
+                        $this->team->notify(new BackupSuccessWithS3Warning($this->backup, $this->database, $database, $s3UploadError));
                     } else {
-                        // Backup succeeded but post-processing failed (cleanup, notification, etc.)
-                        if ($this->backup_log) {
-                            $this->backup_log->update([
-                                'status' => 'success',
-                                'message' => $this->backup_output ? $this->backup_output."\nWarning: Post-backup cleanup encountered an issue: ".$e->getMessage() : 'Warning: '.$e->getMessage(),
-                                'size' => $size,
-                            ]);
-                        }
-                        // Send success notification since the backup itself succeeded
                         $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
-                        // Log the post-backup issue
-                        ray('Post-backup operation failed but backup was successful: '.$e->getMessage());
                     }
                 }
             }
@@ -591,24 +621,24 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $fullImageName = $this->getFullImageName();
 
-            $containerExists = instant_remote_process(["docker ps -a -q -f name=backup-of-{$this->backup->uuid}"], $this->server, false);
+            $containerExists = instant_remote_process(["docker ps -a -q -f name=backup-of-{$this->backup_log_uuid}"], $this->server, false);
             if (filled($containerExists)) {
-                instant_remote_process(["docker rm -f backup-of-{$this->backup->uuid}"], $this->server, false);
+                instant_remote_process(["docker rm -f backup-of-{$this->backup_log_uuid}"], $this->server, false);
             }
 
             if (isDev()) {
                 if ($this->database->name === 'coolify-db') {
                     $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/coolify/coolify-db-'.$this->server->ip.$this->backup_file;
-                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
+                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
                 } else {
                     $backup_location_from = '/var/lib/docker/volumes/coolify_dev_backups_data/_data/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name.$this->backup_file;
-                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
+                    $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $backup_location_from:$this->backup_location:ro {$fullImageName}";
                 }
             } else {
-                $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
+                $commands[] = "docker run -d --network {$network} --name backup-of-{$this->backup_log_uuid} --rm -v $this->backup_location:$this->backup_location:ro {$fullImageName}";
             }
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
-            $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$endpoint} {$key} \"{$secret}\"";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
 
             $this->s3_uploaded = true;
@@ -617,7 +647,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {
-            $command = "docker rm -f backup-of-{$this->backup->uuid}";
+            $command = "docker rm -f backup-of-{$this->backup_log_uuid}";
             instant_remote_process([$command], $this->server);
         }
     }
