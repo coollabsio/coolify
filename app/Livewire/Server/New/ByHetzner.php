@@ -7,6 +7,7 @@ use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
+use App\Rules\ValidHostname;
 use App\Services\HetznerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -104,7 +105,7 @@ class ByHetzner extends Component
 
         if ($this->current_step === 2) {
             $rules = array_merge($rules, [
-                'server_name' => 'required|string|max:255',
+                'server_name' => ['required', 'string', 'max:253', new ValidHostname],
                 'selected_location' => 'required|string',
                 'selected_image' => 'required|integer',
                 'selected_server_type' => 'required|string',
@@ -361,9 +362,12 @@ class ByHetzner extends Component
             ray('Uploaded new SSH key', ['ssh_key_id' => $sshKeyId, 'name' => $sshKeyName]);
         }
 
+        // Normalize server name to lowercase for RFC 1123 compliance
+        $normalizedServerName = strtolower(trim($this->server_name));
+
         // Prepare server creation parameters
         $params = [
-            'name' => $this->server_name,
+            'name' => $normalizedServerName,
             'server_type' => $this->selected_server_type,
             'image' => $this->selected_image,
             'location' => $this->selected_location,

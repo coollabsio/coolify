@@ -2,20 +2,25 @@
     <div class="flex flex-col gap-4">
         @can('viewAny', App\Models\CloudProviderToken::class)
             <div>
-                <div class="flex gap-2 flex-wrap">
-                    <x-modal-input title="Connect a Hetzner Server">
-                        <x-slot:button-title>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-5 h-5" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <x-modal-input title="Connect a Hetzner Server">
+                    <x-slot:content>
+                        <div class="relative gap-2 cursor-pointer box group">
+                            <div class="flex items-center gap-4 mx-6">
+                                <svg class="w-10 h-10 flex-shrink-0" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                                     <rect width="200" height="200" fill="#D50C2D" rx="8" />
                                     <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z" fill="white" />
                                 </svg>
-                                <span>Hetzner</span>
+                                <div class="flex flex-col justify-center flex-1">
+                                    <div class="box-title">Connect a Hetzner Server</div>
+                                    <div class="box-description">
+                                        Deploy servers directly from your Hetzner Cloud account
+                                    </div>
+                                </div>
                             </div>
-                        </x-slot:button-title>
-                        <livewire:server.new.by-hetzner :private_keys="$private_keys" :limit_reached="$limit_reached" />
-                    </x-modal-input>
-                </div>
+                        </div>
+                    </x-slot:content>
+                    <livewire:server.new.by-hetzner :private_keys="$private_keys" :limit_reached="$limit_reached" />
+                </x-modal-input>
             </div>
 
             <div class="border-t dark:border-coolgray-300 my-4"></div>
