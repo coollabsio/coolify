@@ -157,7 +157,7 @@
 
                     <div class="flex flex-col gap-2">
                         <div class="flex justify-between items-center gap-2">
-                            <label class="text-sm font-medium w-64">Cloud-Init Script</label>
+                            <label class="text-sm font-medium w-32">Cloud-Init Script</label>
                             @if ($saved_cloud_init_scripts->count() > 0)
                                 <div class="flex items-center gap-2 flex-1">
                                     <x-forms.select wire:model.live="selected_cloud_init_script_id" label="" helper="">
