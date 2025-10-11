@@ -175,8 +175,7 @@
 
                         <div class="flex flex-col gap-2">
                             <x-forms.checkbox id="save_cloud_init_script" label="Save this script for later use"
-                                helper="Save this cloud-init script to your team's library for reuse"
-                                :disabled="empty($cloud_init_script)" />
+                                helper="Save this cloud-init script to your team's library for reuse" />
 
                             @if ($save_cloud_init_script)
                                 <div class="flex flex-col gap-2 ml-6">
