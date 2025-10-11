@@ -10,7 +10,6 @@ class CloudInitScript extends Model
         'team_id',
         'name',
         'script',
-        'description',
     ];
 
     protected function casts(): array

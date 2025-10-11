@@ -69,7 +69,7 @@ class ByHetzner extends Component
 
     public ?string $cloud_init_script_name = null;
 
-    public ?string $cloud_init_script_description = null;
+    public ?int $selected_cloud_init_script_id = null;
 
     #[Locked]
     public Collection $saved_cloud_init_scripts;
@@ -155,8 +155,8 @@ class ByHetzner extends Component
                 'enable_ipv6' => 'required|boolean',
                 'cloud_init_script' => 'nullable|string',
                 'save_cloud_init_script' => 'boolean',
-                'cloud_init_script_name' => 'required_if:save_cloud_init_script,true|nullable|string|max:255',
-                'cloud_init_script_description' => 'nullable|string',
+                'cloud_init_script_name' => 'nullable|string|max:255',
+                'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
             ]);
         }
 
@@ -394,11 +394,12 @@ class ByHetzner extends Component
         ray('Image selected', $value);
     }
 
-    public function loadCloudInitScript(?int $scriptId)
+    public function updatedSelectedCloudInitScriptId($value)
     {
-        if ($scriptId) {
-            $script = CloudInitScript::ownedByCurrentTeam()->findOrFail($scriptId);
+        if ($value) {
+            $script = CloudInitScript::ownedByCurrentTeam()->findOrFail($value);
             $this->cloud_init_script = $script->script;
+            $this->cloud_init_script_name = $script->name;
         }
     }
 
@@ -496,14 +497,13 @@ class ByHetzner extends Component
             }
 
             // Save cloud-init script if requested
-            if ($this->save_cloud_init_script && ! empty($this->cloud_init_script)) {
+            if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
                 CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
-                    'description' => $this->cloud_init_script_description,
                 ]);
             }
 

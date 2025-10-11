@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained()->onDelete('cascade');
             $table->string('name');
             $table->text('script'); // Encrypted in the model
-            $table->text('description')->nullable();
             $table->timestamps();
 
             $table->index('team_id');

@@ -160,9 +160,9 @@
                         <div class="flex justify-between items-center">
                             <label class="text-sm font-medium">Cloud-Init Script (Optional)</label>
                             @if ($saved_cloud_init_scripts->count() > 0)
-                                <x-forms.select id="load_script" wire:change="loadCloudInitScript($event.target.value)"
+                                <x-forms.select wire:model.live="selected_cloud_init_script_id"
                                     label="" helper="">
-                                    <option value="">Load saved script...</option>
+                                    <option value="" disabled>Load saved script...</option>
                                     @foreach ($saved_cloud_init_scripts as $script)
                                         <option value="{{ $script->id }}">{{ $script->name }}</option>
                                     @endforeach
@@ -173,17 +173,11 @@
                             helper="Add a cloud-init script to run when the server is created. See Hetzner's documentation for details."
                             rows="8" />
 
-                        <div class="flex flex-col gap-2">
-                            <x-forms.checkbox id="save_cloud_init_script" label="Save this script for later use"
-                                helper="Save this cloud-init script to your team's library for reuse" />
-
-                            @if ($save_cloud_init_script)
-                                <div class="flex flex-col gap-2 ml-6">
-                                    <x-forms.input id="cloud_init_script_name" label="Script Name" required />
-                                    <x-forms.textarea id="cloud_init_script_description" label="Description (Optional)"
-                                        rows="2" />
-                                </div>
-                            @endif
+                        <div class="flex items-center gap-2">
+                            <x-forms.checkbox id="save_cloud_init_script" label="Save this script for later use" />
+                            <div class="flex-1">
+                                <x-forms.input id="cloud_init_script_name" label="" placeholder="Script name..." />
+                            </div>
                         </div>
                     </div>
 
