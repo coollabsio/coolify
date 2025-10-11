@@ -65,6 +65,7 @@ services:
   vite:
     image: node:24-alpine
     pull_policy: always
+    container_name: coolify-vite
     working_dir: /var/www/html
     environment:
       VITE_HOST: "${VITE_HOST:-localhost}"
