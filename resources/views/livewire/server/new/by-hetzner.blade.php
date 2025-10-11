@@ -18,7 +18,8 @@
                             </x-forms.select>
                         </div>
                         <div class="flex items-end">
-                            <x-forms.button canGate="create" :canResource="App\Models\Server::class" wire:click="nextStep" :disabled="!$selected_token_id">
+                            <x-forms.button canGate="create" :canResource="App\Models\Server::class" wire:click="nextStep"
+                                :disabled="!$selected_token_id">
                                 Continue
                             </x-forms.button>
                         </div>
@@ -48,8 +49,7 @@
                     </div>
 
                     <div>
-                        <x-forms.select label="Location" id="selected_location" wire:model.live="selected_location"
-                            required>
+                        <x-forms.select label="Location" id="selected_location" wire:model.live="selected_location" required>
                             <option value="">Select a location...</option>
                             @foreach ($locations as $location)
                                 <option value="{{ $location['name'] }}">
@@ -60,8 +60,8 @@
                     </div>
 
                     <div>
-                        <x-forms.select label="Server Type" id="selected_server_type"
-                            wire:model.live="selected_server_type" required :disabled="!$selected_location">
+                        <x-forms.select label="Server Type" id="selected_server_type" wire:model.live="selected_server_type"
+                            required :disabled="!$selected_location">
                             <option value="">
                                 {{ $selected_location ? 'Select a server type...' : 'Select a location first' }}
                             </option>
@@ -111,8 +111,7 @@
                                     <p class="text-sm mb-3 text-neutral-700 dark:text-neutral-300">
                                         No private keys found. You need to create a private key to continue.
                                     </p>
-                                    <x-modal-input buttonTitle="Create New Private Key" title="New Private Key"
-                                        isHighlightedButton>
+                                    <x-modal-input buttonTitle="Create New Private Key" title="New Private Key" isHighlightedButton>
                                         <livewire:security.private-key.create :modal_mode="true" from="server" />
                                     </x-modal-input>
                                 </div>
@@ -158,11 +157,10 @@
 
                     <div class="flex flex-col gap-2">
                         <div class="flex justify-between items-center">
-                            <label class="text-sm font-medium">Cloud-Init Script (Optional)</label>
+                            <label class="text-sm font-medium w-64">Cloud-Init Script</label>
                             @if ($saved_cloud_init_scripts->count() > 0)
-                                <x-forms.select wire:model.live="selected_cloud_init_script_id"
-                                    label="" helper="">
-                                    <option value="" disabled>Load saved script...</option>
+                                <x-forms.select wire:model.live="selected_cloud_init_script_id" label="" helper="">
+                                    <option value="">Load saved script...</option>
                                     @foreach ($saved_cloud_init_scripts as $script)
                                         <option value="{{ $script->id }}">{{ $script->name }}</option>
                                     @endforeach
