@@ -617,7 +617,14 @@ class GlobalSearch extends Component
                     'type' => 'navigation',
                     'description' => 'Manage private keys and API tokens',
                     'link' => route('security.private-key.index'),
-                    'search_text' => 'security private keys ssh api tokens',
+                    'search_text' => 'security private keys ssh api tokens cloud-init scripts',
+                ],
+                [
+                    'name' => 'Cloud-Init Scripts',
+                    'type' => 'navigation',
+                    'description' => 'Manage reusable cloud-init scripts',
+                    'link' => route('security.cloud-init-scripts'),
+                    'search_text' => 'cloud-init scripts cloud init cloudinit initialization startup server setup',
                 ],
                 [
                     'name' => 'Sources',
