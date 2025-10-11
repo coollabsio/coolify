@@ -108,7 +108,16 @@ class HetznerService
 
     public function createServer(array $params): array
     {
+        ray('Hetzner createServer request', [
+            'endpoint' => '/servers',
+            'params' => $params,
+        ]);
+
         $response = $this->request('post', '/servers', $params);
+
+        ray('Hetzner createServer response', [
+            'response' => $response,
+        ]);
 
         return $response['server'] ?? [];
     }
