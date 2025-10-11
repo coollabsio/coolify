@@ -103,6 +103,10 @@ class ByHetzner extends Component
     {
         $this->selected_token_id = null;
         $this->current_step = 1;
+        $this->cloud_init_script = null;
+        $this->save_cloud_init_script = false;
+        $this->cloud_init_script_name = null;
+        $this->selected_cloud_init_script_id = null;
     }
 
     public function loadTokens()
