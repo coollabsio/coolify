@@ -36,7 +36,7 @@ class CloudInitScriptForm extends Component
     {
         return [
             'name' => 'required|string|max:255',
-            'script' => 'required|string',
+            'script' => ['required', 'string', new \App\Rules\ValidCloudInitYaml],
         ];
     }
 

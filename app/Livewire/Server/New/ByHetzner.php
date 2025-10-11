@@ -157,7 +157,7 @@ class ByHetzner extends Component
                 'selectedHetznerSshKeyIds.*' => 'integer',
                 'enable_ipv4' => 'required|boolean',
                 'enable_ipv6' => 'required|boolean',
-                'cloud_init_script' => 'nullable|string',
+                'cloud_init_script' => ['nullable', 'string', new \App\Rules\ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
                 'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',

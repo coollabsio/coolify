@@ -2,7 +2,7 @@
     <x-forms.input id="name" label="Script Name" helper="A descriptive name for this cloud-init script." required />
 
     <x-forms.textarea id="script" label="Script Content" rows="12"
-        helper="Enter your cloud-init script. Supports both bash scripts and cloud-config YAML format." required />
+        helper="Enter your cloud-init script. Supports cloud-config YAML format." required />
 
     <div class="flex justify-end gap-2">
         @if ($modal_mode)
