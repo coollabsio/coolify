@@ -407,6 +407,14 @@ class ByHetzner extends Component
         }
     }
 
+    public function clearCloudInitScript()
+    {
+        $this->selected_cloud_init_script_id = null;
+        $this->cloud_init_script = '';
+        $this->cloud_init_script_name = '';
+        $this->save_cloud_init_script = false;
+    }
+
     private function createHetznerServer(string $token): array
     {
         $hetznerService = new HetznerService($token);

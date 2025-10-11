@@ -156,15 +156,20 @@
                     </div>
 
                     <div class="flex flex-col gap-2">
-                        <div class="flex justify-between items-center">
+                        <div class="flex justify-between items-center gap-2">
                             <label class="text-sm font-medium w-64">Cloud-Init Script</label>
                             @if ($saved_cloud_init_scripts->count() > 0)
-                                <x-forms.select wire:model.live="selected_cloud_init_script_id" label="" helper="">
-                                    <option value="">Load saved script...</option>
-                                    @foreach ($saved_cloud_init_scripts as $script)
-                                        <option value="{{ $script->id }}">{{ $script->name }}</option>
-                                    @endforeach
-                                </x-forms.select>
+                                <div class="flex items-center gap-2 flex-1">
+                                    <x-forms.select wire:model.live="selected_cloud_init_script_id" label="" helper="">
+                                        <option value="">Load saved script...</option>
+                                        @foreach ($saved_cloud_init_scripts as $script)
+                                            <option value="{{ $script->id }}">{{ $script->name }}</option>
+                                        @endforeach
+                                    </x-forms.select>
+                                    <x-forms.button type="button" wire:click="clearCloudInitScript">
+                                        Clear
+                                    </x-forms.button>
+                                </div>
                             @endif
                         </div>
                         <x-forms.textarea id="cloud_init_script" label=""
