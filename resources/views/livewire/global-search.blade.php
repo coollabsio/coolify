@@ -828,7 +828,7 @@
                         </template>
 
                         <template
-                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource">
+                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
                             <div class="flex items-center justify-center py-12 px-4">
                                 <div class="text-center">
                                     <p class="mt-4 text-sm font-medium text-neutral-900 dark:text-white">
