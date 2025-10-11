@@ -173,20 +173,19 @@
                             helper="Add a cloud-init script to run when the server is created. See Hetzner's documentation for details."
                             rows="8" />
 
-                        @if (!empty($cloud_init_script))
-                            <div class="flex flex-col gap-2 p-3 border border-neutral-200 dark:border-neutral-700 rounded">
-                                <x-forms.checkbox id="save_cloud_init_script" label="Save this script for later use"
-                                    helper="Save this cloud-init script to your team's library for reuse" />
+                        <div class="flex flex-col gap-2">
+                            <x-forms.checkbox id="save_cloud_init_script" label="Save this script for later use"
+                                helper="Save this cloud-init script to your team's library for reuse"
+                                :disabled="empty($cloud_init_script)" />
 
-                                @if ($save_cloud_init_script)
-                                    <div class="flex flex-col gap-2 ml-6">
-                                        <x-forms.input id="cloud_init_script_name" label="Script Name" required />
-                                        <x-forms.textarea id="cloud_init_script_description" label="Description (Optional)"
-                                            rows="2" />
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
+                            @if ($save_cloud_init_script)
+                                <div class="flex flex-col gap-2 ml-6">
+                                    <x-forms.input id="cloud_init_script_name" label="Script Name" required />
+                                    <x-forms.textarea id="cloud_init_script_description" label="Description (Optional)"
+                                        rows="2" />
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     <div class="flex gap-2 justify-between">
