@@ -8,7 +8,7 @@
             </x-modal-input>
         @endcan
     </div>
-    <div class="pb-4 text-sm">Manage reusable cloud-init scripts for server initialization.</div>
+    <div class="pb-4 text-sm">Manage reusable cloud-init scripts for server initialization. Currently working only with <span class="text-red-500 font-bold">Hetzner's</span> integration.</div>
 
     <div class="grid gap-4 lg:grid-cols-2">
         @forelse ($scripts as $script)
