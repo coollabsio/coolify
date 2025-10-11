@@ -79,6 +79,7 @@ class GlobalSearch extends Component
 
     public function openSearchModal()
     {
+        sleep(4);
         $this->isModalOpen = true;
         $this->loadSearchableItems();
         $this->loadCreatableItems();

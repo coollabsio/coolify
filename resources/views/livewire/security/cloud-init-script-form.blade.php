@@ -1,4 +1,4 @@
-<form wire:submit='save' class="flex flex-col gap-4">
+<form wire:submit='save' class="flex flex-col gap-4 w-full">
     <x-forms.input id="name" label="Script Name" helper="A descriptive name for this cloud-init script." required />
 
     <x-forms.textarea id="script" label="Script Content" rows="12"

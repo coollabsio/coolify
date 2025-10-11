@@ -290,22 +290,6 @@
                     </div>
                 </div>
 
-                <!-- Debug: Show data loaded (temporary) -->
-                {{-- <div x-show="!isLoadingInitialData && searchQuery === '' && allSearchableItems.length > 0" x-cloak
-                    class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden p-6">
-                    <div class="text-center">
-                        <p class="text-sm font-semibold text-green-600 dark:text-green-400">
-                            ✓ Data loaded successfully!
-                        </p>
-                        <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
-                            <span x-text="allSearchableItems.length"></span> searchable items available
-                        </p>
-                        <p class="text-xs text-neutral-400 dark:text-neutral-500 mt-1">
-                            Start typing to search...
-                        </p>
-                    </div>
-                </div> --}}
-
                 <!-- Search results (with background) -->
                 <div x-show="searchQuery.length >= 1" x-cloak
                     class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden">
