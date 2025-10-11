@@ -12,42 +12,35 @@
 
     <div class="grid gap-4 lg:grid-cols-2">
         @forelse ($scripts as $script)
-            <div wire:key="script-{{ $script->id }}" class="box group">
-                <div class="flex flex-col gap-2 mx-6">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1">
-                            <div class="box-title">{{ $script->name }}</div>
-                            <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                Created {{ $script->created_at->diffForHumans() }}
-                            </div>
+            <div wire:key="script-{{ $script->id }}"
+                class="flex flex-col gap-1 p-2 border dark:border-coolgray-200 hover:no-underline">
+                <div class="flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="font-bold dark:text-white">{{ $script->name }}</div>
+                        <div class="text-xs text-neutral-500 dark:text-neutral-400">
+                            Created {{ $script->created_at->diffForHumans() }}
                         </div>
                     </div>
+                </div>
 
-                    <div class="mt-2">
-                        <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Script Preview:</div>
-                        <pre
-                            class="p-2 text-xs rounded bg-neutral-100 dark:bg-coolgray-100 overflow-x-auto max-h-32 overflow-y-auto">{{ Str::limit($script->script, 200) }}</pre>
-                    </div>
+                <div class="flex gap-2 mt-2">
+                    @can('update', $script)
+                        <x-modal-input buttonTitle="Edit" title="Edit Cloud-Init Script" fullWidth>
+                            <livewire:security.cloud-init-script-form :scriptId="$script->id"
+                                wire:key="edit-{{ $script->id }}" />
+                        </x-modal-input>
+                    @endcan
 
-                    <div class="flex gap-2 mt-2">
-                        @can('update', $script)
-                            <x-modal-input buttonTitle="Edit" title="Edit Cloud-Init Script">
-                                <livewire:security.cloud-init-script-form :scriptId="$script->id"
-                                    wire:key="edit-{{ $script->id }}" />
-                            </x-modal-input>
-                        @endcan
-
-                        @can('delete', $script)
-                            <x-modal-confirmation title="Confirm Script Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="deleteScript({{ $script->id }})" :actions="[
-                                    'This cloud-init script will be permanently deleted.',
-                                    'This action cannot be undone.',
-                                ]" confirmationText="{{ $script->name }}"
-                                confirmationLabel="Please confirm the deletion by entering the script name below"
-                                shortConfirmationLabel="Script Name" :confirmWithPassword="false"
-                                step2ButtonText="Delete Script" />
-                        @endcan
-                    </div>
+                    @can('delete', $script)
+                        <x-modal-confirmation title="Confirm Script Deletion?" isErrorButton buttonTitle="Delete"
+                            submitAction="deleteScript({{ $script->id }})" :actions="[
+                                'This cloud-init script will be permanently deleted.',
+                                'This action cannot be undone.',
+                            ]" confirmationText="{{ $script->name }}"
+                            confirmationLabel="Please confirm the deletion by entering the script name below"
+                            shortConfirmationLabel="Script Name" :confirmWithPassword="false"
+                            step2ButtonText="Delete Script" />
+                    @endcan
                 </div>
             </div>
         @empty

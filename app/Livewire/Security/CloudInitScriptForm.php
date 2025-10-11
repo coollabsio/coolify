@@ -78,7 +78,11 @@ class CloudInitScriptForm extends Component
                 $message = 'Cloud-init script created successfully.';
             }
 
-            $this->reset(['name', 'script', 'scriptId']);
+            // Only reset fields if creating (not editing)
+            if (! $this->scriptId) {
+                $this->reset(['name', 'script']);
+            }
+
             $this->dispatch('scriptSaved');
             $this->dispatch('success', $message);
 
