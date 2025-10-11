@@ -11,6 +11,11 @@
                     <button>Cloud Tokens</button>
                 </a>
             @endcan
+            @can('viewAny', App\Models\CloudInitScript::class)
+                <a href="{{ route('security.cloud-init-scripts') }}">
+                    <button>Cloud-Init Scripts</button>
+                </a>
+            @endcan
             <a href="{{ route('security.api-tokens') }}">
                 <button>API Tokens</button>
             </a>
