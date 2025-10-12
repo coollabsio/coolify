@@ -1,0 +1,19 @@
+# documentation: https://github.com/hoppscotch/proxyscotch
+# slogan: A simple proxy server created for https://hoppscotch.io - CORS proxy
+# tags: proxy,hoppscotch,cors
+# logo: svgs/hoppscotch.png
+# port: 9159
+
+# NOTE IF YOU USE HOPPSCOTCH
+# REMEMBER TO SET THE VITE_PROXYSCOTCH_ACCESS_TOKEN IN YOUR HOPPSCOTCH ENV
+# It should be set to the same as PROXYSCOTCH_TOKEN
+
+services:
+  proxyscotch:
+    image: hoppscotch/proxyscotch:latest
+    environment:
+      - SERVICE_URL_PROXYSCOTCH_9159
+      - PROXYSCOTCH_TOKEN=${SERVICE_PASSWORD_TOKEN}
+      - PROXYSCOTCH_ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - PROXYSCOTCH_BANNED_OUTPUTS=${BANNED_OUTPUTS}
+      - PROXYSCOTCH_BANNED_DESTS=${BANNED_DESTS}
