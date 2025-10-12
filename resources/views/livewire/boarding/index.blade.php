@@ -264,7 +264,6 @@
                                 <div class="p-4 rounded-lg border border-neutral-200 dark:border-coolgray-400">
                                     <form wire:submit='selectExistingPrivateKey' class="flex flex-col gap-4">
                                         <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
-                                            <option disabled selected value="">-- Select a Private Key --</option>
                                             @foreach ($privateKeys as $privateKey)
                                                 <option wire:key="{{ $loop->index }}" value="{{ $privateKey->id }}">
                                                     {{ $privateKey->name }}

@@ -187,7 +187,10 @@ class Index extends Component
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
             $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
-            // Don't auto-select - let user explicitly choose from dropdown
+            // Auto-select first key if available for better UX
+            if ($this->privateKeys->count() > 0) {
+                $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
+            }
             // Onboarding always creates new servers, skip existing server selection
             $this->currentState = 'private-key';
         }
