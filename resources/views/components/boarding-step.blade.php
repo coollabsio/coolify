@@ -1,5 +1,5 @@
 <div class="w-full max-w-4xl">
-    <div class="bg-white dark:bg-coolgray-100 rounded-lg shadow-sm border border-neutral-200 dark:border-coolgray-300 overflow-hidden">
+    <div class=" rounded-lg shadow-sm border border-neutral-200 dark:border-coolgray-300 overflow-hidden">
         <div class="p-8 lg:p-12">
             <h1 class="text-3xl font-bold lg:text-4xl mb-4">{{ $title }}</h1>
             @isset($question)
@@ -16,7 +16,7 @@
         </div>
 
         @isset($explanation)
-            <div class="dark:bg-coolgray-200 border-t border-neutral-200 dark:border-coolgray-300 p-8 lg:p-12 bg-neutral-50">
+            <div class=" border-t border-neutral-200 dark:border-coolgray-300 p-8 lg:p-12 ">
                 <h3 class="text-sm font-bold uppercase tracking-wide mb-4 dark:text-neutral-400">
                     Technical Details
                 </h3>

@@ -143,6 +143,11 @@ class Index extends Component
                 $this->projects = Project::ownedByCurrentTeam(['name'])->get();
             }
         }
+
+        // Load projects when on create-project state (for page refresh)
+        if ($this->currentState === 'create-project' && $this->projects->isEmpty()) {
+            $this->projects = Project::ownedByCurrentTeam(['name'])->get();
+        }
     }
 
     public function explanation()
@@ -182,34 +187,10 @@ class Index extends Component
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
             $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
-            if ($this->privateKeys->count() > 0) {
-                $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
-            }
-            $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
-            if ($this->servers->count() > 0) {
-                $this->selectedExistingServer = $this->servers->first()->id;
-                $this->updateServerDetails();
-                $this->currentState = 'select-existing-server';
-
-                return;
-            }
+            // Don't auto-select - let user explicitly choose from dropdown
+            // Onboarding always creates new servers, skip existing server selection
             $this->currentState = 'private-key';
         }
-    }
-
-    public function selectExistingServer()
-    {
-        $this->createdServer = Server::find($this->selectedExistingServer);
-        if (! $this->createdServer) {
-            $this->dispatch('error', 'Server is not found.');
-            $this->currentState = 'private-key';
-
-            return;
-        }
-        $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
-        $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
-        $this->updateServerDetails();
-        $this->currentState = 'validate-server';
     }
 
     private function updateServerDetails()
@@ -229,7 +210,7 @@ class Index extends Component
     public function selectExistingPrivateKey()
     {
         if (is_null($this->selectedExistingPrivateKey)) {
-            $this->restartBoarding();
+            $this->dispatch('error', 'Please select a private key.');
 
             return;
         }

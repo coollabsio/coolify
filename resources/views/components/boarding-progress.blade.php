@@ -7,8 +7,8 @@
                 <div class="flex flex-col items-center">
                     <div
                         class="flex items-center justify-center size-10 rounded-full border-2 transition-all duration-300
-                        {{ $i < $currentStep ? 'bg-success border-success' : '' }}
-                        {{ $i === $currentStep ? 'bg-white dark:bg-coolgray-100' : '' }}
+                        {{ $i < $currentStep ? 'bg-success border-success' : 'border-neutral-200 dark:border-coolgray-300' }}
+                        {{ $i === $currentStep ? 'bg-white dark:bg-coolgray-500' : '' }}
                        ">
                         @if ($i < $currentStep)
                             <svg class="size-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
@@ -38,7 +38,7 @@
                 @if ($i < $totalSteps)
                     <div
                         class="flex-1 h-0.5 mx-4 transition-all duration-300
-                        {{ $i < $currentStep ? 'bg-success' : 'bg-coolgray-200 dark:bg-coolgray-600' }}">
+                        {{ $i < $currentStep ? 'bg-success' : 'bg-neutral-200 dark:bg-coolgray-300' }}">
                     </div>
                 @endif
             </div>
