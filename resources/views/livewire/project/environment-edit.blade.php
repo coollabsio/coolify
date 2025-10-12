@@ -47,8 +47,8 @@
             </ol>
         </nav>
         <div class="flex gap-2">
-            <x-forms.input label="Name" id="name" />
-            <x-forms.input label="Description" id="description" />
+            <x-forms.input label="Name" id="name" wire:model.defer="name" />
+            <x-forms.input label="Description" id="description" wire:model.defer="description" />
         </div>
     </form>
 </div>
