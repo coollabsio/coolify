@@ -1,25 +1,29 @@
-<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-    <div class="box-border col-span-2 lg:min-w-[24rem] lg:min-h-[21rem]">
-        <h1 class="text-2xl font-bold lg:text-5xl">{{ $title }}</h1>
-        <div class="py-6">
+<div class="w-full max-w-4xl">
+    <div class="bg-white dark:bg-coolgray-100 rounded-lg shadow-sm border border-neutral-200 dark:border-coolgray-300 overflow-hidden">
+        <div class="p-8 lg:p-12">
+            <h1 class="text-3xl font-bold lg:text-4xl mb-4">{{ $title }}</h1>
             @isset($question)
-                <p class="dark:text-neutral-400">
+                <div class="text-base lg:text-lg dark:text-neutral-400 mb-8">
                     {{ $question }}
-                </p>
+                </div>
             @endisset
+
+            @if ($actions)
+                <div class="flex flex-col gap-4">
+                    {{ $actions }}
+                </div>
+            @endif
         </div>
-        @if ($actions)
-            <div class="flex flex-col flex-wrap gap-4 lg:items-center md:flex-row">
-                {{ $actions }}
+
+        @isset($explanation)
+            <div class="dark:bg-coolgray-200 border-t border-neutral-200 dark:border-coolgray-300 p-8 lg:p-12 bg-neutral-50">
+                <h3 class="text-sm font-bold uppercase tracking-wide mb-4 dark:text-neutral-400">
+                    Technical Details
+                </h3>
+                <div class="space-y-3 text-sm dark:text-neutral-400">
+                    {{ $explanation }}
+                </div>
             </div>
-        @endif
+        @endisset
     </div>
-    @isset($explanation)
-        <div class="col-span-1">
-            <h3 class="pb-8 font-bold">Explanation</h3>
-            <div class="space-y-4">
-                {{ $explanation }}
-            </div>
-        </div>
-    @endisset
 </div>

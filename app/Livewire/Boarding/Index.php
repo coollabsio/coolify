@@ -16,14 +16,18 @@ class Index extends Component
 {
     protected $listeners = ['refreshBoardingIndex' => 'validateServer'];
 
+    #[\Livewire\Attributes\Url(as: 'step', history: true)]
     public string $currentState = 'welcome';
 
+    #[\Livewire\Attributes\Url(keep: true)]
     public ?string $selectedServerType = null;
 
     public ?Collection $privateKeys = null;
 
+    #[\Livewire\Attributes\Url(keep: true)]
     public ?int $selectedExistingPrivateKey = null;
 
+    #[\Livewire\Attributes\Url(keep: true)]
     public ?string $privateKeyType = null;
 
     public ?string $privateKey = null;
@@ -38,6 +42,7 @@ class Index extends Component
 
     public ?Collection $servers = null;
 
+    #[\Livewire\Attributes\Url(keep: true)]
     public ?int $selectedExistingServer = null;
 
     public ?string $remoteServerName = null;
@@ -58,6 +63,7 @@ class Index extends Component
 
     public Collection $projects;
 
+    #[\Livewire\Attributes\Url(keep: true)]
     public ?int $selectedProject = null;
 
     public ?Project $createdProject = null;
@@ -79,17 +85,63 @@ class Index extends Component
         $this->minDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
-        if (isDev()) {
-            $this->privateKey = '-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
-hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
-AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
-uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
------END OPENSSH PRIVATE KEY-----';
-            $this->privateKeyDescription = 'Created by Coolify';
-            $this->remoteServerDescription = 'Created by Coolify';
-            $this->remoteServerHost = 'coolify-testing-host';
+
+        // Initialize collections to avoid null errors
+        if ($this->privateKeys === null) {
+            $this->privateKeys = collect();
+        }
+        if ($this->servers === null) {
+            $this->servers = collect();
+        }
+        if (! isset($this->projects)) {
+            $this->projects = collect();
+        }
+
+        // Restore state when coming from URL with query params
+        if ($this->selectedServerType === 'localhost' && $this->selectedExistingServer === 0) {
+            $this->createdServer = Server::find(0);
+            if ($this->createdServer) {
+                $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
+            }
+        }
+
+        if ($this->selectedServerType === 'remote') {
+            if ($this->privateKeys->isEmpty()) {
+                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            }
+            if ($this->servers->isEmpty()) {
+                $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            }
+
+            if ($this->selectedExistingServer) {
+                $this->createdServer = Server::find($this->selectedExistingServer);
+                if ($this->createdServer) {
+                    $this->serverPublicKey = $this->createdServer->privateKey->getPublicKey();
+                    $this->updateServerDetails();
+                }
+            }
+
+            if ($this->selectedExistingPrivateKey) {
+                $this->createdPrivateKey = PrivateKey::where('team_id', currentTeam()->id)
+                    ->where('id', $this->selectedExistingPrivateKey)
+                    ->first();
+                if ($this->createdPrivateKey) {
+                    $this->privateKey = $this->createdPrivateKey->private_key;
+                    $this->publicKey = $this->createdPrivateKey->getPublicKey();
+                }
+            }
+
+            // Auto-regenerate key pair for "Generate with Coolify" mode on page refresh
+            if ($this->privateKeyType === 'create' && empty($this->privateKey)) {
+                $this->createNewPrivateKey();
+            }
+        }
+
+        if ($this->selectedProject) {
+            $this->createdProject = Project::find($this->selectedProject);
+            if (! $this->createdProject) {
+                $this->projects = Project::ownedByCurrentTeam(['name'])->get();
+            }
         }
     }
 
@@ -129,11 +181,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
-            if (isDev()) {
-                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
-            } else {
-                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
-            }
+            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->privateKeys->count() > 0) {
                 $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
             }
@@ -202,6 +250,9 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->privateKeyType = $type;
         if ($type === 'create') {
             $this->createNewPrivateKey();
+        } else {
+            $this->privateKey = null;
+            $this->publicKey = null;
         }
         $this->currentState = 'create-private-key';
     }
