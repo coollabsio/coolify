@@ -7,7 +7,16 @@
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
         <div>
-            <h2>Logs</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2>Logs</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.checkbox 
+                        wire:click="toggleStreamAll" 
+                        :checked="$streamAllLogs"
+                        label="Stream all logs" 
+                        id="streamAllLogs" />
+                </div>
+            </div>
             @if (str($status)->contains('exited'))
                 <div class="pt-4">The resource is not running.</div>
             @else
@@ -42,7 +51,16 @@
         <h1>Logs</h1>
         <livewire:project.database.heading :database="$resource" />
         <div>
-            <h2>Logs</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2>Logs</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.checkbox 
+                        wire:click="toggleStreamAll" 
+                        :checked="$streamAllLogs"
+                        label="Stream all logs" 
+                        id="streamAllLogs" />
+                </div>
+            </div>
             @if (str($status)->contains('exited'))
                 <div class="pt-4">The resource is not running.</div>
             @else
@@ -66,7 +84,16 @@
     @elseif ($type === 'service')
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" :query="$query" title="Logs" />
         <div>
-            <h2>Logs</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2>Logs</h2>
+                <div class="flex items-center gap-2">
+                    <x-forms.checkbox 
+                        wire:click="toggleStreamAll" 
+                        :checked="$streamAllLogs"
+                        label="Stream all logs" 
+                        id="streamAllLogs" />
+                </div>
+            </div>
             @if (str($status)->contains('exited'))
                 <div class="pt-4">The resource is not running.</div>
             @else

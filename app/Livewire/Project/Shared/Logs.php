@@ -41,6 +41,8 @@ class Logs extends Component
 
     public bool $containersLoaded = false;
 
+    public bool $streamAllLogs = false;
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -154,6 +156,12 @@ class Logs extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function toggleStreamAll()
+    {
+        $this->streamAllLogs = ! $this->streamAllLogs;
+        $this->dispatch('streamAllToggled', $this->streamAllLogs);
     }
 
     public function render()

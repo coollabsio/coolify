@@ -41,6 +41,18 @@ class GetLogs extends Component
 
     public ?int $numberOfLines = 100;
 
+    public function getListeners()
+    {
+        return [
+            'streamAllToggled' => 'handleStreamAllToggle',
+        ];
+    }
+
+    public function handleStreamAllToggle($enabled)
+    {
+        $this->streamLogs = $enabled;
+    }
+
     public function mount()
     {
         if (! is_null($this->resource)) {
