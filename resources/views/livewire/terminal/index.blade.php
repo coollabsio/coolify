@@ -17,7 +17,7 @@
             @if ($servers->count() > 0)
                 <form class="flex flex-col gap-2 justify-center xl:items-end xl:flex-row"
                     wire:submit="$dispatchSelf('connectToContainer')">
-                    <x-forms.select id="server" required wire:model.live="selected_uuid">
+                    <x-forms.datalist id="selected_uuid" required wire:model.live="selected_uuid" placeholder="Search servers or containers...">
                         @foreach ($servers as $server)
                             @if ($loop->first)
                                 <option disabled value="default">Select a server or container</option>
@@ -31,7 +31,7 @@
                                 @endif
                             @endforeach
                         @endforeach
-                    </x-forms.select>
+                    </x-forms.datalist>
                     <x-forms.button type="submit">Connect</x-forms.button>
                 </form>
             @else

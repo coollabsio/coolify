@@ -98,11 +98,12 @@
 
             {{-- Unified Input Container with Tags Inside --}}
             <div @click="$refs.searchInput.focus()"
-                class="flex flex-wrap gap-1.5 p-2 min-h-[42px] max-h-40 overflow-y-auto {{ $defaultClass }} cursor-text"
+                class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar py-1.5 w-full text-sm rounded-sm border-0 ring-1 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-text px-1 focus-within:ring-2 focus-within:ring-coollabs dark:focus-within:ring-warning text-black dark:text-white"
                 :class="{
                     'opacity-50': {{ $disabled ? 'true' : 'false' }}
                 }"
-                wire:loading.class="opacity-50">
+                wire:loading.class="opacity-50"
+                wire:dirty.class="dark:ring-warning ring-warning">
 
                 {{-- Selected Tags Inside Input --}}
                 <template x-for="value in selected" :key="value">
@@ -124,13 +125,13 @@
                     @required($required) @readonly($readonly) @disabled($disabled) @if ($autofocus)
                 autofocus
     @endif
-    class="flex-1 min-w-[120px] text-sm border-0 outline-none bg-transparent p-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600"
+    class="flex-1 min-w-[120px] text-sm border-0 outline-none bg-transparent p-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 text-black dark:text-white"
     />
 </div>
 
 {{-- Dropdown Options --}}
 <div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
-    class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto">
+    class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
 
     <template x-if="filteredOptions.length === 0">
         <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
@@ -156,21 +157,131 @@
 </datalist>
 </div>
 @else
-{{-- Single Selection Mode (Standard HTML5 Datalist) --}}
-<input list="{{ $id }}" {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-    @readonly($readonly) @disabled($disabled) wire:dirty.class="dark:ring-warning ring-warning"
-    wire:loading.attr="disabled" name="{{ $id }}"
-    @if ($value) value="{{ $value }}" @endif
-    @if ($placeholder) placeholder="{{ $placeholder }}" @endif
-    @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }}
-            @else
-                wire:model="{{ $id }}" @endif
-    @if ($instantSave) wire:change="{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}"
-                wire:blur="{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}" @endif
-    @if ($autofocus) x-ref="autofocusInput" @endif>
-<datalist id="{{ $id }}">
-    {{ $slot }}
-</datalist>
+{{-- Single Selection Mode with Alpine.js --}}
+<div x-data="{
+    open: false,
+    search: '',
+    selected: @entangle(($attributes->whereStartsWith('wire:model')->first() ? $attributes->wire('model')->value() : $id)).live,
+    options: [],
+    filteredOptions: [],
+
+    init() {
+        this.options = Array.from(this.$refs.datalist.querySelectorAll('option')).map(opt => {
+            // Skip disabled options
+            if (opt.disabled) {
+                return null;
+            }
+            // Try to parse as integer, fallback to string
+            let value = opt.value;
+            const intValue = parseInt(value, 10);
+            if (!isNaN(intValue) && intValue.toString() === value) {
+                value = intValue;
+            }
+            return {
+                value: value,
+                text: opt.textContent.trim()
+            };
+        }).filter(opt => opt !== null);
+        this.filteredOptions = this.options;
+    },
+
+    filterOptions() {
+        if (!this.search) {
+            this.filteredOptions = this.options;
+            return;
+        }
+        const searchLower = this.search.toLowerCase();
+        this.filteredOptions = this.options.filter(opt =>
+            opt.text.toLowerCase().includes(searchLower)
+        );
+    },
+
+    selectOption(value) {
+        this.selected = value;
+        this.search = '';
+        this.open = false;
+        this.filterOptions();
+    },
+
+    openDropdown() {
+        if ({{ $disabled ? 'true' : 'false' }}) return;
+        this.open = true;
+        this.$nextTick(() => {
+            if (this.$refs.searchInput) {
+                this.$refs.searchInput.focus();
+            }
+        });
+    },
+
+    getSelectedText() {
+        if (!this.selected || this.selected === 'default') return '';
+        const option = this.options.find(opt => opt.value == this.selected);
+        return option ? option.text : this.selected;
+    },
+
+    isDefaultValue() {
+        return !this.selected || this.selected === 'default' || this.selected === '';
+    }
+}" @click.outside="open = false" class="relative">
+
+    {{-- Hidden input for form validation --}}
+    <input type="hidden" :value="selected" @required($required) />
+
+    {{-- Input Container --}}
+    <div @click="openDropdown()"
+        class="flex items-center gap-2 py-1.5 w-full text-sm rounded-sm border-0 ring-1 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-text focus-within:ring-2 focus-within:ring-coollabs dark:focus-within:ring-warning text-black dark:text-white"
+        :class="{
+            'opacity-50': {{ $disabled ? 'true' : 'false' }}
+        }"
+        wire:loading.class="opacity-50"
+        wire:dirty.class="dark:ring-warning ring-warning">
+
+        {{-- Display Selected Value or Search Input --}}
+        <div class="flex-1 flex items-center min-w-0 px-1">
+            <template x-if="!isDefaultValue() && !open">
+                <span class="text-sm flex-1 truncate text-black dark:text-white px-2" x-text="getSelectedText()"></span>
+            </template>
+            <input type="text" x-show="isDefaultValue() || open" x-model="search" x-ref="searchInput"
+                @input="filterOptions()" @focus="open = true"
+                @keydown.escape="open = false"
+                :placeholder="{{ json_encode($placeholder ?: 'Search...') }}"
+                @readonly($readonly) @disabled($disabled) @if ($autofocus) autofocus @endif
+                class="flex-1 text-sm border-0 outline-none bg-transparent p-0 focus:ring-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 text-black dark:text-white px-2" />
+        </div>
+
+        {{-- Dropdown Arrow --}}
+        <button type="button" @click.stop="open = !open" :disabled="{{ $disabled ? 'true' : 'false' }}"
+            class="shrink-0 text-neutral-400 px-2 {{ $disabled ? 'cursor-not-allowed' : 'cursor-pointer' }}">
+            <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+    </div>
+
+    {{-- Dropdown Options --}}
+    <div x-show="open && !{{ $disabled ? 'true' : 'false' }}" x-transition
+        class="absolute z-50 w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg max-h-60 overflow-auto scrollbar">
+
+        <template x-if="filteredOptions.length === 0">
+            <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+                No options found
+            </div>
+        </template>
+
+        <template x-for="option in filteredOptions" :key="option.value">
+            <div @click="selectOption(option.value)"
+                class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200"
+                :class="{ 'bg-neutral-50 dark:bg-coolgray-300': selected == option.value }">
+                <span class="text-sm" x-text="option.text"></span>
+            </div>
+        </template>
+    </div>
+
+    {{-- Hidden datalist for options --}}
+    <datalist x-ref="datalist" style="display: none;">
+        {{ $slot }}
+    </datalist>
+</div>
 @endif
 
 @error($id)
