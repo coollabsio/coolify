@@ -260,6 +260,8 @@ class StartMongodb
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        $this->commands[] = "docker stop --timeout=10 $container_name 2>/dev/null || true";
+        $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         if ($this->database->enable_ssl) {
             $this->commands[] = executeInDocker($this->database->uuid, 'chown mongodb:mongodb /etc/mongo/certs/server.pem');
