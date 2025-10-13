@@ -4,13 +4,9 @@
 # logo: svgs/hoppscotch.png
 # port: 9159
 
-# NOTE IF YOU USE HOPPSCOTCH
-# REMEMBER TO SET THE VITE_PROXYSCOTCH_ACCESS_TOKEN IN YOUR HOPPSCOTCH ENV
-# It should be set to the same as PROXYSCOTCH_TOKEN
-
 services:
   proxyscotch:
-    image: hoppscotch/proxyscotch:latest
+    image: hoppscotch/proxyscotch:v0.1.4
     environment:
       - SERVICE_URL_PROXYSCOTCH_9159
       - PROXYSCOTCH_TOKEN=${SERVICE_PASSWORD_TOKEN}
