@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
+use App\Events\ServerValidated;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -60,6 +61,19 @@ class ValidateAndInstall extends Component
     public function startValidatingAfterAsking()
     {
         $this->ask = false;
+        $this->init();
+    }
+
+    public function retry()
+    {
+        $this->authorize('update', $this->server);
+        $this->uptime = null;
+        $this->supported_os_type = null;
+        $this->docker_installed = null;
+        $this->docker_compose_installed = null;
+        $this->docker_version = null;
+        $this->error = null;
+        $this->number_of_tries = 0;
         $this->init();
     }
 
@@ -136,8 +150,12 @@ class ValidateAndInstall extends Component
         } else {
             $this->docker_version = $this->server->validateDockerEngineVersion();
             if ($this->docker_version) {
+                // Mark validation as complete
+                $this->server->update(['is_validating' => false]);
+
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
+                ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
                 $this->dispatch('success', 'Server validated, proxy is starting in a moment.');
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if (! $proxyShouldRun) {

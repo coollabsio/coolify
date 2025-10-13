@@ -484,6 +484,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         );
         $this->generate_image_names();
         $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
@@ -1432,9 +1436,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'hidden' => true,
                 ],
             );
-        } elseif ($this->build_pack === 'dockercompose') {
-            // For Docker Compose, create an empty .env file even if there are no build-time variables
-            // This ensures the file exists when referenced in docker-compose commands
+        } elseif ($this->build_pack === 'dockercompose' || $this->build_pack === 'dockerfile') {
+            // For Docker Compose and Dockerfile, create an empty .env file even if there are no build-time variables
+            // This ensures the file exists when referenced in build commands
             $this->application_deployment_queue->addLogEntry('Creating empty build-time .env file in /artifacts (no build-time variables defined).', hidden: true);
 
             $this->execute_remote_command(
@@ -3196,7 +3200,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
 
             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-            $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info');
+            $this->application_deployment_queue->addLogEntry('Final Dockerfile:', type: 'info', hidden: true);
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),

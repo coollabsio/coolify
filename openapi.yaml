@@ -2377,6 +2377,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2418,7 +2420,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: string, example: 'Backup configuration and all executions deleted.' }
+                  message: { type: string, example: 'Backup configuration and all executions deleted.' }
                 type: object
         '404':
           description: 'Backup configuration not found.'
@@ -2426,7 +2428,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: string, example: 'Backup configuration not found.' }
+                  message: { type: string, example: 'Backup configuration not found.' }
                 type: object
       security:
         -
@@ -2510,6 +2512,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2612,6 +2616,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2702,6 +2708,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2789,6 +2797,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2879,6 +2889,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -2969,6 +2981,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3068,6 +3082,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3167,6 +3183,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3257,6 +3275,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3306,7 +3326,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: string, example: 'Backup execution deleted.' }
+                  message: { type: string, example: 'Backup execution deleted.' }
                 type: object
         '404':
           description: 'Backup execution not found.'
@@ -3314,7 +3334,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: string, example: 'Backup execution not found.' }
+                  message: { type: string, example: 'Backup execution not found.' }
                 type: object
       security:
         -
@@ -3349,7 +3369,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { type: string }, status: { type: string } }, type: object } }
+                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { type: string }, status: { type: string } }, type: object } }
                 type: object
         '404':
           description: 'Backup configuration not found.'
@@ -3727,7 +3747,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: array, items: { type: object } }
+                  repositories: { type: array, items: { type: object } }
                 type: object
         '400':
           $ref: '#/components/responses/400'
@@ -3774,7 +3794,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  '': { type: array, items: { type: object } }
+                  branches: { type: array, items: { type: object } }
                 type: object
         '400':
           $ref: '#/components/responses/400'
@@ -3900,7 +3920,7 @@ paths:
         '404':
           description: 'GitHub app not found'
         '422':
-          description: 'Validation error'
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -3913,7 +3933,7 @@ paths:
         '200':
           description: 'Returns the version of the application'
           content:
-            application/json:
+            text/html:
               schema:
                 type: string
               example: v4.0.0
@@ -3991,7 +4011,7 @@ paths:
         '200':
           description: 'Healthcheck endpoint.'
           content:
-            application/json:
+            text/html:
               schema:
                 type: string
               example: OK
@@ -4057,6 +4077,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4121,6 +4143,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4170,6 +4194,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4208,6 +4234,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4241,6 +4269,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           description: 'Project not found.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4286,6 +4316,8 @@ paths:
           description: 'Project not found.'
         '409':
           description: 'Environment with this name already exists.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4326,6 +4358,8 @@ paths:
           description: 'Environment has resources, so it cannot be deleted.'
         '404':
           description: 'Project or environment not found.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4409,6 +4443,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4447,6 +4483,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4610,6 +4648,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4674,6 +4714,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4740,6 +4782,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4837,6 +4881,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -4929,6 +4975,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -5097,6 +5145,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -5190,6 +5240,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -5252,6 +5304,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -5299,6 +5353,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -6321,6 +6377,24 @@ components:
               message:
                 type: string
                 example: 'Resource not found.'
+            type: object
+    '422':
+      description: 'Validation error.'
+      content:
+        application/json:
+          schema:
+            properties:
+              message:
+                type: string
+                example: 'Validation error.'
+              errors:
+                type: object
+                example:
+                  name: ['The name field is required.']
+                  api_url: ['The api url field is required.', 'The api url format is invalid.']
+                additionalProperties:
+                  type: array
+                  items: { type: string }
             type: object
   securitySchemes:
     bearerAuth:

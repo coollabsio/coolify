@@ -219,7 +219,8 @@ class GithubController extends Controller
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'repositories' => new OA\Schema(
+                            new OA\Property(
+                                property: 'repositories',
                                 type: 'array',
                                 items: new OA\Items(type: 'object')
                             ),
@@ -335,7 +336,8 @@ class GithubController extends Controller
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'branches' => new OA\Schema(
+                            new OA\Property(
+                                property: 'branches',
                                 type: 'array',
                                 items: new OA\Items(type: 'object')
                             ),
@@ -457,7 +459,7 @@ class GithubController extends Controller
             ),
             new OA\Response(response: 401, description: 'Unauthorized'),
             new OA\Response(response: 404, description: 'GitHub app not found'),
-            new OA\Response(response: 422, description: 'Validation error'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function update_github_app(Request $request, $github_app_id)

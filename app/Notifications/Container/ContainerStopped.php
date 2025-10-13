@@ -121,4 +121,22 @@ class ContainerStopped extends CustomEmailNotification
             buttons: $buttons,
         );
     }
+    
+    public function toWebhook(): array
+    {
+        $data = [
+            'success' => false,
+            'message' => 'Resource stopped unexpectedly',
+            'event' => 'container_stopped',
+            'container_name' => $this->name,
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+        ];
+
+        if ($this->url) {
+            $data['url'] = $this->url;
+        }
+
+        return $data;
+    }
 }

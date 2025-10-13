@@ -92,4 +92,18 @@ class Unreachable extends CustomEmailNotification
             message: "Your server **'{$this->server->name}'** is unreachable.\nAll automations & integrations are turned off!\n\n**IMPORTANT:** We automatically try to revive your server and turn on all automations & integrations.",
         );
     }
+    
+    public function toWebhook(): array
+    {
+        $url = base_url().'/server/'.$this->server->uuid;
+
+        return [
+            'success' => false,
+            'message' => 'Server unreachable',
+            'event' => 'server_unreachable',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'url' => $url,
+        ];
+    }
 }

@@ -108,4 +108,18 @@ class HighDiskUsage extends CustomEmailNotification
             buttons: $buttons
         );
     }
+    
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => 'High disk usage detected',
+            'event' => 'high_disk_usage',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'disk_usage' => $this->disk_usage,
+            'threshold' => $this->server_disk_usage_notification_threshold,
+            'url' => base_url().'/server/'.$this->server->uuid,
+        ];
+    }
 }

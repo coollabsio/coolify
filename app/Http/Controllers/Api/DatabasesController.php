@@ -317,6 +317,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_by_uuid(Request $request)
@@ -666,6 +670,10 @@ class DatabasesController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_backup(Request $request)
@@ -844,6 +852,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_postgresql(Request $request)
@@ -907,6 +919,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_clickhouse(Request $request)
@@ -968,6 +984,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1032,6 +1052,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_redis(Request $request)
@@ -1094,6 +1118,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1161,6 +1189,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_mariadb(Request $request)
@@ -1227,6 +1259,10 @@ class DatabasesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function create_database_mysql(Request $request)
@@ -1289,6 +1325,10 @@ class DatabasesController extends Controller
             new OA\Response(
                 response: 400,
                 ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -1941,7 +1981,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup configuration and all executions deleted.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup configuration and all executions deleted.'),
                     ]
                 )
             ),
@@ -1951,7 +1991,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup configuration not found.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup configuration not found.'),
                     ]
                 )
             ),
@@ -2065,7 +2105,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup execution deleted.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup execution deleted.'),
                     ]
                 )
             ),
@@ -2075,7 +2115,7 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'message' => new OA\Schema(type: 'string', example: 'Backup execution not found.'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Backup execution not found.'),
                     ]
                 )
             ),
@@ -2171,17 +2211,18 @@ class DatabasesController extends Controller
                 content: new OA\JsonContent(
                     type: 'object',
                     properties: [
-                        'executions' => new OA\Schema(
+                        new OA\Property(
+                            property: 'executions',
                             type: 'array',
                             items: new OA\Items(
                                 type: 'object',
                                 properties: [
-                                    'uuid' => ['type' => 'string'],
-                                    'filename' => ['type' => 'string'],
-                                    'size' => ['type' => 'integer'],
-                                    'created_at' => ['type' => 'string'],
-                                    'message' => ['type' => 'string'],
-                                    'status' => ['type' => 'string'],
+                                    new OA\Property(property: 'uuid', type: 'string'),
+                                    new OA\Property(property: 'filename', type: 'string'),
+                                    new OA\Property(property: 'size', type: 'integer'),
+                                    new OA\Property(property: 'created_at', type: 'string'),
+                                    new OA\Property(property: 'message', type: 'string'),
+                                    new OA\Property(property: 'status', type: 'string'),
                                 ]
                             )
                         ),

@@ -56,6 +56,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
             $team->telegramNotificationSettings()->create();
             $team->pushoverNotificationSettings()->create();
             $team->gotifyNotificationSettings()->create();
+            $team->webhookNotificationSettings()->create();
         });
 
         static::saving(function ($team) {
@@ -269,6 +270,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
         return $this->hasMany(PrivateKey::class);
     }
 
+    public function cloudProviderTokens()
+    {
+        return $this->hasMany(CloudProviderToken::class);
+    }
+
     public function sources()
     {
         $sources = collect([]);
@@ -322,5 +328,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsGotify, Sends
     public function gotifyNotificationSettings()
     {
         return $this->hasOne(GotifyNotificationSettings::class);
+    }
+    
+    public function webhookNotificationSettings()
+    {
+        return $this->hasOne(WebhookNotificationSettings::class);
     }
 }

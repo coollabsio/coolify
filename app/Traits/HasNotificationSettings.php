@@ -8,6 +8,7 @@ use App\Notifications\Channels\GotifyChannel;
 use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Channels\WebhookChannel;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasNotificationSettings
@@ -18,6 +19,7 @@ trait HasNotificationSettings
         'general',
         'test',
         'ssl_certificate_renewal',
+        'hetzner_deletion_failure',
     ];
 
     /**
@@ -32,6 +34,7 @@ trait HasNotificationSettings
             'slack' => $this->slackNotificationSettings,
             'pushover' => $this->pushoverNotificationSettings,
             'gotify' => $this->gotifyNotificationSettings,
+            'webhook' => $this->webhookNotificationSettings,
             default => null,
         };
     }
@@ -80,6 +83,7 @@ trait HasNotificationSettings
             'slack' => SlackChannel::class,
             'pushover' => PushoverChannel::class,
             'gotify' => GotifyChannel::class,
+            'webhook' => WebhookChannel::class,
         ];
 
         if ($event === 'general') {

@@ -134,6 +134,10 @@ class ProjectController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function environment_details(Request $request)
@@ -213,6 +217,10 @@ class ProjectController extends Controller
             new OA\Response(
                 response: 404,
                 ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -324,6 +332,10 @@ class ProjectController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function update_project(Request $request)
@@ -425,6 +437,10 @@ class ProjectController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
         ]
     )]
     public function delete_project(Request $request)
@@ -486,6 +502,10 @@ class ProjectController extends Controller
             new OA\Response(
                 response: 404,
                 description: 'Project not found.',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -565,6 +585,10 @@ class ProjectController extends Controller
             new OA\Response(
                 response: 409,
                 description: 'Environment with this name already exists.',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]
@@ -662,6 +686,10 @@ class ProjectController extends Controller
             new OA\Response(
                 response: 404,
                 description: 'Project or environment not found.',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
             ),
         ]
     )]

@@ -3698,6 +3698,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -3753,7 +3756,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "message": {
                                             "type": "string",
                                             "example": "Backup configuration and all executions deleted."
                                         }
@@ -3769,7 +3772,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "message": {
                                             "type": "string",
                                             "example": "Backup configuration not found."
                                         }
@@ -3892,6 +3895,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4033,6 +4039,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4158,6 +4167,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4279,6 +4291,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4404,6 +4419,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4529,6 +4547,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4666,6 +4687,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4803,6 +4827,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4928,6 +4955,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -4993,7 +5023,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "message": {
                                             "type": "string",
                                             "example": "Backup execution deleted."
                                         }
@@ -5009,7 +5039,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "message": {
                                             "type": "string",
                                             "example": "Backup execution not found."
                                         }
@@ -5063,7 +5093,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "executions": {
                                             "type": "array",
                                             "items": {
                                                 "properties": {
@@ -5690,7 +5720,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "repositories": {
                                             "type": "array",
                                             "items": {
                                                 "type": "object"
@@ -5763,7 +5793,7 @@
                             "application\/json": {
                                 "schema": {
                                     "properties": {
-                                        "": {
+                                        "branches": {
                                             "type": "array",
                                             "items": {
                                                 "type": "object"
@@ -5968,7 +5998,7 @@
                         "description": "GitHub app not found"
                     },
                     "422": {
-                        "description": "Validation error"
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5987,7 +6017,7 @@
                     "200": {
                         "description": "Returns the version of the application",
                         "content": {
-                            "application\/json": {
+                            "text\/html": {
                                 "schema": {
                                     "type": "string"
                                 },
@@ -6122,7 +6152,7 @@
                     "200": {
                         "description": "Healthcheck endpoint.",
                         "content": {
-                            "application\/json": {
+                            "text\/html": {
                                 "schema": {
                                     "type": "string"
                                 },
@@ -6228,6 +6258,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6327,6 +6360,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6408,6 +6444,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6464,6 +6503,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6514,6 +6556,9 @@
                     },
                     "404": {
                         "description": "Project not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6586,6 +6631,9 @@
                     },
                     "409": {
                         "description": "Environment with this name already exists."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6648,6 +6696,9 @@
                     },
                     "404": {
                         "description": "Project or environment not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6779,6 +6830,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -6840,6 +6894,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7094,6 +7151,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7193,6 +7253,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7292,6 +7355,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7473,6 +7539,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7702,6 +7771,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7953,6 +8025,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -8093,6 +8168,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -8186,6 +8264,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -8288,6 +8369,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -9744,6 +9828,40 @@
                                 "message": {
                                     "type": "string",
                                     "example": "Resource not found."
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "422": {
+                "description": "Validation error.",
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Validation error."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "example": {
+                                        "name": [
+                                            "The name field is required."
+                                        ],
+                                        "api_url": [
+                                            "The api url field is required.",
+                                            "The api url format is invalid."
+                                        ]
+                                    },
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             },
                             "type": "object"

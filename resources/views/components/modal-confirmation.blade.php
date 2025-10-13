@@ -114,7 +114,7 @@
         }
     }
 }"
-    @keydown.escape.window="modalOpen = false; resetModal()" :class="{ 'z-40': modalOpen }"
+    @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
     @if ($customButton)
         @if ($buttonFullWidth)
@@ -250,6 +250,18 @@
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
+                                @if (isset($checkbox['default_warning']))
+                                    <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
+                                        <li class="flex items-center text-red-500">
+                                            <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                            <span>{{ $checkbox['default_warning'] }}</span>
+                                        </li>
+                                    </template>
+                                @endif
                             @endforeach
                         </ul>
                         @if (!$disableTwoStepConfirmation)

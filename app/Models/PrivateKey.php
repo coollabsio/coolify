@@ -289,6 +289,17 @@ class PrivateKey extends BaseModel
         }
     }
 
+    public static function generateMd5Fingerprint($privateKey)
+    {
+        try {
+            $key = PublicKeyLoader::load($privateKey);
+
+            return $key->getPublicKey()->getFingerprint('md5');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public static function fingerprintExists($fingerprint, $excludeId = null)
     {
         $query = self::query()

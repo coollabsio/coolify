@@ -95,4 +95,20 @@ class BackupSuccess extends CustomEmailNotification
             message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.\n\n**Frequency:** {$this->frequency}",
         );
     }
+    
+    public function toWebhook(): array
+    {
+        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+
+        return [
+            'success' => true,
+            'message' => 'Database backup successful',
+            'event' => 'backup_success',
+            'database_name' => $this->name,
+            'database_uuid' => $this->database->uuid,
+            'database_type' => $this->database_name,
+            'frequency' => $this->frequency,
+            'url' => $url,
+        ];
+    }
 }

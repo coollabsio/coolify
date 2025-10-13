@@ -84,4 +84,18 @@ class Reachable extends CustomEmailNotification
             level: 'success',
         );
     }
+    
+    public function toWebhook(): array
+    {
+        $url = base_url().'/server/'.$this->server->uuid;
+
+        return [
+            'success' => true,
+            'message' => 'Server revived',
+            'event' => 'server_reachable',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'url' => $url,
+        ];
+    }
 }
