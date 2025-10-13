@@ -68,11 +68,14 @@
                             @foreach ($this->availableServerTypes as $serverType)
                                 <option value="{{ $serverType['name'] }}">
                                     {{ $serverType['description'] }} -
-                                    {{ $serverType['cores'] }} vCPU,
-                                    {{ $serverType['memory'] }}GB RAM,
+                                    {{ $serverType['cores'] }} vCPU
+                                    @if (isset($serverType['cpu_vendor_info']) && $serverType['cpu_vendor_info'])
+                                        ({{ $serverType['cpu_vendor_info'] }})
+                                    @endif
+                                    , {{ $serverType['memory'] }}GB RAM, 
                                     {{ $serverType['disk'] }}GB
                                     @if (isset($serverType['architecture']))
-                                        ({{ $serverType['architecture'] }})
+                                        [{{ $serverType['architecture'] }}]
                                     @endif
                                     @if (isset($serverType['prices']))
                                         -

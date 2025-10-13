@@ -290,6 +290,23 @@ class ByHetzner extends Component
         }
     }
 
+    private function getCpuVendorInfo(array $serverType): array
+    {
+        $name = strtolower($serverType['name'] ?? '');
+
+        if (str_starts_with($name, 'ccx')) {
+            return ['vendor_info' => 'AMD Milan EPYC™'];
+        } elseif (str_starts_with($name, 'cpx')) {
+            return ['vendor_info' => 'AMD EPYC™'];
+        } elseif (str_starts_with($name, 'cx')) {
+            return ['vendor_info' => 'Intel® Xeon®'];
+        } elseif (str_starts_with($name, 'cax')) {
+            return ['vendor_info' => 'Ampere® Altra®'];
+        }
+
+        return ['vendor_info' => null];
+    }
+
     public function getAvailableServerTypesProperty()
     {
         ray('Getting available server types', [
@@ -310,6 +327,12 @@ class ByHetzner extends Component
                 $locationNames = collect($type['locations'])->pluck('name')->toArray();
 
                 return in_array($this->selected_location, $locationNames);
+            })
+            ->map(function ($serverType) {
+                $cpuInfo = $this->getCpuVendorInfo($serverType);
+                $serverType['cpu_vendor_info'] = $cpuInfo['vendor_info'];
+
+                return $serverType;
             })
             ->values()
             ->toArray();
