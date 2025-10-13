@@ -29,16 +29,32 @@ class ServiceApplicationView extends Component
 
     public $forceSaveDomains = false;
 
+    public ?string $humanName = null;
+
+    public ?string $description = null;
+
+    public ?string $fqdn = null;
+
+    public ?string $image = null;
+
+    public bool $excludeFromStatus = false;
+
+    public bool $isLogDrainEnabled = false;
+
+    public bool $isGzipEnabled = false;
+
+    public bool $isStripprefixEnabled = false;
+
     protected $rules = [
-        'application.human_name' => 'nullable',
-        'application.description' => 'nullable',
-        'application.fqdn' => 'nullable',
-        'application.image' => 'string|nullable',
-        'application.exclude_from_status' => 'required|boolean',
+        'humanName' => 'nullable',
+        'description' => 'nullable',
+        'fqdn' => 'nullable',
+        'image' => 'string|nullable',
+        'excludeFromStatus' => 'required|boolean',
         'application.required_fqdn' => 'required|boolean',
-        'application.is_log_drain_enabled' => 'nullable|boolean',
-        'application.is_gzip_enabled' => 'nullable|boolean',
-        'application.is_stripprefix_enabled' => 'nullable|boolean',
+        'isLogDrainEnabled' => 'nullable|boolean',
+        'isGzipEnabled' => 'nullable|boolean',
+        'isStripprefixEnabled' => 'nullable|boolean',
     ];
 
     public function instantSave()
@@ -56,11 +72,12 @@ class ServiceApplicationView extends Component
         try {
             $this->authorize('update', $this->application);
             if (! $this->application->service->destination->server->isLogDrainEnabled()) {
-                $this->application->is_log_drain_enabled = false;
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
             }
+            $this->syncData(true);
             $this->application->save();
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (\Throwable $e) {
@@ -95,8 +112,32 @@ class ServiceApplicationView extends Component
         try {
             $this->parameters = get_route_parameters();
             $this->authorize('view', $this->application);
+            $this->syncData(false);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->application->human_name = $this->humanName;
+            $this->application->description = $this->description;
+            $this->application->fqdn = $this->fqdn;
+            $this->application->image = $this->image;
+            $this->application->exclude_from_status = $this->excludeFromStatus;
+            $this->application->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->application->is_gzip_enabled = $this->isGzipEnabled;
+            $this->application->is_stripprefix_enabled = $this->isStripprefixEnabled;
+        } else {
+            $this->humanName = $this->application->human_name;
+            $this->description = $this->application->description;
+            $this->fqdn = $this->application->fqdn;
+            $this->image = $this->application->image;
+            $this->excludeFromStatus = $this->application->exclude_from_status ?? false;
+            $this->isLogDrainEnabled = $this->application->is_log_drain_enabled ?? false;
+            $this->isGzipEnabled = $this->application->is_gzip_enabled ?? false;
+            $this->isStripprefixEnabled = $this->application->is_stripprefix_enabled ?? false;
         }
     }
 
@@ -146,19 +187,21 @@ class ServiceApplicationView extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
+            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
+            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
                 $domain = trim($domain);
                 Url::fromString($domain, ['http', 'https']);
 
                 return str($domain)->lower();
             });
-            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-            $warning = sslipDomainWarning($this->application->fqdn);
+            $this->fqdn = $domains->unique()->implode(',');
+            $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
+            // Sync to model for domain conflict check
+            $this->syncData(true);
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
@@ -175,6 +218,8 @@ class ServiceApplicationView extends Component
 
             $this->validate();
             $this->application->save();
+            $this->application->refresh();
+            $this->syncData(false);
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
@@ -186,6 +231,7 @@ class ServiceApplicationView extends Component
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
+                $this->syncData(false);
             }
 
             return handleError($e, $this);

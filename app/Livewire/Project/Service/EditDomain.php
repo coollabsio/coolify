@@ -18,14 +18,25 @@ class EditDomain extends Component
 
     public $forceSaveDomains = false;
 
+    public ?string $fqdn = null;
+
     protected $rules = [
-        'application.fqdn' => 'nullable',
-        'application.required_fqdn' => 'required|boolean',
+        'fqdn' => 'nullable',
     ];
 
     public function mount()
     {
         $this->application = ServiceApplication::find($this->applicationId);
+        $this->syncData(false);
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->application->fqdn = $this->fqdn;
+        } else {
+            $this->fqdn = $this->application->fqdn;
+        }
     }
 
     public function confirmDomainUsage()
@@ -38,19 +49,21 @@ class EditDomain extends Component
     public function submit()
     {
         try {
-            $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-            $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
-            $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
+            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
+            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
                 $domain = trim($domain);
                 Url::fromString($domain, ['http', 'https']);
 
                 return str($domain)->lower();
             });
-            $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
-            $warning = sslipDomainWarning($this->application->fqdn);
+            $this->fqdn = $domains->unique()->implode(',');
+            $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
             }
+            // Sync to model for domain conflict check
+            $this->syncData(true);
             // Check for domain conflicts if not forcing save
             if (! $this->forceSaveDomains) {
                 $result = checkDomainUsage(resource: $this->application);
@@ -67,6 +80,8 @@ class EditDomain extends Component
 
             $this->validate();
             $this->application->save();
+            $this->application->refresh();
+            $this->syncData(false);
             updateCompose($this->application);
             if (str($this->application->fqdn)->contains(',')) {
                 $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
@@ -79,6 +94,7 @@ class EditDomain extends Component
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
                 $this->application->fqdn = $originalFqdn;
+                $this->syncData(false);
             }
 
             return handleError($e, $this);

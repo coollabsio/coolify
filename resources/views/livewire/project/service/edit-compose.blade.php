@@ -6,24 +6,24 @@
 
     <div x-cloak x-show="raw" class="font-mono">
         <div x-cloak x-show="showNormalTextarea">
-            <x-forms.textarea rows="20" id="service.docker_compose_raw">
+            <x-forms.textarea rows="20" id="dockerComposeRaw">
             </x-forms.textarea>
         </div>
         <div x-cloak x-show="!showNormalTextarea">
             <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml" rows="20"
-                id="service.docker_compose_raw">
+                id="dockerComposeRaw">
             </x-forms.textarea>
         </div>
     </div>
     <div x-cloak x-show="raw === false" class="font-mono">
-        <x-forms.textarea rows="20" readonly id="service.docker_compose">
+        <x-forms.textarea rows="20" readonly id="dockerCompose">
         </x-forms.textarea>
     </div>
     <div class="pt-2 flex gap-2">
         <div class="flex flex-col gap-2">
             <x-forms.checkbox label="Escape special characters in labels?"
                 helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
-                id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
+                id="isContainerLabelEscapeEnabled" instantSave></x-forms.checkbox>
             <x-forms.checkbox label="Show Normal Textarea" x-model="showNormalTextarea"></x-forms.checkbox>
         </div>
 

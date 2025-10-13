@@ -26,7 +26,7 @@
                     <div class="pb-6 w-96">
                         <x-forms.checkbox canGate="update" :canResource="$server"
                             helper="If set, all resources will only have docker container labels for {{ str($server->proxyType())->title() }}.<br>For applications, labels needs to be regenerated manually. <br>Resources needs to be restarted."
-                            id="server.settings.generate_exact_labels"
+                            id="generateExactLabels"
                             label="Generate labels only for {{ str($server->proxyType())->title() }}" instantSave />
                         <x-forms.checkbox canGate="update" :canResource="$server" instantSave="instantSaveRedirect"
                             id="redirectEnabled" label="Override default request handler"

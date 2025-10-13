@@ -42,7 +42,7 @@
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
                         <div class="flex items-end gap-2 w-full">
-                            <x-forms.input canGate="update" :canResource="$github_app" id="github_app.name" label="App Name" />
+                            <x-forms.input canGate="update" :canResource="$github_app" id="name" label="App Name" />
                             <x-forms.button canGate="update" :canResource="$github_app" wire:click.prevent="updateGithubAppName">
                                 Sync Name
                             </x-forms.button>
@@ -64,41 +64,41 @@
                             @endcan
                         </div>
                     </div>
-                    <x-forms.input canGate="update" :canResource="$github_app" id="github_app.organization" label="Organization"
+                    <x-forms.input canGate="update" :canResource="$github_app" id="organization" label="Organization"
                         placeholder="If empty, personal user will be used" />
                     @if (!isCloud())
                         <div class="w-48">
                             <x-forms.checkbox canGate="update" :canResource="$github_app" label="System Wide?"
                                 helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                                instantSave id="github_app.is_system_wide" />
+                                instantSave id="isSystemWide" />
                         </div>
                     @endif
                     <div class="flex gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.html_url" label="HTML Url" />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.api_url" label="API Url" />
+                        <x-forms.input canGate="update" :canResource="$github_app" id="htmlUrl" label="HTML Url" />
+                        <x-forms.input canGate="update" :canResource="$github_app" id="apiUrl" label="API Url" />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.custom_user" label="User"
+                        <x-forms.input canGate="update" :canResource="$github_app" id="customUser" label="User"
                             required />
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="github_app.custom_port"
+                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="customPort"
                             label="Port" required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="github_app.app_id"
+                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
                             label="App Id" required />
                         <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                            id="github_app.installation_id" label="Installation Id" required />
+                            id="installationId" label="Installation Id" required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.client_id" label="Client Id"
+                        <x-forms.input canGate="update" :canResource="$github_app" id="clientId" label="Client Id"
                             type="password" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.client_secret"
+                        <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
                             label="Client Secret" type="password" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="github_app.webhook_secret"
+                        <x-forms.input canGate="update" :canResource="$github_app" id="webhookSecret"
                             label="Webhook Secret" type="password" required />
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.select canGate="update" :canResource="$github_app" id="github_app.private_key_id"
+                        <x-forms.select canGate="update" :canResource="$github_app" id="privateKeyId"
                             label="Private Key" required>
                             @if (blank($github_app->private_key_id))
                                 <option value="0" selected>Select a private key</option>
@@ -121,14 +121,14 @@
                         @endcan
                     </div>
                     <div class="flex gap-2">
-                        <x-forms.input id="github_app.contents" helper="read - mandatory." label="Content" readonly
+                        <x-forms.input id="contents" helper="read - mandatory." label="Content" readonly
                             placeholder="N/A" />
-                        <x-forms.input id="github_app.metadata" helper="read - mandatory." label="Metadata" readonly
+                        <x-forms.input id="metadata" helper="read - mandatory." label="Metadata" readonly
                             placeholder="N/A" />
-                        {{-- <x-forms.input id="github_app.administration"
+                        {{-- <x-forms.input id="administration"
                             helper="read:write access needed to setup servers as GitHub Runner." label="Administration"
                             readonly placeholder="N/A" /> --}}
-                        <x-forms.input id="github_app.pull_requests"
+                        <x-forms.input id="pullRequests"
                             helper="write access needed to use deployment status update in previews."
                             label="Pull Request" readonly placeholder="N/A" />
                     </div>

@@ -60,12 +60,12 @@
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                             <div class="w-96">
                                 <x-forms.checkbox instantSave label="Is this based on the Git repository?"
-                                    id="fileStorage.is_based_on_git"></x-forms.checkbox>
+                                    id="isBasedOnGit"></x-forms.checkbox>
                             </div>
                         @endif
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
-                            rows="20" id="fileStorage.content"
+                            rows="20" id="content"
                             readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary }}"></x-forms.textarea>
                         @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary)
                             <x-forms.button class="w-full" type="submit">Save</x-forms.button>
@@ -74,12 +74,12 @@
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                             <div class="w-96">
                                 <x-forms.checkbox disabled label="Is this based on the Git repository?"
-                                    id="fileStorage.is_based_on_git"></x-forms.checkbox>
+                                    id="isBasedOnGit"></x-forms.checkbox>
                             </div>
                         @endif
                         <x-forms.textarea
                             label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
-                            rows="20" id="fileStorage.content" disabled></x-forms.textarea>
+                            rows="20" id="content" disabled></x-forms.textarea>
                     @endcan
                 @endif
             @else
@@ -88,12 +88,12 @@
                     @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                         <div class="w-96">
                             <x-forms.checkbox disabled label="Is this based on the Git repository?"
-                                id="fileStorage.is_based_on_git"></x-forms.checkbox>
+                                id="isBasedOnGit"></x-forms.checkbox>
                         </div>
                     @endif
                     <x-forms.textarea
                         label="{{ $fileStorage->is_based_on_git ? 'Content (refreshed after a successful deployment)' : 'Content' }}"
-                        rows="20" id="fileStorage.content" disabled></x-forms.textarea>
+                        rows="20" id="content" disabled></x-forms.textarea>
                 @endif
             @endif
         </form>

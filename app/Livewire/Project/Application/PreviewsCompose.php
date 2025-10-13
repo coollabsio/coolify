@@ -18,6 +18,13 @@ class PreviewsCompose extends Component
 
     public ApplicationPreview $preview;
 
+    public ?string $domain = null;
+
+    public function mount()
+    {
+        $this->domain = data_get($this->service, 'domain');
+    }
+
     public function render()
     {
         return view('livewire.project.application.previews-compose');
@@ -28,10 +35,9 @@ class PreviewsCompose extends Component
         try {
             $this->authorize('update', $this->preview->application);
 
-            $domain = data_get($this->service, 'domain');
             $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
             $docker_compose_domains = json_decode($docker_compose_domains, true);
-            $docker_compose_domains[$this->serviceName]['domain'] = $domain;
+            $docker_compose_domains[$this->serviceName]['domain'] = $this->domain;
             $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
             $this->preview->save();
             $this->dispatch('update_links');
@@ -83,9 +89,10 @@ class PreviewsCompose extends Component
             }
 
             // Save the generated domain
+            $this->domain = $preview_fqdn;
             $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
             $docker_compose_domains = json_decode($docker_compose_domains, true);
-            $docker_compose_domains[$this->serviceName]['domain'] = $this->service->domain = $preview_fqdn;
+            $docker_compose_domains[$this->serviceName]['domain'] = $this->domain;
             $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
             $this->preview->save();
 

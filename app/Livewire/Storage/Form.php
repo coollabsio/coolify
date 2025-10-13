@@ -14,17 +14,34 @@ class Form extends Component
 
     public S3Storage $storage;
 
+    // Explicit properties
+    public ?string $name = null;
+
+    public ?string $description = null;
+
+    public string $endpoint;
+
+    public string $bucket;
+
+    public string $region;
+
+    public string $key;
+
+    public string $secret;
+
+    public ?bool $isUsable = null;
+
     protected function rules(): array
     {
         return [
-            'storage.is_usable' => 'nullable|boolean',
-            'storage.name' => ValidationPatterns::nameRules(required: false),
-            'storage.description' => ValidationPatterns::descriptionRules(),
-            'storage.region' => 'required|max:255',
-            'storage.key' => 'required|max:255',
-            'storage.secret' => 'required|max:255',
-            'storage.bucket' => 'required|max:255',
-            'storage.endpoint' => 'required|url|max:255',
+            'isUsable' => 'nullable|boolean',
+            'name' => ValidationPatterns::nameRules(required: false),
+            'description' => ValidationPatterns::descriptionRules(),
+            'region' => 'required|max:255',
+            'key' => 'required|max:255',
+            'secret' => 'required|max:255',
+            'bucket' => 'required|max:255',
+            'endpoint' => 'required|url|max:255',
         ];
     }
 
@@ -33,33 +50,68 @@ class Form extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
-                'storage.name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'storage.description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
-                'storage.region.required' => 'The Region field is required.',
-                'storage.region.max' => 'The Region may not be greater than 255 characters.',
-                'storage.key.required' => 'The Access Key field is required.',
-                'storage.key.max' => 'The Access Key may not be greater than 255 characters.',
-                'storage.secret.required' => 'The Secret Key field is required.',
-                'storage.secret.max' => 'The Secret Key may not be greater than 255 characters.',
-                'storage.bucket.required' => 'The Bucket field is required.',
-                'storage.bucket.max' => 'The Bucket may not be greater than 255 characters.',
-                'storage.endpoint.required' => 'The Endpoint field is required.',
-                'storage.endpoint.url' => 'The Endpoint must be a valid URL.',
-                'storage.endpoint.max' => 'The Endpoint may not be greater than 255 characters.',
+                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+                'region.required' => 'The Region field is required.',
+                'region.max' => 'The Region may not be greater than 255 characters.',
+                'key.required' => 'The Access Key field is required.',
+                'key.max' => 'The Access Key may not be greater than 255 characters.',
+                'secret.required' => 'The Secret Key field is required.',
+                'secret.max' => 'The Secret Key may not be greater than 255 characters.',
+                'bucket.required' => 'The Bucket field is required.',
+                'bucket.max' => 'The Bucket may not be greater than 255 characters.',
+                'endpoint.required' => 'The Endpoint field is required.',
+                'endpoint.url' => 'The Endpoint must be a valid URL.',
+                'endpoint.max' => 'The Endpoint may not be greater than 255 characters.',
             ]
         );
     }
 
     protected $validationAttributes = [
-        'storage.is_usable' => 'Is Usable',
-        'storage.name' => 'Name',
-        'storage.description' => 'Description',
-        'storage.region' => 'Region',
-        'storage.key' => 'Key',
-        'storage.secret' => 'Secret',
-        'storage.bucket' => 'Bucket',
-        'storage.endpoint' => 'Endpoint',
+        'isUsable' => 'Is Usable',
+        'name' => 'Name',
+        'description' => 'Description',
+        'region' => 'Region',
+        'key' => 'Key',
+        'secret' => 'Secret',
+        'bucket' => 'Bucket',
+        'endpoint' => 'Endpoint',
     ];
+
+    /**
+     * Sync data between component properties and model
+     *
+     * @param  bool  $toModel  If true, sync FROM properties TO model. If false, sync FROM model TO properties.
+     */
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            // Sync TO model (before save)
+            $this->storage->name = $this->name;
+            $this->storage->description = $this->description;
+            $this->storage->endpoint = $this->endpoint;
+            $this->storage->bucket = $this->bucket;
+            $this->storage->region = $this->region;
+            $this->storage->key = $this->key;
+            $this->storage->secret = $this->secret;
+            $this->storage->is_usable = $this->isUsable;
+        } else {
+            // Sync FROM model (on load/refresh)
+            $this->name = $this->storage->name;
+            $this->description = $this->storage->description;
+            $this->endpoint = $this->storage->endpoint;
+            $this->bucket = $this->storage->bucket;
+            $this->region = $this->storage->region;
+            $this->key = $this->storage->key;
+            $this->secret = $this->storage->secret;
+            $this->isUsable = $this->storage->is_usable;
+        }
+    }
+
+    public function mount()
+    {
+        $this->syncData(false);
+    }
 
     public function testConnection()
     {
@@ -94,6 +146,9 @@ class Form extends Component
 
             DB::transaction(function () {
                 $this->validate();
+
+                // Sync properties to model before saving
+                $this->syncData(true);
                 $this->storage->save();
 
                 // Test connection with new values - if this fails, transaction will rollback
@@ -103,12 +158,16 @@ class Form extends Component
                 $this->storage->is_usable = true;
                 $this->storage->unusable_email_sent = false;
                 $this->storage->save();
+
+                // Update local property to reflect success
+                $this->isUsable = true;
             });
 
             $this->dispatch('success', 'Storage settings updated and connection verified.');
         } catch (\Throwable $e) {
             // Refresh the model to revert UI to database values after rollback
             $this->storage->refresh();
+            $this->syncData(false);
 
             return handleError($e, $this);
         }

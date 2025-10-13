@@ -23,48 +23,48 @@
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
-                <x-forms.input canGate="update" :canResource="$application" label="Name" id="application.human_name"
+                <x-forms.input canGate="update" :canResource="$application" label="Name" id="humanName"
                     placeholder="Human readable name"></x-forms.input>
                 <x-forms.input canGate="update" :canResource="$application" label="Description"
-                    id="application.description"></x-forms.input>
+                    id="description"></x-forms.input>
             </div>
             <div class="flex gap-2">
                 @if (!$application->serviceType()?->contains(str($application->image)->before(':')))
                     @if ($application->required_fqdn)
                         <x-forms.input canGate="update" :canResource="$application" required placeholder="https://app.coolify.io"
-                            label="Domains" id="application.fqdn"
+                            label="Domains" id="fqdn"
                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
                     @else
                         <x-forms.input canGate="update" :canResource="$application" placeholder="https://app.coolify.io"
-                            label="Domains" id="application.fqdn"
+                            label="Domains" id="fqdn"
                             helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
                     @endif
                 @endif
                 <x-forms.input canGate="update" :canResource="$application"
                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
-                    label="Image" id="application.image"></x-forms.input>
+                    label="Image" id="image"></x-forms.input>
             </div>
         </div>
         <h3 class="py-2 pt-4">Advanced</h3>
         <div class="w-96 flex flex-col gap-1">
             @if (str($application->image)->contains('pocketbase'))
-                <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="application.is_gzip_enabled"
+                <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="isGzipEnabled"
                     label="Enable Gzip Compression"
                     helper="Pocketbase does not need gzip compression, otherwise SSE will not work." disabled />
             @else
-                <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="application.is_gzip_enabled"
+                <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="isGzipEnabled"
                     label="Enable Gzip Compression"
                     helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
             @endif
-            <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="application.is_stripprefix_enabled"
+            <x-forms.checkbox canGate="update" :canResource="$application" instantSave id="isStripprefixEnabled"
                 label="Strip Prefixes"
                 helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api." />
             <x-forms.checkbox canGate="update" :canResource="$application" instantSave label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
-                id="application.exclude_from_status"></x-forms.checkbox>
+                id="excludeFromStatus"></x-forms.checkbox>
             <x-forms.checkbox canGate="update" :canResource="$application"
                 helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="application.is_log_drain_enabled" label="Drain Logs" />
+                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" />
         </div>
     </form>
     

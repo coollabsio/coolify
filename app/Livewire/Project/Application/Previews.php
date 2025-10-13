@@ -33,14 +33,34 @@ class Previews extends Component
 
     public $pendingPreviewId = null;
 
+    public array $previewFqdns = [];
+
     protected $rules = [
-        'application.previews.*.fqdn' => 'string|nullable',
+        'previewFqdns.*' => 'string|nullable',
     ];
 
     public function mount()
     {
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
+        $this->syncData(false);
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            foreach ($this->previewFqdns as $key => $fqdn) {
+                $preview = $this->application->previews->get($key);
+                if ($preview) {
+                    $preview->fqdn = $fqdn;
+                }
+            }
+        } else {
+            $this->previewFqdns = [];
+            foreach ($this->application->previews as $key => $preview) {
+                $this->previewFqdns[$key] = $preview->fqdn;
+            }
+        }
     }
 
     public function load_prs()
@@ -73,35 +93,52 @@ class Previews extends Component
             $this->authorize('update', $this->application);
             $success = true;
             $preview = $this->application->previews->find($preview_id);
-            if (data_get_str($preview, 'fqdn')->isNotEmpty()) {
-                $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
-                $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
-                $preview->fqdn = str($preview->fqdn)->trim()->lower();
-                if (! validateDNSEntry($preview->fqdn, $this->application->destination->server)) {
-                    $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
-                    $success = false;
-                }
-                // Check for domain conflicts if not forcing save
-                if (! $this->forceSaveDomains) {
-                    $result = checkDomainUsage(resource: $this->application, domain: $preview->fqdn);
-                    if ($result['hasConflicts']) {
-                        $this->domainConflicts = $result['conflicts'];
-                        $this->showDomainConflictModal = true;
-                        $this->pendingPreviewId = $preview_id;
-
-                        return;
-                    }
-                } else {
-                    // Reset the force flag after using it
-                    $this->forceSaveDomains = false;
-                }
-            }
 
             if (! $preview) {
                 throw new \Exception('Preview not found');
             }
-            $success && $preview->save();
-            $success && $this->dispatch('success', 'Preview saved.<br><br>Do not forget to redeploy the preview to apply the changes.');
+
+            // Find the key for this preview in the collection
+            $previewKey = $this->application->previews->search(function ($item) use ($preview_id) {
+                return $item->id == $preview_id;
+            });
+
+            if ($previewKey !== false && isset($this->previewFqdns[$previewKey])) {
+                $fqdn = $this->previewFqdns[$previewKey];
+
+                if (! empty($fqdn)) {
+                    $fqdn = str($fqdn)->replaceEnd(',', '')->trim();
+                    $fqdn = str($fqdn)->replaceStart(',', '')->trim();
+                    $fqdn = str($fqdn)->trim()->lower();
+                    $this->previewFqdns[$previewKey] = $fqdn;
+
+                    if (! validateDNSEntry($fqdn, $this->application->destination->server)) {
+                        $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        $success = false;
+                    }
+
+                    // Check for domain conflicts if not forcing save
+                    if (! $this->forceSaveDomains) {
+                        $result = checkDomainUsage(resource: $this->application, domain: $fqdn);
+                        if ($result['hasConflicts']) {
+                            $this->domainConflicts = $result['conflicts'];
+                            $this->showDomainConflictModal = true;
+                            $this->pendingPreviewId = $preview_id;
+
+                            return;
+                        }
+                    } else {
+                        // Reset the force flag after using it
+                        $this->forceSaveDomains = false;
+                    }
+                }
+            }
+
+            if ($success) {
+                $this->syncData(true);
+                $preview->save();
+                $this->dispatch('success', 'Preview saved.<br><br>Do not forget to redeploy the preview to apply the changes.');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -121,6 +158,7 @@ class Previews extends Component
             if ($this->application->build_pack === 'dockercompose') {
                 $preview->generate_preview_fqdn_compose();
                 $this->application->refresh();
+                $this->syncData(false);
                 $this->dispatch('success', 'Domain generated.');
 
                 return;
@@ -128,6 +166,7 @@ class Previews extends Component
 
             $preview->generate_preview_fqdn();
             $this->application->refresh();
+            $this->syncData(false);
             $this->dispatch('update_links');
             $this->dispatch('success', 'Domain generated.');
         } catch (\Throwable $e) {
@@ -152,6 +191,7 @@ class Previews extends Component
                 }
                 $found->generate_preview_fqdn_compose();
                 $this->application->refresh();
+                $this->syncData(false);
             } else {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -164,6 +204,7 @@ class Previews extends Component
                 }
                 $found->generate_preview_fqdn();
                 $this->application->refresh();
+                $this->syncData(false);
                 $this->dispatch('update_links');
                 $this->dispatch('success', 'Preview added.');
             }

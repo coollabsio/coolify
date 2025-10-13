@@ -36,12 +36,16 @@ class FileStorage extends Component
 
     public bool $isReadOnly = false;
 
+    public ?string $content = null;
+
+    public bool $isBasedOnGit = false;
+
     protected $rules = [
         'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
-        'fileStorage.content' => 'nullable',
-        'fileStorage.is_based_on_git' => 'required|boolean',
+        'content' => 'nullable',
+        'isBasedOnGit' => 'required|boolean',
     ];
 
     public function mount()
@@ -56,6 +60,18 @@ class FileStorage extends Component
         }
 
         $this->isReadOnly = $this->fileStorage->isReadOnlyVolume();
+        $this->syncData(false);
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->fileStorage->content = $this->content;
+            $this->fileStorage->is_based_on_git = $this->isBasedOnGit;
+        } else {
+            $this->content = $this->fileStorage->content;
+            $this->isBasedOnGit = $this->fileStorage->is_based_on_git ?? false;
+        }
     }
 
     public function convertToDirectory()
@@ -82,6 +98,7 @@ class FileStorage extends Component
             $this->authorize('update', $this->resource);
 
             $this->fileStorage->loadStorageOnServer();
+            $this->syncData(false);
             $this->dispatch('success', 'File storage loaded from server.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -148,14 +165,16 @@ class FileStorage extends Component
         try {
             $this->validate();
             if ($this->fileStorage->is_directory) {
-                $this->fileStorage->content = null;
+                $this->content = null;
             }
+            $this->syncData(true);
             $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated.');
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
             $this->fileStorage->save();
+            $this->syncData(false);
 
             return handleError($e, $this);
         }
