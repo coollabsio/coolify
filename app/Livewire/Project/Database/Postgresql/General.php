@@ -22,6 +22,40 @@ class General extends Component
 
     public Server $server;
 
+    public string $name;
+
+    public ?string $description = null;
+
+    public string $postgresUser;
+
+    public string $postgresPassword;
+
+    public string $postgresDb;
+
+    public ?string $postgresInitdbArgs = null;
+
+    public ?string $postgresHostAuthMethod = null;
+
+    public ?string $postgresConf = null;
+
+    public ?array $initScripts = null;
+
+    public string $image;
+
+    public ?string $portsMappings = null;
+
+    public ?bool $isPublic = null;
+
+    public ?int $publicPort = null;
+
+    public bool $isLogDrainEnabled = false;
+
+    public ?string $customDockerRunOptions = null;
+
+    public bool $enableSsl = false;
+
+    public ?string $sslMode = null;
+
     public string $new_filename;
 
     public string $new_content;
@@ -38,7 +72,6 @@ class General extends Component
 
         return [
             "echo-private:user.{$userId},DatabaseStatusChanged" => '$refresh',
-            'refresh' => '$refresh',
             'save_init_script',
             'delete_init_script',
         ];
@@ -47,23 +80,23 @@ class General extends Component
     protected function rules(): array
     {
         return [
-            'database.name' => ValidationPatterns::nameRules(),
-            'database.description' => ValidationPatterns::descriptionRules(),
-            'database.postgres_user' => 'required',
-            'database.postgres_password' => 'required',
-            'database.postgres_db' => 'required',
-            'database.postgres_initdb_args' => 'nullable',
-            'database.postgres_host_auth_method' => 'nullable',
-            'database.postgres_conf' => 'nullable',
-            'database.init_scripts' => 'nullable',
-            'database.image' => 'required',
-            'database.ports_mappings' => 'nullable',
-            'database.is_public' => 'nullable|boolean',
-            'database.public_port' => 'nullable|integer',
-            'database.is_log_drain_enabled' => 'nullable|boolean',
-            'database.custom_docker_run_options' => 'nullable',
-            'database.enable_ssl' => 'boolean',
-            'database.ssl_mode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'postgresUser' => 'required',
+            'postgresPassword' => 'required',
+            'postgresDb' => 'required',
+            'postgresInitdbArgs' => 'nullable',
+            'postgresHostAuthMethod' => 'nullable',
+            'postgresConf' => 'nullable',
+            'initScripts' => 'nullable',
+            'image' => 'required',
+            'portsMappings' => 'nullable',
+            'isPublic' => 'nullable|boolean',
+            'publicPort' => 'nullable|integer',
+            'isLogDrainEnabled' => 'nullable|boolean',
+            'customDockerRunOptions' => 'nullable',
+            'enableSsl' => 'boolean',
+            'sslMode' => 'nullable|string|in:allow,prefer,require,verify-ca,verify-full',
         ];
     }
 
@@ -72,48 +105,99 @@ class General extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
-                'database.name.required' => 'The Name field is required.',
-                'database.name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'database.description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
-                'database.postgres_user.required' => 'The Postgres User field is required.',
-                'database.postgres_password.required' => 'The Postgres Password field is required.',
-                'database.postgres_db.required' => 'The Postgres Database field is required.',
-                'database.image.required' => 'The Docker Image field is required.',
-                'database.public_port.integer' => 'The Public Port must be an integer.',
-                'database.ssl_mode.in' => 'The SSL Mode must be one of: allow, prefer, require, verify-ca, verify-full.',
+                'name.required' => 'The Name field is required.',
+                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
+                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
+                'postgresUser.required' => 'The Postgres User field is required.',
+                'postgresPassword.required' => 'The Postgres Password field is required.',
+                'postgresDb.required' => 'The Postgres Database field is required.',
+                'image.required' => 'The Docker Image field is required.',
+                'publicPort.integer' => 'The Public Port must be an integer.',
+                'sslMode.in' => 'The SSL Mode must be one of: allow, prefer, require, verify-ca, verify-full.',
             ]
         );
     }
 
     protected $validationAttributes = [
-        'database.name' => 'Name',
-        'database.description' => 'Description',
-        'database.postgres_user' => 'Postgres User',
-        'database.postgres_password' => 'Postgres Password',
-        'database.postgres_db' => 'Postgres DB',
-        'database.postgres_initdb_args' => 'Postgres Initdb Args',
-        'database.postgres_host_auth_method' => 'Postgres Host Auth Method',
-        'database.postgres_conf' => 'Postgres Configuration',
-        'database.init_scripts' => 'Init Scripts',
-        'database.image' => 'Image',
-        'database.ports_mappings' => 'Port Mapping',
-        'database.is_public' => 'Is Public',
-        'database.public_port' => 'Public Port',
-        'database.custom_docker_run_options' => 'Custom Docker Run Options',
-        'database.enable_ssl' => 'Enable SSL',
-        'database.ssl_mode' => 'SSL Mode',
+        'name' => 'Name',
+        'description' => 'Description',
+        'postgresUser' => 'Postgres User',
+        'postgresPassword' => 'Postgres Password',
+        'postgresDb' => 'Postgres DB',
+        'postgresInitdbArgs' => 'Postgres Initdb Args',
+        'postgresHostAuthMethod' => 'Postgres Host Auth Method',
+        'postgresConf' => 'Postgres Configuration',
+        'initScripts' => 'Init Scripts',
+        'image' => 'Image',
+        'portsMappings' => 'Port Mapping',
+        'isPublic' => 'Is Public',
+        'publicPort' => 'Public Port',
+        'customDockerRunOptions' => 'Custom Docker Run Options',
+        'enableSsl' => 'Enable SSL',
+        'sslMode' => 'SSL Mode',
     ];
 
     public function mount()
     {
-        $this->db_url = $this->database->internal_db_url;
-        $this->db_url_public = $this->database->external_db_url;
-        $this->server = data_get($this->database, 'destination.server');
+        try {
+            $this->syncData();
+            $this->server = data_get($this->database, 'destination.server');
 
-        $existingCert = $this->database->sslCertificates()->first();
+            $existingCert = $this->database->sslCertificates()->first();
 
-        if ($existingCert) {
-            $this->certificateValidUntil = $existingCert->valid_until;
+            if ($existingCert) {
+                $this->certificateValidUntil = $existingCert->valid_until;
+            }
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function syncData(bool $toModel = false)
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->database->name = $this->name;
+            $this->database->description = $this->description;
+            $this->database->postgres_user = $this->postgresUser;
+            $this->database->postgres_password = $this->postgresPassword;
+            $this->database->postgres_db = $this->postgresDb;
+            $this->database->postgres_initdb_args = $this->postgresInitdbArgs;
+            $this->database->postgres_host_auth_method = $this->postgresHostAuthMethod;
+            $this->database->postgres_conf = $this->postgresConf;
+            $this->database->init_scripts = $this->initScripts;
+            $this->database->image = $this->image;
+            $this->database->ports_mappings = $this->portsMappings;
+            $this->database->is_public = $this->isPublic;
+            $this->database->public_port = $this->publicPort;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->custom_docker_run_options = $this->customDockerRunOptions;
+            $this->database->enable_ssl = $this->enableSsl;
+            $this->database->ssl_mode = $this->sslMode;
+            $this->database->save();
+
+            $this->db_url = $this->database->internal_db_url;
+            $this->db_url_public = $this->database->external_db_url;
+        } else {
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->postgresUser = $this->database->postgres_user;
+            $this->postgresPassword = $this->database->postgres_password;
+            $this->postgresDb = $this->database->postgres_db;
+            $this->postgresInitdbArgs = $this->database->postgres_initdb_args;
+            $this->postgresHostAuthMethod = $this->database->postgres_host_auth_method;
+            $this->postgresConf = $this->database->postgres_conf;
+            $this->initScripts = $this->database->init_scripts;
+            $this->image = $this->database->image;
+            $this->portsMappings = $this->database->ports_mappings;
+            $this->isPublic = $this->database->is_public;
+            $this->publicPort = $this->database->public_port;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->enableSsl = $this->database->enable_ssl;
+            $this->sslMode = $this->database->ssl_mode;
+            $this->db_url = $this->database->internal_db_url;
+            $this->db_url_public = $this->database->external_db_url;
         }
     }
 
@@ -123,12 +207,12 @@ class General extends Component
             $this->authorize('update', $this->database);
 
             if (! $this->server->isLogDrainEnabled()) {
-                $this->database->is_log_drain_enabled = false;
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
             }
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
@@ -136,7 +220,7 @@ class General extends Component
         }
     }
 
-    public function updatedDatabaseSslMode()
+    public function updatedSslMode()
     {
         $this->instantSaveSSL();
     }
@@ -146,10 +230,8 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'SSL configuration updated.');
-            $this->db_url = $this->database->internal_db_url;
-            $this->db_url_public = $this->database->external_db_url;
         } catch (Exception $e) {
             return handleError($e, $this);
         }
@@ -194,16 +276,16 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            if ($this->database->is_public && ! $this->database->public_port) {
+            if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
-                $this->database->is_public = false;
+                $this->isPublic = false;
 
                 return;
             }
-            if ($this->database->is_public) {
+            if ($this->isPublic) {
                 if (! str($this->database->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->database->is_public = false;
+                    $this->isPublic = false;
 
                     return;
                 }
@@ -213,10 +295,9 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->db_url_public = $this->database->external_db_url;
-            $this->database->save();
+            $this->syncData(true);
         } catch (\Throwable $e) {
-            $this->database->is_public = ! $this->database->is_public;
+            $this->isPublic = ! $this->isPublic;
 
             return handleError($e, $this);
         }
@@ -226,7 +307,7 @@ class General extends Component
     {
         $this->authorize('update', $this->database);
 
-        $initScripts = collect($this->database->init_scripts ?? []);
+        $initScripts = collect($this->initScripts ?? []);
 
         $existingScript = $initScripts->firstWhere('filename', $script['filename']);
         $oldScript = $initScripts->firstWhere('index', $script['index']);
@@ -262,7 +343,7 @@ class General extends Component
             $initScripts->push($script);
         }
 
-        $this->database->init_scripts = $initScripts->values()
+        $this->initScripts = $initScripts->values()
             ->map(function ($item, $index) {
                 $item['index'] = $index;
 
@@ -270,7 +351,7 @@ class General extends Component
             })
             ->all();
 
-        $this->database->save();
+        $this->syncData(true);
         $this->dispatch('success', 'Init script saved and updated.');
     }
 
@@ -278,7 +359,7 @@ class General extends Component
     {
         $this->authorize('update', $this->database);
 
-        $collection = collect($this->database->init_scripts);
+        $collection = collect($this->initScripts);
         $found = $collection->firstWhere('filename', $script['filename']);
         if ($found) {
             $container_name = $this->database->uuid;
@@ -303,8 +384,8 @@ class General extends Component
                 })
                 ->all();
 
-            $this->database->init_scripts = $updatedScripts;
-            $this->database->save();
+            $this->initScripts = $updatedScripts;
+            $this->syncData(true);
             $this->dispatch('refresh')->self();
             $this->dispatch('success', 'Init script deleted from the database and the server.');
         }
@@ -318,23 +399,23 @@ class General extends Component
             'new_filename' => 'required|string',
             'new_content' => 'required|string',
         ]);
-        $found = collect($this->database->init_scripts)->firstWhere('filename', $this->new_filename);
+        $found = collect($this->initScripts)->firstWhere('filename', $this->new_filename);
         if ($found) {
             $this->dispatch('error', 'Filename already exists.');
 
             return;
         }
-        if (! isset($this->database->init_scripts)) {
-            $this->database->init_scripts = [];
+        if (! isset($this->initScripts)) {
+            $this->initScripts = [];
         }
-        $this->database->init_scripts = array_merge($this->database->init_scripts, [
+        $this->initScripts = array_merge($this->initScripts, [
             [
-                'index' => count($this->database->init_scripts),
+                'index' => count($this->initScripts),
                 'filename' => $this->new_filename,
                 'content' => $this->new_content,
             ],
         ]);
-        $this->database->save();
+        $this->syncData(true);
         $this->dispatch('success', 'Init script added.');
         $this->new_content = '';
         $this->new_filename = '';
@@ -345,11 +426,10 @@ class General extends Component
         try {
             $this->authorize('update', $this->database);
 
-            if (str($this->database->public_port)->isEmpty()) {
-                $this->database->public_port = null;
+            if (str($this->publicPort)->isEmpty()) {
+                $this->publicPort = null;
             }
-            $this->validate();
-            $this->database->save();
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
