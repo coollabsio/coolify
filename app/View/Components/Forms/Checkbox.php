@@ -53,14 +53,14 @@ class Checkbox extends Component
     {
         // Store original ID for wire:model binding (property name)
         $this->modelBinding = $this->id;
-        $this->htmlId = $this->id;
 
-        // Generate unique HTML ID by prefixing with Livewire component ID if available
+        // Generate unique HTML ID by adding random suffix
+        // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->id) {
-            $livewireId = $this->attributes?->wire('id');
-            if ($livewireId) {
-                $this->htmlId = $livewireId.'-'.$this->id;
-            }
+            $uniqueSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 8);
+            $this->htmlId = $this->id.'-'.$uniqueSuffix;
+        } else {
+            $this->htmlId = $this->id;
         }
 
         return view('components.forms.checkbox');

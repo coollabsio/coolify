@@ -56,20 +56,22 @@ class Datalist extends Component
 
         if (is_null($this->id)) {
             $this->id = new Cuid2;
-            $this->modelBinding = $this->id;
+            // Don't create wire:model binding for auto-generated IDs
+            $this->modelBinding = 'null';
         }
 
-        // Generate unique HTML ID by prefixing with Livewire component ID
+        // Generate unique HTML ID by adding random suffix
         // This prevents duplicate IDs when multiple forms are on the same page
-        $livewireId = $this->attributes?->wire('id');
-        if ($livewireId && $this->modelBinding) {
-            $this->htmlId = $livewireId.'-'.$this->modelBinding;
+        if ($this->modelBinding && $this->modelBinding !== 'null') {
+            // Use original ID with random suffix for uniqueness
+            $uniqueSuffix = substr(md5(uniqid((string) mt_rand(), true)), 0, 8);
+            $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
         } else {
-            $this->htmlId = $this->modelBinding ?: $this->id;
+            $this->htmlId = (string) $this->id;
         }
 
         if (is_null($this->name)) {
-            $this->name = $this->modelBinding;
+            $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
         }
 
         return view('components.forms.datalist');
