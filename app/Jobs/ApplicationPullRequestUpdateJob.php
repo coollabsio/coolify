@@ -35,6 +35,8 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->application->is_public_repository()) {
                 return;
             }
+            $serviceName = $this->application->name;
+
             if ($this->status === ProcessStatus::CLOSED) {
                 $this->delete_comment();
 
