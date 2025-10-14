@@ -1305,7 +1305,8 @@ class Application extends BaseModel
         }
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
-            $git_clone_command = "{$git_clone_command} {$customRepository} {$baseDir}";
+            $escapedCustomRepository = escapeshellarg($customRepository);
+            $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
             $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true);
 
             if ($pull_request_id !== 0) {

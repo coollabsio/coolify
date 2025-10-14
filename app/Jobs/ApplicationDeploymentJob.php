@@ -1897,9 +1897,27 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         if ($this->saved_outputs->get('git_commit_sha') && ! $this->rollback) {
-            $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
-            $this->application_deployment_queue->commit = $this->commit;
-            $this->application_deployment_queue->save();
+            // Extract commit SHA from git ls-remote output, handling multi-line output (e.g., redirect warnings)
+            // Expected format: "commit_sha\trefs/heads/branch" possibly preceded by warning lines
+            // Note: Git warnings can be on the same line as the result (no newline)
+            $lsRemoteOutput = $this->saved_outputs->get('git_commit_sha');
+
+            // Find the part containing a tab (the actual ls-remote result)
+            // Handle cases where warning is on the same line as the result
+            if ($lsRemoteOutput->contains("\t")) {
+                // Get everything from the last occurrence of a valid commit SHA pattern before the tab
+                // A valid commit SHA is 40 hex characters
+                $output = $lsRemoteOutput->value();
+
+                // Extract the line with the tab (actual ls-remote result)
+                preg_match('/([0-9a-f]{40})\s*\t/', $output, $matches);
+
+                if (isset($matches[1])) {
+                    $this->commit = $matches[1];
+                    $this->application_deployment_queue->commit = $this->commit;
+                    $this->application_deployment_queue->save();
+                }
+            }
         }
         $this->set_coolify_variables();
 
