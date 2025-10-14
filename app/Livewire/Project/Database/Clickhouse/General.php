@@ -16,7 +16,7 @@ class General extends Component
 {
     use AuthorizesRequests;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public StandaloneClickhouse $database;
 
@@ -58,6 +58,11 @@ class General extends Component
         try {
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -20,7 +20,7 @@ class General extends Component
 
     public StandaloneMysql $database;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public string $name;
 
@@ -129,6 +129,11 @@ class General extends Component
         try {
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
 
             $existingCert = $this->database->sslCertificates()->first();
 

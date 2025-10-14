@@ -18,7 +18,7 @@ class General extends Component
 {
     use AuthorizesRequests;
 
-    public Server $server;
+    public ?Server $server = null;
 
     public StandaloneMongodb $database;
 
@@ -124,6 +124,11 @@ class General extends Component
         try {
             $this->syncData();
             $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
 
             $existingCert = $this->database->sslCertificates()->first();
 
