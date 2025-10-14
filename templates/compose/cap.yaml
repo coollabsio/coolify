@@ -31,7 +31,6 @@ services:
   cap-web:
     container_name: cap-web
     image: 'ghcr.io/capsoftware/cap-web:latest'
-    restart: unless-stopped
     environment:
       - SERVICE_URL_CAP_3000
       - 'DATABASE_URL=mysql://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@cap-db:3306/${MYSQL_DATABASE:-planetscale}'
