@@ -51,7 +51,6 @@ services:
         condition: service_healthy
         
   cap-db:
-    container_name: cap-db
     image: 'mysql:8.0'
     environment:
       - 'MYSQL_USER=${SERVICE_USER_MYSQL}'
