@@ -1131,7 +1131,8 @@ class Application extends BaseModel
 
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
-            $base_command = "{$base_command} {$customRepository}";
+            $escapedCustomRepository = escapeshellarg($customRepository);
+            $base_command = "{$base_command} {$escapedCustomRepository}";
 
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $base_command));
