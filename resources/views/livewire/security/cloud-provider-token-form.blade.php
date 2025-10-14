@@ -55,10 +55,12 @@
                         Create an API token in the <a href='https://console.hetzner.com/projects' target='_blank'
                             class='underline dark:text-white'>Hetzner Console</a> → choose Project → Security → API
                         Tokens.
+                        <br><br>
+                        Don't have a Hetzner account? <a href='https://coolify.io/hetzner' target='_blank'
+                            class='underline dark:text-white'>Sign up here</a>
                         <br>
-                        Don't have a Hetzner account? <a href='https://hetzner.cloud/?ref=coolify' target='_blank'
-                            class='underline dark:text-white'>Sign up here</a> (official Coolify affiliate link - supports us
-                        and gives you credits!)
+                        <span class="text-xs">(Coolify's affiliate link, only new accounts - supports us (€10)
+                        and gives you €20)</span>
                     </div>
                 @endif
             </div>
