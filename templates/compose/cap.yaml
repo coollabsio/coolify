@@ -53,7 +53,6 @@ services:
   cap-db:
     container_name: cap-db
     image: 'mysql:8.0'
-    restart: unless-stopped
     environment:
       - 'MYSQL_USER=${SERVICE_USER_MYSQL}'
       - 'MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}'
