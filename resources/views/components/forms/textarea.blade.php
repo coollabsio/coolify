@@ -25,7 +25,7 @@
         </label>
     @endif
     @if ($useMonacoEditor)
-        <x-forms.monaco-editor id="{{ $htmlId }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
+        <x-forms.monaco-editor id="{{ $modelBinding }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
             name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
             readonly="{{ $readonly }}" label="dockerfile" />
     @else
