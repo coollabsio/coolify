@@ -491,6 +491,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+
+        // Save runtime environment variables AFTER the build
+        // This overwrites the build-time .env with ALL variables (build-time + runtime)
+        $this->save_runtime_environment_variables();
+
         $this->push_to_docker_registry();
         $this->rolling_update();
     }
