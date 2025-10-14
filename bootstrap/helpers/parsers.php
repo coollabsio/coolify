@@ -1181,22 +1181,25 @@ function serviceParser(Service $resource): Collection
         $image = data_get_str($service, 'image');
         $isDatabase = isDatabaseImage($image, $service);
         if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
             } else {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
-                'image' => $image,
                 'service_id' => $resource->id,
             ]);
+        }
+        // Update image if it changed
+        if ($savedService->image !== $image) {
+            $savedService->image = $image;
+            $savedService->save();
         }
     }
     foreach ($services as $serviceName => $service) {
@@ -1514,20 +1517,18 @@ function serviceParser(Service $resource): Collection
         }
 
         if ($isDatabase) {
-            $applicationFound = ServiceApplication::where('name', $serviceName)->where('image', $image)->where('service_id', $resource->id)->first();
+            $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
             if ($applicationFound) {
                 $savedService = $applicationFound;
             } else {
                 $savedService = ServiceDatabase::firstOrCreate([
                     'name' => $serviceName,
-                    'image' => $image,
                     'service_id' => $resource->id,
                 ]);
             }
         } else {
             $savedService = ServiceApplication::firstOrCreate([
                 'name' => $serviceName,
-                'image' => $image,
                 'service_id' => $resource->id,
             ]);
         }

@@ -1317,6 +1317,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'name' => $serviceName,
                             'service_id' => $resource->id,
                         ])->first();
+                        if (is_null($savedService)) {
+                            $savedService = ServiceDatabase::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        }
                     }
                 } else {
                     if ($isNew) {
@@ -1330,21 +1337,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'name' => $serviceName,
                             'service_id' => $resource->id,
                         ])->first();
-                    }
-                }
-                if (is_null($savedService)) {
-                    if ($isDatabase) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
+                        if (is_null($savedService)) {
+                            $savedService = ServiceApplication::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        }
                     }
                 }
 
