@@ -2708,7 +2708,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ]
                 );
             }
-            $publishDir = ltrim($this->application->publish_directory, '/');
+            $publishDir = trim($this->application->publish_directory, '/');
             $publishDir = $publishDir ? "/{$publishDir}" : '';
             $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
