@@ -29,7 +29,6 @@
 
 services:
   cap-web:
-    container_name: cap-web
     image: 'ghcr.io/capsoftware/cap-web:latest'
     environment:
       - SERVICE_URL_CAP_3000
