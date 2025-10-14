@@ -25,9 +25,9 @@
         </label>
     @endif
     @if ($useMonacoEditor)
-        <x-forms.monaco-editor id="{{ $id }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
-            name="{{ $id }}" model="{{ $value ?? $id }}" wire:model="{{ $value ?? $id }}"
-            readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
+        <x-forms.monaco-editor id="{{ $htmlId }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
+            name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
+            readonly="{{ $readonly }}" label="dockerfile" />
     @else
         @if ($type === 'password')
             <div class="relative" x-data="{ type: 'password' }">
@@ -45,36 +45,34 @@
                 @endif
                 <input x-cloak x-show="type === 'password'" value="{{ $value }}"
                     {{ $attributes->merge(['class' => $defaultClassInput]) }} @required($required)
-                    @if ($id !== 'null') wire:model={{ $id }} @endif
-                    wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" wire:loading.attr="disabled"
-                    type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
+                    @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} @endif
+                    wire:dirty.class="dark:ring-warning ring-warning" wire:loading.attr="disabled"
+                    type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                     name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                     aria-placeholder="{{ $attributes->get('placeholder') }}">
                 <textarea minlength="{{ $minlength }}" maxlength="{{ $maxlength }}" x-cloak x-show="type !== 'password'"
                     placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
-                    @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
+                    @if ($realtimeValidation) wire:model.debounce.200ms="{{ $modelBinding }}"
                 @else
-            wire:model={{ $value ?? $id }}
-                     wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
-                    @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
-                    name="{{ $name }}" name={{ $id }}
-                    @if ($autofocus) x-ref="autofocusInput" @endif></textarea>
+            wire:model={{ $value ?? $modelBinding }}
+                     wire:dirty.class="dark:ring-warning ring-warning" @endif
+                    @disabled($disabled) @readonly($readonly) @required($required) id="{{ $htmlId }}"
+                    name="{{ $name }}" name={{ $modelBinding }}></textarea>
 
             </div>
         @else
             <textarea minlength="{{ $minlength }}" maxlength="{{ $maxlength }}"
                 {{ $allowTab ? '@keydown.tab=handleKeydown' : '' }} placeholder="{{ $placeholder }}"
                 {{ !$spellcheck ? 'spellcheck=false' : '' }} {{ $attributes->merge(['class' => $defaultClass]) }}
-                @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
+                @if ($realtimeValidation) wire:model.debounce.200ms="{{ $modelBinding }}"
         @else
-    wire:model={{ $value ?? $id }}
-    wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
-                @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
-                name="{{ $name }}" name={{ $id }}
-                @if ($autofocus) x-ref="autofocusInput" @endif></textarea>
+    wire:model={{ $value ?? $modelBinding }}
+    wire:dirty.class="dark:ring-warning ring-warning" @endif
+                @disabled($disabled) @readonly($readonly) @required($required) id="{{ $htmlId }}"
+                name="{{ $name }}" name={{ $modelBinding }}></textarea>
         @endif
     @endif
-    @error($id)
+    @error($modelBinding)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>
         </label>

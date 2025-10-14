@@ -16,7 +16,7 @@
         <div x-data="{
             open: false,
             search: '',
-            selected: @entangle($id).live,
+            selected: @entangle($modelBinding).live,
             options: [],
             filteredOptions: [],
         
@@ -161,7 +161,7 @@
 <div x-data="{
     open: false,
     search: '',
-    selected: @entangle(($attributes->whereStartsWith('wire:model')->first() ? $attributes->wire('model')->value() : $id)).live,
+    selected: @entangle(($attributes->whereStartsWith('wire:model')->first() ? $attributes->wire('model')->value() : $modelBinding)).live,
     options: [],
     filteredOptions: [],
 
@@ -284,7 +284,7 @@
 </div>
 @endif
 
-@error($id)
+@error($modelBinding)
     <label class="label">
         <span class="text-red-500 label-text-alt">{{ $message }}</span>
     </label>

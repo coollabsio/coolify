@@ -10,6 +10,10 @@ use Visus\Cuid2\Cuid2;
 
 class Input extends Component
 {
+    public ?string $modelBinding = null;
+
+    public ?string $htmlId = null;
+
     public function __construct(
         public ?string $id = null,
         public ?string $name = null,
@@ -43,11 +47,24 @@ class Input extends Component
 
     public function render(): View|Closure|string
     {
+        // Store original ID for wire:model binding (property name)
+        $this->modelBinding = $this->id;
+
         if (is_null($this->id)) {
             $this->id = new Cuid2;
+            $this->modelBinding = $this->id;
         }
+        // Generate unique HTML ID by prefixing with Livewire component ID
+        // This prevents duplicate IDs when multiple forms are on the same page
+        $livewireId = $this->attributes?->wire('id');
+        if ($livewireId && $this->modelBinding) {
+            $this->htmlId = $livewireId.'-'.$this->modelBinding;
+        } else {
+            $this->htmlId = $this->modelBinding ?: $this->id;
+        }
+
         if (is_null($this->name)) {
-            $this->name = $this->id;
+            $this->name = $this->modelBinding;
         }
         if ($this->type === 'password') {
             $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';

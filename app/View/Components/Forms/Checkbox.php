@@ -9,6 +9,10 @@ use Illuminate\View\Component;
 
 class Checkbox extends Component
 {
+    public ?string $modelBinding = null;
+
+    public ?string $htmlId = null;
+
     /**
      * Create a new component instance.
      */
@@ -47,6 +51,18 @@ class Checkbox extends Component
      */
     public function render(): View|Closure|string
     {
+        // Store original ID for wire:model binding (property name)
+        $this->modelBinding = $this->id;
+        $this->htmlId = $this->id;
+
+        // Generate unique HTML ID by prefixing with Livewire component ID if available
+        if ($this->id) {
+            $livewireId = $this->attributes?->wire('id');
+            if ($livewireId) {
+                $this->htmlId = $livewireId.'-'.$this->id;
+            }
+        }
+
         return view('components.forms.checkbox');
     }
 }
