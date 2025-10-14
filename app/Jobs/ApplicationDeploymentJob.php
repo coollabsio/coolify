@@ -1910,7 +1910,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $output = $lsRemoteOutput->value();
 
                 // Extract the line with the tab (actual ls-remote result)
-                preg_match('/([0-9a-f]{40})\s*\t/', $output, $matches);
+                preg_match('/\b([0-9a-fA-F]{40})(?=\s*\t)/', $output, $matches);
 
                 if (isset($matches[1])) {
                     $this->commit = $matches[1];
